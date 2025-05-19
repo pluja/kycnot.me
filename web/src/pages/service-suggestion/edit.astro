@@ -1,0 +1,102 @@
+---
+import { actions, isInputError } from 'astro:actions'
+import { z } from 'astro:content'
+
+import Captcha from '../../components/Captcha.astro'
+import InputHoneypotTrap from '../../components/InputHoneypotTrap.astro'
+import InputSubmitButton from '../../components/InputSubmitButton.astro'
+import InputTextArea from '../../components/InputTextArea.astro'
+import ServiceCard from '../../components/ServiceCard.astro'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
+import { prisma } from '../../lib/prisma'
+import { makeLoginUrl } from '../../lib/redirectUrls'
+
+const user = Astro.locals.user
+if (!user) {
+  return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Login to suggest a new service' }))
+}
+
+const result = Astro.getActionResult(actions.serviceSuggestion.editService)
+if (result && !result.error) {
+  return Astro.redirect(`/service-suggestion/${result.data.serviceSuggestion.id}`)
+}
+const inputErrors = isInputError(result?.error) ? result.error.fields : {}
+
+const { data: params } = zodParseQueryParamsStoringErrors(
+  {
+    serviceId: z.coerce.number().int().positive(),
+    notes: z.string().default(''),
+  },
+  Astro
+)
+
+if (!params.serviceId) return Astro.rewrite('/404')
+
+const service = await Astro.locals.banners.try(
+  'Failed to fetch service',
+  async () =>
+    prisma.service.findUnique({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        overallScore: true,
+        kycLevel: true,
+        imageUrl: true,
+        verificationStatus: true,
+        acceptedCurrencies: true,
+        categories: {
+          select: {
+            name: true,
+            icon: true,
+          },
+        },
+      },
+      where: { id: params.serviceId },
+    }),
+  null
+)
+
+if (!service) return Astro.rewrite('/404')
+---
+
+<BaseLayout
+  pageTitle="Edit service"
+  description="Suggest an edit to service"
+  ogImage={{ template: 'generic', title: 'Edit service' }}
+  widthClassName="max-w-screen-md"
+  breadcrumbs={[
+    {
+      name: 'Service suggestions',
+      url: '/service-suggestion',
+    },
+    {
+      name: 'Edit service',
+    },
+  ]}
+>
+  <h1 class="font-title mt-12 mb-6 text-center text-3xl font-bold">Edit service</h1>
+
+  <ServiceCard service={service} withoutLink class="mb-6" />
+
+  <form method="POST" action={actions.serviceSuggestion.editService} class="space-y-6">
+    <input type="hidden" name="serviceId" value={params.serviceId} />
+
+    <InputTextArea
+      label="Note for Moderators"
+      name="notes"
+      value={params.notes}
+      rows={10}
+      placeholder="List the changes you want us to make to the service. Example: 'Add X, Y and Z attributes' 'Monero is accepted'. Provide supporting evidence."
+      error={inputErrors.notes}
+    />
+
+    <Captcha action={actions.serviceSuggestion.createService} />
+
+    <InputHoneypotTrap name="message" />
+
+    <InputSubmitButton />
+  </form>
+</BaseLayout>

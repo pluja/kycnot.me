@@ -1,0 +1,11 @@
+---
+import type { AstroChildren } from '../lib/astro'
+
+type Props = {
+  children: AstroChildren
+}
+
+//
+---
+
+{!!Astro.locals.user?.admin && <slot />}

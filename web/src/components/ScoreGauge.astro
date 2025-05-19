@@ -1,0 +1,175 @@
+---
+import { Schema } from 'astro-seo-schema'
+
+import { cn } from '../lib/cn'
+import { interpolate } from '../lib/numbers'
+import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
+import { transformCase } from '../lib/strings'
+
+import type { HTMLAttributes } from 'astro/types'
+import type { Review, WithContext } from 'schema-dts'
+
+export type Props = HTMLAttributes<'div'> & {
+  score: number
+  label: string
+  total?: number
+  itemReviewedId?: string
+}
+
+const { score, label, total = 100, class: className, itemReviewedId, ...htmlProps } = Astro.props
+
+const progress = total === 0 ? 0 : Math.min(Math.max(score / total, 0), 1)
+
+function makeScoreInfo(score: number, total: number) {
+  const formattedScore = Math.round(score).toLocaleString()
+  const angle = interpolate(progress, -100, 100)
+  const n = score / total
+
+  if (n > 1) return { text: 'Excellent', step: 5, formattedScore, angle: 100 }
+  if (n >= 0.9 && n <= 1) return { text: 'Excellent', step: 5, formattedScore, angle }
+  if (n >= 0.8 && n < 0.9) return { text: 'Very Good', step: 5, formattedScore, angle }
+  if (n >= 0.6 && n < 0.8) return { text: 'Good', step: 4, formattedScore, angle }
+  if (n >= 0.45 && n < 0.6) return { text: 'Average', step: 3, formattedScore, angle }
+  if (n >= 0.4 && n < 0.45) return { text: 'Average', step: 3, formattedScore, angle: angle + 5 }
+  if (n >= 0.2 && n < 0.4) return { text: 'Bad', step: 2, formattedScore, angle: angle + 5 }
+  if (n >= 0.1 && n < 0.2) return { text: 'Very Bad', step: 1, formattedScore, angle }
+  if (n >= 0 && n < 0.1) return { text: 'Terrible', step: 1, formattedScore, angle }
+  if (n < 0) return { text: 'Terrible', step: 1, formattedScore, angle: -100 }
+
+  return { text: '', step: undefined, formattedScore, angle: undefined }
+}
+
+const { text, step, angle, formattedScore } = makeScoreInfo(score, total)
+---
+
+{
+  !!itemReviewedId && (
+    <Schema
+      item={
+        {
+          '@context': 'https://schema.org',
+          '@type': 'Review',
+          reviewAspect: label,
+          name: `${text} ${transformCase(label, 'lower')}`,
+          itemReviewed: { '@id': itemReviewedId },
+          reviewRating: {
+            '@type': 'Rating',
+            ratingValue: score,
+            worstRating: 0,
+            bestRating: total,
+          },
+          author: KYCNOTME_SCHEMA_MINI,
+        } satisfies WithContext<Review>
+      }
+    />
+  )
+}
+
+<div
+  {...htmlProps}
+  class={cn(
+    '2xs:size-24 relative flex aspect-square size-18 flex-col items-center justify-start text-white',
+    className
+  )}
+  role="group"
+>
+  <div
+    class={cn('2xs:text-[2rem] mt-[25%] mb-1 text-[1.5rem] leading-none font-bold tracking-tight', {
+      'text-score-saturate-1 text-shadow-glow': step === 1,
+      'text-score-saturate-2 text-shadow-glow': step === 2,
+      'text-score-saturate-3 text-shadow-glow': step === 3,
+      'text-score-saturate-4 text-shadow-glow': step === 4,
+      'text-score-saturate-5 text-shadow-glow': step === 5,
+      'mr-[0.05em] ml-[-0.025em] text-[1.75rem] leading-[calc(2/1.75)] tracking-[-0.075em]':
+        formattedScore.length > 2,
+    })}
+  >
+    <span>{formattedScore}</span>
+  </div>
+
+  <div class="2xs:mb-0.5 text-base leading-none font-bold tracking-wide uppercase">
+    {label}
+  </div>
+
+  <span class="text-xs leading-none tracking-wide text-current/80">{text}</span>
+
+  <svg class="absolute inset-0 -z-1 overflow-visible" viewBox="0 0 96 96" aria-hidden="true">
+    <!-- Background segments -->
+    <g opacity="0.2">
+      <path
+        d="M19.84 29.962C20.8221 30.3687 21.3066 31.4709 21.0222 32.4951C20.3586 34.8848 20.0039 37.4031 20.0039 40.0042C20.0039 42.6054 20.3586 45.1237 21.0223 47.5135C21.3067 48.5376 20.8221 49.6398 19.8401 50.0466L7.05214 55.3435C5.88072 55.8288 4.55702 55.1152 4.38993 53.8583C4.13532 51.9431 4.00391 49.989 4.00391 48.0042C4.00391 40.5588 5.85316 33.5454 9.11742 27.3981C9.58659 26.5145 10.656 26.1579 11.5803 26.5407L19.84 29.962Z"
+        class="fill-score-saturate-1"></path>
+      <path
+        d="M33.3538 8.55389C32.9417 7.55882 31.8133 7.06445 30.8219 7.48539C23.7527 10.4869 17.6304 15.2843 13.0275 21.3051C12.2575 22.3122 12.689 23.7526 13.8603 24.2378L20.9906 27.1912C21.9721 27.5978 23.0937 27.1616 23.6168 26.237C26.1243 21.8048 29.805 18.1241 34.2373 15.6167C35.1619 15.0936 35.5981 13.972 35.1915 12.9904L33.3538 8.55389Z"
+        class="fill-score-saturate-2"></path>
+      <path
+        d="M40.4948 13.0224C39.4706 13.3068 38.3684 12.8222 37.9616 11.8402L36.316 7.86723C35.8618 6.77068 36.4564 5.51825 37.6099 5.23888C40.9424 4.43183 44.423 4.00415 48.0035 4.00415C51.5842 4.00415 55.0651 4.43188 58.3977 5.23902C59.5512 5.5184 60.1458 6.77082 59.6916 7.86736L58.046 11.8403C57.6392 12.8224 56.537 13.307 55.5128 13.0225C53.123 12.3588 50.6047 12.0042 48.0035 12.0042C45.4025 12.0042 42.8844 12.3588 40.4948 13.0224Z"
+        class="fill-score-saturate-3"></path>
+      <path
+        d="M75.017 27.1913C74.0355 27.5979 72.9139 27.1617 72.3908 26.2371C69.8834 21.805 66.2028 18.1244 61.7708 15.617C60.8461 15.0938 60.41 13.9723 60.8166 12.9907L62.6542 8.55414C63.0664 7.55905 64.1948 7.06469 65.1862 7.48564C72.2552 10.4871 78.3773 15.2845 82.9801 21.3051C83.75 22.3123 83.3186 23.7527 82.1473 24.2378L75.017 27.1913Z"
+        class="fill-score-saturate-4"></path>
+      <path
+        d="M76.1682 50.0463C75.1862 49.6395 74.7016 48.5373 74.986 47.5131C75.6496 45.1235 76.0043 42.6053 76.0043 40.0042C76.0043 37.4031 75.6496 34.8849 74.986 32.4952C74.7016 31.471 75.1861 30.3688 76.1682 29.962L84.4279 26.5407C85.3521 26.1579 86.4216 26.5145 86.8908 27.3981C90.155 33.5454 92.0043 40.5588 92.0043 48.0042C92.0043 49.9889 91.8729 51.9429 91.6183 53.8579C91.4512 55.1148 90.1275 55.8284 88.9561 55.3432L76.1682 50.0463Z"
+        fill="#7CFF00"></path>
+    </g>
+
+    <!-- Active segments -->
+    <g>
+      {
+        step === 1 && (
+          <path
+            d="M19.84 29.962C20.8221 30.3687 21.3066 31.4709 21.0222 32.4951C20.3586 34.8848 20.0039 37.4031 20.0039 40.0042C20.0039 42.6054 20.3586 45.1237 21.0223 47.5135C21.3067 48.5376 20.8221 49.6398 19.8401 50.0466L7.05214 55.3435C5.88072 55.8288 4.55702 55.1152 4.38993 53.8583C4.13532 51.9431 4.00391 49.989 4.00391 48.0042C4.00391 40.5588 5.85316 33.5454 9.11742 27.3981C9.58659 26.5145 10.656 26.1579 11.5803 26.5407L19.84 29.962Z"
+            class="text-score-saturate-1 drop-shadow-glow fill-current"
+          />
+        )
+      }
+      {
+        step === 2 && (
+          <path
+            d="M33.3538 8.55389C32.9417 7.55882 31.8133 7.06445 30.8219 7.48539C23.7527 10.4869 17.6304 15.2843 13.0275 21.3051C12.2575 22.3122 12.689 23.7526 13.8603 24.2378L20.9906 27.1912C21.9721 27.5978 23.0937 27.1616 23.6168 26.237C26.1243 21.8048 29.805 18.1241 34.2373 15.6167C35.1619 15.0936 35.5981 13.972 35.1915 12.9904L33.3538 8.55389Z"
+            class="text-score-saturate-2 drop-shadow-glow fill-current"
+          />
+        )
+      }
+      {
+        step === 3 && (
+          <path
+            d="M40.4948 13.0224C39.4706 13.3068 38.3684 12.8222 37.9616 11.8402L36.316 7.86723C35.8618 6.77068 36.4564 5.51825 37.6099 5.23888C40.9424 4.43183 44.423 4.00415 48.0035 4.00415C51.5842 4.00415 55.0651 4.43188 58.3977 5.23902C59.5512 5.5184 60.1458 6.77082 59.6916 7.86736L58.046 11.8403C57.6392 12.8224 56.537 13.307 55.5128 13.0225C53.123 12.3588 50.6047 12.0042 48.0035 12.0042C45.4025 12.0042 42.8844 12.3588 40.4948 13.0224Z"
+            class="text-score-saturate-3 drop-shadow-glow fill-current"
+          />
+        )
+      }
+      {
+        step === 4 && (
+          <path
+            d="M75.017 27.1913C74.0355 27.5979 72.9139 27.1617 72.3908 26.2371C69.8834 21.805 66.2028 18.1244 61.7708 15.617C60.8461 15.0938 60.41 13.9723 60.8166 12.9907L62.6542 8.55414C63.0664 7.55905 64.1948 7.06469 65.1862 7.48564C72.2552 10.4871 78.3773 15.2845 82.9801 21.3051C83.75 22.3123 83.3186 23.7527 82.1473 24.2378L75.017 27.1913Z"
+            class="text-score-saturate-4 drop-shadow-glow fill-current"
+          />
+        )
+      }
+      {
+        step === 5 && (
+          <path
+            d="M76.1682 50.0463C75.1862 49.6395 74.7016 48.5373 74.986 47.5131C75.6496 45.1235 76.0043 42.6053 76.0043 40.0042C76.0043 37.4031 75.6496 34.8849 74.986 32.4952C74.7016 31.471 75.1861 30.3688 76.1682 29.962L84.4279 26.5407C85.3521 26.1579 86.4216 26.5145 86.8908 27.3981C90.155 33.5454 92.0043 40.5588 92.0043 48.0042C92.0043 49.9889 91.8729 51.9429 91.6183 53.8579C91.4512 55.1148 90.1275 55.8284 88.9561 55.3432L76.1682 50.0463Z"
+            class="text-score-saturate-5 drop-shadow-glow fill-current"
+          />
+        )
+      }
+    </g>
+
+    <!-- Arrow -->
+    <path
+      d="M47.134 9.4282C47.3126 9.7376 47.6427 9.9282 48 9.9282C48.3573 9.9282 48.6874 9.7376 48.866 9.4282L52.866 2.5C53.0447 2.1906 53.0447 1.8094 52.866 1.5C52.6874 1.1906 52.3573 1 52 1L44 1C43.6427 1 43.3126 1.1906 43.134 1.5C42.9553 1.8094 42.9553 2.1906 43.134 2.5L47.134 9.4282Z"
+      fill="white"
+      stroke-width="2"
+      stroke-linejoin="round"
+      transform={angle !== undefined ? `rotate(${angle}, 48, 48)` : undefined}
+      class="stroke-night-700"></path>
+
+    <!-- Info icon -->
+    <!-- <path
+      d="M88 13C85.2386 13 83 10.7614 83 8C83 5.23857 85.2386 3 88 3C90.7614 3 93 5.23857 93 8C93 10.7614 90.7614 13 88 13ZM88 12C90.2092 12 92 10.2092 92 8C92 5.79086 90.2092 4 88 4C85.7909 4 84 5.79086 84 8C84 10.2092 85.7909 12 88 12ZM87.5 5.5H88.5V6.5H87.5V5.5ZM87.5 7.5H88.5V10.5H87.5V7.5Z"
+      fill="white"
+      fill-opacity="0.67"></path> -->
+  </svg>
+</div>

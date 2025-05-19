@@ -1,0 +1,27 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../lib/cn'
+
+import type { Polymorphic } from 'astro/types'
+
+type Props<Tag extends 'a' | 'div' | 'li' = 'div'> = Polymorphic<{
+  as: Tag
+  icon: string
+  text: string
+  inlineIcon?: boolean
+}>
+
+const { icon, text, class: className, inlineIcon, as: Tag = 'div', ...divProps } = Astro.props
+---
+
+<Tag
+  {...divProps}
+  class={cn(
+    'bg-night-900 inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm text-white',
+    className
+  )}
+>
+  <Icon name={icon} class="size-4" is:inline={inlineIcon} />
+  <span>{text}</span>
+</Tag>

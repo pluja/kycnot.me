@@ -1,0 +1,497 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { kycLevels } from '../constants/kycLevels'
+import { cn } from '../lib/cn'
+import { type ServicesFiltersObject, type ServicesFiltersOptions } from '../pages/index.astro'
+
+import Button from './Button.astro'
+import PillsRadioGroup from './PillsRadioGroup.astro'
+import { makeOverallScoreInfo } from './ScoreSquare.astro'
+import Tooltip from './Tooltip.astro'
+
+import type { HTMLAttributes } from 'astro/types'
+
+export type Props = HTMLAttributes<'form'> & {
+  filters: ServicesFiltersObject
+  hasDefaultFilters: boolean
+  options: ServicesFiltersOptions
+  searchResultsId: string
+  showFiltersId: string
+}
+
+const {
+  filters,
+  hasDefaultFilters,
+  options,
+  searchResultsId,
+  showFiltersId,
+  class: className,
+  ...formProps
+} = Astro.props
+---
+
+<form
+  method="GET"
+  hx-get={Astro.url.pathname}
+  hx-trigger={`input delay:500ms from:input[type='text'], keyup[key=='Enter'], change from:input:not([data-show-more-input], #${showFiltersId}), change from:select`}
+  hx-target={`#${searchResultsId}`}
+  hx-select={`#${searchResultsId}`}
+  hx-push-url="true"
+  hx-indicator="#search-indicator"
+  data-services-filters-form
+  data-default-verification-filter={options.verification
+    .filter((verification) => verification.default)
+    .map((verification) => verification.slug)}
+  {...formProps}
+  class={cn('', className)}
+>
+  <div class="mb-4 flex items-center justify-between">
+    <h2 class="font-title text-xl text-green-500">FILTERS</h2>
+    <a
+      href={Astro.url.pathname}
+      class={cn('text-sm text-green-500 hover:text-green-400', hasDefaultFilters && 'hidden')}
+      id="clear-filters-button">Clear all</a
+    >
+  </div>
+
+  <!-- Sort Selector -->
+  <fieldset class="mb-6">
+    <legend class="font-title mb-3 leading-none text-green-500">
+      <label for="sort">Sort By</label>
+    </legend>
+    <select
+      name="sort"
+      id="sort"
+      class="border-night-600 bg-night-900 w-full rounded-md border p-2 text-white focus:border-green-500 focus:outline-hidden"
+    >
+      {
+        options.sort.map((option) => (
+          <option value={option.value} selected={filters.sort === option.value}>
+            {option.label}
+          </option>
+        ))
+      }
+    </select>
+    <p class="text-day-500 mt-1.5 text-center text-sm">
+      <Icon name="ri:shuffle-line" class="inline-block size-3.5 align-[-0.125em]" />
+      Ties randomly sorted
+    </p>
+  </fieldset>
+
+  <!-- Text Search -->
+  <fieldset class="mb-6">
+    <legend class="font-title mb-3 leading-none text-green-500">
+      <label for="q">Text</label>
+    </legend>
+    <input
+      type="text"
+      name="q"
+      id="q"
+      value={filters?.q}
+      placeholder="Search..."
+      class="placeholder-day-500 border-night-600 bg-night-900 w-full rounded-md border p-2 text-white focus:border-green-500 focus:outline-hidden"
+    />
+  </fieldset>
+
+  <!-- Type Filter -->
+  <fieldset class="mb-6">
+    <legend class="font-title mb-3 leading-none text-green-500">Type</legend>
+    <input type="checkbox" id="show-more-categories" class="peer hidden" hx-preserve data-show-more-input />
+    <ul class="not-peer-checked:[&>li:not([data-show-always])]:hidden">
+      {
+        options.categories?.map((category) => (
+          <li data-show-always={category.showAlways ? '' : undefined}>
+            <label class="flex cursor-pointer items-center space-x-2 text-sm text-white">
+              <input
+                type="checkbox"
+                class="peer text-green-500"
+                name="categories"
+                value={category.slug}
+                checked={category.checked}
+              />
+              <span class="peer-checked:font-bold">
+                {category.name}
+                <span class="text-day-500 font-normal">{category._count.services}</span>
+              </span>
+            </label>
+          </li>
+        ))
+      }
+    </ul>
+    {
+      options.categories.filter((category) => category.showAlways).length < options.categories.length && (
+        <>
+          <label
+            for="show-more-categories"
+            class="mt-2 block cursor-pointer text-sm text-green-500 peer-checked:hidden"
+          >
+            + Show more
+          </label>
+          <label
+            for="show-more-categories"
+            class="mt-2 hidden cursor-pointer text-sm text-green-500 peer-checked:block"
+          >
+            - Show less
+          </label>
+        </>
+      )
+    }
+  </fieldset>
+
+  <!-- Verification Filter -->
+  <fieldset class="mb-6">
+    <legend class="font-title mb-3 leading-none text-green-500">Verification</legend>
+    <div>
+      {
+        options.verification.map((verification) => (
+          <label class="flex cursor-pointer items-center gap-2 text-sm text-white">
+            <input
+              type="checkbox"
+              class="peer text-green-500"
+              name="verification"
+              value={verification.slug}
+              checked={filters.verification.includes(verification.value)}
+            />
+            <Icon name={verification.icon} class={cn('size-4', verification.classNames.icon)} />
+            <span class="peer-checked:font-bold">{verification.labelShort}</span>
+          </label>
+        ))
+      }
+    </div>
+  </fieldset>
+
+  <!-- Accepted currencies Filter -->
+  <fieldset class="mb-6">
+    <div class="mb-3 flex items-center justify-between">
+      <legend class="font-title leading-none text-green-500">Currencies</legend>
+      <PillsRadioGroup
+        name="currency-mode"
+        options={options.modeOptions}
+        selectedValue={filters['currency-mode']}
+        class="-my-2"
+      />
+    </div>
+    <div>
+      {
+        options.currencies.map((currency) => (
+          <label class="flex cursor-pointer items-center gap-2 text-sm text-white">
+            <input
+              type="checkbox"
+              class="peer text-green-500"
+              name="currencies"
+              value={currency.slug}
+              checked={filters.currencies?.some((id) => id === currency.id)}
+            />
+            <Icon name={currency.icon} class="size-4" />
+            <span class="peer-checked:font-bold">{currency.name}</span>
+          </label>
+        ))
+      }
+    </div>
+  </fieldset>
+
+  <!-- Network Filter -->
+  <fieldset class="mb-6">
+    <legend class="font-title mb-3 leading-none text-green-500">Networks</legend>
+    <div>
+      {
+        options.network.map((network) => (
+          <label class="flex cursor-pointer items-center gap-2 text-sm text-white">
+            <input
+              type="checkbox"
+              class="peer text-green-500"
+              name="networks"
+              value={network.slug}
+              checked={filters.networks?.some((slug) => slug === network.slug)}
+            />
+            <Icon name={network.icon} class="size-4" />
+            <span class="peer-checked:font-bold">{network.name}</span>
+          </label>
+        ))
+      }
+    </div>
+  </fieldset>
+
+  <!-- KYC Level Filter -->
+  <fieldset class="mb-6">
+    <legend class="font-title mb-3 leading-none text-green-500">
+      <label for="max-kyc">KYC Level (max)</label>
+    </legend>
+    <div class="flex items-center gap-2">
+      <input
+        type="range"
+        min="0"
+        max="4"
+        name="max-kyc"
+        id="max-kyc"
+        value={filters['max-kyc'] ?? 4}
+        class="w-full accent-green-500"
+      />
+    </div>
+    <div class="text-day-400 mt-1 flex justify-between px-1 text-xs">
+      {
+        kycLevels.map((level) => (
+          <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">
+            {level.value}
+            <Icon name={level.icon} class="ms-1 size-3 shrink-0" />
+          </span>
+        ))
+      }
+    </div>
+  </fieldset>
+
+  <!-- User Score Filter -->
+  <fieldset class="mb-6">
+    <legend class="font-title mb-3 leading-none text-green-500">
+      <label for="user-rating">User Rating (min)</label>
+    </legend>
+    <div class="flex items-center gap-2">
+      <input
+        type="range"
+        min={0}
+        max={4}
+        name="user-rating"
+        id="user-rating"
+        value={filters['user-rating']}
+        class="w-full accent-green-500"
+      />
+    </div>
+    <div class="text-day-400 mt-1 flex justify-between px-2 text-xs">
+      <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">-</span>
+      <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">
+        1<Icon name="ri:star-line" class="size-3 shrink-0" />
+      </span>
+      <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">
+        2<Icon name="ri:star-line" class="size-3 shrink-0" />
+      </span>
+      <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">
+        3<Icon name="ri:star-line" class="size-3 shrink-0" />
+      </span>
+      <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">
+        4<Icon name="ri:star-line" class="size-3 shrink-0" />
+      </span>
+    </div>
+  </fieldset>
+
+  <!-- Attributes Filter -->
+  <fieldset class="mb-6 min-w-0 space-y-2">
+    <div class="mb-3 flex items-center justify-between">
+      <legend class="font-title leading-none text-green-500">Attributes</legend>
+      <PillsRadioGroup
+        name="attribute-mode"
+        options={options.modeOptions}
+        selectedValue={filters['attribute-mode']}
+        class="-my-2"
+      />
+    </div>
+    {
+      options.attributesByCategory.map(({ category, attributes }) => (
+        <fieldset class="min-w-0">
+          <legend class="font-title mb-0.5 text-xs tracking-wide text-white">{category}</legend>
+          <input
+            type="checkbox"
+            id={`show-more-attributes-${category}`}
+            class="peer hidden"
+            hx-preserve
+            data-show-more-input
+          />
+          <ul class="not-peer-checked:[&>li:not([data-show-always])]:hidden">
+            {attributes.map((attribute) => {
+              const inputName = `attr-${attribute.id}` as const
+              const yesId = `attr-${attribute.id}=yes` as const
+              const noId = `attr-${attribute.id}=no` as const
+              const emptyId = `attr-${attribute.id}=empty` as const
+              const isPositive = attribute.type === 'GOOD' || attribute.type === 'INFO'
+
+              return (
+                <li data-show-always={attribute.showAlways ? '' : undefined} class="cursor-pointer">
+                  <fieldset class="flex max-w-full min-w-0 cursor-pointer items-center text-sm text-white">
+                    <legend class="sr-only">
+                      {attribute.title} ({attribute._count?.services})
+                    </legend>
+                    <input
+                      type="radio"
+                      class="peer/empty hidden"
+                      id={emptyId}
+                      name={inputName}
+                      value=""
+                      checked={!attribute.value}
+                      aria-label="Ignore"
+                    />
+                    <input
+                      type="radio"
+                      name={inputName}
+                      value="yes"
+                      id={yesId}
+                      class="peer/yes hidden"
+                      checked={attribute.value === 'yes'}
+                      aria-label="Include"
+                    />
+                    <input
+                      type="radio"
+                      name={inputName}
+                      value="no"
+                      id={noId}
+                      class="peer/no hidden"
+                      checked={attribute.value === 'no'}
+                      aria-label="Exclude"
+                    />
+
+                    <label
+                      for={yesId}
+                      class="flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-l-sm bg-zinc-950 peer-checked/yes:hidden"
+                      aria-hidden="true"
+                    >
+                      <Icon name="ri:check-line" class="size-3" />
+                    </label>
+                    <label
+                      for={emptyId}
+                      class="hidden size-4 shrink-0 cursor-pointer items-center justify-center rounded-l-sm bg-green-600 peer-checked/yes:flex"
+                      aria-hidden="true"
+                    >
+                      <Icon name="ri:check-line" class="size-3" />
+                    </label>
+
+                    <span class="block h-4 w-px border-y-2 border-zinc-950 bg-zinc-800" aria-hidden="true" />
+
+                    <label
+                      for={noId}
+                      class="flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-r-sm bg-zinc-950 peer-checked/no:hidden"
+                      aria-hidden="true"
+                    >
+                      <Icon name="ri:close-line" class="size-3" />
+                    </label>
+                    <label
+                      for={emptyId}
+                      class="hidden size-4 shrink-0 cursor-pointer items-center justify-center rounded-r-sm bg-red-600 peer-checked/no:flex"
+                      aria-hidden="true"
+                    >
+                      <Icon name="ri:close-line" class="size-3" />
+                    </label>
+
+                    <label
+                      for={isPositive ? yesId : noId}
+                      class="ml-2 flex min-w-0 cursor-pointer items-center font-normal peer-checked/no:hidden peer-checked/yes:hidden"
+                      aria-hidden="true"
+                    >
+                      <Icon
+                        name={attribute.icon}
+                        class={cn('mr-2 size-3 shrink-0 opacity-80', attribute.iconClass)}
+                        aria-hidden="true"
+                      />
+                      <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                        {attribute.title}
+                      </span>
+                      <span class="text-day-500 ml-2 font-normal">{attribute._count?.services}</span>
+                    </label>
+                    <label
+                      for={emptyId}
+                      class="ml-2 hidden min-w-0 cursor-pointer items-center font-bold peer-checked/no:flex peer-checked/yes:flex"
+                      aria-hidden="true"
+                    >
+                      <Icon
+                        name={attribute.icon}
+                        class={cn('mr-2 size-3 shrink-0 opacity-100', attribute.iconClass)}
+                        aria-hidden="true"
+                      />
+                      <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                        {attribute.title}
+                      </span>
+                      <span class="text-day-500 ml-2 font-normal">{attribute._count?.services}</span>
+                    </label>
+                  </fieldset>
+                </li>
+              )
+            })}
+          </ul>
+          {attributes.filter((attribute) => attribute.showAlways).length < attributes.length && (
+            <>
+              <label
+                for={`show-more-attributes-${category}`}
+                class="mt-2 block cursor-pointer text-sm text-green-500 peer-checked:hidden"
+              >
+                + Show more
+              </label>
+              <label
+                for={`show-more-attributes-${category}`}
+                class="mt-2 hidden cursor-pointer text-sm text-green-500 peer-checked:block"
+              >
+                - Show less
+              </label>
+            </>
+          )}
+        </fieldset>
+      ))
+    }
+  </fieldset>
+
+  <!-- Score Filter -->
+  <fieldset class="mb-6">
+    <legend class="font-title mb-3 leading-none text-green-500">
+      <label for="min-score">Score (min)</label>
+    </legend>
+    <div class="flex items-center gap-2">
+      <input
+        type="range"
+        min="0"
+        max="10"
+        name="min-score"
+        id="min-score"
+        value={filters['min-score']}
+        class="w-full accent-green-500"
+      />
+    </div>
+    <div class="-mx-1.5 mt-2 flex justify-between px-1">
+      {
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => {
+          const info = makeOverallScoreInfo(score)
+          return (
+            <Tooltip
+              text={info.text}
+              position="bottom"
+              class={cn(
+                'flex h-4 w-full max-w-4 min-w-0 cursor-default items-center justify-center rounded-xs text-xs font-bold tracking-tighter',
+                info.classNameBg
+              )}
+            >
+              {score.toLocaleString()}
+            </Tooltip>
+          )
+        })
+      }
+    </div>
+  </fieldset>
+
+  <input type="hidden" name="sort-seed" value={filters['sort-seed']} />
+
+  <div
+    class="sm:js:hidden bg-night-700 sticky inset-x-0 bottom-0 mt-4 block rounded-t-md pb-4 shadow-[0_0_16px_16px_var(--color-night-700)]"
+  >
+    <Button type="submit" label="Apply" size="lg" class="w-full" color="success" shadow />
+  </div>
+</form>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const forms = document.querySelectorAll<HTMLFormElement>('form[data-services-filters-form]')
+
+    forms.forEach((form) => {
+      form.addEventListener('input', () => {
+        form.querySelectorAll<HTMLAnchorElement>('a#clear-filters-button').forEach((button) => {
+          button.classList.remove('hidden')
+        })
+
+        const verificationInputs = form.querySelectorAll<HTMLInputElement>('input[name="verification"]')
+        const noVerificationChecked = Array.from(verificationInputs).every((input) => !input.checked)
+        if (noVerificationChecked) {
+          verificationInputs.forEach((input) => {
+            if (form.dataset.defaultVerificationFilter?.includes(input.value)) {
+              input.checked = true
+            }
+          })
+        }
+      })
+    })
+  })
+</script>

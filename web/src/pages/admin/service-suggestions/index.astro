@@ -1,0 +1,385 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+import { z } from 'astro:content'
+import { orderBy as lodashOrderBy } from 'lodash-es'
+
+import SortArrowIcon from '../../../components/SortArrowIcon.astro'
+import TimeFormatted from '../../../components/TimeFormatted.astro'
+import {
+  getServiceSuggestionStatusInfo,
+  serviceSuggestionStatuses,
+} from '../../../constants/serviceSuggestionStatus'
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
+import { prisma } from '../../../lib/prisma'
+import { makeLoginUrl } from '../../../lib/redirectUrls'
+
+import type { Prisma, ServiceSuggestionStatus } from '@prisma/client'
+
+const user = Astro.locals.user
+if (!user?.admin) {
+  return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Admin access required' }))
+}
+
+const search = Astro.url.searchParams.get('search') ?? ''
+const statusEnumValues = serviceSuggestionStatuses.map((s) => s.value) as [string, ...string[]]
+const statusParam = Astro.url.searchParams.get('status')
+const statusFilter = z
+  .enum(statusEnumValues)
+  .nullable()
+  .parse(statusParam === '' ? null : statusParam) as ServiceSuggestionStatus | null
+
+const { data: filters } = zodParseQueryParamsStoringErrors(
+  {
+    'sort-by': z.enum(['service', 'status', 'user', 'createdAt', 'messageCount']).default('createdAt'),
+    'sort-order': z.enum(['asc', 'desc']).default('desc'),
+  },
+  Astro
+)
+
+const sortBy = filters['sort-by']
+const sortOrder = filters['sort-order']
+
+let prismaOrderBy: Prisma.ServiceSuggestionOrderByWithRelationInput = { createdAt: 'desc' }
+if (sortBy === 'createdAt') {
+  prismaOrderBy = { createdAt: sortOrder }
+}
+
+let suggestions = await prisma.serviceSuggestion.findMany({
+  where: {
+    ...(search
+      ? {
+          OR: [
+            { service: { name: { contains: search, mode: 'insensitive' } } },
+            { user: { name: { contains: search, mode: 'insensitive' } } },
+            { notes: { contains: search, mode: 'insensitive' } },
+          ],
+        }
+      : {}),
+    status: statusFilter ?? undefined,
+  },
+  orderBy: prismaOrderBy,
+  select: {
+    id: true,
+    status: true,
+    notes: true,
+    createdAt: true,
+    user: {
+      select: {
+        id: true,
+        name: true,
+      },
+    },
+    service: {
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        imageUrl: true,
+        verificationStatus: true,
+        categories: {
+          select: {
+            name: true,
+            icon: true,
+          },
+        },
+      },
+    },
+    messages: {
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 1,
+    },
+    _count: {
+      select: {
+        messages: true,
+      },
+    },
+  },
+})
+
+let suggestionsWithDetails = suggestions.map((s) => ({
+  ...s,
+  statusInfo: getServiceSuggestionStatusInfo(s.status),
+  messageCount: s._count.messages,
+  lastMessage: s.messages[0],
+}))
+
+if (sortBy === 'service') {
+  suggestionsWithDetails = lodashOrderBy(
+    suggestionsWithDetails,
+    [(s) => s.service.name.toLowerCase()],
+    [sortOrder]
+  )
+} else if (sortBy === 'status') {
+  suggestionsWithDetails = lodashOrderBy(suggestionsWithDetails, [(s) => s.statusInfo.label], [sortOrder])
+} else if (sortBy === 'user') {
+  suggestionsWithDetails = lodashOrderBy(
+    suggestionsWithDetails,
+    [(s) => s.user.name.toLowerCase()],
+    [sortOrder]
+  )
+} else if (sortBy === 'messageCount') {
+  suggestionsWithDetails = lodashOrderBy(suggestionsWithDetails, ['messageCount'], [sortOrder])
+}
+
+const suggestionCount = suggestionsWithDetails.length
+
+const makeSortUrl = (slug: string) => {
+  const currentSortBy = filters['sort-by']
+  const currentSortOrder = filters['sort-order']
+  const newSortOrder = currentSortBy === slug && currentSortOrder === 'asc' ? 'desc' : 'asc'
+  const searchParams = new URLSearchParams(Astro.url.search)
+  searchParams.set('sort-by', slug)
+  searchParams.set('sort-order', newSortOrder)
+  return `/admin/service-suggestions?${searchParams.toString()}`
+}
+---
+
+<BaseLayout pageTitle="Service Suggestions" widthClassName="max-w-screen-xl">
+  <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+    <h1 class="font-title text-2xl font-bold text-white">Service Suggestions</h1>
+    <div class="mt-2 flex items-center gap-4 sm:mt-0">
+      <span class="text-sm text-zinc-400">{suggestionCount} suggestions</span>
+    </div>
+  </div>
+
+  <div class="mb-6 rounded-lg border border-zinc-700 bg-zinc-800/50 p-4 shadow-lg">
+    <form method="GET" class="grid gap-3 md:grid-cols-2 lg:grid-cols-4" autocomplete="off">
+      <div class="lg:col-span-2">
+        <label for="search" class="block text-xs font-medium text-zinc-400">Search</label>
+        <input
+          type="text"
+          name="search"
+          id="search"
+          value={search}
+          placeholder="Search by service, user, notes..."
+          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label for="status-filter" class="block text-xs font-medium text-zinc-400">Status</label>
+        <select
+          name="status"
+          id="status-filter"
+          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+        >
+          <option value="">All Statuses</option>
+          {
+            serviceSuggestionStatuses.map((status) => (
+              <option value={status.value} selected={statusFilter === status.value}>
+                {status.label}
+              </option>
+            ))
+          }
+        </select>
+      </div>
+      <div class="flex items-end">
+        <button
+          type="submit"
+          class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+        >
+          <Icon name="ri:search-2-line" class="h-4 w-4" />
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="rounded-lg border border-zinc-700 bg-zinc-800/50 shadow-lg">
+    <div class="sticky top-0 z-10 border-b border-zinc-700 bg-zinc-800/90 px-4 py-3 backdrop-blur-sm">
+      <h2 class="font-title font-semibold text-blue-400">Suggestions List</h2>
+      <div class="mt-1 text-xs text-zinc-400 md:hidden">
+        <span>Scroll horizontally to see more →</span>
+      </div>
+    </div>
+    <div class="scrollbar-thin max-w-full overflow-x-auto">
+      <div class="min-w-[900px]">
+        <table class="w-full divide-y divide-zinc-700">
+          <thead class="bg-zinc-900/30">
+            <tr>
+              <th
+                class="w-[25%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('service')} class="flex items-center hover:text-zinc-200">
+                  Service <SortArrowIcon
+                    active={filters['sort-by'] === 'service'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('user')} class="flex items-center hover:text-zinc-200">
+                  User <SortArrowIcon
+                    active={filters['sort-by'] === 'user'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('status')} class="flex items-center hover:text-zinc-200">
+                  Status <SortArrowIcon
+                    active={filters['sort-by'] === 'status'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('createdAt')} class="flex items-center hover:text-zinc-200">
+                  Created <SortArrowIcon
+                    active={filters['sort-by'] === 'createdAt'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                class="w-[10%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a
+                  href={makeSortUrl('messageCount')}
+                  class="flex items-center justify-center hover:text-zinc-200"
+                >
+                  Messages <SortArrowIcon
+                    active={filters['sort-by'] === 'messageCount'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                class="w-[20%] px-4 py-3 text-right text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-700 bg-zinc-800/10">
+            {
+              suggestionsWithDetails.map((suggestion) => (
+                <tr id={`suggestion-${suggestion.id}`} class="group hover:bg-zinc-700/30">
+                  <td class="px-4 py-3 text-sm font-medium text-zinc-200">
+                    <div class="truncate" title={suggestion.service.name}>
+                      <a
+                        href={`/service/${suggestion.service.slug}`}
+                        class="flex items-center gap-1 hover:text-green-500"
+                      >
+                        {suggestion.service.name}
+                        <Icon name="ri:external-link-line" class="inline-block size-4 align-[-0.05em]" />
+                      </a>
+                    </div>
+                    <div
+                      class="text-2xs max-w-[220px] truncate text-zinc-500"
+                      title={suggestion.service.description}
+                    >
+                      {suggestion.service.description}
+                    </div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <a href={`/admin/users?name=${suggestion.user.name}`} class="hover:text-green-500">
+                      {suggestion.user.name}
+                    </a>
+                  </td>
+                  <td class="px-4 py-3">
+                    <form method="POST" action={actions.admin.serviceSuggestions.update}>
+                      <input type="hidden" name="suggestionId" value={suggestion.id} />
+                      <select
+                        name="status"
+                        class="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+                        value={suggestion.status}
+                        onchange="this.form.submit()"
+                        title="Change status"
+                      >
+                        {serviceSuggestionStatuses.map((status) => (
+                          <option value={status.value} selected={suggestion.status === status.value}>
+                            {status.label}
+                          </option>
+                        ))}
+                      </select>
+                    </form>
+                  </td>
+                  <td class="px-4 py-3 text-sm">
+                    <TimeFormatted date={suggestion.createdAt} hourPrecision />
+                  </td>
+                  <td class="px-4 py-3 text-center">
+                    <span class="inline-flex items-center rounded-full bg-zinc-700 px-2.5 py-0.5 text-xs font-medium text-zinc-300">
+                      {suggestion.messageCount}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-right">
+                    <div class="flex justify-end gap-1">
+                      <a
+                        href={`/admin/service-suggestions/${suggestion.id}`}
+                        class="inline-flex items-center justify-center rounded-full border border-green-500/40 bg-green-500/10 p-1.5 text-green-400 shadow-xs transition-colors duration-200 hover:bg-green-500/20 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
+                        title="View"
+                      >
+                        <Icon name="ri:external-link-line" class="size-4" />
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  @keyframes highlight {
+    0% {
+      background-color: rgba(59, 130, 246, 0.1);
+    }
+    50% {
+      background-color: rgba(59, 130, 246, 0.3);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+  .text-2xs {
+    font-size: 0.6875rem;
+    line-height: 1rem;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(30, 41, 59, 0.2);
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(75, 85, 99, 0.5);
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.6);
+  }
+  @media (max-width: 768px) {
+    .scrollbar-thin {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(75, 85, 99, 0.5) rgba(30, 41, 59, 0.2);
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+</style>

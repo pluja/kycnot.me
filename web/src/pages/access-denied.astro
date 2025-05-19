@@ -1,0 +1,75 @@
+---
+import { Icon } from 'astro-icon/components'
+import { z } from 'astro:content'
+
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
+import { makeLoginUrl, makeUnimpersonateUrl } from '../lib/redirectUrls'
+
+const {
+  data: { reason, reasonType, redirect },
+} = zodParseQueryParamsStoringErrors(
+  {
+    reason: z.string().optional(),
+    reasonType: z.enum(['admin-required']).optional(),
+    redirect: z.string().optional(),
+  },
+  Astro
+)
+
+if (reasonType === 'admin-required' && Astro.locals.user?.admin) {
+  return Astro.redirect(redirect)
+}
+---
+
+<BaseLayout
+  pageTitle="403: Access Denied"
+  description="You don't have permission to access this page."
+  className={{
+    main: 'my-0 flex flex-col items-center justify-center px-6 py-24 text-center sm:py-32 lg:px-8',
+    body: 'cursor-not-allowed bg-[oklch(0.16_0.07_31.84)] text-red-50',
+  }}
+>
+  <Icon name="ri:hand" class="xs:size-24 size-16 text-red-100 sm:size-32" />
+  <h1 class="font-title mt-8 text-3xl font-semibold tracking-wide text-white sm:mt-12 sm:text-5xl">
+    Access denied
+  </h1>
+  <p class="mt-8 text-lg leading-7 text-balance whitespace-pre-wrap text-red-400">
+    {reason}
+  </p>
+
+  <div class="mt-12 flex flex-wrap items-center justify-center">
+    <a href="/" class="focus-visible:outline-primary group flex items-center gap-2 px-3.5 py-2.5 text-white">
+      <Icon
+        name="ri:home-2-line"
+        class="size-5 transition-transform group-hover:-translate-x-1 group-active:translate-x-0"
+      />
+      Go to home
+    </a>
+    <a
+      href={makeLoginUrl(Astro.url, { redirect, logout: true, message: reason })}
+      data-astro-reload
+      class="focus-visible:outline-primary group flex items-center gap-2 px-3.5 py-2.5 text-white"
+    >
+      <Icon
+        name="ri:user-line"
+        class="size-5 transition-transform group-hover:-translate-y-1 group-active:translate-y-0"
+      />
+      Login as different user
+    </a>
+    {
+      Astro.locals.actualUser && (
+        <a
+          href={makeUnimpersonateUrl(Astro.url, { redirect })}
+          class="focus-visible:outline-primary group flex items-center gap-2 px-3.5 py-2.5 text-white"
+        >
+          <Icon
+            name="ri:spy-line"
+            class="size-5 transition-transform group-hover:-translate-y-1 group-active:translate-y-0"
+          />
+          Unimpersonate
+        </a>
+      )
+    }
+  </div>
+</BaseLayout>

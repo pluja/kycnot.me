@@ -1,0 +1,27 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../lib/cn'
+
+import type { HTMLAttributes } from 'astro/types'
+
+export type Props = HTMLAttributes<'a'> & {
+  label: string
+  icon?: string
+  href: string
+}
+
+const { label, icon, href, class: className, ...htmlProps } = Astro.props
+---
+
+<a
+  href={href}
+  class={cn(
+    'text-day-300 hover:bg-night-800 flex items-center px-4 py-2 text-sm hover:text-white',
+    className
+  )}
+  {...htmlProps}
+>
+  {icon && <Icon name={icon} class="mr-2 size-4" />}
+  <span class="flex-1">{label}</span>
+</a>

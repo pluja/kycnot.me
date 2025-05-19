@@ -1,0 +1,49 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../lib/cn'
+import { baseInputClassNames } from '../lib/formInputs'
+
+import InputWrapper from './InputWrapper.astro'
+
+import type { ComponentProps } from 'astro/types'
+
+type Props = Omit<ComponentProps<typeof InputWrapper>, 'children' | 'inputId'> & {
+  options: {
+    label: string
+    value: string
+    icon?: string
+  }[]
+  disabled?: boolean
+  selectedValues?: string[]
+}
+
+const { options, disabled, selectedValues = [], ...wrapperProps } = Astro.props
+
+const inputId = Astro.locals.makeId(`input-${wrapperProps.name}`)
+const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
+---
+
+<InputWrapper inputId={inputId} {...wrapperProps}>
+  <div class={cn(baseInputClassNames.div, hasError && baseInputClassNames.error)}>
+    <div class="h-48 overflow-y-auto mask-y-from-[calc(100%-var(--spacing)*8)] py-5">
+      {
+        options.map((option) => (
+          <label class="hover:bg-night-500 flex cursor-pointer items-center gap-2 px-5 py-1">
+            <input
+              transition:persist
+              type="checkbox"
+              name={wrapperProps.name}
+              value={option.value}
+              checked={selectedValues.includes(option.value)}
+              class={cn(hasError && baseInputClassNames.error, disabled && baseInputClassNames.disabled)}
+              disabled={disabled}
+            />
+            {option.icon && <Icon name={option.icon} class="size-4" />}
+            <span class="text-sm leading-none">{option.label}</span>
+          </label>
+        ))
+      }
+    </div>
+  </div>
+</InputWrapper>

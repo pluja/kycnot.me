@@ -1,0 +1,72 @@
+---
+layout: ../layouts/MarkdownLayout.astro
+title: How does karma work?
+description: "KYCnot.me has a user karma system, here's how it works"
+author: KYCnot.me
+pubDate: 2025-05-15
+---
+
+import KarmaUnlocksTable from '../components/KarmaUnlocksTable.astro';
+
+[KYCnot.me](https://kycnot.me) implements a karma system to encourage quality contributions and maintain community standards. Users can earn (or lose) karma points through various interactions on the platform, primarily through their comments on services.
+
+## How to Earn Karma
+
+There are several ways to earn karma points:
+
+1. **Comment Approval** (+1 point)
+
+   - When your comment moves from 'unmoderated' to 'approved' status
+   - This is the basic reward for contributing a valid comment
+
+2. **Comment Verification** (+5 points)
+
+   - When your comment is marked as 'verified'
+   - This is a significant reward for providing particularly valuable or verified information
+
+3. **Upvotes**
+   - Each upvote on your comment adds +1 to your karma
+   - Similarly, each downvote reduces your karma by -1
+   - This allows the community to reward helpful contributions
+
+## Karma Penalties
+
+The system also includes penalties to discourage spam and low-quality content:
+
+1. **Spam Detection** (-10 points)
+   - If your comment is marked as suspicious/spam
+   - This is a significant penalty to discourage spam behavior
+   - If the spam mark is removed, the 10 points are restored
+
+## Karma Tracking
+
+The system maintains a detailed record of all karma changes through:
+
+1. **Karma Transactions**
+
+   - Every karma change is recorded as a transaction
+   - Each transaction includes:
+     - The action that triggered it
+     - The number of points awarded/deducted
+     - A description of why the karma changed
+     - The related comment (if applicable)
+
+2. **Total Karma**
+   - Your total karma is displayed on your profile
+   - It's the sum of all your karma transactions
+   - This score helps establish your reputation in the community
+
+## Impact of Karma
+
+Your karma score is more than just a number - it's a reflection of your contributions to the community. Higher karma scores indicate:
+
+- Active participation in the community
+- History of providing valuable information
+- Trustworthiness of your contributions
+- Commitment to community standards
+
+The karma system helps maintain the quality of discussions and encourages meaningful contributions to the platform.
+
+## Unlocking Actions with Karma
+
+<KarmaUnlocksTable />

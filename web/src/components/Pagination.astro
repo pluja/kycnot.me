@@ -1,0 +1,134 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../lib/cn'
+import { createPageUrl } from '../lib/urls'
+
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = HTMLAttributes<'nav'> & {
+  currentPage: number
+  totalPages: number
+  currentUrl?: URL | string
+  sortSeed?: string
+}
+
+const {
+  currentPage,
+  totalPages,
+  currentUrl = Astro.url,
+  sortSeed,
+  class: className,
+  ...navProps
+} = Astro.props
+
+const prevPage = currentPage > 1 ? currentPage - 1 : null
+const nextPage = currentPage < totalPages ? currentPage + 1 : null
+
+const getVisiblePages = () => {
+  const pages: (number | '...')[] = []
+
+  if (totalPages <= 9) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1)
+  }
+
+  // Always show first page
+  pages.push(1)
+
+  if (currentPage > 4) {
+    pages.push('...')
+  }
+
+  // Calculate range around current page
+  let rangeStart = Math.max(2, currentPage - 2)
+  let rangeEnd = Math.min(totalPages - 1, currentPage + 2)
+
+  // Adjust range if at the start or end
+  if (currentPage <= 4) {
+    rangeEnd = 6
+  }
+  if (currentPage >= totalPages - 3) {
+    rangeStart = totalPages - 5
+  }
+
+  // Add range numbers
+  for (let i = rangeStart; i <= rangeEnd; i++) {
+    pages.push(i)
+  }
+
+  if (currentPage < totalPages - 3) {
+    pages.push('...')
+  }
+
+  // Always show last page
+  pages.push(totalPages)
+
+  return pages
+}
+const PrevTag = prevPage ? 'a' : 'span'
+const NextTag = nextPage ? 'a' : 'span'
+---
+
+<nav
+  aria-label="Pagination"
+  {...navProps}
+  class={cn('flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-lg sm:flex-nowrap', className)}
+>
+  <PrevTag
+    href={PrevTag === 'a' && prevPage
+      ? createPageUrl(prevPage, currentUrl, { 'sort-seed': sortSeed })
+      : undefined}
+    class={cn(
+      'flex w-[5.5ch] items-center justify-end text-green-500 hover:text-green-400',
+      !prevPage && 'pointer-events-none opacity-50'
+    )}
+    aria-label="Previous page"
+  >
+    <Icon name="ri:arrow-left-s-line" class="size-6 shrink-0" />
+    <span class="text-green-500">Prev</span>
+  </PrevTag>
+
+  <div class="order-first flex w-full items-center justify-center gap-4 sm:order-none sm:w-auto">
+    {
+      getVisiblePages().map((page) => {
+        if (page === '...') {
+          return <span class="text-gray-400">...</span>
+        }
+
+        const isCurrentPage = page === currentPage
+        return isCurrentPage ? (
+          <button
+            class="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500 text-white"
+            aria-current="page"
+            aria-label={`Page ${page.toLocaleString()}`}
+            disabled
+          >
+            {page}
+          </button>
+        ) : (
+          <a
+            href={createPageUrl(page, currentUrl, { 'sort-seed': sortSeed })}
+            class="text-white hover:text-gray-300"
+            aria-label={`Page ${page.toLocaleString()}`}
+          >
+            {page}
+          </a>
+        )
+      })
+    }
+  </div>
+
+  <NextTag
+    href={NextTag === 'a' && nextPage
+      ? createPageUrl(nextPage, currentUrl, { 'sort-seed': sortSeed })
+      : undefined}
+    class={cn(
+      'flex w-[5.5ch] items-center justify-start text-green-500 hover:text-green-400',
+      !nextPage && 'pointer-events-none opacity-50'
+    )}
+    aria-label="Next page"
+  >
+    <span class="text-green-500">Next</span>
+    <Icon name="ri:arrow-right-s-line" class="size-6 shrink-0" />
+  </NextTag>
+</nav>

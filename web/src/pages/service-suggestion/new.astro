@@ -1,0 +1,308 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions, isInputError } from 'astro:actions'
+
+import {
+  SUGGESTION_DESCRIPTION_MAX_LENGTH,
+  SUGGESTION_NAME_MAX_LENGTH,
+  SUGGESTION_NOTES_MAX_LENGTH,
+  SUGGESTION_SLUG_MAX_LENGTH,
+} from '../../actions/serviceSuggestion'
+import Captcha from '../../components/Captcha.astro'
+import InputCardGroup from '../../components/InputCardGroup.astro'
+import InputCheckboxGroup from '../../components/InputCheckboxGroup.astro'
+import InputHoneypotTrap from '../../components/InputHoneypotTrap.astro'
+import InputImageFile from '../../components/InputImageFile.astro'
+import InputSubmitButton from '../../components/InputSubmitButton.astro'
+import InputText from '../../components/InputText.astro'
+import InputTextArea from '../../components/InputTextArea.astro'
+import { currencies } from '../../constants/currencies'
+import { kycLevels } from '../../constants/kycLevels'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { prisma } from '../../lib/prisma'
+import { makeLoginUrl } from '../../lib/redirectUrls'
+
+const user = Astro.locals.user
+if (!user) {
+  return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Login to suggest a new service' }))
+}
+
+const result = Astro.getActionResult(actions.serviceSuggestion.createService)
+if (result && !result.error && !result.data.hasDuplicates) {
+  return Astro.redirect(`/service-suggestion/${result.data.serviceSuggestion.id}`)
+}
+const inputErrors = isInputError(result?.error) ? result.error.fields : {}
+
+const [categories, attributes] = await Astro.locals.banners.tryMany([
+  [
+    'Failed to fetch categories',
+    () =>
+      prisma.category.findMany({
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          icon: true,
+        },
+      }),
+    [],
+  ],
+  [
+    'Failed to fetch attributes',
+    () =>
+      prisma.attribute.findMany({
+        orderBy: { category: 'asc' },
+        select: {
+          id: true,
+          title: true,
+        },
+      }),
+    [],
+  ],
+])
+---
+
+<BaseLayout
+  pageTitle="New service"
+  description="Suggest a new service to be added to KYCnot.me"
+  ogImage={{ template: 'generic', title: 'New service' }}
+  widthClassName="max-w-screen-md"
+  breadcrumbs={[
+    {
+      name: 'Service suggestions',
+      url: '/service-suggestion',
+    },
+    {
+      name: 'New service',
+    },
+  ]}
+>
+  <h1 class="font-title mt-12 mb-6 text-center text-3xl font-bold">Service suggestion</h1>
+
+  <form
+    method="POST"
+    action={actions.serviceSuggestion.createService}
+    enctype="multipart/form-data"
+    class="space-y-6"
+  >
+    {
+      result?.data?.hasDuplicates && (
+        <>
+          <div class="sm:border-night-300 sm:bg-night-500 mb-16 sm:rounded-lg sm:border sm:p-2 md:p-4">
+            <input type="hidden" name="skipDuplicateCheck" value="true" />
+
+            <h2 class="font-title flex items-center justify-center gap-2 text-2xl font-semibold text-red-500">
+              Possible duplicates found
+            </h2>
+
+            <p class="text-day-400 text-center">Is your service already listed below?</p>
+
+            <div class="mt-4 space-y-2">
+              {result.data.possibleDuplicates.map((duplicate) => {
+                const editServiceUrl = new URL('/service-suggestion/edit', Astro.url)
+                editServiceUrl.searchParams.set('serviceId', duplicate.id.toString())
+                if (result.data.extraNotes) {
+                  editServiceUrl.searchParams.set('notes', result.data.extraNotes)
+                }
+
+                return (
+                  <div class="border-night-400 bg-night-600 flex gap-4 rounded-lg border p-4 shadow-sm">
+                    <div class="grow">
+                      <p class="text-day-100 mb-1 text-lg font-medium">{duplicate.name}</p>
+                      <p class="text-day-300 mb-3 line-clamp-2 text-sm">{duplicate.description}</p>
+                    </div>
+                    <div class="flex shrink-0 flex-col justify-center gap-2">
+                      <a
+                        href={`/service/${duplicate.slug}`}
+                        target="_blank"
+                        class="text-day-300 bg-night-300 hover:bg-night-400 flex items-center gap-1 rounded px-2.5 py-1.5 text-sm font-medium transition-colors"
+                      >
+                        <Icon name="ri:external-link-line" class="size-4 shrink-0" />
+                        View
+                      </a>
+
+                      <a
+                        href={editServiceUrl.toString()}
+                        target="_blank"
+                        class="flex items-center gap-1 rounded bg-green-600 px-2.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-green-700"
+                      >
+                        <Icon name="ri:edit-line" class="size-4 shrink-0" />
+                        Submit as edit
+                      </a>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div class="bg-night-400 mt-4 hidden h-px w-full sm:block" />
+
+            <div class="mt-4 flex items-center gap-2 px-4">
+              <p class="text-day-200 flex-1">None of these match?</p>
+              <button
+                type="submit"
+                class="bg-day-700 text-day-100 hover:bg-day-600 flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium"
+              >
+                <Icon name="ri:send-plane-2-line" class="size-4" />
+                Submit anyway
+              </button>
+            </div>
+          </div>
+          <h1 class="font-title mt-12 mb-6 block text-center text-3xl font-bold sm:hidden">
+            Review your suggestion
+          </h1>
+        </>
+      )
+    }
+
+    <InputText
+      label="Name"
+      name="name"
+      inputProps={{
+        required: true,
+        maxlength: SUGGESTION_NAME_MAX_LENGTH,
+        'data-generate-slug': true,
+      }}
+      error={inputErrors.name}
+    />
+    <InputText
+      label="Slug"
+      name="slug"
+      description="Auto-generated from name. Only lowercase letters, numbers, and hyphens."
+      error={inputErrors.slug}
+      inputProps={{
+        required: true,
+        pattern: '^[a-z0-9\\-]+$',
+        placeholder: 'my-service-name',
+        minlength: 1,
+        maxlength: SUGGESTION_SLUG_MAX_LENGTH,
+        'data-generate-slug': true,
+      }}
+    />
+
+    <InputTextArea
+      label="Description"
+      name="description"
+      id="description"
+      required
+      maxlength={SUGGESTION_DESCRIPTION_MAX_LENGTH}
+      error={inputErrors.description}
+    />
+
+    <InputTextArea
+      label="Service URLs"
+      name="serviceUrls"
+      required
+      placeholder="https://example1.com\nhttps://example2.org"
+      error={inputErrors.serviceUrls}
+    />
+
+    <InputTextArea
+      label="Terms of Service URLs"
+      name="tosUrls"
+      required
+      placeholder="https://example1.com/tos\nhttps://example2.org/terms"
+      error={inputErrors.tosUrls}
+    />
+
+    <InputTextArea
+      label="Onion URLs"
+      name="onionUrls"
+      placeholder="http://example1.onion\nhttp://example2.onion"
+      error={inputErrors.onionUrls}
+    />
+
+    <InputCardGroup
+      name="kycLevel"
+      label="KYC Level"
+      options={kycLevels.map((kycLevel) => ({
+        label: kycLevel.name,
+        value: kycLevel.id.toString(),
+        icon: kycLevel.icon,
+        description: `${kycLevel.description}\n\n_KYC Level ${kycLevel.value}/4_`,
+      }))}
+      iconSize="md"
+      cardSize="md"
+      required
+      error={inputErrors.kycLevel}
+    />
+
+    <InputCheckboxGroup
+      name="categories"
+      label="Categories"
+      required
+      options={categories.map((category) => ({
+        label: category.name,
+        value: category.id.toString(),
+        icon: category.icon,
+      }))}
+      error={inputErrors.categories}
+    />
+
+    <InputCheckboxGroup
+      name="attributes"
+      label="Attributes"
+      options={attributes.map((attribute) => ({
+        label: attribute.title,
+        value: attribute.id.toString(),
+      }))}
+      error={inputErrors.attributes}
+    />
+
+    <InputCardGroup
+      name="acceptedCurrencies"
+      label="Accepted Currencies"
+      options={currencies.map((currency) => ({
+        label: currency.name,
+        value: currency.id,
+        icon: currency.icon,
+      }))}
+      error={inputErrors.acceptedCurrencies}
+      required
+      multiple
+    />
+
+    <InputImageFile
+      label="Service Image"
+      name="imageFile"
+      description="Square image. At least 192x192px. Transparency supported."
+      error={inputErrors.imageFile}
+      square
+      required
+    />
+
+    <InputTextArea
+      label="Note for Moderators"
+      name="notes"
+      id="notes"
+      error={inputErrors.notes}
+      maxlength={SUGGESTION_NOTES_MAX_LENGTH}
+    />
+
+    <Captcha action={actions.serviceSuggestion.createService} />
+
+    <InputHoneypotTrap name="message" />
+
+    <InputSubmitButton label={result?.data?.hasDuplicates ? 'Submit anyway' : 'Submit'} />
+  </form>
+</BaseLayout>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const triggerInputs = document.querySelectorAll<HTMLInputElement>('[data-generate-slug] input')
+    const slugInputs = document.querySelectorAll<HTMLInputElement>('input[name="slug"]')
+
+    triggerInputs.forEach((triggerInput) => {
+      triggerInput.addEventListener('input', (event) => {
+        const target = event.target as HTMLInputElement
+        slugInputs.forEach((slugInput) => {
+          slugInput.value = target.value
+            .toLowerCase()
+            .replace(/[^a-z0-9\-]+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '')
+        })
+      })
+    })
+  })
+</script>

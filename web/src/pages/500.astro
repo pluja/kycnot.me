@@ -1,0 +1,105 @@
+---
+import { z } from 'astro/zod'
+import { Icon } from 'astro-icon/components'
+
+import { SUPPORT_EMAIL } from '../constants/project'
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { DEPLOYMENT_MODE } from '../lib/envVariables'
+import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
+
+type Props = {
+  error: unknown
+}
+
+const { error } = Astro.props
+
+const {
+  data: { message },
+} = zodParseQueryParamsStoringErrors({ message: z.string().optional() }, Astro)
+---
+
+<BaseLayout
+  pageTitle="500: Server Error"
+  description="Sorry, something crashed on the server."
+  className={{
+    main: 'relative my-0 flex flex-col items-center justify-center px-6 py-24 text-center sm:py-32 lg:px-8',
+  }}
+>
+  <Icon
+    name="ri:bug-line"
+    class="text-night-800 absolute top-0 right-8 -z-50 size-32 -rotate-45 sm:top-12 md:right-16"
+  />
+  <p class="text-primary text-day-700 text-9xl font-black">500</p>
+  <h1 class="font-title mt-8 text-3xl font-bold tracking-tight text-white sm:mt-12 sm:text-5xl">
+    Server Error
+  </h1>
+  <p class="text-day-400 mt-6 text-base leading-7 text-balance">
+    {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
+    {message || 'Sorry, something crashed on the server.'}
+  </p>
+  {
+    (DEPLOYMENT_MODE !== 'production' || Astro.locals.user?.admin) && (
+      <div class="bg-night-800 mt-4 block max-h-96 min-h-32 w-full max-w-4xl overflow-auto rounded-lg p-4 text-left text-sm break-words whitespace-pre-wrap">
+        {error instanceof Error
+          ? error.message
+          : error === undefined
+            ? // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+              message || 'undefined'
+            : typeof error === 'object'
+              ? JSON.stringify(error, null, 2)
+              : String(error as unknown)}
+      </div>
+    )
+  }
+
+  <div class="mt-10 flex flex-wrap items-center justify-center">
+    <button
+      data-reload-button
+      class="focus-visible:outline-primary group no-js:hidden flex items-center gap-2 px-3.5 py-2.5 text-white"
+    >
+      <Icon
+        name="ri:refresh-line"
+        class="size-5 transition-transform duration-300 group-hover:rotate-90 group-active:rotate-180"
+      />
+      Try again
+    </button>
+    <a
+      href={Astro.url}
+      class="focus-visible:outline-primary group js:hidden flex items-center gap-2 px-3.5 py-2.5 text-white"
+    >
+      <Icon
+        name="ri:refresh-line"
+        class="size-5 transition-transform duration-300 group-hover:rotate-90 group-active:rotate-180"
+      />
+      Try again
+    </a>
+    <a href="/" class="focus-visible:outline-primary group flex items-center gap-2 px-3.5 py-2.5 text-white">
+      <Icon
+        name="ri:arrow-left-line"
+        class="size-5 transition-transform group-hover:-translate-x-1 group-active:translate-x-0"
+      />
+      Go back home
+    </a>
+    <a
+      href={`mailto:${SUPPORT_EMAIL}`}
+      class="focus-visible:outline-primary group flex items-center gap-2 px-3.5 py-2.5 text-white"
+    >
+      <Icon
+        name="ri:mail-line"
+        class="size-5 transition-transform group-hover:-translate-y-1 group-active:translate-y-0"
+      />
+      Contact support
+    </a>
+  </div>
+</BaseLayout>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const reloadButtons = document.querySelectorAll<HTMLButtonElement>('[data-reload-button]')
+    reloadButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        window.location.reload()
+      })
+    })
+  })
+</script>

@@ -1,0 +1,44 @@
+---
+import { cn } from '../lib/cn'
+import { baseInputClassNames } from '../lib/formInputs'
+
+import InputWrapper from './InputWrapper.astro'
+
+import type { ComponentProps } from 'astro/types'
+
+type Props = Omit<ComponentProps<typeof InputWrapper>, 'children' | 'inputId'> & {
+  value?: string
+  placeholder?: string
+  disabled?: boolean
+  autofocus?: boolean
+  rows?: number
+  maxlength?: number
+}
+
+const { value, placeholder, maxlength, disabled, autofocus, rows = 3, ...wrapperProps } = Astro.props
+
+const inputId = Astro.locals.makeId(`input-${wrapperProps.name}`)
+const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
+---
+
+{/* eslint-disable astro/jsx-a11y/no-autofocus */}
+
+<InputWrapper inputId={inputId} {...wrapperProps}>
+  <textarea
+    transition:persist
+    id={inputId}
+    class={cn(
+      baseInputClassNames.input,
+      baseInputClassNames.textarea,
+      hasError && baseInputClassNames.error,
+      disabled && baseInputClassNames.disabled
+    )}
+    placeholder={placeholder}
+    required={wrapperProps.required}
+    disabled={disabled}
+    name={wrapperProps.name}
+    autofocus={autofocus}
+    maxlength={maxlength}
+    rows={rows}>{value}</textarea
+  >
+</InputWrapper>

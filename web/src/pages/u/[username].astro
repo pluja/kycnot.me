@@ -1,0 +1,912 @@
+---
+import { Icon } from 'astro-icon/components'
+import { Picture } from 'astro:assets'
+import { sortBy } from 'lodash-es'
+
+import defaultServiceImage from '../../assets/fallback-service-image.jpg'
+import AdminOnly from '../../components/AdminOnly.astro'
+import BadgeSmall from '../../components/BadgeSmall.astro'
+import TimeFormatted from '../../components/TimeFormatted.astro'
+import Tooltip from '../../components/Tooltip.astro'
+import { karmaUnlocks } from '../../constants/karmaUnlocks'
+import { SUPPORT_EMAIL } from '../../constants/project'
+import { getServiceSuggestionStatusInfo } from '../../constants/serviceSuggestionStatus'
+import { getServiceSuggestionTypeInfo } from '../../constants/serviceSuggestionType'
+import { getServiceUserRoleInfo } from '../../constants/serviceUserRoles'
+import { verificationStatusesByValue } from '../../constants/verificationStatus'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { cn } from '../../lib/cn'
+import { makeUserWithKarmaUnlocks } from '../../lib/karmaUnlocks'
+import { prisma } from '../../lib/prisma'
+import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
+import { formatDateShort } from '../../lib/timeAgo'
+
+import type { ProfilePage, WithContext } from 'schema-dts'
+
+const username = Astro.params.username
+if (!username) return Astro.rewrite('/404')
+
+const user = await Astro.locals.banners.try('user', async () => {
+  return makeUserWithKarmaUnlocks(
+    await prisma.user.findUnique({
+      where: { name: Astro.params.username },
+      select: {
+        id: true,
+        name: true,
+        displayName: true,
+        link: true,
+        picture: true,
+        spammer: true,
+        verified: true,
+        admin: true,
+        verifier: true,
+        verifiedLink: true,
+        totalKarma: true,
+        createdAt: true,
+        _count: {
+          select: {
+            comments: true,
+            commentVotes: true,
+            karmaTransactions: true,
+          },
+        },
+        karmaTransactions: {
+          select: {
+            id: true,
+            points: true,
+            action: true,
+            description: true,
+            createdAt: true,
+            comment: {
+              select: {
+                id: true,
+                content: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        },
+        suggestions: {
+          select: {
+            id: true,
+            type: true,
+            status: true,
+            createdAt: true,
+            service: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+          },
+          where: { service: { serviceVisibility: 'PUBLIC' } },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        },
+        comments: {
+          select: {
+            id: true,
+            content: true,
+            createdAt: true,
+            upvotes: true,
+            status: true,
+            service: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        },
+        commentVotes: {
+          select: {
+            id: true,
+            downvote: true,
+            createdAt: true,
+            comment: {
+              select: {
+                id: true,
+                content: true,
+                service: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        },
+        serviceAffiliations: {
+          select: {
+            role: true,
+            service: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                imageUrl: true,
+                verificationStatus: true,
+              },
+            },
+          },
+          orderBy: [{ role: 'asc' }, { service: { name: 'asc' } }],
+        },
+      },
+    })
+  )
+})
+
+if (!user) return Astro.rewrite('/404')
+
+const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
+---
+
+<BaseLayout
+  pageTitle={`${user.name} - Account`}
+  description="Manage your user profile"
+  ogImage={{ template: 'generic', title: `${user.name} | Account` }}
+  widthClassName="max-w-screen-md"
+  className={{
+    main: 'space-y-6',
+  }}
+  htmx
+  schemas={[
+    {
+      '@context': 'https://schema.org',
+      '@type': 'ProfilePage',
+      url: new URL(`/u/${user.name}`, Astro.url).href,
+      name: `${user.displayName ?? user.name}'s Profile`,
+      dateCreated: user.createdAt.toISOString(),
+
+      mainEntity: {
+        '@type': 'Person',
+        name: user.displayName ?? user.name,
+        alternateName: user.displayName ? user.name : undefined,
+        image: user.picture ?? undefined,
+        url: new URL(`/u/${user.name}`, Astro.url).href,
+        sameAs: user.link ? [user.link] : undefined,
+        description: `User account for ${user.displayName ?? user.name} on KYCnot.me`,
+        identifier: [user.name, user.id.toString()],
+        jobTitle: user.admin ? 'Administrator' : user.verifier ? 'Moderator' : undefined,
+        memberOf: KYCNOTME_SCHEMA_MINI,
+        interactionStatistic: [
+          {
+            '@type': 'InteractionCounter',
+            interactionType: { '@type': 'WriteAction' },
+            userInteractionCount: user._count.comments,
+          },
+          {
+            '@type': 'InteractionCounter',
+            interactionType: { '@type': 'CommentAction' },
+            userInteractionCount: user._count.comments,
+          },
+          {
+            '@type': 'InteractionCounter',
+            interactionType: { '@type': 'LikeAction' },
+            userInteractionCount: user._count.commentVotes,
+          },
+        ],
+      },
+    } satisfies WithContext<ProfilePage>,
+  ]}
+  breadcrumbs={[
+    {
+      name: 'Users',
+      url: '/u',
+    },
+    {
+      name: user.displayName ?? user.name,
+      url: `/u/${user.name}`,
+    },
+  ]}
+>
+  <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+    <header class="flex items-center gap-4">
+      {
+        user.picture ? (
+          <img src={user.picture} alt="" class="ring-day-500/30 size-16 rounded-full ring-2" />
+        ) : (
+          <div class="bg-day-500/10 ring-day-500/30 text-day-400 flex size-16 items-center justify-center rounded-full ring-2">
+            <Icon name="ri:user-3-line" class="size-8" />
+          </div>
+        )
+      }
+      <div>
+        <h1 class="font-title text-lg font-bold tracking-wider text-white">
+          {user.name}
+          {isCurrentUser && <span class="text-day-500 font-normal">(You)</span>}
+        </h1>
+        {user.displayName && <p class="text-day-200">{user.displayName}</p>}
+        <div class="mt-1 flex gap-2">
+          {
+            user.admin && (
+              <span class="rounded-full border border-red-500/50 bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
+                admin
+              </span>
+            )
+          }
+          {
+            user.verified && (
+              <span class="rounded-full border border-blue-500/50 bg-blue-500/20 px-2 py-0.5 text-xs text-blue-400">
+                verified
+              </span>
+            )
+          }
+          {
+            user.verifier && (
+              <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
+                verifier
+              </span>
+            )
+          }
+        </div>
+      </div>
+      <nav class="ml-auto flex items-center gap-2">
+        <AdminOnly>
+          <Tooltip
+            as="a"
+            href={`/account/impersonate?targetUserId=${user.id}&redirect=${encodeURIComponent(Astro.url.href)}`}
+            class="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-sm text-amber-400 shadow-xs transition-colors duration-200 hover:bg-amber-500/20 focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
+            text="Impersonate (admin)"
+          >
+            <Icon name="ri:spy-line" class="size-4" />
+          </Tooltip>
+        </AdminOnly>
+        <AdminOnly>
+          <Tooltip
+            as="a"
+            href={`/admin/users/${user.name}`}
+            class="border-day-500/30 bg-day-500/10 text-day-400 hover:bg-day-500/20 focus:ring-day-500 inline-flex items-center gap-1 rounded-md border p-2 text-sm shadow-xs transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
+            text="Edit user (admin)"
+          >
+            <Icon name="ri:edit-line" class="size-4" />
+          </Tooltip>
+        </AdminOnly>
+        {
+          isCurrentUser && (
+            <Tooltip
+              as="a"
+              href="/account"
+              class="border-day-500/30 bg-day-500/10 text-day-400 hover:bg-day-500/20 focus:ring-day-500 inline-flex items-center gap-1 rounded-md border p-2 text-sm shadow-xs transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
+              text="Go to my account"
+            >
+              <Icon name="ri:eye-off-line" class="size-4" />
+            </Tooltip>
+          )
+        }
+        <a
+          href={`mailto:${SUPPORT_EMAIL}`}
+          class="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-sm text-red-400 shadow-xs transition-colors duration-200 hover:bg-red-500/20 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
+        >
+          <Icon name="ri:alert-line" class="size-4" /> Report
+        </a>
+      </nav>
+    </header>
+
+    <div class="border-night-400 mt-6 border-t pt-6">
+      <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div>
+          <h3 class="font-title text-day-200 mb-4 text-sm">Profile Information</h3>
+          <ul class="flex flex-col items-start gap-2">
+            <li class="flex items-start">
+              <span class="text-day-500 mt-0.5 mr-2"><Icon name="ri:user-3-line" class="size-4" /></span>
+              <div>
+                <p class="text-day-500 text-xs">Username</p>
+                <p class="text-day-300">{user.name}</p>
+              </div>
+            </li>
+
+            <li class="inline-flex items-start">
+              <span class="text-day-500 mt-0.5 mr-2">
+                <Icon name="ri:user-smile-line" class="size-4" />
+              </span>
+              <div>
+                <p class="text-day-500 text-xs">Display Name</p>
+
+                <p class="text-day-300">
+                  {user.displayName ?? <span class="text-sm italic">Not set</span>}
+                </p>
+              </div>
+            </li>
+
+            {
+              !!user.link && (
+                <li class="inline-flex items-start">
+                  <span class="text-day-500 mt-0.5 mr-2">
+                    <Icon name="ri:link" class="size-4" />
+                  </span>
+                  <div>
+                    <p class="text-day-500 text-xs">Website</p>
+                    <a
+                      href={user.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-blue-400 hover:underline"
+                    >
+                      {user.link}
+                    </a>
+                  </div>
+                </li>
+              )
+            }
+
+            <li class="flex items-start">
+              <span class="text-day-500 mt-0.5 mr-2"><Icon name="ri:award-line" class="size-4" /></span>
+              <div>
+                <p class="text-day-500 text-xs">Karma</p>
+                <p class="text-day-300">{user.totalKarma.toLocaleString()}</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div id="account-status">
+          <h3 class="font-title text-day-200 mb-4 text-sm">Account Status</h3>
+          <ul class="space-y-3">
+            <li class="flex items-start">
+              <span class="text-day-500 mt-0.5 mr-2">
+                <Icon name="ri:shield-check-line" class="size-4" />
+              </span>
+              <div>
+                <p class="text-day-500 text-xs">Account Type</p>
+                <div class="mt-1 flex flex-wrap gap-2">
+                  {
+                    user.admin && (
+                      <span class="rounded-full border border-red-500/50 bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
+                        Admin
+                      </span>
+                    )
+                  }
+                  {
+                    user.verified && (
+                      <span class="rounded-full border border-blue-500/50 bg-blue-500/20 px-2 py-0.5 text-xs text-blue-400">
+                        Verified User
+                      </span>
+                    )
+                  }
+                  {
+                    user.verifier && (
+                      <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
+                        Verifier
+                      </span>
+                    )
+                  }
+                  {
+                    !user.admin && !user.verified && !user.verifier && (
+                      <span class="border-day-700/50 bg-day-700/20 text-day-400 rounded-full border px-2 py-0.5 text-xs">
+                        Standard User
+                      </span>
+                    )
+                  }
+                </div>
+              </div>
+            </li>
+
+            <li class="flex items-start">
+              <span class="text-day-500 mt-0.5 mr-2">
+                <Icon name="ri:spam-2-line" class="size-4" />
+              </span>
+              <div>
+                <p class="text-day-500 text-xs">Spam Status</p>
+                {
+                  user.spammer ? (
+                    <span class="rounded-full border border-red-500/50 bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
+                      Spammer
+                    </span>
+                  ) : (
+                    <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
+                      Not Flagged
+                    </span>
+                  )
+                }
+              </div>
+            </li>
+
+            <li class="flex items-start">
+              <span class="text-day-500 mt-0.5 mr-2"><Icon name="ri:calendar-line" class="size-4" /></span>
+              <div>
+                <p class="text-day-500 text-xs">Joined</p>
+                <p class="text-day-300">
+                  {
+                    formatDateShort(user.createdAt, {
+                      prefix: false,
+                      hourPrecision: true,
+                      caseType: 'sentence',
+                    })
+                  }
+                </p>
+              </div>
+            </li>
+
+            {
+              user.verifiedLink && (
+                <li class="flex items-start">
+                  <span class="text-day-500 mt-0.5 mr-2">
+                    <Icon name="ri:check-double-line" class="size-4" />
+                  </span>
+                  <div>
+                    <p class="text-day-500 text-xs">Verified as related to</p>
+                    <a
+                      href={user.verifiedLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-blue-400 hover:underline"
+                    >
+                      {user.verifiedLink}
+                    </a>
+                  </div>
+                </li>
+              )
+            }
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+    <header>
+      <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+        <Icon name="ri:building-4-line" class="mr-2 inline-block size-5" />
+        Service Affiliations
+      </h2>
+    </header>
+
+    {
+      user.serviceAffiliations.length > 0 ? (
+        <ul class="2xs:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] grid gap-4">
+          {user.serviceAffiliations.map((affiliation) => {
+            const roleInfo = getServiceUserRoleInfo(affiliation.role)
+            const statusIcon = {
+              ...verificationStatusesByValue,
+              APPROVED: undefined,
+            }[affiliation.service.verificationStatus]
+
+            return (
+              <li class="shrink-0">
+                <a
+                  href={`/service/${affiliation.service.slug}`}
+                  class="text-day-300 group flex min-w-32 items-center gap-2 text-sm"
+                >
+                  <Picture
+                    src={affiliation.service.imageUrl ?? (defaultServiceImage as unknown as string)}
+                    alt={affiliation.service.name}
+                    width={40}
+                    height={40}
+                    class="size-10 shrink-0 rounded-lg"
+                  />
+                  <div class="flex min-w-0 flex-1 flex-col justify-center">
+                    <div class="flex items-center gap-1.5">
+                      <BadgeSmall color={roleInfo.color} text={roleInfo.label} icon={roleInfo.icon} />
+                      <span class="text-day-500">of</span>
+                    </div>
+
+                    <div class="text-day-300 flex items-center gap-1 font-semibold">
+                      <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap group-hover:underline">
+                        {affiliation.service.name}
+                      </span>
+                      {statusIcon && (
+                        <Tooltip text={statusIcon.label} position="right" class="-m-1 shrink-0">
+                          <Icon
+                            name={statusIcon.icon}
+                            class={cn(
+                              'inline-block size-6 shrink-0 rounded-lg p-1',
+                              statusIcon.classNames.icon
+                            )}
+                          />
+                        </Tooltip>
+                      )}
+                      <Icon name="ri:external-link-line" class="size-4 shrink-0" />
+                    </div>
+                  </div>
+                </a>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        <p class="text-day-400 mb-6">No service affiliations yet.</p>
+      )
+    }
+  </section>
+
+  <section
+    class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs"
+    id="karma-unlocks"
+  >
+    <header>
+      <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+        <Icon name="ri:lock-unlock-line" class="mr-2 inline-block size-5" />
+        Karma Unlocks
+      </h2>
+
+      <div class="border-night-500 bg-night-800/70 mb-4 rounded-md border px-4 py-3">
+        <p class="text-day-300">
+          Earn karma to unlock features and privileges. <a href="/karma" class="text-day-200 hover:underline"
+            >Learn about karma</a
+          >
+        </p>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div class="space-y-3">
+        <h3 class="font-title border-day-700/20 text-day-200 border-b pb-2 text-sm">Positive unlocks</h3>
+
+        {
+          sortBy(
+            karmaUnlocks.filter((unlock) => unlock.karma >= 0),
+            'karma'
+          ).map((unlock) => (
+            <div
+              class={cn(
+                'flex items-center justify-between rounded-md border p-3',
+                user.karmaUnlocks[unlock.id]
+                  ? 'border-green-500/30 bg-green-500/10'
+                  : 'border-night-500 bg-night-800'
+              )}
+            >
+              <div class="flex items-center">
+                <span class={cn('mr-3', user.karmaUnlocks[unlock.id] ? 'text-day-400' : 'text-day-500')}>
+                  <Icon name={unlock.icon} class="size-5" />
+                </span>
+                <div>
+                  <p
+                    class={cn('font-medium', user.karmaUnlocks[unlock.id] ? 'text-day-300' : 'text-day-400')}
+                  >
+                    {unlock.name}
+                  </p>
+                  <p class="text-day-500 text-sm">{unlock.karma.toLocaleString()} karma</p>
+                </div>
+              </div>
+              <div>
+                {user.karmaUnlocks[unlock.id] ? (
+                  <span class="bg-day-500/20 text-day-300 inline-flex items-center rounded-full px-2 py-1 text-xs">
+                    <Icon name="ri:check-line" class="mr-1 size-3" /> Unlocked
+                  </span>
+                ) : (
+                  <span class="bg-night-800 text-day-400 inline-flex items-center rounded-full px-2 py-1 text-xs">
+                    <Icon name="ri:lock-line" class="mr-1 size-3" /> Locked
+                  </span>
+                )}
+              </div>
+            </div>
+          ))
+        }
+      </div>
+
+      <div class="space-y-3">
+        <h3 class="font-title border-b border-red-500/20 pb-2 text-sm text-red-400">Negative unlocks</h3>
+
+        {
+          sortBy(
+            karmaUnlocks.filter((unlock) => unlock.karma < 0),
+            'karma'
+          )
+            .reverse()
+            .map((unlock) => (
+              <div
+                class={cn(
+                  'flex items-center justify-between rounded-md border p-3',
+                  user.karmaUnlocks[unlock.id]
+                    ? 'border-red-500/30 bg-red-500/10'
+                    : 'border-night-500 bg-night-800'
+                )}
+              >
+                <div class="flex items-center">
+                  <span class={cn('mr-3', user.karmaUnlocks[unlock.id] ? 'text-red-400' : 'text-day-500')}>
+                    <Icon name={unlock.icon} class="size-5" />
+                  </span>
+                  <div>
+                    <p
+                      class={cn(
+                        'font-medium',
+                        user.karmaUnlocks[unlock.id] ? 'text-red-400' : 'text-day-400'
+                      )}
+                    >
+                      {unlock.name}
+                    </p>
+                    <p class="text-day-500 text-sm">{unlock.karma.toLocaleString()} karma</p>
+                  </div>
+                </div>
+                <div>
+                  {user.karmaUnlocks[unlock.id] ? (
+                    <span class="inline-flex items-center rounded-full bg-red-500/20 px-2 py-1 text-xs text-red-400">
+                      <Icon name="ri:alert-line" class="mr-1 size-3" /> Active
+                    </span>
+                  ) : (
+                    <span class="bg-night-800 text-day-400 inline-flex items-center rounded-full px-2 py-1 text-xs">
+                      <Icon name="ri:shield-check-line" class="mr-1 size-3" /> Avoided
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))
+        }
+
+        <p class="text-day-400 border-night-500/30 bg-night-800/70 mt-4 rounded-md border p-3 text-xs">
+          <Icon name="ri:information-line" class="inline-block size-4" />
+          Negative karma leads to restrictions. <br class="hidden sm:block" />Keep interactions positive to
+          avoid penalties.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <div class="space-y-6">
+    <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+      <header class="flex items-center justify-between">
+        <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+          <Icon name="ri:chat-3-line" class="mr-2 inline-block size-5" />
+          Recent Comments
+        </h2>
+        <span class="text-day-500">{user._count.comments.toLocaleString()} comments</span>
+      </header>
+
+      {
+        user.comments.length === 0 ? (
+          <p class="text-day-400">No comments yet.</p>
+        ) : (
+          <div class="overflow-x-auto">
+            <table class="divide-night-400/20 w-full min-w-full divide-y">
+              <thead>
+                <tr>
+                  <th class="text-day-400 px-4 py-3 text-left text-xs">Service</th>
+                  <th class="text-day-400 px-4 py-3 text-left text-xs">Comment</th>
+                  <th class="text-day-400 px-4 py-3 text-center text-xs">Status</th>
+                  <th class="text-day-400 px-4 py-3 text-center text-xs">Upvotes</th>
+                  <th class="text-day-400 px-4 py-3 text-right text-xs">Date</th>
+                </tr>
+              </thead>
+              <tbody class="divide-night-400/10 divide-y">
+                {user.comments.map((comment) => (
+                  <tr class="hover:bg-night-500/5">
+                    <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
+                      <a href={`/service/${comment.service.slug}`} class="text-blue-400 hover:underline">
+                        {comment.service.name}
+                      </a>
+                    </td>
+                    <td class="text-day-300 px-4 py-3">
+                      <p class="line-clamp-1">{comment.content}</p>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                      <span class="border-day-700/20 bg-night-800/30 text-day-300 inline-flex rounded-full border px-2 py-0.5 text-xs">
+                        {comment.status}
+                      </span>
+                    </td>
+                    <td class="text-day-300 px-4 py-3 text-center text-xs">
+                      <span class="inline-flex items-center">
+                        <Icon name="ri:thumb-up-line" class="mr-1 size-4" /> {comment.upvotes}
+                      </span>
+                    </td>
+                    <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
+                      <TimeFormatted
+                        date={comment.createdAt}
+                        prefix={false}
+                        hourPrecision
+                        caseType="sentence"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </section>
+
+    {
+      user.karmaUnlocks.voteComments || user._count.commentVotes ? (
+        <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+          <header class="flex items-center justify-between">
+            <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+              <Icon name="ri:thumb-up-line" class="mr-2 inline-block size-5" />
+              Recent Votes
+            </h2>
+            <span class="text-day-500">{user._count.commentVotes.toLocaleString()} votes</span>
+          </header>
+
+          {user.commentVotes.length === 0 ? (
+            <p class="text-day-400">No votes yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="divide-night-400/20 w-full min-w-full divide-y">
+                <thead>
+                  <tr>
+                    <th class="text-day-400 px-4 py-3 text-left text-xs">Service</th>
+                    <th class="text-day-400 px-4 py-3 text-left text-xs">Comment</th>
+                    <th class="text-day-400 px-4 py-3 text-center text-xs">Vote</th>
+                    <th class="text-day-400 px-4 py-3 text-right text-xs">Date</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-night-400/10 divide-y">
+                  {user.commentVotes.map((vote) => (
+                    <tr class="hover:bg-night-500/5">
+                      <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
+                        <a
+                          href={`/service/${vote.comment.service.slug}`}
+                          class="text-blue-400 hover:underline"
+                        >
+                          {vote.comment.service.name}
+                        </a>
+                      </td>
+                      <td class="text-day-300 px-4 py-3">
+                        <p class="line-clamp-1">{vote.comment.content}</p>
+                      </td>
+                      <td class="px-4 py-3 text-center">
+                        {vote.downvote ? (
+                          <span class="inline-flex items-center text-red-400">
+                            <Icon name="ri:thumb-down-fill" class="size-4" />
+                          </span>
+                        ) : (
+                          <span class="inline-flex items-center text-green-400">
+                            <Icon name="ri:thumb-up-fill" class="size-4" />
+                          </span>
+                        )}
+                      </td>
+                      <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
+                        <TimeFormatted
+                          date={vote.createdAt}
+                          prefix={false}
+                          hourPrecision
+                          caseType="sentence"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : (
+        <section class="border-night-400 bg-night-400/5 flex flex-wrap items-center justify-between gap-2 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+          <h2 class="font-title text-day-200 grow-9999 text-xl font-bold">
+            <Icon name="ri:thumb-up-line" class="mr-2 inline-block size-5" />
+            Recent Votes
+          </h2>
+          <span class="text-day-500 inline-flex grow items-center justify-center gap-1">
+            <Icon name="ri:lock-line" class="inline-block size-5" />
+            Locked
+          </span>
+        </section>
+      )
+    }
+
+    <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+      <header class="flex items-center justify-between">
+        <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+          <Icon name="ri:lightbulb-line" class="mr-2 inline-block size-5" />
+          Recent Suggestions
+        </h2>
+      </header>
+
+      {
+        user.suggestions.length === 0 ? (
+          <p class="text-day-400">No suggestions yet.</p>
+        ) : (
+          <div class="overflow-x-auto">
+            <table class="divide-night-400/20 w-full min-w-full divide-y">
+              <thead>
+                <tr>
+                  <th class="text-day-400 px-4 py-3 text-left text-xs">Service</th>
+                  <th class="text-day-400 px-4 py-3 text-left text-xs">Type</th>
+                  <th class="text-day-400 px-4 py-3 text-center text-xs">Status</th>
+                  <th class="text-day-400 px-4 py-3 text-right text-xs">Date</th>
+                </tr>
+              </thead>
+              <tbody class="divide-night-400/10 divide-y">
+                {user.suggestions.map((suggestion) => {
+                  const typeInfo = getServiceSuggestionTypeInfo(suggestion.type)
+                  const statusInfo = getServiceSuggestionStatusInfo(suggestion.status)
+
+                  return (
+                    <tr class="hover:bg-night-500/5">
+                      <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
+                        <a
+                          href={`/service-suggestion/${suggestion.id}`}
+                          class="text-blue-400 hover:underline"
+                        >
+                          {suggestion.service.name}
+                        </a>
+                      </td>
+                      <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
+                        <span class="inline-flex items-center">
+                          <Icon name={typeInfo.icon} class="mr-1 size-4" />
+                          {typeInfo.label}
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-center">
+                        <span
+                          class={cn(
+                            'border-night-500/20 bg-night-800/10 inline-flex items-center rounded-full border px-2 py-0.5 text-xs',
+                            statusInfo.iconClass
+                          )}
+                        >
+                          <Icon name={statusInfo.icon} class="mr-1 size-3" />
+                          {statusInfo.label}
+                        </span>
+                      </td>
+                      <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
+                        <TimeFormatted
+                          date={suggestion.createdAt}
+                          prefix={false}
+                          hourPrecision
+                          caseType="sentence"
+                        />
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </section>
+
+    <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+      <header class="flex items-center justify-between">
+        <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+          <Icon name="ri:exchange-line" class="mr-2 inline-block size-5" />
+          Recent Karma Transactions
+        </h2>
+        <span class="text-day-500">{user.totalKarma.toLocaleString()} karma</span>
+      </header>
+
+      {
+        user.karmaTransactions.length === 0 ? (
+          <p class="text-day-400">No karma transactions yet.</p>
+        ) : (
+          <div class="overflow-x-auto">
+            <table class="divide-night-400/20 w-full min-w-full divide-y">
+              <thead>
+                <tr>
+                  <th class="text-day-400 px-4 py-3 text-left text-xs">Action</th>
+                  <th class="text-day-400 px-4 py-3 text-left text-xs">Description</th>
+                  <th class="text-day-400 px-4 py-3 text-right text-xs">Points</th>
+                  <th class="text-day-400 px-4 py-3 text-right text-xs">Date</th>
+                </tr>
+              </thead>
+              <tbody class="divide-night-400/10 divide-y">
+                {user.karmaTransactions.map((transaction) => (
+                  <tr class="hover:bg-night-500/5">
+                    <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">{transaction.action}</td>
+                    <td class="text-day-300 px-4 py-3">{transaction.description}</td>
+                    <td
+                      class={cn(
+                        'px-4 py-3 text-right text-xs whitespace-nowrap',
+                        transaction.points >= 0 ? 'text-green-400' : 'text-red-400'
+                      )}
+                    >
+                      {transaction.points >= 0 && '+'}
+                      {transaction.points}
+                    </td>
+                    <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
+                      <TimeFormatted
+                        date={transaction.createdAt}
+                        prefix={false}
+                        hourPrecision
+                        caseType="sentence"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </section>
+  </div>
+</BaseLayout>

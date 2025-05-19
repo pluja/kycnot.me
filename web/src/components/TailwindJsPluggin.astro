@@ -1,0 +1,11 @@
+---
+
+---
+
+<script>
+  document.body.classList.add('js')
+
+  document.addEventListener('astro:before-swap', (event) => {
+    event.newDocument.body.classList.add('js')
+  })
+</script>

@@ -1,0 +1,119 @@
+---
+import { Icon } from 'astro-icon/components'
+import { Markdown } from 'astro-remote'
+
+import { cn } from '../lib/cn'
+
+import InputWrapper from './InputWrapper.astro'
+
+import type { MarkdownString } from '../lib/markdown'
+import type { ComponentProps } from 'astro/types'
+
+type Props = Omit<ComponentProps<typeof InputWrapper>, 'children' | 'inputId'> & {
+  options: {
+    label: string
+    value: string
+    icon?: string
+    iconClass?: string
+    description?: MarkdownString
+  }[]
+  disabled?: boolean
+  selectedValue?: string
+  cardSize?: 'lg' | 'md' | 'sm'
+  iconSize?: 'md' | 'sm'
+  multiple?: boolean
+}
+
+const {
+  options,
+  disabled,
+  selectedValue,
+  cardSize = 'sm',
+  iconSize = 'sm',
+  class: className,
+  multiple,
+  ...wrapperProps
+} = Astro.props
+
+const inputId = Astro.locals.makeId(`input-${wrapperProps.name}`)
+
+const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
+---
+
+<InputWrapper inputId={inputId} class={cn('@container', className)} {...wrapperProps}>
+  <div
+    class={cn(
+      'grid grid-cols-[repeat(auto-fill,minmax(var(--card-min-size),1fr))] gap-2 rounded-lg',
+      !multiple &&
+        'has-focus-visible:ring-offset-night-900 has-focus-visible:ring-day-200 has-focus-visible:bg-night-900 has-focus-visible:ring-2 has-focus-visible:ring-offset-3',
+      {
+        '[--card-min-size:12rem] @max-[12rem]:grid-cols-1': cardSize === 'sm',
+        '[--card-min-size:16rem] @max-[16rem]:grid-cols-1': cardSize === 'md',
+        '[--card-min-size:32rem] @max-[32rem]:grid-cols-1': cardSize === 'lg',
+      },
+      hasError && 'border border-red-700 p-2'
+    )}
+  >
+    {
+      options.map((option) => (
+        <label
+          class={cn(
+            'group border-night-400 bg-night-600 hover:bg-night-500 relative cursor-pointer items-start gap-3 rounded-lg border p-3 transition-all',
+            'has-checked:border-green-700 has-checked:bg-green-700/20 has-checked:ring-1 has-checked:ring-green-700',
+            multiple &&
+              'has-focus-visible:border-day-300 has-focus-visible:ring-2 has-focus-visible:ring-green-700 has-focus-visible:ring-offset-1',
+            disabled && 'cursor-not-allowed opacity-50'
+          )}
+        >
+          <input
+            transition:persist
+            type={multiple ? 'checkbox' : 'radio'}
+            name={wrapperProps.name}
+            value={option.value}
+            checked={selectedValue === option.value}
+            class="peer sr-only"
+            disabled={disabled}
+          />
+          <div class="flex items-center gap-1.5">
+            {option.icon && (
+              <Icon
+                name={option.icon}
+                class={cn(
+                  'text-day-200 group-peer-checked:text-day-300 size-8',
+                  {
+                    'size-4': iconSize === 'sm',
+                    'size-8': iconSize === 'md',
+                  },
+                  option.iconClass
+                )}
+              />
+            )}
+            <p class="text-day-200 group-peer-checked:text-day-300 flex-1 text-sm leading-none font-medium text-pretty">
+              {option.label}
+            </p>
+            <div class="self-stretch">
+              <div
+                class={cn(
+                  'border-day-600 flex size-5 items-center justify-center border-2',
+                  'group-has-checked:border-green-600 group-has-checked:bg-green-600',
+                  multiple ? 'rounded-md' : 'rounded-full',
+                  !!option.description && '-m-1'
+                )}
+              >
+                <Icon
+                  name="ri:check-line"
+                  class="text-day-100 size-3 opacity-0 group-has-checked:opacity-100"
+                />
+              </div>
+            </div>
+          </div>
+          {option.description && (
+            <div class="prose prose-sm prose-invert text-day-400 mt-1 text-xs text-pretty">
+              <Markdown content={option.description} />
+            </div>
+          )}
+        </label>
+      ))
+    }
+  </div>
+</InputWrapper>

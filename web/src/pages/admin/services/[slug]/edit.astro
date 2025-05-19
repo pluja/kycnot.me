@@ -1,0 +1,1367 @@
+---
+import {
+  AttributeCategory,
+  Currency,
+  EventType,
+  VerificationStatus,
+  VerificationStepStatus,
+} from '@prisma/client'
+import { Icon } from 'astro-icon/components'
+import { actions, isInputError } from 'astro:actions'
+import { Image } from 'astro:assets'
+
+import { serviceVisibilities } from '../../../../constants/serviceVisibility'
+import BaseLayout from '../../../../layouts/BaseLayout.astro'
+import { cn } from '../../../../lib/cn'
+import { prisma } from '../../../../lib/prisma'
+import { ACCEPTED_IMAGE_TYPES } from '../../../../lib/zodUtils'
+
+const { slug } = Astro.params
+
+const serviceResult = Astro.getActionResult(actions.admin.service.update)
+const eventCreateResult = Astro.getActionResult(actions.admin.event.create)
+const eventToggleResult = Astro.getActionResult(actions.admin.event.toggle)
+const eventDeleteResult = Astro.getActionResult(actions.admin.event.delete)
+const eventUpdateResult = Astro.getActionResult(actions.admin.event.update)
+const verificationStepCreateResult = Astro.getActionResult(actions.admin.verificationStep.create)
+const verificationStepUpdateResult = Astro.getActionResult(actions.admin.verificationStep.update)
+const verificationStepDeleteResult = Astro.getActionResult(actions.admin.verificationStep.delete)
+
+Astro.locals.banners.addIfSuccess(serviceResult, 'Service updated successfully')
+Astro.locals.banners.addIfSuccess(eventCreateResult, 'Event created successfully')
+Astro.locals.banners.addIfSuccess(eventToggleResult, 'Event visibility updated successfully')
+Astro.locals.banners.addIfSuccess(eventDeleteResult, 'Event deleted successfully')
+Astro.locals.banners.addIfSuccess(eventUpdateResult, 'Event updated successfully')
+Astro.locals.banners.addIfSuccess(verificationStepCreateResult, 'Verification step added successfully')
+Astro.locals.banners.addIfSuccess(verificationStepUpdateResult, 'Verification step updated successfully')
+Astro.locals.banners.addIfSuccess(verificationStepDeleteResult, 'Verification step deleted successfully')
+
+if (serviceResult && !serviceResult.error && slug !== serviceResult.data.service.slug) {
+  return Astro.redirect(`/admin/services/${serviceResult.data.service.slug}/edit`)
+}
+
+const serviceInputErrors = isInputError(serviceResult?.error) ? serviceResult.error.fields : {}
+const eventInputErrors = isInputError(eventCreateResult?.error) ? eventCreateResult.error.fields : {}
+const eventUpdateInputErrors = isInputError(eventUpdateResult?.error) ? eventUpdateResult.error.fields : {}
+const verificationStepInputErrors = isInputError(verificationStepCreateResult?.error)
+  ? verificationStepCreateResult.error.fields
+  : {}
+const verificationStepUpdateInputErrors = isInputError(verificationStepUpdateResult?.error)
+  ? verificationStepUpdateResult.error.fields
+  : {}
+
+if (!slug) return Astro.rewrite('/404')
+
+const service = await Astro.locals.banners.try('Error fetching service', () =>
+  prisma.service.findUnique({
+    where: { slug },
+    include: {
+      attributes: {
+        select: {
+          attribute: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      },
+      categories: {
+        select: {
+          id: true,
+        },
+      },
+      events: {
+        orderBy: {
+          startedAt: 'desc',
+        },
+      },
+      verificationRequests: {
+        select: {
+          id: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              displayName: true,
+            },
+          },
+          createdAt: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
+      verificationSteps: {
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
+      contactMethods: {
+        orderBy: {
+          label: 'asc',
+        },
+      },
+      _count: {
+        select: {
+          verificationRequests: true,
+        },
+      },
+    },
+  })
+)
+
+if (!service) return Astro.rewrite('/404')
+
+const categories = await Astro.locals.banners.try(
+  'Error fetching categories',
+  () =>
+    prisma.category.findMany({
+      orderBy: { name: 'asc' },
+    }),
+  []
+)
+
+const attributes = await Astro.locals.banners.try(
+  'Error fetching attributes',
+  () =>
+    prisma.attribute.findMany({
+      orderBy: { category: 'asc' },
+    }),
+  []
+)
+
+const inputBaseClasses =
+  'w-full rounded-md border-zinc-600 bg-zinc-700/80 p-2 text-zinc-200 placeholder-zinc-400 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm'
+const labelBaseClasses = 'block text-sm font-medium text-zinc-300 mb-1'
+const errorTextClasses = 'mt-1 text-xs text-red-400'
+const checkboxLabelClasses = 'inline-flex items-center text-sm text-zinc-300'
+const checkboxInputClasses =
+  'rounded-sm border-zinc-500 bg-zinc-700 text-sky-500 focus:ring-sky-500 focus:ring-offset-zinc-800'
+
+// Button style constants
+const buttonPrimaryClasses =
+  'inline-flex items-center justify-center rounded-md border border-transparent bg-sky-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-zinc-900'
+
+const buttonSmallBaseClasses = 'rounded-md px-2 py-1 text-xs font-medium'
+const buttonSmallPrimaryClasses = cn(
+  buttonSmallBaseClasses,
+  'text-sky-400 hover:bg-sky-700/30 hover:text-sky-300'
+)
+const buttonSmallSecondaryClasses = cn(
+  buttonSmallBaseClasses,
+  'text-zinc-400 hover:bg-zinc-700/50 hover:text-zinc-300'
+)
+const buttonSmallDestructiveClasses = cn(
+  buttonSmallBaseClasses,
+  'text-red-400 hover:bg-red-700/30 hover:text-red-300'
+)
+const buttonSmallWarningClasses = cn(
+  buttonSmallBaseClasses,
+  'text-yellow-400 hover:bg-yellow-700/30 hover:text-yellow-300'
+)
+---
+
+<BaseLayout pageTitle={`Edit Service: ${service.name}`}>
+  <div class="mx-auto max-w-3xl space-y-8">
+    <div class="mb-6 flex items-center justify-between border-b border-zinc-700 pb-3">
+      <h1 class="font-title text-2xl text-zinc-100">
+        Editing <span class="font-semibold text-yellow-500">{service.name}</span> [{service.id}]
+      </h1>
+      <a
+        href={`/service/${service.slug}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-sky-400 hover:text-sky-300 hover:underline focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+      >
+        <Icon name="ri:external-link-line" class="size-4" />
+        View Service Page
+      </a>
+    </div>
+
+    <section>
+      <h2 class="font-title mb-4 border-b border-zinc-700 pb-2 text-xl font-semibold text-zinc-100">
+        Service Details
+      </h2>
+      <form
+        method="POST"
+        action={actions.admin.service.update}
+        class="space-y-6 rounded-lg border border-zinc-700/80 bg-zinc-800/60 p-6 shadow-lg backdrop-blur-sm"
+        enctype="multipart/form-data"
+      >
+        <input type="hidden" name="id" value={service.id} />
+        <div>
+          <label for="name" class={labelBaseClasses}>Name</label>
+          <input
+            transition:persist
+            type="text"
+            name="name"
+            id="name"
+            required
+            value={service.name}
+            class={inputBaseClasses}
+          />
+          {serviceInputErrors.name && <p class={errorTextClasses}>{serviceInputErrors.name.join(', ')}</p>}
+        </div>
+
+        <div>
+          <label for="description" class={labelBaseClasses}>Description</label>
+          <textarea
+            transition:persist
+            name="description"
+            id="description"
+            required
+            rows={4}
+            class={inputBaseClasses}>{service.description}</textarea
+          >
+          {
+            serviceInputErrors.description && (
+              <p class={errorTextClasses}>{serviceInputErrors.description.join(', ')}</p>
+            )
+          }
+        </div>
+
+        <div>
+          <label for="slug" class={cn(labelBaseClasses, 'font-title')}>Slug (auto-generated if empty)</label>
+          <input
+            transition:persist
+            type="text"
+            name="slug"
+            id="slug"
+            value={service.slug}
+            class={cn(inputBaseClasses, 'font-title')}
+          />
+          {serviceInputErrors.slug && <p class={errorTextClasses}>{serviceInputErrors.slug.join(', ')}</p>}
+        </div>
+
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div>
+            <label for="serviceUrls" class={labelBaseClasses}>Service URLs (one per line)</label>
+            <textarea
+              transition:persist
+              class={inputBaseClasses}
+              name="serviceUrls"
+              id="serviceUrls"
+              rows={3}
+              placeholder="https://example1.com\nhttps://example2.com"
+              >{service.serviceUrls.join('\n')}</textarea
+            >
+            {
+              serviceInputErrors.serviceUrls && (
+                <p class={errorTextClasses}>{serviceInputErrors.serviceUrls.join(', ')}</p>
+              )
+            }
+          </div>
+          <div>
+            <label for="tosUrls" class={labelBaseClasses}>ToS URLs (one per line)</label>
+            <textarea
+              transition:persist
+              class={inputBaseClasses}
+              name="tosUrls"
+              id="tosUrls"
+              rows={3}
+              placeholder="https://example1.com/tos\nhttps://example2.com/tos"
+              >{service.tosUrls.join('\n')}</textarea
+            >
+            {
+              serviceInputErrors.tosUrls && (
+                <p class={errorTextClasses}>{serviceInputErrors.tosUrls.join(', ')}</p>
+              )
+            }
+          </div>
+          <div>
+            <label for="onionUrls" class={labelBaseClasses}>Onion URLs (one per line)</label>
+            <textarea
+              transition:persist
+              class={inputBaseClasses}
+              name="onionUrls"
+              id="onionUrls"
+              rows={3}
+              placeholder="http://example1.onion\nhttp://example2.onion"
+              >{service.onionUrls.join('\n')}</textarea
+            >
+            {
+              serviceInputErrors.onionUrls && (
+                <p class={errorTextClasses}>{serviceInputErrors.onionUrls.join(', ')}</p>
+              )
+            }
+          </div>
+          <div>
+            <label for="i2pUrls" class={labelBaseClasses}>I2P URLs (one per line)</label>
+            <textarea
+              transition:persist
+              class={inputBaseClasses}
+              name="i2pUrls"
+              id="i2pUrls"
+              rows={3}
+              placeholder="http://example1.b32.i2p\nhttp://example2.b32.i2p"
+              >{service.i2pUrls.join('\n')}</textarea
+            >
+            {/* Assuming i2pUrls might have errors, add error display if schema supports it */}
+            {
+              /* serviceInputErrors.i2pUrls && (
+              <p class={errorTextClasses}>{serviceInputErrors.i2pUrls.join(', ')}</p>
+            ) */
+            }
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-end gap-4">
+            <div class="grow">
+              <label for="imageFile" class={labelBaseClasses}>Service Image</label>
+              <div class="space-y-1">
+                <input
+                  transition:persist
+                  type="file"
+                  name="imageFile"
+                  id="imageFile"
+                  accept={ACCEPTED_IMAGE_TYPES.join(',')}
+                  class={cn(
+                    inputBaseClasses,
+                    'p-0 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-600 file:px-3 file:py-2 file:font-medium file:text-zinc-200 hover:file:bg-zinc-500'
+                  )}
+                />
+                <p class="text-xs text-zinc-400">
+                  Leave empty to keep the current image. Square images (e.g., 256x256) recommended.
+                </p>
+              </div>
+              {
+                serviceInputErrors.imageFile && (
+                  <p class={errorTextClasses}>{serviceInputErrors.imageFile.join(', ')}</p>
+                )
+              }
+            </div>
+            {
+              service.imageUrl ? (
+                <div class="mt-2 shrink-0">
+                  <Image
+                    src={service.imageUrl}
+                    alt="Current service image"
+                    width={100}
+                    height={100}
+                    class="h-24 w-24 rounded-md border border-zinc-600 object-cover"
+                  />
+                </div>
+              ) : (
+                <div class="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg border border-zinc-600 bg-zinc-700/50 text-3xl leading-none text-zinc-500">
+                  <Icon name="ri:image-add-line" class="size-10" />
+                </div>
+              )
+            }
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div>
+            <label class={labelBaseClasses} for="categories">Categories</label>
+            <div
+              class="mt-1 max-h-48 space-y-1 space-x-2 overflow-y-auto rounded-md border border-zinc-600 bg-zinc-700/30 p-3"
+            >
+              {
+                categories.map((category) => (
+                  <label class={checkboxLabelClasses}>
+                    <input
+                      transition:persist
+                      type="checkbox"
+                      name="categories"
+                      value={category.id}
+                      checked={service.categories.some((c) => c.id === category.id)}
+                      class={cn(checkboxInputClasses, 'mr-1')}
+                    />
+                    <span>{category.name}</span>
+                  </label>
+                ))
+              }
+            </div>
+            {
+              serviceInputErrors.categories && (
+                <p class={errorTextClasses}>{serviceInputErrors.categories.join(', ')}</p>
+              )
+            }
+          </div>
+
+          <div>
+            <label for="kycLevel" class={labelBaseClasses}>KYC Level (0-4)</label>
+            <input
+              transition:persist
+              class={inputBaseClasses}
+              type="number"
+              name="kycLevel"
+              id="kycLevel"
+              min={0}
+              max={4}
+              value={service.kycLevel}
+            />
+            {
+              serviceInputErrors.kycLevel && (
+                <p class={errorTextClasses}>{serviceInputErrors.kycLevel.join(', ')}</p>
+              )
+            }
+          </div>
+        </div>
+
+        <div>
+          <label class={labelBaseClasses} for="attributes">Attributes</label>
+          <div class="space-y-3">
+            {
+              Object.values(AttributeCategory).map((categoryValue) => (
+                <div class="rounded-md border border-zinc-700 bg-zinc-700/30 p-4">
+                  <h4 class="font-title text-md mb-2 font-medium text-zinc-200">{categoryValue}</h4>
+                  <div class="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
+                    {attributes
+                      .filter((attr) => attr.category === categoryValue)
+                      .map((attr) => (
+                        <label class={checkboxLabelClasses}>
+                          <input
+                            transition:persist
+                            type="checkbox"
+                            name="attributes"
+                            value={attr.id}
+                            checked={service.attributes.some((a) => a.attribute.id === attr.id)}
+                            class={cn(checkboxInputClasses, 'mr-2')}
+                          />
+                          <span class="flex items-center gap-1.5">
+                            {attr.title}
+                            <span
+                              class={cn(
+                                'rounded-sm border px-1 py-0.5 text-xs font-medium',
+                                {
+                                  'border-green-500/50 bg-green-500/20 text-green-300': attr.type === 'GOOD',
+                                },
+                                {
+                                  'border-red-500/50 bg-red-500/20 text-red-300': attr.type === 'BAD',
+                                },
+                                {
+                                  'border-yellow-500/50 bg-yellow-500/20 text-yellow-300':
+                                    attr.type === 'WARNING',
+                                },
+                                {
+                                  'border-sky-500/50 bg-sky-500/20 text-sky-300': attr.type === 'INFO',
+                                }
+                              )}
+                            >
+                              {attr.type}
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                  </div>
+                  {serviceInputErrors.attributes && (
+                    <p class={errorTextClasses}>{serviceInputErrors.attributes.join(', ')}</p>
+                  )}
+                </div>
+              ))
+            }
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div>
+            <label class={labelBaseClasses} for="verificationStatus">Verification Status</label>
+            <select
+              transition:persist
+              class={inputBaseClasses}
+              name="verificationStatus"
+              id="verificationStatus"
+            >
+              {
+                Object.values(VerificationStatus).map((status) => (
+                  <option value={status} selected={service.verificationStatus === status}>
+                    {status}
+                  </option>
+                ))
+              }
+            </select>
+            {
+              serviceInputErrors.verificationStatus && (
+                <p class={errorTextClasses}>{serviceInputErrors.verificationStatus.join(', ')}</p>
+              )
+            }
+          </div>
+
+          <div>
+            <label class={labelBaseClasses} for="acceptedCurrencies">Accepted Currencies</label>
+            <div
+              class="mt-1 max-h-32 space-y-1 space-x-2 overflow-y-auto rounded-md border border-zinc-600 bg-zinc-700/30 p-3"
+            >
+              {
+                Object.values(Currency).map((currency) => (
+                  <label class={checkboxLabelClasses}>
+                    <input
+                      transition:persist
+                      type="checkbox"
+                      name="acceptedCurrencies"
+                      value={currency}
+                      checked={service.acceptedCurrencies.includes(currency)}
+                      class={cn(checkboxInputClasses, 'mr-1')}
+                    />
+                    <span>{currency}</span>
+                  </label>
+                ))
+              }
+            </div>
+            {
+              serviceInputErrors.acceptedCurrencies && (
+                <p class={errorTextClasses}>{serviceInputErrors.acceptedCurrencies.join(', ')}</p>
+              )
+            }
+          </div>
+        </div>
+
+        <div>
+          <label class={labelBaseClasses} for="verificationSummary">Verification Summary (Markdown)</label>
+          <textarea
+            transition:persist
+            class={inputBaseClasses}
+            name="verificationSummary"
+            id="verificationSummary"
+            rows={4}>{service.verificationSummary}</textarea
+          >
+          {
+            serviceInputErrors.verificationSummary && (
+              <p class={errorTextClasses}>{serviceInputErrors.verificationSummary.join(', ')}</p>
+            )
+          }
+        </div>
+
+        <div>
+          <label class={labelBaseClasses} for="verificationProofMd">Verification Proof (Markdown)</label>
+          <textarea
+            transition:persist
+            class={inputBaseClasses}
+            name="verificationProofMd"
+            id="verificationProofMd"
+            rows={8}>{service.verificationProofMd}</textarea
+          >
+          {
+            serviceInputErrors.verificationProofMd && (
+              <p class={errorTextClasses}>{serviceInputErrors.verificationProofMd.join(', ')}</p>
+            )
+          }
+        </div>
+
+        <div>
+          <label class={labelBaseClasses} for="referral">Referral Code/Link (Optional)</label>
+          <input
+            transition:persist
+            type="text"
+            name="referral"
+            id="referral"
+            value={service.referral}
+            placeholder="e.g., REFCODE123 or https://example.com?ref=123"
+            class={inputBaseClasses}
+          />
+          {
+            serviceInputErrors.referral && (
+              <p class={errorTextClasses}>{serviceInputErrors.referral.join(', ')}</p>
+            )
+          }
+        </div>
+
+        <div>
+          <label class={labelBaseClasses} for="serviceVisibility">Service Visibility</label>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {
+              serviceVisibilities.map((visibility) => (
+                <div class="contents">
+                  <input
+                    transition:persist
+                    type="radio"
+                    name="serviceVisibility"
+                    id={`serviceVisibility-${visibility.value}`}
+                    value={visibility.value}
+                    checked={service.serviceVisibility === visibility.value}
+                    class="peer sr-only"
+                  />
+                  <label
+                    for={`serviceVisibility-${visibility.value}`}
+                    class="group relative cursor-pointer items-start gap-3 rounded-lg border border-zinc-700 bg-zinc-700/50 p-3 transition-all peer-checked:border-sky-500 peer-checked:bg-sky-500/20 peer-checked:ring-1 peer-checked:ring-sky-500 hover:bg-zinc-700/80"
+                  >
+                    <div class="mb-1 flex items-center gap-1.5">
+                      <Icon
+                        name={visibility.icon}
+                        class={cn(
+                          'size-4 text-zinc-300 group-peer-checked:text-sky-400',
+                          visibility.iconClass
+                        )}
+                      />
+                      <span class="text-sm font-medium text-zinc-200 group-peer-checked:text-sky-300">
+                        {visibility.label}
+                      </span>
+                    </div>
+                    <p class="text-xs leading-snug text-zinc-400 group-peer-checked:text-sky-400/80">
+                      {visibility.description}
+                    </p>
+                  </label>
+                </div>
+              ))
+            }
+          </div>
+          {
+            serviceInputErrors.serviceVisibility && (
+              <p class={errorTextClasses}>{serviceInputErrors.serviceVisibility.join(', ')}</p>
+            )
+          }
+        </div>
+
+        <button
+          type="submit"
+          class="inline-flex justify-center rounded-md border border-transparent bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+        >
+          Update Service
+        </button>
+      </form>
+    </section>
+
+    <!-- Events Section -->
+    <section>
+      <h2 class="font-title mb-4 border-b border-zinc-700 pb-2 text-xl font-semibold text-zinc-100">
+        Events
+      </h2>
+      <div
+        class="space-y-6 rounded-lg border border-zinc-700/80 bg-zinc-800/60 p-6 shadow-lg backdrop-blur-sm"
+      >
+        <!-- Existing Events List -->
+        {
+          service.events.length > 0 && (
+            <div class="space-y-3">
+              <h3 class="font-title mb-2 text-lg font-medium text-zinc-200">Existing Events</h3>
+              {service.events.map((event) => (
+                <div class="rounded-md border border-zinc-700 bg-zinc-700/30 p-3">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex-grow space-y-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-md font-semibold text-zinc-100">{event.title}</span>
+                        <span
+                          class={cn(
+                            'rounded-full border px-2 py-0.5 text-xs font-medium',
+                            // Matching status badge styles from service/[slug].astro
+                            {
+                              'border-yellow-500/60 bg-yellow-500/20 text-yellow-300':
+                                event.type === 'WARNING',
+                              'border-red-500/60 bg-red-500/20 text-red-300': event.type === 'ALERT',
+                              'border-sky-500/60 bg-sky-500/20 text-sky-300': event.type === 'INFO',
+                              'border-green-500/60 bg-green-500/20 text-green-300':
+                                event.type === 'NORMAL' || event.type === 'UPDATE',
+                              'border-teal-500/60 bg-teal-500/20 text-teal-300':
+                                event.type === 'WARNING_SOLVED' || event.type === 'ALERT_SOLVED',
+                            }
+                          )}
+                        >
+                          {event.type}
+                        </span>
+                        {!event.visible && (
+                          <span class="rounded-full border border-zinc-600 bg-zinc-500/20 px-2 py-0.5 text-xs font-medium text-zinc-400">
+                            Hidden
+                          </span>
+                        )}
+                      </div>
+                      <p class="text-sm text-pretty text-zinc-400">{event.content}</p>
+                      <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+                        <span>Started: {new Date(event.startedAt).toLocaleDateString()}</span>
+                        <span>
+                          Ended:
+                          {event.endedAt
+                            ? event.endedAt === event.startedAt
+                              ? '1-time event'
+                              : new Date(event.endedAt).toLocaleDateString()
+                            : 'Ongoing'}
+                        </span>
+                        {event.source && <span>Source: {event.source}</span>}
+                      </div>
+                    </div>
+                    <div class="flex shrink-0 gap-1.5">
+                      <form method="POST" action={actions.admin.event.toggle} class="inline">
+                        <input type="hidden" name="eventId" value={event.id} />
+                        <button
+                          type="submit"
+                          class={buttonSmallWarningClasses}
+                          title={event.visible ? 'Hide Event' : 'Show Event'}
+                        >
+                          <Icon name={event.visible ? 'ri:eye-off-line' : 'ri:eye-line'} class="size-4" />
+                        </button>
+                      </form>
+                      <button
+                        type="button"
+                        class={buttonSmallPrimaryClasses}
+                        title="Edit Event"
+                        onclick={`document.getElementById('edit-event-${event.id}')?.classList.toggle('hidden')`}
+                      >
+                        <Icon name="ri:pencil-line" class="size-4" />
+                      </button>
+                      <form method="POST" action={actions.admin.event.delete} class="inline">
+                        <input type="hidden" name="eventId" value={event.id} />
+                        <button type="submit" class={buttonSmallDestructiveClasses} title="Delete Event">
+                          <Icon name="ri:delete-bin-line" class="size-4" />
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                  {/* Edit Event Form - Hidden by default */}
+                  <form
+                    id={`edit-event-${event.id}`}
+                    method="POST"
+                    action={actions.admin.event.update}
+                    class="mt-3 hidden space-y-3 rounded-md border border-zinc-600 bg-zinc-700/40 p-3"
+                  >
+                    <input type="hidden" name="eventId" value={event.id} />
+                    <div>
+                      <label for={`title-${event.id}`} class={labelBaseClasses}>
+                        Title
+                      </label>
+                      <input
+                        type="text"
+                        name="title"
+                        id={`title-${event.id}`}
+                        required
+                        value={event.title}
+                        class={inputBaseClasses}
+                      />
+                      {eventUpdateInputErrors.title && (
+                        <p class={errorTextClasses}>{eventUpdateInputErrors.title.join(', ')}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label for={`content-${event.id}`} class={labelBaseClasses}>
+                        Content
+                      </label>
+                      <textarea
+                        name="content"
+                        id={`content-${event.id}`}
+                        required
+                        rows={3}
+                        class={inputBaseClasses}
+                      >
+                        {event.content}
+                      </textarea>
+                      {eventUpdateInputErrors.content && (
+                        <p class={errorTextClasses}>{eventUpdateInputErrors.content.join(', ')}</p>
+                      )}
+                    </div>
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <div>
+                        <label for={`startedAt-${event.id}`} class={labelBaseClasses}>
+                          Started At
+                        </label>
+                        <input
+                          type="date"
+                          name="startedAt"
+                          id={`startedAt-${event.id}`}
+                          required
+                          value={new Date(event.startedAt).toISOString().split('T')[0]}
+                          class={inputBaseClasses}
+                        />
+                        {eventUpdateInputErrors.startedAt && (
+                          <p class={errorTextClasses}>{eventUpdateInputErrors.startedAt.join(', ')}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label for={`endedAt-${event.id}`} class={labelBaseClasses}>
+                          Ended At (optional)
+                        </label>
+                        <input
+                          type="date"
+                          name="endedAt"
+                          id={`endedAt-${event.id}`}
+                          value={event.endedAt ? new Date(event.endedAt).toISOString().split('T')[0] : ''}
+                          class={inputBaseClasses}
+                        />
+                        {eventUpdateInputErrors.endedAt && (
+                          <p class={errorTextClasses}>{eventUpdateInputErrors.endedAt.join(', ')}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <div>
+                        <label for={`source-${event.id}`} class={labelBaseClasses}>
+                          Source (URL)
+                        </label>
+                        <input
+                          type="text"
+                          name="source"
+                          id={`source-${event.id}`}
+                          value={event.source}
+                          class={inputBaseClasses}
+                        />
+                        {eventUpdateInputErrors.source && (
+                          <p class={errorTextClasses}>{eventUpdateInputErrors.source.join(', ')}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label for={`type-${event.id}`} class={labelBaseClasses}>
+                          Type
+                        </label>
+                        <select name="type" id={`type-${event.id}`} required class={inputBaseClasses}>
+                          {Object.values(EventType).map((type) => (
+                            <option value={type} selected={event.type === type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
+                        {eventUpdateInputErrors.type && (
+                          <p class={errorTextClasses}>{eventUpdateInputErrors.type.join(', ')}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div class="mt-2 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        class={buttonSmallSecondaryClasses}
+                        onclick={`document.getElementById('edit-event-${event.id}')?.classList.add('hidden')`}
+                      >
+                        Cancel
+                      </button>
+                      <button type="submit" class={buttonSmallPrimaryClasses}>
+                        Update Event
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              ))}
+            </div>
+          )
+        }
+
+        <details class="group" open={!service.events.length}>
+          <summary class="cursor-pointer list-none">
+            <h3
+              class="font-title inline-flex items-center gap-1 text-lg font-medium text-zinc-200 hover:text-sky-400"
+            >
+              <Icon
+                name="ri:arrow-right-s-line"
+                class="size-5 transition-transform duration-150 group-open:rotate-90"
+              />
+              Add New Event
+            </h3>
+          </summary>
+          <form
+            method="POST"
+            action={actions.admin.event.create}
+            class="mt-3 space-y-4 border-t border-zinc-700 pt-4"
+          >
+            <input type="hidden" name="serviceId" value={service.id} />
+            <div>
+              <label for="newEventTitle" class={labelBaseClasses}>Title</label>
+              <input type="text" name="title" id="newEventTitle" required class={inputBaseClasses} />
+              {eventInputErrors.title && <p class={errorTextClasses}>{eventInputErrors.title.join(', ')}</p>}
+            </div>
+            <div>
+              <label for="newEventContent" class={labelBaseClasses}>Content</label>
+              <textarea name="content" id="newEventContent" required rows={3} class={inputBaseClasses}
+              ></textarea>
+              {
+                eventInputErrors.content && (
+                  <p class={errorTextClasses}>{eventInputErrors.content.join(', ')}</p>
+                )
+              }
+            </div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label for="newEventStartedAt" class={labelBaseClasses}>Started At</label>
+                <input
+                  type="date"
+                  name="startedAt"
+                  id="newEventStartedAt"
+                  required
+                  value={new Date().toISOString().split('T')[0]}
+                  class={inputBaseClasses}
+                />
+                {
+                  eventInputErrors.startedAt && (
+                    <p class={errorTextClasses}>{eventInputErrors.startedAt.join(', ')}</p>
+                  )
+                }
+              </div>
+              <div>
+                <label for="newEventEndedAt" class={labelBaseClasses}>Ended At (optional)</label>
+                <input
+                  type="date"
+                  name="endedAt"
+                  id="newEventEndedAt"
+                  value={new Date().toISOString().split('T')[0]}
+                  class={inputBaseClasses}
+                />
+                {
+                  eventInputErrors.endedAt && (
+                    <p class={errorTextClasses}>{eventInputErrors.endedAt.join(', ')}</p>
+                  )
+                }
+              </div>
+            </div>
+            <div
+              class="rounded-md border border-yellow-600/50 bg-yellow-500/10 p-3 text-xs text-yellow-300/80"
+            >
+              <p class="mb-1 font-semibold text-yellow-200/90">End Date Options:</p>
+              <ul class="list-disc space-y-0.5 pl-4">
+                <li>Leave empty: Event is ongoing.</li>
+                <li>Same as start date: One-time event.</li>
+                <li>Future date: Event with specific end date.</li>
+              </ul>
+            </div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label for="newEventSource" class={labelBaseClasses}>Source (URL)</label>
+                <input type="text" name="source" id="newEventSource" class={inputBaseClasses} />
+                {
+                  eventInputErrors.source && (
+                    <p class={errorTextClasses}>{eventInputErrors.source.join(', ')}</p>
+                  )
+                }
+              </div>
+              <div>
+                <label for="newEventType" class={labelBaseClasses}>Type</label>
+                <select name="type" id="newEventType" required class={inputBaseClasses}>
+                  {Object.values(EventType).map((type) => <option value={type}>{type}</option>)}
+                </select>
+                {eventInputErrors.type && <p class={errorTextClasses}>{eventInputErrors.type.join(', ')}</p>}
+              </div>
+            </div>
+            <button type="submit" class={buttonPrimaryClasses}>Add Event</button>
+          </form>
+        </details>
+      </div>
+    </section>
+
+    <!-- Verification Steps Section -->
+    <section>
+      <h2 class="font-title mb-4 border-b border-zinc-700 pb-2 text-xl font-semibold text-zinc-100">
+        Verification Steps
+      </h2>
+      <div
+        class="space-y-6 rounded-lg border border-zinc-700/80 bg-zinc-800/60 p-6 shadow-lg backdrop-blur-sm"
+      >
+        <!-- Existing Verification Steps List -->
+        {
+          service.verificationSteps.length > 0 && (
+            <div class="space-y-3">
+              <h3 class="font-title mb-2 text-lg font-medium text-zinc-200">Submitted Steps</h3>
+              {service.verificationSteps.map((step) => (
+                <div class="rounded-md border border-zinc-700 bg-zinc-700/30 p-3">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex-grow space-y-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-md font-semibold text-zinc-100">{step.title}</span>
+                        <span
+                          class={cn('rounded-full border px-2 py-0.5 text-xs font-medium', {
+                            'border-sky-500/60 bg-sky-500/20 text-sky-300':
+                              step.status === VerificationStepStatus.PENDING,
+                            'border-yellow-500/60 bg-yellow-500/20 text-yellow-300':
+                              step.status === VerificationStepStatus.IN_PROGRESS,
+                            'border-green-500/60 bg-green-500/20 text-green-300':
+                              step.status === VerificationStepStatus.PASSED,
+                            'border-red-500/60 bg-red-500/20 text-red-300':
+                              step.status === VerificationStepStatus.FAILED,
+                          })}
+                        >
+                          {step.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <p class="text-sm text-pretty text-zinc-400">{step.description}</p>
+                      {step.evidenceMd && (
+                        <p class="mt-1 text-xs text-zinc-500 italic">Evidence provided (see edit form)</p>
+                      )}
+                      <p class="text-xs text-zinc-500">
+                        Created: {new Date(step.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div class="flex shrink-0 gap-1.5">
+                      <button
+                        type="button"
+                        class={buttonSmallPrimaryClasses}
+                        title="Edit Step"
+                        onclick={`document.getElementById('edit-verification-step-${step.id}')?.classList.toggle('hidden')`}
+                      >
+                        <Icon name="ri:pencil-line" class="size-4" />
+                      </button>
+                      <form method="POST" action={actions.admin.verificationStep.delete} class="inline">
+                        <input type="hidden" name="id" value={step.id} />
+                        <button type="submit" class={buttonSmallDestructiveClasses} title="Delete Step">
+                          <Icon name="ri:delete-bin-line" class="size-4" />
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+
+                  {/* Edit Verification Step Form - Hidden by default */}
+                  <form
+                    id={`edit-verification-step-${step.id}`}
+                    method="POST"
+                    action={actions.admin.verificationStep.update}
+                    class="mt-3 hidden space-y-3 rounded-md border border-zinc-600 bg-zinc-700/40 p-3"
+                  >
+                    <input type="hidden" name="id" value={step.id} />
+                    <div>
+                      <label for={`stepTitleEdit-${step.id}`} class={labelBaseClasses}>
+                        Title
+                      </label>
+                      <input
+                        type="text"
+                        name="title"
+                        id={`stepTitleEdit-${step.id}`}
+                        value={step.title}
+                        class={inputBaseClasses}
+                      />
+                      {verificationStepUpdateInputErrors.title && (
+                        <p class={errorTextClasses}>{verificationStepUpdateInputErrors.title.join(', ')}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label for={`stepDescriptionEdit-${step.id}`} class={labelBaseClasses}>
+                        Description (Max 200 chars)
+                      </label>
+                      <textarea
+                        name="description"
+                        id={`stepDescriptionEdit-${step.id}`}
+                        rows={2}
+                        class={inputBaseClasses}
+                      >
+                        {step.description}
+                      </textarea>
+                      {verificationStepUpdateInputErrors.description && (
+                        <p class={errorTextClasses}>
+                          {verificationStepUpdateInputErrors.description.join(', ')}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label for={`stepEvidenceMdEdit-${step.id}`} class={labelBaseClasses}>
+                        Evidence (Markdown)
+                      </label>
+                      <textarea
+                        name="evidenceMd"
+                        id={`stepEvidenceMdEdit-${step.id}`}
+                        rows={4}
+                        class={inputBaseClasses}
+                      >
+                        {step.evidenceMd}
+                      </textarea>
+                      {verificationStepUpdateInputErrors.evidenceMd && (
+                        <p class={errorTextClasses}>
+                          {verificationStepUpdateInputErrors.evidenceMd.join(', ')}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label for={`stepStatusEdit-${step.id}`} class={labelBaseClasses}>
+                        Status
+                      </label>
+                      <select name="status" id={`stepStatusEdit-${step.id}`} class={inputBaseClasses}>
+                        {Object.values(VerificationStepStatus).map((status) => (
+                          <option value={status} selected={step.status === status}>
+                            {status.replace('_', ' ')}
+                          </option>
+                        ))}
+                      </select>
+                      {verificationStepUpdateInputErrors.status && (
+                        <p class={errorTextClasses}>{verificationStepUpdateInputErrors.status.join(', ')}</p>
+                      )}
+                    </div>
+                    <div class="mt-2 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        class={buttonSmallSecondaryClasses}
+                        onclick={`document.getElementById('edit-verification-step-${step.id}')?.classList.add('hidden')`}
+                      >
+                        Cancel
+                      </button>
+                      <button type="submit" class={buttonSmallPrimaryClasses}>
+                        Update Step
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              ))}
+            </div>
+          )
+        }
+
+        <details class="group" open={!service.verificationSteps.length}>
+          <summary class="cursor-pointer list-none">
+            <h3
+              class="font-title inline-flex items-center gap-1 text-lg font-medium text-zinc-200 hover:text-sky-400"
+            >
+              <Icon
+                name="ri:arrow-right-s-line"
+                class="size-5 transition-transform duration-150 group-open:rotate-90"
+              />
+              Add New Verification Step
+            </h3>
+          </summary>
+          <form
+            method="POST"
+            action={actions.admin.verificationStep.create}
+            class="mt-3 space-y-4 border-t border-zinc-700 pt-4"
+          >
+            <input type="hidden" name="serviceId" value={service.id} />
+            <div>
+              <label for="newStepTitle" class={labelBaseClasses}>Title</label>
+              <input type="text" name="title" id="newStepTitle" required class={inputBaseClasses} />
+              {
+                verificationStepInputErrors.title && (
+                  <p class={errorTextClasses}>{verificationStepInputErrors.title.join(', ')}</p>
+                )
+              }
+            </div>
+            <div>
+              <label for="newStepDescription" class={labelBaseClasses}>Description (Max 200 chars)</label>
+              <textarea name="description" id="newStepDescription" required rows={3} class={inputBaseClasses}
+              ></textarea>
+              {
+                verificationStepInputErrors.description && (
+                  <p class={errorTextClasses}>{verificationStepInputErrors.description.join(', ')}</p>
+                )
+              }
+            </div>
+            <div>
+              <label for="newStepEvidenceMd" class={labelBaseClasses}>Evidence (Markdown)</label>
+              <textarea name="evidenceMd" id="newStepEvidenceMd" rows={5} class={inputBaseClasses}></textarea>
+              {
+                verificationStepInputErrors.evidenceMd && (
+                  <p class={errorTextClasses}>{verificationStepInputErrors.evidenceMd.join(', ')}</p>
+                )
+              }
+            </div>
+            <div>
+              <label for="newStepStatus" class={labelBaseClasses}>Status</label>
+              <select name="status" id="newStepStatus" required class={inputBaseClasses}>
+                {
+                  Object.values(VerificationStepStatus).map((status) => (
+                    <option value={status}>{status.replace('_', ' ')}</option>
+                  ))
+                }
+              </select>
+              {
+                verificationStepInputErrors.status && (
+                  <p class={errorTextClasses}>{verificationStepInputErrors.status.join(', ')}</p>
+                )
+              }
+            </div>
+            <button type="submit" class={buttonPrimaryClasses}>Add Verification Step</button>
+          </form>
+        </details>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="font-title mb-4 border-b border-zinc-700 pb-2 text-xl font-semibold text-zinc-100">
+        Verification Requests
+        <span class="ml-2 rounded-full bg-sky-500/20 px-2.5 py-0.5 text-sm font-medium text-sky-300">
+          {service._count.verificationRequests}
+        </span>
+      </h2>
+      <div
+        class="overflow-hidden rounded-lg border border-zinc-700/80 bg-zinc-800/60 p-0 shadow-lg backdrop-blur-sm"
+      >
+        {
+          service.verificationRequests.length > 0 ? (
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-zinc-700/50">
+                  <tr class="text-left">
+                    <th class="p-3 font-semibold text-zinc-300">User</th>
+                    <th class="p-3 font-semibold text-zinc-300">Requested At</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-700/80">
+                  {service.verificationRequests.map((request) => (
+                    <tr class="transition-colors hover:bg-zinc-700/40">
+                      <td class="p-3 text-zinc-300">{request.user.displayName ?? request.user.name}</td>
+                      <td class="p-3 text-zinc-400">{new Date(request.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p class="p-6 text-center text-zinc-400">No verification requests yet.</p>
+          )
+        }
+      </div>
+    </section>
+
+    <!-- Contact Methods Section -->
+    <section>
+      <h2 class="font-title mb-4 border-b border-zinc-700 pb-2 text-xl font-semibold text-zinc-100">
+        Contact Methods
+      </h2>
+      <div
+        class="space-y-6 rounded-lg border border-zinc-700/80 bg-zinc-800/60 p-6 shadow-lg backdrop-blur-sm"
+      >
+        <!-- Existing Contact Methods List -->
+        {
+          service.contactMethods.length > 0 && (
+            <div class="space-y-3">
+              <h3 class="font-title mb-2 text-lg font-medium text-zinc-200">Existing Contact Methods</h3>
+              {service.contactMethods.map((method) => (
+                <div class="rounded-md border border-zinc-700 bg-zinc-700/30 p-3">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex-grow space-y-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <Icon name={method.iconId} class="size-4 text-zinc-300" />
+                        <span class="text-md font-semibold text-zinc-100">{method.label}</span>
+                      </div>
+                      <p class="text-sm text-pretty text-zinc-400">{method.value}</p>
+                      {method.info && <p class="text-xs text-zinc-500">{method.info}</p>}
+                    </div>
+                    <div class="flex shrink-0 gap-1.5">
+                      <button
+                        type="button"
+                        class={buttonSmallPrimaryClasses}
+                        title="Edit Contact Method"
+                        onclick={`document.getElementById('edit-contact-method-${method.id}')?.classList.toggle('hidden')`}
+                      >
+                        <Icon name="ri:pencil-line" class="size-4" />
+                      </button>
+                      <form method="POST" action={actions.admin.service.deleteContactMethod} class="inline">
+                        <input type="hidden" name="id" value={method.id} />
+                        <button
+                          type="submit"
+                          class={buttonSmallDestructiveClasses}
+                          title="Delete Contact Method"
+                        >
+                          <Icon name="ri:delete-bin-line" class="size-4" />
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+
+                  {/* Edit Contact Method Form - Hidden by default */}
+                  <form
+                    id={`edit-contact-method-${method.id}`}
+                    method="POST"
+                    action={actions.admin.service.updateContactMethod}
+                    class="mt-3 hidden space-y-3 rounded-md border border-zinc-600 bg-zinc-700/40 p-3"
+                  >
+                    <input type="hidden" name="id" value={method.id} />
+                    <input type="hidden" name="serviceId" value={service.id} />
+                    <div>
+                      <label for={`contactLabel-${method.id}`} class={labelBaseClasses}>
+                        Label
+                      </label>
+                      <input
+                        type="text"
+                        name="label"
+                        id={`contactLabel-${method.id}`}
+                        value={method.label}
+                        class={inputBaseClasses}
+                      />
+                    </div>
+                    <div>
+                      <label for={`contactValue-${method.id}`} class={labelBaseClasses}>
+                        Value (with protocol)
+                      </label>
+                      <input
+                        type="text"
+                        name="value"
+                        id={`contactValue-${method.id}`}
+                        value={method.value}
+                        placeholder="e.g., mailto:contact@example.com or https://t.me/example"
+                        class={inputBaseClasses}
+                      />
+                    </div>
+                    <div>
+                      <label for={`contactIcon-${method.id}`} class={labelBaseClasses}>
+                        Icon ID
+                      </label>
+                      <input
+                        type="text"
+                        name="iconId"
+                        id={`contactIcon-${method.id}`}
+                        value={method.iconId}
+                        placeholder="e.g., ri:mail-line or ri:telegram-line"
+                        class={inputBaseClasses}
+                      />
+                    </div>
+                    <div>
+                      <label for={`contactInfo-${method.id}`} class={labelBaseClasses}>
+                        Additional Info (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        name="info"
+                        id={`contactInfo-${method.id}`}
+                        value={method.info}
+                        placeholder="e.g., Available 24/7 or Response within 24h"
+                        class={inputBaseClasses}
+                      />
+                    </div>
+                    <div class="mt-2 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        class={buttonSmallSecondaryClasses}
+                        onclick={`document.getElementById('edit-contact-method-${method.id}')?.classList.add('hidden')`}
+                      >
+                        Cancel
+                      </button>
+                      <button type="submit" class={buttonSmallPrimaryClasses}>
+                        Update Contact Method
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              ))}
+            </div>
+          )
+        }
+
+        <details class="group" open={!service.contactMethods.length}>
+          <summary class="cursor-pointer list-none">
+            <h3
+              class="font-title inline-flex items-center gap-1 text-lg font-medium text-zinc-200 hover:text-sky-400"
+            >
+              <Icon
+                name="ri:arrow-right-s-line"
+                class="size-5 transition-transform duration-150 group-open:rotate-90"
+              />
+              Add New Contact Method
+            </h3>
+          </summary>
+          <form
+            method="POST"
+            action={actions.admin.service.createContactMethod}
+            class="mt-3 space-y-4 border-t border-zinc-700 pt-4"
+          >
+            <input type="hidden" name="serviceId" value={service.id} />
+            <div>
+              <label for="newContactLabel" class={labelBaseClasses}>Label</label>
+              <input type="text" name="label" id="newContactLabel" required class={inputBaseClasses} />
+            </div>
+            <div>
+              <label for="newContactValue" class={labelBaseClasses}>Value (with protocol)</label>
+              <input
+                type="text"
+                name="value"
+                id="newContactValue"
+                required
+                placeholder="e.g., mailto:contact@example.com or https://t.me/example"
+                class={inputBaseClasses}
+              />
+            </div>
+            <div>
+              <label for="newContactIcon" class={labelBaseClasses}>Icon ID</label>
+              <input
+                type="text"
+                name="iconId"
+                id="newContactIcon"
+                required
+                placeholder="e.g., ri:mail-line or ri:telegram-line"
+                class={inputBaseClasses}
+              />
+            </div>
+            <div>
+              <label for="newContactInfo" class={labelBaseClasses}>Additional Info (Optional)</label>
+              <input
+                type="text"
+                name="info"
+                id="newContactInfo"
+                placeholder="e.g., Available 24/7 or Response within 24h"
+                class={inputBaseClasses}
+              />
+            </div>
+            <button type="submit" class={buttonPrimaryClasses}>Add Contact Method</button>
+          </form>
+        </details>
+      </div>
+    </section>
+  </div></BaseLayout
+>

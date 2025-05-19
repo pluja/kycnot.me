@@ -1,0 +1,590 @@
+// This is your Prisma schema file
+
+datasource db {
+  provider = "postgres"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator json {
+  provider = "prisma-json-types-generator"
+}
+
+enum CommentStatus {
+  PENDING
+  HUMAN_PENDING
+  APPROVED
+  VERIFIED
+  REJECTED
+}
+
+enum OrderIdStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Comment {
+  id                  Int                @id @default(autoincrement())
+  /// Computed via trigger. Do not update through prisma.
+  upvotes             Int                @default(0)
+  status              CommentStatus      @default(PENDING)
+  suspicious          Boolean            @default(false)
+  requiresAdminReview Boolean            @default(false)
+  communityNote       String?
+  verificationNote    String?
+  internalNote        String?
+  privateContext      String?
+  orderId             String?            @db.VarChar(100)
+  orderIdStatus       OrderIdStatus?     @default(PENDING)
+  kycRequested        Boolean            @default(false)
+  fundsBlocked        Boolean            @default(false)
+  content             String
+  rating              Int?               @db.SmallInt
+  ratingActive        Boolean            @default(false)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @default(now()) @updatedAt
+  author              User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId            Int
+  service             Service            @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId           Int
+  parentId            Int?
+  parent              Comment?           @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies             Comment[]          @relation("CommentReplies")
+  karmaTransactions   KarmaTransaction[]
+  votes               CommentVote[]
+
+  notificationPreferenceswatchedComments NotificationPreferences[] @relation("watchedComments")
+  Notification                           Notification[]
+
+  @@unique([serviceId, orderId], name: "unique_orderId_per_service")
+  @@index([status])
+  @@index([createdAt])
+  @@index([serviceId])
+  @@index([authorId])
+  @@index([upvotes])
+  @@index([rating])
+  @@index([ratingActive])
+}
+
+enum VerificationStatus {
+  COMMUNITY_CONTRIBUTED
+  // COMMUNITY_VERIFIED
+  APPROVED
+  VERIFICATION_SUCCESS
+  VERIFICATION_FAILED
+}
+
+enum ServiceInfoBanner {
+  NONE
+  NO_LONGER_OPERATIONAL
+}
+
+enum ServiceVisibility {
+  PUBLIC
+  UNLISTED
+  HIDDEN
+}
+
+enum Currency {
+  MONERO
+  BITCOIN
+  LIGHTNING
+  FIAT
+  CASH
+}
+
+enum EventType {
+  WARNING
+  WARNING_SOLVED
+  ALERT
+  ALERT_SOLVED
+  INFO
+  NORMAL
+  UPDATE
+}
+
+enum ServiceUserRole {
+  OWNER
+  ADMIN
+  MODERATOR
+  SUPPORT
+  TEAM_MEMBER
+}
+
+enum AccountStatusChange {
+  ADMIN_TRUE
+  ADMIN_FALSE
+  VERIFIED_TRUE
+  VERIFIED_FALSE
+  VERIFIER_TRUE
+  VERIFIER_FALSE
+  SPAMMER_TRUE
+  SPAMMER_FALSE
+}
+
+enum NotificationType {
+  COMMENT_STATUS_CHANGE
+  REPLY_COMMENT_CREATED
+  COMMUNITY_NOTE_ADDED
+  /// Comment that is not a reply. May include a rating.
+  ROOT_COMMENT_CREATED
+  SUGGESTION_MESSAGE
+  SUGGESTION_STATUS_CHANGE
+  // KARMA_UNLOCK // TODO: [KARMA_UNLOCK] Will be added later, when karma unloks are in the database, not in the code.
+  /// Marked as spammer, promoted to admin, etc.
+  ACCOUNT_STATUS_CHANGE
+  EVENT_CREATED
+  SERVICE_VERIFICATION_STATUS_CHANGE
+}
+
+enum CommentStatusChange {
+  MARKED_AS_SPAM
+  UNMARKED_AS_SPAM
+  MARKED_FOR_ADMIN_REVIEW
+  UNMARKED_FOR_ADMIN_REVIEW
+  STATUS_CHANGED_TO_APPROVED
+  STATUS_CHANGED_TO_VERIFIED
+  STATUS_CHANGED_TO_REJECTED
+  STATUS_CHANGED_TO_PENDING
+}
+
+enum ServiceVerificationStatusChange {
+  STATUS_CHANGED_TO_COMMUNITY_CONTRIBUTED
+  STATUS_CHANGED_TO_APPROVED
+  STATUS_CHANGED_TO_VERIFICATION_SUCCESS
+  STATUS_CHANGED_TO_VERIFICATION_FAILED
+}
+
+enum ServiceSuggestionStatusChange {
+  STATUS_CHANGED_TO_PENDING
+  STATUS_CHANGED_TO_APPROVED
+  STATUS_CHANGED_TO_REJECTED
+  STATUS_CHANGED_TO_WITHDRAWN
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  user      User             @relation("NotificationOwner", fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @default(now()) @updatedAt
+
+  aboutComment                         Comment?                         @relation(fields: [aboutCommentId], references: [id])
+  aboutCommentId                       Int?
+  aboutEvent                           Event?                           @relation(fields: [aboutEventId], references: [id])
+  aboutEventId                         Int?
+  aboutService                         Service?                         @relation(fields: [aboutServiceId], references: [id])
+  aboutServiceId                       Int?
+  aboutServiceSuggestion               ServiceSuggestion?               @relation(fields: [aboutServiceSuggestionId], references: [id])
+  aboutServiceSuggestionId             Int?
+  aboutServiceSuggestionMessage        ServiceSuggestionMessage?        @relation(fields: [aboutServiceSuggestionMessageId], references: [id])
+  aboutServiceSuggestionMessageId      Int?
+  aboutAccountStatusChange             AccountStatusChange?
+  aboutCommentStatusChange             CommentStatusChange?
+  aboutServiceVerificationStatusChange ServiceVerificationStatusChange?
+  aboutSuggestionStatusChange          ServiceSuggestionStatusChange?
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+  @@index([userId, read, createdAt])
+  @@index([userId, type, aboutCommentId])
+  @@index([userId, type, aboutServiceSuggestionMessageId], map: "idx_notification_suggestion_message")
+  @@index([userId, type, aboutServiceSuggestionId], map: "idx_notification_suggestion_status")
+  @@index([userId, type, aboutAccountStatusChange], map: "idx_notification_account_status")
+}
+
+model NotificationPreferences {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  userId Int  @unique
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  enableOnMyCommentStatusChange     Boolean @default(true)
+  enableAutowatchMyComments         Boolean @default(true)
+  enableNotifyPendingRepliesOnWatch Boolean @default(false)
+
+  onEventCreatedForServices       Service[] @relation("onEventCreatedForServices")
+  onRootCommentCreatedForServices Service[] @relation("onRootCommentCreatedForServices")
+  onVerificationChangeForServices Service[] @relation("onVerificationChangeForServices")
+  watchedComments                 Comment[] @relation("watchedComments")
+
+  onServiceVerificationChangeFilter NotificationPreferenceOnServiceVerificationChangeFilterFilter[]
+}
+
+model NotificationPreferenceOnServiceVerificationChangeFilterFilter {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  verificationStatus        VerificationStepStatus
+  notificationPreferences   NotificationPreferences @relation(fields: [notificationPreferencesId], references: [id], onDelete: Cascade)
+  notificationPreferencesId Int
+
+  categories Category[]
+  attributes Attribute[]
+  currencies Currency[]
+  /// 0-10
+  scores     Int[]
+
+  @@unique([verificationStatus, notificationPreferencesId])
+}
+
+model Event {
+  id           Int            @id @default(autoincrement())
+  title        String
+  content      String
+  source       String?
+  type         EventType
+  visible      Boolean        @default(true)
+  startedAt    DateTime
+  /// If null, the event is ongoing. If same as startedAt, the event is a one-time event. If startedAt is in the future, the event is upcoming.
+  endedAt      DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @default(now()) @updatedAt
+  service      Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId    Int
+  Notification Notification[]
+
+  @@index([visible])
+  @@index([startedAt])
+  @@index([createdAt])
+  @@index([endedAt])
+  @@index([type])
+  @@index([serviceId])
+}
+
+enum ServiceSuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum ServiceSuggestionType {
+  CREATE_SERVICE
+  EDIT_SERVICE
+}
+
+model ServiceSuggestion {
+  id               Int                        @id @default(autoincrement())
+  type             ServiceSuggestionType
+  status           ServiceSuggestionStatus    @default(PENDING)
+  notes            String?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @default(now()) @updatedAt
+  userId           Int
+  serviceId        Int
+  user             User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service          Service                    @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  messages         ServiceSuggestionMessage[]
+  Notification     Notification[]
+  KarmaTransaction KarmaTransaction[]
+
+  @@index([userId])
+  @@index([serviceId])
+}
+
+model ServiceSuggestionMessage {
+  id            Int               @id @default(autoincrement())
+  content       String
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @default(now()) @updatedAt
+  userId        Int
+  suggestionId  Int
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  suggestion    ServiceSuggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+
+  @@index([userId])
+  @@index([suggestionId])
+  @@index([createdAt])
+}
+
+model Service {
+  id                     Int                          @id @default(autoincrement())
+  name                   String
+  slug                   String                       @unique
+  description            String
+  categories             Category[]                   @relation("ServiceToCategory")
+  kycLevel               Int                          @default(4)
+  overallScore           Int                          @default(0)
+  privacyScore           Int                          @default(0)
+  trustScore             Int                          @default(0)
+  /// Computed via trigger. Do not update through prisma.
+  isRecentlyListed       Boolean                      @default(false)
+  /// Computed via trigger. Do not update through prisma.
+  averageUserRating      Float?
+  serviceVisibility      ServiceVisibility            @default(PUBLIC)
+  serviceInfoBanner      ServiceInfoBanner            @default(NONE)
+  serviceInfoBannerNotes String?
+  verificationStatus     VerificationStatus           @default(COMMUNITY_CONTRIBUTED)
+  verificationSummary    String?
+  verificationRequests   ServiceVerificationRequest[]
+  verificationProofMd    String?
+  /// Computed via trigger when the service status is VERIFICATION_SUCCESS. Do not update through prisma.
+  verifiedAt             DateTime?
+  /// [UserSentiment]
+  userSentiment          Json?
+  userSentimentAt        DateTime?
+  referral               String?
+  acceptedCurrencies     Currency[]                   @default([])
+  serviceUrls            String[]
+  tosUrls                String[]                     @default([])
+  onionUrls              String[]                     @default([])
+  i2pUrls                String[]                     @default([])
+  imageUrl               String?
+  /// [TosReview]
+  tosReview              Json?
+  tosReviewAt            DateTime?
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @default(now()) @updatedAt
+  listedAt               DateTime?
+  comments               Comment[]
+  events                 Event[]
+  contactMethods         ServiceContactMethod[]       @relation("ServiceToContactMethod")
+  attributes             ServiceAttribute[]
+  verificationSteps      VerificationStep[]
+  suggestions            ServiceSuggestion[]
+
+  onEventCreatedForServices       NotificationPreferences[] @relation("onEventCreatedForServices")
+  onRootCommentCreatedForServices NotificationPreferences[] @relation("onRootCommentCreatedForServices")
+  onVerificationChangeForServices NotificationPreferences[] @relation("onVerificationChangeForServices")
+  Notification                    Notification[]
+  affiliatedUsers                 ServiceUser[]             @relation("ServiceUsers")
+
+  @@index([listedAt])
+  @@index([overallScore])
+  @@index([privacyScore])
+  @@index([trustScore])
+  @@index([averageUserRating])
+  @@index([name])
+  @@index([verificationStatus])
+  @@index([kycLevel])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([slug])
+}
+
+model ServiceContactMethod {
+  id        Int     @id @default(autoincrement())
+  label     String
+  /// Including the protocol (e.g. "mailto:", "tel:", "https://")
+  value     String
+  iconId    String
+  info      String
+  services  Service @relation("ServiceToContactMethod", fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId Int
+}
+
+enum AttributeCategory {
+  PRIVACY
+  TRUST
+}
+
+enum AttributeType {
+  GOOD
+  BAD
+  WARNING
+  INFO
+}
+
+model Attribute {
+  id            Int                @id @default(autoincrement())
+  slug          String             @unique
+  title         String
+  /// Markdown
+  description   String
+  privacyPoints Int                @default(0)
+  trustPoints   Int                @default(0)
+  category      AttributeCategory
+  type          AttributeType
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @default(now()) @updatedAt
+  services      ServiceAttribute[]
+
+  notificationPreferencesOnServiceVerificationChange NotificationPreferenceOnServiceVerificationChangeFilterFilter[]
+}
+
+model InternalUserNote {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  user          User  @relation("UserRecievedNotes", fields: [userId], references: [id], onDelete: Cascade)
+  userId        Int
+  addedByUser   User? @relation("UserAddedNotes", fields: [addedByUserId], references: [id], onDelete: SetNull)
+  addedByUserId Int?
+
+  @@index([userId])
+  @@index([addedByUserId])
+  @@index([createdAt])
+}
+
+model User {
+  id              Int     @id @default(autoincrement())
+  name            String  @unique
+  displayName     String?
+  link            String?
+  picture         String?
+  spammer         Boolean @default(false)
+  verified        Boolean @default(false)
+  admin           Boolean @default(false)
+  verifier        Boolean @default(false)
+  verifiedLink    String?
+  secretTokenHash String  @unique
+  /// Computed via trigger. Do not update through prisma.
+  totalKarma      Int     @default(0)
+
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @default(now()) @updatedAt
+  lastLoginAt             DateTime                     @default(now())
+  comments                Comment[]
+  karmaTransactions       KarmaTransaction[]
+  commentVotes            CommentVote[]
+  suggestions             ServiceSuggestion[]
+  suggestionMessages      ServiceSuggestionMessage[]
+  internalNotes           InternalUserNote[]           @relation("UserRecievedNotes")
+  addedInternalNotes      InternalUserNote[]           @relation("UserAddedNotes")
+  verificationRequests    ServiceVerificationRequest[]
+  notifications           Notification[]               @relation("NotificationOwner")
+  notificationPreferences NotificationPreferences?
+  serviceAffiliations     ServiceUser[]                @relation("UserServices")
+
+  @@index([createdAt])
+  @@index([totalKarma])
+}
+
+model CommentVote {
+  id        Int      @id @default(autoincrement())
+  downvote  Boolean  @default(false) // false = upvote, true = downvote
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, userId]) // Ensure one vote per user per comment
+  @@index([commentId])
+  @@index([userId])
+}
+
+model ServiceAttribute {
+  service     Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId   Int
+  attribute   Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  attributeId Int
+  createdAt   DateTime  @default(now())
+
+  @@id([serviceId, attributeId])
+}
+
+model KarmaTransaction {
+  id           Int                @id @default(autoincrement())
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int
+  action       String
+  points       Int                @default(0)
+  comment      Comment?           @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId    Int?
+  suggestion   ServiceSuggestion? @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  suggestionId Int?
+  description  String
+  processed    Boolean            @default(false)
+  createdAt    DateTime           @default(now())
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([processed])
+  @@index([suggestionId])
+  @@index([commentId])
+}
+
+enum VerificationStepStatus {
+  PENDING
+  IN_PROGRESS
+  PASSED
+  FAILED
+}
+
+model VerificationStep {
+  id          Int                    @id @default(autoincrement())
+  title       String
+  description String
+  status      VerificationStepStatus @default(PENDING)
+  evidenceMd  String?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @default(now()) @updatedAt
+  service     Service                @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId   Int
+
+  @@index([serviceId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Category {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+  icon String
+  slug String @unique
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  services  Service[] @relation("ServiceToCategory")
+
+  notificationPreferencesOnServiceVerificationChange NotificationPreferenceOnServiceVerificationChangeFilterFilter[]
+
+  @@index([name])
+  @@index([slug])
+}
+
+model ServiceVerificationRequest {
+  id        Int      @id @default(autoincrement())
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([serviceId, userId])
+  @@index([serviceId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ServiceScoreRecalculationJob {
+  id          Int       @id @default(autoincrement())
+  serviceId   Int       @unique
+  createdAt   DateTime  @default(now())
+  processedAt DateTime? @updatedAt
+
+  @@index([processedAt])
+  @@index([createdAt])
+}
+
+model ServiceUser {
+  id        Int             @id @default(autoincrement())
+  userId    Int
+  user      User            @relation("UserServices", fields: [userId], references: [id], onDelete: Cascade)
+  serviceId Int
+  service   Service         @relation("ServiceUsers", fields: [serviceId], references: [id], onDelete: Cascade)
+  role      ServiceUserRole
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@unique([userId, serviceId])
+  @@index([userId])
+  @@index([serviceId])
+  @@index([role])
+}

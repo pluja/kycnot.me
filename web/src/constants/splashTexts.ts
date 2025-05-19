@@ -1,0 +1,17 @@
+export const splashTexts: string[] = [
+  'Privacy is not a crime.',
+  'True financial independence.',
+  'Privacy is a human right.',
+  'Cypherpunk zone ahead.',
+  'KYC? Not me!',
+  'Freedom through privacy.',
+  'Resist surveillance.',
+  'Anonymity is power.',
+  'Defend your privacy.',
+  'Unbank yourself.',
+  'Banking without borders.',
+  'Escape the panopticon.',
+  'Ditch the gatekeepers.',
+  'Own your identity.',
+  'Financial privacy matters.',
+]

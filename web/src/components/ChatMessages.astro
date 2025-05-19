@@ -1,0 +1,110 @@
+---
+import { Picture } from 'astro:assets'
+
+import { cn } from '../lib/cn'
+import { formatDateShort } from '../lib/timeAgo'
+
+import type { Prisma } from '@prisma/client'
+import type { HTMLAttributes } from 'astro/types'
+
+export type ChatMessage = {
+  id: number
+  content: string
+  createdAt: Date
+  user: Prisma.UserGetPayload<{
+    select: {
+      id: true
+      name: true
+      picture: true
+    }
+  }>
+}
+
+type Props = HTMLAttributes<'div'> & {
+  messages: ChatMessage[]
+  userId: number | null
+}
+
+const { messages, userId, class: className, ...htmlProps } = Astro.props
+---
+
+<div
+  class={cn(
+    'mb-1 flex max-h-[60dvh] flex-col-reverse overflow-y-auto mask-t-from-[calc(100%-var(--spacing)*16)] pt-16',
+    className
+  )}
+  {...htmlProps}
+>
+  <p
+    class="sticky bottom-0 -z-1 flex min-h-7 w-full items-end justify-center text-center text-xs text-balance text-gray-500"
+  >
+    <span class="js:hidden">Refresh the page to see new messages</span>
+    <span class="no-js:hidden" data-refresh-in="10">Refreshing every 10s</span>
+  </p>
+  {
+    messages.length > 0 ? (
+      messages
+        .map((message) => ({
+          ...message,
+          formattedCreatedAt: formatDateShort(message.createdAt, {
+            prefix: false,
+            hourPrecision: true,
+            caseType: 'sentence',
+          }),
+        }))
+        .map((message, index, messages) => {
+          const isCurrentUser = message.user.id === userId
+
+          const prev = messages[index - 1]
+          const next = messages[index + 1]
+          const isPrevFromSameUser = !!prev && prev.user.id === message.user.id
+          const isPrevSameDate = !!prev && prev.formattedCreatedAt === message.formattedCreatedAt
+          const isNextFromSameUser = !!next && next.user.id === message.user.id
+          const isNextSameDate = !!next && next.formattedCreatedAt === message.formattedCreatedAt
+
+          return (
+            <div
+              class={cn(
+                'flex flex-col',
+                isCurrentUser ? 'ml-8 items-end' : 'mr-8 items-start',
+                isNextFromSameUser ? 'mt-1' : 'mt-3'
+              )}
+            >
+              {!isCurrentUser && !isNextFromSameUser && (
+                <p class="text-day-500 mb-0.5 text-xs">
+                  {!!message.user.picture && (
+                    <Picture
+                      src={message.user.picture}
+                      height={16}
+                      width={16}
+                      class="inline-block rounded-full align-[-0.33em]"
+                      alt=""
+                      formats={['jxl', 'avif', 'webp']}
+                    />
+                  )}
+                  {message.user.name}
+                </p>
+              )}
+              <p
+                class={cn(
+                  'rounded-xl p-3 text-sm whitespace-pre-wrap',
+                  isCurrentUser ? 'bg-blue-900 text-white' : 'bg-night-500 text-day-300',
+                  isCurrentUser ? 'rounded-br-xs' : 'rounded-bl-xs',
+                  isCurrentUser && isNextFromSameUser && isNextSameDate && 'rounded-tr-xs',
+                  !isCurrentUser && isNextFromSameUser && isNextSameDate && 'rounded-tl-xs'
+                )}
+                id={`message-${message.id.toString()}`}
+              >
+                {message.content}
+              </p>
+              {(!isPrevFromSameUser || !isPrevSameDate) && (
+                <p class="text-day-500 mt-0.5 mb-2 text-xs">{message.formattedCreatedAt}</p>
+              )}
+            </div>
+          )
+        })
+    ) : (
+      <div class="text-day-500 my-16 text-center text-sm italic">No messages yet</div>
+    )
+  }
+</div>

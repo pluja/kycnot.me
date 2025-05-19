@@ -1,0 +1,751 @@
+---
+import { AttributeCategory, AttributeType, type Prisma } from '@prisma/client'
+import { Icon } from 'astro-icon/components'
+import { actions, isInputError } from 'astro:actions'
+import { z } from 'astro:content'
+import { orderBy as lodashOrderBy } from 'lodash-es'
+
+import SortArrowIcon from '../../components/SortArrowIcon.astro'
+import { getAttributeCategoryInfo } from '../../constants/attributeCategories'
+import { getAttributeTypeInfo } from '../../constants/attributeTypes'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { cn } from '../../lib/cn'
+import { formatNumber } from '../../lib/numbers'
+import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
+import { prisma } from '../../lib/prisma'
+
+const search = Astro.url.searchParams.get('search') ?? ''
+const categoryFilter = z
+  .nativeEnum(AttributeCategory)
+  .nullable()
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+  .parse(Astro.url.searchParams.get('category') || null)
+
+const typeFilter = z
+  .nativeEnum(AttributeType)
+  .nullable()
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+  .parse(Astro.url.searchParams.get('type') || null)
+
+const { data: filters } = zodParseQueryParamsStoringErrors(
+  {
+    'sort-by': z
+      .enum(['title', 'category', 'type', 'privacyPoints', 'trustPoints', 'serviceCount'])
+      .default('title'),
+    'sort-order': z.enum(['asc', 'desc']).default('asc'),
+  },
+  Astro
+)
+
+const createResult = Astro.getActionResult(actions.admin.attribute.create)
+Astro.locals.banners.addIfSuccess(createResult, 'Attribute created successfully')
+const createInputErrors = isInputError(createResult?.error) ? createResult.error.fields : {}
+
+const updateResult = Astro.getActionResult(actions.admin.attribute.update)
+Astro.locals.banners.addIfSuccess(updateResult, 'Attribute updated successfully')
+
+const updatedAttributeId = updateResult?.data?.attribute.id ?? null
+
+const sortBy = filters['sort-by']
+const sortOrder = filters['sort-order']
+
+const whereClause: Prisma.AttributeWhereInput = {
+  ...(search
+    ? {
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+          { slug: { contains: search, mode: 'insensitive' } },
+        ],
+      }
+    : {}),
+  category: categoryFilter ?? undefined,
+  type: typeFilter ?? undefined,
+}
+
+let prismaOrderBy: Record<string, 'asc' | 'desc'> = { title: 'asc' } // Default sort
+
+// Ensure sortBy is a valid key for Attribute model for Prisma ordering
+const validPrismaSortKeys = ['title', 'slug', 'privacyPoints', 'trustPoints', 'createdAt', 'updatedAt'] // Add other valid direct fields if needed
+if (validPrismaSortKeys.includes(sortBy)) {
+  prismaOrderBy = { [sortBy]: sortOrder }
+} else {
+  // If sortBy is not a direct DB field (like category, type, serviceCount),
+  // Prisma will use its default (title: asc) or the last valid key set.
+  // The actual sorting for these custom cases will happen in JS after fetch.
+  if (sortBy === 'category' || sortBy === 'type' || sortBy === 'serviceCount') {
+    // Keep default prisma sort, JS will handle it
+  } else {
+    // Fallback if an unexpected sort key is provided, perhaps log this or handle error
+    console.warn(`Unsupported Prisma sort key: ${sortBy}. Defaulting to title sort.`)
+    prismaOrderBy = { title: 'asc' }
+  }
+}
+
+let attributes = await Astro.locals.banners.try(
+  'Error fetching attributes',
+  async () =>
+    prisma.attribute.findMany({
+      where: whereClause,
+      orderBy: prismaOrderBy,
+      include: {
+        services: {
+          select: {
+            serviceId: true,
+          },
+        },
+      },
+    }),
+  []
+)
+
+let attributesWithDetails = attributes.map((attribute) => ({
+  ...attribute,
+  categoryInfo: getAttributeCategoryInfo(attribute.category),
+  typeInfo: getAttributeTypeInfo(attribute.type),
+  serviceCount: attribute.services.length,
+}))
+
+if (sortBy === 'category') {
+  attributesWithDetails = lodashOrderBy(
+    attributesWithDetails,
+    [(item) => item.categoryInfo.order],
+    [sortOrder]
+  )
+} else if (sortBy === 'type') {
+  attributesWithDetails = lodashOrderBy(attributesWithDetails, [(item) => item.typeInfo.order], [sortOrder])
+} else if (sortBy === 'serviceCount') {
+  attributesWithDetails = lodashOrderBy(attributesWithDetails, ['serviceCount'], [sortOrder])
+}
+
+const attributeCount = attributesWithDetails.length
+
+const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
+  const currentSortBy = filters['sort-by']
+  const currentSortOrder = filters['sort-order']
+  const newSortOrder = currentSortBy === slug && currentSortOrder === 'asc' ? 'desc' : 'asc'
+  const searchParams = new URLSearchParams(Astro.url.search)
+  searchParams.set('sort-by', slug)
+  searchParams.set('sort-order', newSortOrder)
+  return `/admin/attributes?${searchParams.toString()}`
+}
+---
+
+<BaseLayout pageTitle="Admin | Attributes" widthClassName="max-w-screen-xl">
+  <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+    <h1 class="font-title text-2xl font-bold text-white">Attribute Management</h1>
+    <div class="mt-2 flex items-center gap-4 sm:mt-0">
+      <span class="text-sm text-zinc-400">{attributeCount} attributes</span>
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none"
+        onclick="document.getElementById('create-attribute-form').classList.toggle('hidden')"
+      >
+        <Icon name="ri:add-line" class="size-4" />
+        <span>New Attribute</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Create Attribute Form (hidden by default, shown via button) -->
+  <div
+    id="create-attribute-form"
+    class="mb-6 hidden rounded-lg border border-zinc-700 bg-zinc-800/50 p-4 shadow-lg"
+  >
+    <h2 class="font-title mb-3 text-lg font-semibold text-green-400">Create New Attribute</h2>
+    <form method="POST" action={actions.admin.attribute.create} class="space-y-4">
+      <div>
+        <label for="title-create" class="block text-sm font-medium text-zinc-300">Title</label>
+        <input
+          transition:persist
+          type="text"
+          name="title"
+          id="title-create"
+          required
+          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-green-500 focus:ring-green-500 focus:outline-none"
+        />
+        {
+          createInputErrors.title && (
+            <p class="mt-1 text-sm text-red-400">{createInputErrors.title.join(', ')}</p>
+          )
+        }
+      </div>
+
+      <div>
+        <label for="description-create" class="block text-sm font-medium text-zinc-300">Description</label>
+        <textarea
+          transition:persist
+          name="description"
+          id="description-create"
+          required
+          rows="3"
+          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-green-500 focus:ring-green-500 focus:outline-none"
+        ></textarea>
+        {
+          createInputErrors.description && (
+            <p class="mt-1 text-sm text-red-400">{createInputErrors.description.join(', ')}</p>
+          )
+        }
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label for="slug-create" class="block text-sm font-medium text-zinc-300">Slug</label>
+          <input
+            transition:persist
+            type="text"
+            name="slug"
+            id="slug-create"
+            required
+            class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-green-500 focus:ring-green-500 focus:outline-none"
+          />
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="privacyPoints-create" class="block text-sm font-medium text-zinc-300">Privacy</label>
+            <input
+              transition:persist
+              type="number"
+              name="privacyPoints"
+              id="privacyPoints-create"
+              min="-100"
+              max="100"
+              value="0"
+              class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-green-500 focus:ring-green-500 focus:outline-none"
+            />
+            {
+              createInputErrors.privacyPoints && (
+                <p class="mt-1 text-sm text-red-400">{createInputErrors.privacyPoints.join(', ')}</p>
+              )
+            }
+          </div>
+          <div>
+            <label for="trustPoints-create" class="block text-sm font-medium text-zinc-300">Trust</label>
+            <input
+              transition:persist
+              type="number"
+              name="trustPoints"
+              id="trustPoints-create"
+              min="-100"
+              max="100"
+              value="0"
+              class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-green-500 focus:ring-green-500 focus:outline-none"
+            />
+            {
+              createInputErrors.trustPoints && (
+                <p class="mt-1 text-sm text-red-400">{createInputErrors.trustPoints.join(', ')}</p>
+              )
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label for="category-create" class="block text-sm font-medium text-zinc-300">Category</label>
+          <select
+            transition:persist
+            name="category"
+            id="category-create"
+            required
+            class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-green-500 focus:ring-green-500 focus:outline-none"
+          >
+            {
+              Object.values(AttributeCategory).map((category) => (
+                <option value={category}>{getAttributeCategoryInfo(category).label}</option>
+              ))
+            }
+          </select>
+          {
+            createInputErrors.category && (
+              <p class="mt-1 text-sm text-red-400">{createInputErrors.category.join(', ')}</p>
+            )
+          }
+        </div>
+        <div>
+          <label for="type-create" class="block text-sm font-medium text-zinc-300">Type</label>
+          <select
+            transition:persist
+            name="type"
+            id="type-create"
+            required
+            class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-green-500 focus:ring-green-500 focus:outline-none"
+          >
+            {
+              Object.values(AttributeType).map((type) => (
+                <option value={type}>{getAttributeTypeInfo(type).label}</option>
+              ))
+            }
+          </select>
+          {
+            createInputErrors.type && (
+              <p class="mt-1 text-sm text-red-400">{createInputErrors.type.join(', ')}</p>
+            )
+          }
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        class="w-full rounded-md bg-green-600 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+      >
+        Create Attribute
+      </button>
+    </form>
+  </div>
+
+  <!-- Filters Bar -->
+  <div class="mb-6 rounded-lg border border-zinc-700 bg-zinc-800/50 p-4 shadow-lg">
+    <form method="GET" class="grid gap-3 md:grid-cols-2 lg:grid-cols-4" autocomplete="off">
+      <div class="lg:col-span-2">
+        <label for="search" class="block text-xs font-medium text-zinc-400">Search</label>
+        <input
+          type="text"
+          name="search"
+          id="search"
+          value={search}
+          placeholder="Search by title, description, slug..."
+          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label for="category-filter" class="block text-xs font-medium text-zinc-400">Category</label>
+        <select
+          name="category"
+          id="category-filter"
+          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+        >
+          <option value="">All Categories</option>
+          {
+            Object.values(AttributeCategory).map((cat) => (
+              <option value={cat} selected={categoryFilter === cat}>
+                {getAttributeCategoryInfo(cat).label}
+              </option>
+            ))
+          }
+        </select>
+      </div>
+      <div>
+        <label for="type-filter" class="block text-xs font-medium text-zinc-400">Type</label>
+        <div class="mt-1 flex">
+          <select
+            name="type"
+            id="type-filter"
+            class="w-full rounded-l-md border border-r-0 border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+          >
+            <option value="">All Types</option>
+            {
+              Object.values(AttributeType).map((attrType) => (
+                <option value={attrType} selected={typeFilter === attrType}>
+                  {getAttributeTypeInfo(attrType).label}
+                </option>
+              ))
+            }
+          </select>
+          <button
+            type="submit"
+            class="inline-flex items-center rounded-r-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+          >
+            <Icon name="ri:search-2-line" class="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Attribute List -->
+  <div class="rounded-lg border border-zinc-700 bg-zinc-800/50 shadow-lg">
+    <div class="sticky top-0 z-10 border-b border-zinc-700 bg-zinc-800/90 px-4 py-3 backdrop-blur-sm">
+      <h2 class="font-title font-semibold text-blue-400">Attributes List</h2>
+      <div class="mt-1 text-xs text-zinc-400 md:hidden">
+        <span>Scroll horizontally to see more →</span>
+      </div>
+    </div>
+
+    <div class="scrollbar-thin max-w-full overflow-x-auto">
+      <div class="min-w-[750px]">
+        <table class="w-full divide-y divide-zinc-700">
+          <thead class="bg-zinc-900/30">
+            <tr>
+              <th
+                scope="col"
+                class="w-[30%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('title')} class="flex items-center hover:text-zinc-200">
+                  Title <SortArrowIcon
+                    active={filters['sort-by'] === 'title'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                scope="col"
+                class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('category')} class="flex items-center hover:text-zinc-200">
+                  Category <SortArrowIcon
+                    active={filters['sort-by'] === 'category'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                scope="col"
+                class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('type')} class="flex items-center hover:text-zinc-200">
+                  Type <SortArrowIcon
+                    active={filters['sort-by'] === 'type'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                scope="col"
+                class="w-[10%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a
+                  href={makeSortUrl('privacyPoints')}
+                  class="flex items-center justify-center hover:text-zinc-200"
+                >
+                  <span class="hidden sm:inline">Privacy</span>
+                  <span class="sm:hidden">Priv</span>
+                  <SortArrowIcon
+                    active={filters['sort-by'] === 'privacyPoints'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                scope="col"
+                class="w-[10%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a
+                  href={makeSortUrl('trustPoints')}
+                  class="flex items-center justify-center hover:text-zinc-200"
+                >
+                  <span class="hidden sm:inline">Trust</span>
+                  <span class="sm:hidden">Tr</span>
+                  <SortArrowIcon
+                    active={filters['sort-by'] === 'trustPoints'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                scope="col"
+                class="w-[10%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a
+                  href={makeSortUrl('serviceCount')}
+                  class="flex items-center justify-center hover:text-zinc-200"
+                >
+                  <span class="hidden sm:inline">Services</span>
+                  <span class="sm:hidden">Svcs</span>
+                  <SortArrowIcon
+                    active={filters['sort-by'] === 'serviceCount'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                scope="col"
+                class="w-[10%] px-4 py-3 text-right text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-700 bg-zinc-800/10">
+            {
+              attributesWithDetails.map((attribute, index) => (
+                <>
+                  <tr id={`attribute-${attribute.id}`} class="group hover:bg-zinc-700/30">
+                    <td class="px-4 py-3 text-sm font-medium text-zinc-200">
+                      <div class="truncate" title={attribute.title}>
+                        {attribute.title}
+                      </div>
+                      <div class="text-2xs text-zinc-500">{attribute.slug}</div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span
+                        class={cn(
+                          'inline-flex items-center rounded-md px-2 py-1 text-xs font-medium',
+                          attribute.categoryInfo.classNames.icon
+                        )}
+                      >
+                        <Icon name={attribute.categoryInfo.icon} class="mr-1 size-3" />
+                        {attribute.categoryInfo.label}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span
+                        class={cn(
+                          'inline-flex items-center rounded-md px-2 py-1 text-xs font-medium',
+                          attribute.typeInfo.classNames.icon
+                        )}
+                      >
+                        <Icon name={attribute.typeInfo.icon} class="mr-1 size-3" />
+                        {attribute.typeInfo.label}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                      <span
+                        class={cn('font-medium', {
+                          'text-red-400': attribute.privacyPoints < 0,
+                          'text-green-400': attribute.privacyPoints > 0,
+                          'text-zinc-500': attribute.privacyPoints === 0,
+                        })}
+                      >
+                        {formatNumber(attribute.privacyPoints, { showSign: true })}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                      <span
+                        class={cn('font-medium', {
+                          'text-red-400': attribute.trustPoints < 0,
+                          'text-green-400': attribute.trustPoints > 0,
+                          'text-zinc-500': attribute.trustPoints === 0,
+                        })}
+                      >
+                        {formatNumber(attribute.trustPoints, { showSign: true })}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                      <span class="inline-flex items-center rounded-full bg-zinc-700 px-2.5 py-0.5 text-xs font-medium text-zinc-300">
+                        {attribute.serviceCount}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                      <div class="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          class="inline-flex items-center justify-center rounded-md border border-blue-500/50 bg-blue-500/20 p-1.5 text-blue-400 transition-colors hover:bg-blue-500/30 focus:outline-none"
+                          onclick={`document.getElementById('edit-form-${index}').classList.toggle('hidden')`}
+                          title="Edit attribute"
+                        >
+                          <Icon name="ri:edit-line" class="size-3.5" />
+                        </button>
+                        <form method="POST" action={actions.admin.attribute.delete} class="inline-block">
+                          <input type="hidden" name="id" value={attribute.id} />
+                          <button
+                            type="submit"
+                            class="inline-flex items-center justify-center rounded-md border border-red-500/50 bg-red-500/20 p-1.5 text-red-400 transition-colors hover:bg-red-500/30 focus:outline-none"
+                            onclick="return confirm('Are you sure you want to delete this attribute?')"
+                            title="Delete attribute"
+                          >
+                            <Icon name="ri:delete-bin-line" class="size-3.5" />
+                          </button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr id={`edit-form-${index}`} class="hidden bg-zinc-700/20">
+                    <td colspan="7" class="p-4">
+                      <h3 class="font-title text-md mb-2 font-semibold text-blue-300">
+                        Edit: {attribute.title}
+                      </h3>
+                      <form method="POST" action={actions.admin.attribute.update} class="space-y-4">
+                        <input type="hidden" name="id" value={attribute.id} />
+
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          <div>
+                            <label
+                              for={`title-edit-${index}`}
+                              class="block text-sm font-medium text-zinc-300"
+                            >
+                              Title
+                            </label>
+                            <input
+                              type="text"
+                              name="title"
+                              id={`title-edit-${index}`}
+                              required
+                              value={attribute.title}
+                              class="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label for={`slug-edit-${index}`} class="block text-sm font-medium text-zinc-300">
+                              Slug
+                            </label>
+                            <input
+                              type="text"
+                              name="slug"
+                              id={`slug-edit-${index}`}
+                              required
+                              value={attribute.slug}
+                              class="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label
+                            for={`description-edit-${index}`}
+                            class="block text-sm font-medium text-zinc-300"
+                          >
+                            Description
+                          </label>
+                          <textarea
+                            name="description"
+                            id={`description-edit-${index}`}
+                            required
+                            rows="3"
+                            class="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+                          >
+                            {attribute.description}
+                          </textarea>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                          <div>
+                            <label
+                              for={`privacyPoints-edit-${index}`}
+                              class="block text-sm font-medium text-zinc-300"
+                            >
+                              Privacy
+                            </label>
+                            <input
+                              type="number"
+                              name="privacyPoints"
+                              id={`privacyPoints-edit-${index}`}
+                              min="-100"
+                              max="100"
+                              value={attribute.privacyPoints}
+                              class="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label
+                              for={`trustPoints-edit-${index}`}
+                              class="block text-sm font-medium text-zinc-300"
+                            >
+                              Trust
+                            </label>
+                            <input
+                              type="number"
+                              name="trustPoints"
+                              id={`trustPoints-edit-${index}`}
+                              min="-100"
+                              max="100"
+                              value={attribute.trustPoints}
+                              class="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label
+                              for={`category-edit-${index}`}
+                              class="block text-sm font-medium text-zinc-300"
+                            >
+                              Category
+                            </label>
+                            <select
+                              name="category"
+                              id={`category-edit-${index}`}
+                              required
+                              class="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+                            >
+                              {Object.values(AttributeCategory).map((category) => (
+                                <option value={category} selected={attribute.category === category}>
+                                  {getAttributeCategoryInfo(category).label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label for={`type-edit-${index}`} class="block text-sm font-medium text-zinc-300">
+                              Type
+                            </label>
+                            <select
+                              name="type"
+                              id={`type-edit-${index}`}
+                              required
+                              class="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+                            >
+                              {Object.values(AttributeType).map((type) => (
+                                <option value={type} selected={attribute.type === type}>
+                                  {getAttributeTypeInfo(type).label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div class="flex justify-end space-x-3">
+                          <button
+                            type="button"
+                            class="rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-700 focus:outline-none"
+                            onclick={`document.getElementById('edit-form-${index}').classList.toggle('hidden')`}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            class="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+                          >
+                            Save Changes
+                          </button>
+                        </div>
+                      </form>
+                    </td>
+                  </tr>
+                </>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script define:vars={{ updatedAttributeId }}></script>
+
+<style>
+  @keyframes highlight {
+    0% {
+      background-color: rgba(59, 130, 246, 0.1);
+    }
+    50% {
+      background-color: rgba(59, 130, 246, 0.3);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+
+  /* Base CSS text size utility */
+  .text-2xs {
+    font-size: 0.6875rem; /* 11px */
+    line-height: 1rem; /* 16px */
+  }
+
+  /* Scrollbar styling for better mobile experience */
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(30, 41, 59, 0.2);
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(75, 85, 99, 0.5);
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.6);
+  }
+
+  @media (max-width: 768px) {
+    .scrollbar-thin {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(75, 85, 99, 0.5) rgba(30, 41, 59, 0.2); /* thumb track for firefox*/
+      -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    }
+  }
+</style>

@@ -1,0 +1,263 @@
+---
+import { Icon } from 'astro-icon/components'
+import { Schema } from 'astro-seo-schema'
+import { z } from 'zod'
+
+import CommentItem from '../components/CommentItem.astro'
+import CommentReply from '../components/CommentReply.astro'
+import { getCommentStatusInfo } from '../constants/commentStatus'
+import { cn } from '../lib/cn'
+import {
+  commentSortSchema,
+  makeCommentsNestedQuery,
+  MAX_COMMENT_DEPTH,
+  type CommentSortOption,
+  type CommentWithReplies,
+  type CommentWithRepliesPopulated,
+} from '../lib/commentsWithReplies'
+import { getOrCreateNotificationPreferences } from '../lib/notificationPreferences'
+import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
+import { prisma } from '../lib/prisma'
+import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
+
+import { makeOgImageUrl } from './OgImage'
+
+import type { Prisma } from '@prisma/client'
+import type { Comment, DiscussionForumPosting, WithContext } from 'schema-dts'
+
+type Props = {
+  itemReviewedId: string
+  service: Prisma.ServiceGetPayload<{
+    select: {
+      id: true
+      slug: true
+      listedAt: true
+      name: true
+      description: true
+      createdAt: true
+    }
+  }>
+}
+
+const { service, itemReviewedId } = Astro.props
+
+const { data: params } = zodParseQueryParamsStoringErrors(
+  {
+    showPending: z.coerce.boolean().default(false),
+    comment: z.coerce.number().int().positive().nullable().default(null),
+    sort: commentSortSchema,
+  },
+  Astro
+)
+
+const toggleUrl = new URL(Astro.request.url)
+toggleUrl.hash = '#comments'
+if (params.showPending) {
+  toggleUrl.searchParams.delete('showPending')
+} else {
+  toggleUrl.searchParams.set('showPending', 'true')
+}
+
+const getSortUrl = (sortOption: CommentSortOption) => {
+  const url = new URL(Astro.request.url)
+  url.searchParams.set('sort', sortOption)
+  return url.toString() + '#comments'
+}
+
+const user = Astro.locals.user
+
+const [dbComments, pendingCommentsCount, activeRatingComment] = await Astro.locals.banners.tryMany([
+  [
+    'Failed to fetch comments',
+    async () =>
+      await prisma.comment.findMany(
+        makeCommentsNestedQuery({
+          depth: MAX_COMMENT_DEPTH,
+          user,
+          showPending: params.showPending,
+          serviceId: service.id,
+          sort: params.sort,
+        })
+      ),
+    [],
+  ],
+  [
+    'Failed to count unmoderated comments',
+    async () =>
+      prisma.comment.count({
+        where: {
+          serviceId: service.id,
+          status: { in: ['PENDING', 'HUMAN_PENDING'] },
+        },
+      }),
+    0,
+  ],
+  [
+    "Failed to fetch user's service rating",
+    async () =>
+      user
+        ? await prisma.comment.findFirst({
+            where: { serviceId: service.id, authorId: user.id, ratingActive: true },
+            orderBy: { createdAt: 'desc' },
+            select: {
+              id: true,
+              rating: true,
+            },
+          })
+        : null,
+    null,
+  ],
+])
+
+const notiPref = user
+  ? await getOrCreateNotificationPreferences(user.id, {
+      watchedComments: { select: { id: true } },
+    })
+  : null
+
+const populateComment = (comment: CommentWithReplies): CommentWithRepliesPopulated => ({
+  ...comment,
+  isWatchingReplies: notiPref?.watchedComments.some((c) => c.id === comment.id) ?? false,
+  replies: comment.replies?.map(populateComment),
+})
+const comments = dbComments.map(populateComment)
+
+function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
+  const statusInfo = getCommentStatusInfo(comment.status)
+  return {
+    '@type': 'Comment',
+    text: comment.content,
+    datePublished: comment.createdAt.toISOString(),
+    dateCreated: comment.createdAt.toISOString(),
+    creativeWorkStatus: statusInfo.creativeWorkStatus,
+    author: {
+      '@type': 'Person',
+      name: comment.author.displayName ?? comment.author.name,
+      url: new URL(`/u/${comment.author.name}`, Astro.url).href,
+      image: comment.author.picture ?? undefined,
+    },
+    interactionStatistic: [
+      {
+        '@type': 'InteractionCounter',
+        interactionType: { '@type': 'LikeAction' },
+        userInteractionCount: comment.upvotes,
+      },
+      {
+        '@type': 'InteractionCounter',
+        interactionType: { '@type': 'ReplyAction' },
+        userInteractionCount: comment.replies?.length ?? 0,
+      },
+    ],
+    commentCount: comment.replies?.length ?? 0,
+    comment: comment.replies?.map(makeReplySchema),
+  } satisfies Comment
+}
+---
+
+<section class="mt-8" id="comments">
+  <Schema
+    item={{
+      '@context': 'https://schema.org',
+      '@type': 'DiscussionForumPosting',
+      url: new URL(`/service/${service.slug}#comments`, Astro.url).href,
+      mainEntityOfPage: new URL(`/service/${service.slug}#comments`, Astro.url).href,
+      datePublished: service.listedAt?.toISOString(),
+      dateCreated: service.createdAt.toISOString(),
+      headline: `${service.name} comments on KYCnot.me`,
+      text: service.description,
+      author: KYCNOTME_SCHEMA_MINI,
+      image: makeOgImageUrl({ template: 'generic', title: `${service.name} comments` }, Astro.url),
+
+      commentCount: comments.length,
+      comment: comments.map(makeReplySchema),
+    } as WithContext<DiscussionForumPosting>}
+  />
+  <CommentReply serviceId={service.id} activeRatingComment={activeRatingComment} class="xs:mb-4 mb-2" />
+
+  <div class="mb-6 flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center">
+      <div class="flex items-center space-x-1">
+        <a
+          href={getSortUrl('newest')}
+          class={cn([
+            'rounded-md px-2 py-1 text-sm',
+            params.sort === 'newest'
+              ? 'bg-blue-500/20 text-blue-400'
+              : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300',
+          ])}
+        >
+          <Icon name="ri:time-line" class="mr-1 inline h-3.5 w-3.5" />
+          Newest
+        </a>
+        <a
+          href={getSortUrl('upvotes')}
+          class={cn([
+            'rounded-md px-2 py-1 text-sm',
+            params.sort === 'upvotes'
+              ? 'bg-blue-500/20 text-blue-400'
+              : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300',
+          ])}
+        >
+          <Icon name="ri:arrow-up-line" class="mr-1 inline h-3.5 w-3.5" />
+          Most Upvotes
+        </a>
+        {
+          user && (user.admin || user.verifier) && (
+            <a
+              href={getSortUrl('status')}
+              class={cn([
+                'rounded-md px-2 py-1 text-sm',
+                params.sort === 'status'
+                  ? 'bg-blue-500/20 text-blue-400'
+                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300',
+              ])}
+            >
+              <Icon name="ri:filter-line" class="mr-1 inline h-3.5 w-3.5" />
+              Status
+            </a>
+          )
+        }
+      </div>
+    </div>
+
+    <div class="flex items-center">
+      {
+        pendingCommentsCount > 0 && (
+          <div class="flex items-center">
+            <a
+              href={toggleUrl.toString()}
+              class={cn([
+                'flex items-center gap-2 text-sm',
+                params.showPending ? 'text-yellow-500' : 'text-zinc-400 hover:text-zinc-300',
+              ])}
+            >
+              <div class="relative flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full bg-zinc-700 p-1 transition-colors duration-200 ease-in-out focus:outline-hidden">
+                <span
+                  class={cn([
+                    'absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-zinc-400 shadow-sm transition-transform duration-200 ease-in-out',
+                    params.showPending && 'translate-x-4 bg-yellow-500',
+                  ])}
+                />
+              </div>
+              <span>Show unmoderated ({pendingCommentsCount})</span>
+            </a>
+          </div>
+        )
+      }
+    </div>
+  </div>
+
+  <div class="space-y-4">
+    {
+      comments.map((comment) => (
+        <CommentItem
+          comment={comment}
+          highlightedCommentId={params.comment}
+          showPending={params.showPending}
+          serviceSlug={service.slug}
+          itemReviewedId={itemReviewedId}
+        />
+      ))
+    }
+  </div>
+</section>

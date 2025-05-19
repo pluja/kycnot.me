@@ -1,0 +1,172 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import { cn } from '../lib/cn'
+import { makeLoginUrl } from '../lib/redirectUrls'
+
+import Button from './Button.astro'
+import FormTimeTrap from './FormTimeTrap.astro'
+import InputHoneypotTrap from './InputHoneypotTrap.astro'
+import InputRating from './InputRating.astro'
+import InputText from './InputText.astro'
+import InputWrapper from './InputWrapper.astro'
+
+import type { Prisma } from '@prisma/client'
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = Omit<HTMLAttributes<'form'>, 'action' | 'enctype' | 'method'> & {
+  serviceId: number
+  parentId?: number
+  commentId?: number
+  activeRatingComment?: Prisma.CommentGetPayload<{
+    select: {
+      id: true
+      rating: true
+    }
+  }> | null
+}
+
+const { serviceId, parentId, commentId, activeRatingComment, class: className, ...htmlProps } = Astro.props
+
+const MIN_COMMENT_LENGTH = parentId ? 10 : 30
+
+const user = Astro.locals.user
+const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
+---
+
+<form
+  method="POST"
+  action={actions.comment.create}
+  enctype="application/x-www-form-urlencoded"
+  class={cn(className)}
+  {...htmlProps}
+>
+  <FormTimeTrap />
+  <input type="hidden" name="serviceId" value={serviceId} />
+  {parentId && <input type="hidden" name="parentId" value={parentId} />}
+
+  <div class="space-y-1.5">
+    <input
+      type="checkbox"
+      id={`use-form-secret-token-${String(commentId ?? 'new')}`}
+      name="useFormUserSecretToken"
+      checked={!user}
+      class="peer/use-form-secret-token hidden"
+    />
+
+    {
+      user ? (
+        userCommentsDisabled ? (
+          <div class="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-sm text-red-400">
+            <Icon name="ri:forbid-line" class="mr-1 inline h-4 w-4 align-[-0.2em]" />
+            You cannot comment due to low karma.
+          </div>
+        ) : (
+          <>
+            <div class="text-day-400 flex items-center gap-2 text-xs peer-checked/use-form-secret-token:hidden">
+              <Icon name="ri:user-line" class="size-3.5" />
+              <span>
+                Commenting as: <span class="font-title font-medium text-green-400">{user.name}</span>
+              </span>
+            </div>
+
+            <InputHoneypotTrap name="message" />
+
+            <div>
+              <textarea
+                id={`comment-${String(commentId ?? 'new')}`}
+                name="content"
+                required
+                minlength={MIN_COMMENT_LENGTH}
+                maxlength={2000}
+                rows="4"
+                placeholder="Write your comment..."
+                class="placeholder:text-day-500 focus:ring-day-500 border-night-500 bg-night-800 focus:border-night-600 max-h-128 min-h-16 w-full resize-y rounded-lg border px-2.5 py-2 text-sm focus:ring-1 focus:outline-hidden"
+              />
+            </div>
+
+            {!parentId ? (
+              <div class="[&:has(input[name='rating'][value='']:checked)_[data-show-if-rating]]:hidden">
+                <div class="flex flex-wrap gap-4">
+                  <InputRating name="rating" label="Rating" />
+
+                  <InputWrapper label="Tags" name="tags">
+                    <label class="flex cursor-pointer items-center gap-2">
+                      <input type="checkbox" name="issueKycRequested" class="text-red-400" />
+                      <span class="flex items-center gap-1 text-xs text-red-400">
+                        <Icon name="ri:user-forbid-fill" class="size-3" />
+                        KYC Issue
+                      </span>
+                    </label>
+
+                    <label class="flex cursor-pointer items-center gap-2">
+                      <input type="checkbox" name="issueFundsBlocked" class="text-orange-400" />
+                      <span class="flex items-center gap-1 text-xs text-orange-400">
+                        <Icon name="ri:wallet-3-fill" class="size-3" />
+                        Funds Blocked
+                      </span>
+                    </label>
+                  </InputWrapper>
+
+                  <InputText
+                    label="Order ID"
+                    name="orderId"
+                    inputProps={{
+                      maxlength: 100,
+                      placeholder: 'Order ID / URL / Proof',
+                      class: 'bg-night-800',
+                    }}
+                    descriptionLabel="Only visible to admins, to verify your comment"
+                    class="grow"
+                  />
+                </div>
+
+                <div class="mt-4 flex items-start justify-end gap-2">
+                  {!!activeRatingComment?.rating && (
+                    <div
+                      class="rounded-sm bg-yellow-500/10 px-2 py-1.5 text-xs text-yellow-400"
+                      data-show-if-rating
+                    >
+                      <Icon name="ri:information-line" class="mr-1 inline size-3.5" />
+                      <a
+                        href={`${Astro.url.origin}${Astro.url.pathname}#comment-${activeRatingComment.id}`}
+                        class="inline-flex items-center gap-1 underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Your previous rating
+                        <Icon name="ri:external-link-line" class="inline size-2.5 align-[-0.1em]" />
+                      </a>
+                      of
+                      {[
+                        activeRatingComment.rating.toLocaleString(),
+                        <Icon name="ri:star-fill" class="inline size-3 align-[-0.1em]" />,
+                      ]}
+                      won't count for the total.
+                    </div>
+                  )}
+
+                  <Button type="submit" label="Send" icon="ri:send-plane-2-line" />
+                </div>
+              </div>
+            ) : (
+              <div class="flex items-center justify-end gap-2">
+                <Button type="submit" label="Reply" icon="ri:reply-line" />
+              </div>
+            )}
+          </>
+        )
+      ) : (
+        <a
+          href={makeLoginUrl(Astro.url, { message: 'Login to comment' })}
+          data-astro-reload
+          class="font-title mb-4 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 text-xs text-blue-400 shadow-xs transition-colors duration-200 hover:bg-blue-500/20 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+        >
+          <Icon name="ri:login-box-line" class="size-3.5" />
+          Login to comment
+        </a>
+      )
+    }
+  </div>
+</form>

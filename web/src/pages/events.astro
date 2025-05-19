@@ -1,0 +1,474 @@
+---
+import { z } from 'astro/zod'
+import { Icon } from 'astro-icon/components'
+import { Picture } from 'astro:assets'
+import { orderBy } from 'lodash-es'
+
+import Button from '../components/Button.astro'
+import FormatTimeInterval from '../components/FormatTimeInterval.astro'
+import TimeFormatted from '../components/TimeFormatted.astro'
+import {
+  eventTypes,
+  eventTypesZodEnumBySlug,
+  getEventTypeInfo,
+  getEventTypeInfoBySlug,
+} from '../constants/eventTypes'
+import { getVerificationStatusInfo } from '../constants/verificationStatus'
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { cn } from '../lib/cn'
+import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
+import { prisma } from '../lib/prisma'
+import { formatDateShort } from '../lib/timeAgo'
+import { createPageUrl } from '../lib/urls'
+
+import type { Prisma } from '@prisma/client'
+
+const PAGE_SIZE = 100
+
+const { data: params, hasDefaultData: hasDefaultFilters } = zodParseQueryParamsStoringErrors(
+  {
+    page: z.coerce.number().int().min(1).default(1),
+    now: z.coerce.date().default(new Date()),
+    from: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
+    to: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
+    /** Service's slug */
+    service: z.string().optional(),
+    type: eventTypesZodEnumBySlug.optional(),
+  },
+  Astro
+)
+
+const [services, [dbEvents, totalEvents]] = await Astro.locals.banners.tryMany([
+  [
+    'Error fetching services',
+    async () =>
+      prisma.service.findMany({
+        where: {
+          events: {
+            some: {
+              visible: true,
+            },
+          },
+        },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          imageUrl: true,
+          verificationStatus: true,
+        },
+        orderBy: {
+          name: 'asc',
+        },
+      }),
+    [],
+  ],
+  [
+    'Error fetching events',
+    async () =>
+      prisma.event.findManyAndCount({
+        where: {
+          visible: true,
+          createdAt: {
+            lte: params.now,
+          },
+          ...(params.service ? { service: { slug: params.service } } : {}),
+          ...(params.type ? { type: getEventTypeInfoBySlug(params.type).id } : {}),
+          ...(params.from || params.to
+            ? {
+                OR: [
+                  ...(params.from
+                    ? ([
+                        { endedAt: null },
+                        { endedAt: { gte: params.from } },
+                      ] satisfies Prisma.EventWhereInput[])
+                    : []),
+                  ...(params.to
+                    ? ([{ startedAt: { lte: params.to } }] satisfies Prisma.EventWhereInput[])
+                    : []),
+                ],
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          source: true,
+          type: true,
+          startedAt: true,
+          endedAt: true,
+          service: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              imageUrl: true,
+              verificationStatus: true,
+            },
+          },
+        },
+        orderBy: {
+          startedAt: 'desc',
+        },
+        skip: (params.page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
+      }),
+    [[], 0] as const,
+  ],
+])
+
+const events = orderBy(
+  dbEvents.map((event) => ({
+    ...event,
+    actualEndedAt: event.endedAt ?? params.now,
+    typeInfo: getEventTypeInfo(event.type),
+    service: {
+      ...event.service,
+      verificationStatusInfo: getVerificationStatusInfo(event.service.verificationStatus),
+    },
+  })),
+  ['actualEndedAt', 'startedAt'],
+  'desc'
+)
+const totalPages = Math.ceil(totalEvents / PAGE_SIZE) || 1
+const hasMorePages = params.page < totalPages
+
+const createUrlWithoutFilter = (paramName: keyof typeof params) => {
+  const url = new URL(Astro.url)
+  url.searchParams.delete(paramName)
+  url.searchParams.forEach((value, key) => {
+    if (value === '') {
+      url.searchParams.delete(key)
+    }
+  })
+  return url.toString()
+}
+---
+
+<BaseLayout
+  pageTitle="Events"
+  description="Discover important events, updates, and news about KYC-free services in chronological order."
+  widthClassName="max-w-screen-lg"
+  className={{ main: 'sm:flex sm:items-start sm:gap-6' }}
+  ogImage={{ template: 'generic', title: 'Events' }}
+  htmx
+>
+  <h1 class="font-title mb-6 block text-center text-2xl font-bold text-white sm:hidden">
+    Service Events Timeline
+  </h1>
+  <form
+    method="GET"
+    class={cn(
+      'mx-auto max-w-xs rounded-lg border border-zinc-700 bg-zinc-800/30 p-4 sm:sticky sm:top-20',
+      '[&:has(~[data-has-default-filters="true"])_[data-clear-filters-button]]:hidden'
+    )}
+    hx-get={Astro.url.pathname}
+    hx-trigger="input from:input, keyup[key=='Enter'], change from:select"
+    hx-target="#events-list-container"
+    hx-select="#events-list-container"
+    hx-swap="outerHTML"
+    hx-push-url="true"
+    hx-indicator="#search-indicator"
+  >
+    <div class="mb-4 flex items-center justify-between">
+      <h2 class="font-title text-xl text-green-500">
+        FILTERS
+        <Icon
+          id="search-indicator"
+          name="ri:loader-2-line"
+          class="htmx-request:inline-block hidden size-5 animate-spin align-[-0.1em] text-green-500"
+        />
+      </h2>
+
+      <a href="/events" class="text-sm text-green-500 hover:text-green-400" data-clear-filters-button>
+        Clear all
+      </a>
+    </div>
+
+    <label for="from" class="mt-2 mb-0.5 block text-sm text-zinc-300">From</label>
+    <input
+      type="date"
+      id="from"
+      name="from"
+      value={params.from?.toISOString().split('T')[0]}
+      class="w-full rounded-sm border border-green-500/30 bg-black/40 p-2 text-white focus:border-green-500 focus:outline-hidden"
+    />
+
+    <label for="to" class="mt-2 mb-0.5 block text-sm text-zinc-300">To</label>
+    <input
+      type="date"
+      id="to"
+      name="to"
+      value={params.to?.toISOString().split('T')[0]}
+      class="w-full rounded-sm border border-green-500/30 bg-black/40 p-2 text-white focus:border-green-500 focus:outline-hidden"
+    />
+
+    <label for="type" class="mt-2 mb-0.5 block text-sm text-zinc-300">Type</label>
+    <select
+      id="type"
+      name="type"
+      class="w-full rounded-sm border border-green-500/30 bg-black/40 p-2 text-white focus:border-green-500 focus:outline-hidden"
+    >
+      <option value="">All Types</option>
+      {
+        eventTypes.map((type) => (
+          <option value={type.slug} selected={params.type === type.slug}>
+            {type.label}
+          </option>
+        ))
+      }
+    </select>
+
+    <label for="service" class="mt-2 mb-0.5 block text-sm text-zinc-300">Service</label>
+    <select
+      id="service"
+      name="service"
+      class="w-full rounded-sm border border-green-500/30 bg-black/40 p-2 text-white focus:border-green-500 focus:outline-hidden"
+    >
+      <option value="">All Services</option>
+      {
+        services.map((service) => (
+          <option value={service.slug} selected={params.service === service.slug}>
+            {service.name}
+          </option>
+        ))
+      }
+    </select>
+
+    <Button type="submit" label="Apply" size="lg" class="sm:js:hidden mt-6 w-full" color="success" shadow />
+  </form>
+
+  <div class="flex-1" id="events-list-container" data-has-default-filters={hasDefaultFilters}>
+    <h1 class="font-title mb-3 hidden text-2xl font-bold text-white sm:block">Service Events Timeline</h1>
+
+    <!-- Active filters -->
+    {
+      !hasDefaultFilters && (
+        <div class="mt-8 mb-6 flex flex-wrap justify-center gap-2 sm:mt-0 sm:justify-start">
+          {params.from && (
+            <a
+              href={createUrlWithoutFilter('from')}
+              class="group flex h-8 items-center gap-2 rounded-full border border-green-500/30 bg-black/40 px-3 text-sm text-white"
+            >
+              <span>
+                From <TimeFormatted date={params.from} prefix={false} />
+              </span>
+              <div class="text-gray-400 group-hover:text-white">
+                <Icon name="ri:close-large-line" class="size-4" />
+              </div>
+            </a>
+          )}
+
+          {params.to && (
+            <a
+              href={createUrlWithoutFilter('to')}
+              class="group flex h-8 items-center gap-2 rounded-full border border-green-500/30 bg-black/40 px-3 text-sm text-white"
+            >
+              <span>
+                To <TimeFormatted date={params.to} prefix={false} />
+              </span>
+              <div class="text-gray-400 group-hover:text-white">
+                <Icon name="ri:close-large-line" class="size-4" />
+              </div>
+            </a>
+          )}
+
+          {params.service &&
+            (() => {
+              const service = services.find((s) => s.slug === params.service)
+              const verificationStatusInfo = service
+                ? getVerificationStatusInfo(service.verificationStatus)
+                : null
+
+              return (
+                <a
+                  href={createUrlWithoutFilter('service')}
+                  class="group flex h-8 items-center gap-2 rounded-full border border-green-500/30 bg-black/40 px-3 text-sm text-white"
+                >
+                  {service?.imageUrl && (
+                    <Picture
+                      src={service.imageUrl}
+                      alt={service.name}
+                      width={16}
+                      height={16}
+                      formats={['jxl', 'avif', 'webp']}
+                      class="size-4 shrink-0 rounded-xs object-contain"
+                    />
+                  )}
+                  <span>
+                    {service?.name ?? params.service}
+                    {service && service.verificationStatus !== 'APPROVED' && verificationStatusInfo && (
+                      <Icon
+                        name={verificationStatusInfo.icon}
+                        class={cn(
+                          'inline-block size-3 shrink-0 align-[-0.1em]',
+                          verificationStatusInfo.classNames.icon
+                        )}
+                      />
+                    )}
+                  </span>
+                  <div class="text-gray-400 group-hover:text-white">
+                    <Icon name="ri:close-large-line" class="size-4" />
+                  </div>
+                </a>
+              )
+            })()}
+
+          {params.type && (
+            <a
+              href={createUrlWithoutFilter('type')}
+              class="group flex h-8 items-center gap-2 rounded-full border border-green-500/30 bg-black/40 px-3 text-sm text-white"
+            >
+              <Icon
+                name={getEventTypeInfo(params.type).icon}
+                class={cn('size-4', getEventTypeInfo(params.type).classNames.dot, 'bg-transparent')}
+              />
+              <span>{getEventTypeInfo(params.type).label}</span>
+              <div class="text-gray-400 group-hover:text-white">
+                <Icon name="ri:close-large-line" class="size-4" />
+              </div>
+            </a>
+          )}
+        </div>
+      )
+    }
+
+    {
+      events.length > 0 ? (
+        <ol id="events-list" class="mx-auto mt-12 sm:mt-0">
+          {events.map((event, i) => (
+            <li
+              class="flex items-stretch gap-2"
+              data-hx-event-item
+              {...(i === events.length - 1 && hasMorePages
+                ? {
+                    'hx-get': createPageUrl(params.page + 1, Astro.url, {
+                      ...Object.fromEntries(Astro.url.searchParams.entries()),
+                      now: params.now.toISOString(),
+                    }),
+                    'hx-trigger': 'revealed',
+                    'hx-swap': 'afterend',
+                    'hx-select': '[data-hx-event-item]',
+                    'hx-indicator': '#infinite-scroll-indicator',
+                  }
+                : {})}
+            >
+              <div class="flex flex-col items-center">
+                <div
+                  class={cn(
+                    'z-10 flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-700 ring-3 ring-zinc-700/50',
+                    event.typeInfo.classNames.dot
+                  )}
+                >
+                  <Icon name={event.typeInfo.icon} class="size-3" />
+                </div>
+                <div class="w-0.5 flex-1 bg-zinc-600" />
+              </div>
+
+              <div class="xs:pb-12 -mt-0.5 flex-1 pb-8">
+                <h3 class="font-title min-h-5 flex-1 text-lg leading-tight font-semibold text-pretty text-white">
+                  {event.title}
+                </h3>
+
+                <FormatTimeInterval
+                  as="p"
+                  start={event.startedAt}
+                  end={event.endedAt}
+                  now={params.now}
+                  class="mt-2 block text-sm leading-none font-normal text-balance text-zinc-300"
+                />
+
+                <div class="mt-3 flex items-center gap-4">
+                  <a
+                    href={`/service/${event.service.slug}`}
+                    class="-m-1.5 flex w-fit items-center rounded-md p-1.5 leading-none transition-colors hover:bg-zinc-800"
+                  >
+                    {event.service.imageUrl && (
+                      <Picture
+                        src={event.service.imageUrl}
+                        alt={event.service.name}
+                        width={16}
+                        height={16}
+                        formats={['jxl', 'avif', 'webp']}
+                        class="size-4 shrink-0 rounded-xs object-contain"
+                      />
+                    )}
+
+                    <span
+                      class={cn(
+                        'ms-2 text-sm leading-none text-zinc-300',
+                        event.service.verificationStatus === 'VERIFICATION_FAILED' && 'text-red-200'
+                      )}
+                    >
+                      {event.service.name}
+                    </span>
+
+                    {event.service.verificationStatus !== 'APPROVED' && (
+                      <Icon
+                        name={event.service.verificationStatusInfo.icon}
+                        class={cn(
+                          'ms-1 inline-block size-3 shrink-0',
+                          event.service.verificationStatusInfo.classNames.icon
+                        )}
+                      />
+                    )}
+                  </a>
+
+                  {event.source && (
+                    <a
+                      href={event.source}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-block text-xs text-blue-400 hover:underline"
+                    >
+                      Source
+                      <Icon name="ri:external-link-line" class="inline-block size-3 align-[-0.1em]" />
+                    </a>
+                  )}
+                </div>
+                <p class="mt-4 text-base font-normal text-pretty text-zinc-400">{event.content}</p>
+              </div>
+            </li>
+          ))}
+
+          {!hasMorePages && (
+            <div class="flex min-h-8 items-center gap-2" data-hx-event-item>
+              <div class="flex w-5 flex-shrink-0 flex-col items-center self-stretch">
+                <div class="w-0.5 flex-1 bg-zinc-600" />
+                <div class="size-2 flex-shrink-0 rounded-full bg-zinc-600" />
+                <div class="flex-1" />
+              </div>
+              <p class="flex-1 text-xs text-zinc-400 italic">
+                {params.from
+                  ? formatDateShort(params.from, { prefix: false, caseType: 'sentence' })
+                  : events.length > 10
+                    ? 'Big Bang'
+                    : null}
+              </p>
+            </div>
+          )}
+
+          <div
+            class="no-js:hidden htmx-request:flex hidden min-h-8 items-center gap-2"
+            id="infinite-scroll-indicator"
+          >
+            <div class="flex w-5 flex-shrink-0 flex-col items-center self-stretch">
+              <div class="w-0.5 flex-1 bg-gradient-to-b from-zinc-600 to-transparent" />
+            </div>
+            <p class="flex-1 animate-pulse text-xs text-zinc-400 italic">Loading more events...</p>
+          </div>
+
+          <div class="no-js:flex hidden min-h-8 items-center gap-2" id="infinite-scroll-indicator">
+            <div class="flex w-5 flex-shrink-0 flex-col items-center self-stretch">
+              <div class="w-0.5 flex-1 bg-gradient-to-b from-zinc-600 to-transparent" />
+            </div>
+            <p class="flex-1 text-xs text-zinc-400 italic">Enable JavaScript to load more events</p>
+          </div>
+        </ol>
+      ) : (
+        <p class="my-12 text-center text-zinc-400">No events reported</p>
+      )
+    }
+  </div>
+</BaseLayout>

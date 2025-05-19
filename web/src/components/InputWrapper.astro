@@ -1,0 +1,74 @@
+---
+import { Icon } from 'astro-icon/components'
+import { Markdown } from 'astro-remote'
+
+import { cn } from '../lib/cn'
+
+import type { AstroChildren } from '../lib/astro'
+import type { MarkdownString } from '../lib/markdown'
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = HTMLAttributes<'div'> & {
+  children: AstroChildren
+  label: string
+  name: string
+  description?: MarkdownString
+  descriptionLabel?: string
+  required?: HTMLAttributes<'input'>['required']
+  error?: string[] | string
+  icon?: string
+  inputId?: string
+}
+
+const {
+  label,
+  name,
+  description,
+  descriptionLabel,
+  required,
+  error,
+  icon,
+  class: className,
+  inputId,
+  ...htmlProps
+} = Astro.props
+
+const hasError = !!error && error.length > 0
+---
+
+<fieldset class={cn('space-y-1', className)} {...htmlProps}>
+  <div class={cn('contents', !!descriptionLabel && 'flex flex-wrap items-center gap-x-4')}>
+    <legend class={cn('font-title block text-sm font-medium', hasError && 'text-red-500')}>
+      {icon && <Icon name={icon} class="inline-block size-4 align-[-0.2em]" />}
+      <label for={inputId}>{label}</label>{required && '*'}
+    </legend>
+    {
+      !!descriptionLabel && (
+        <span class="text-day-400 flex-1 basis-24 text-xs text-pretty">{descriptionLabel}</span>
+      )
+    }
+  </div>
+
+  <slot />
+
+  {
+    hasError &&
+      (typeof error === 'string' ? (
+        <p class="text-sm text-red-500">{error}</p>
+      ) : (
+        <ul class="text-sm text-red-500">
+          {error.map((e) => (
+            <li>{e}</li>
+          ))}
+        </ul>
+      ))
+  }
+
+  {
+    !!description && (
+      <div class="prose prose-sm prose-invert text-day-400 text-xs text-pretty">
+        <Markdown content={description} />
+      </div>
+    )
+  }
+</fieldset>
