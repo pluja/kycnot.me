@@ -10,15 +10,27 @@ type Props = Omit<ComponentProps<typeof InputWrapper>, 'children' | 'inputId'> &
   accept?: string
   disabled?: boolean
   multiple?: boolean
+  removeCheckbox?: {
+    name: string
+    label: string
+  }
 }
 
-const { accept, disabled, multiple, ...wrapperProps } = Astro.props
+const { accept, disabled, multiple, removeCheckbox, ...wrapperProps } = Astro.props
 
 const inputId = Astro.locals.makeId(`input-${wrapperProps.name}`)
 const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
 ---
 
 <InputWrapper inputId={inputId} {...wrapperProps}>
+  {
+    !!removeCheckbox && (
+      <label class="flex cursor-pointer items-center gap-2 py-1 pl-1 text-sm leading-none">
+        <input transition:persist type="checkbox" name={removeCheckbox.name} data-remove-checkbox />
+        {removeCheckbox.label || 'Remove'}
+      </label>
+    )
+  }
   <input
     transition:persist
     type="file"
@@ -27,7 +39,8 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
       baseInputClassNames.input,
       baseInputClassNames.file,
       hasError && baseInputClassNames.error,
-      disabled && baseInputClassNames.disabled
+      disabled && baseInputClassNames.disabled,
+      '[&:is(:has([data-remove-checkbox]:checked)_~_*)]:hidden'
     )}
     required={wrapperProps.required}
     disabled={disabled}

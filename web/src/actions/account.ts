@@ -159,6 +159,7 @@ export const accountActions = {
         .optional()
         .nullable(),
       pictureFile: imageFileSchema,
+      removePicture: z.coerce.boolean().default(false),
     }),
     handler: async (input, context) => {
       if (input.id !== context.locals.user.id) {
@@ -204,14 +205,14 @@ export const accountActions = {
               input.pictureFile.name,
               `users/pictures/${String(context.locals.user.id)}`
             )
-          : null
+          : undefined
 
       const user = await prisma.user.update({
         where: { id: context.locals.user.id },
         data: {
           displayName: input.displayName ?? null,
           link: input.link ?? null,
-          picture: pictureUrl,
+          picture: input.removePicture ? null : (pictureUrl ?? undefined),
         },
       })
 

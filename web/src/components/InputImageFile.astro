@@ -8,20 +8,26 @@ import type { ComponentProps } from 'astro/types'
 
 type Props = Omit<ComponentProps<typeof InputFile>, 'accept'> & {
   square?: boolean
+  value?: string | null
 }
 
-const { class: className, square, ...inputFileProps } = Astro.props
+const { class: className, square, value, ...inputFileProps } = Astro.props
 ---
 
 <div class={cn('flex flex-wrap items-center justify-center gap-4', className)} data-preview-image>
-  <InputFile accept={ACCEPTED_IMAGE_TYPES.join(',')} class="min-w-0 flex-1 basis-2xs" {...inputFileProps} />
+  <InputFile
+    accept={ACCEPTED_IMAGE_TYPES.join(',')}
+    class="min-w-0 flex-1 basis-[calc(var(--spacing)*32)]"
+    {...inputFileProps}
+  />
   <img
-    src="#"
+    src={value}
     alt="Preview"
     class={cn(
-      'block w-26.5 rounded object-cover',
-      'no-js:hidden not-[[src]]:hidden [&[src=""]]:hidden [&[src="#"]]:hidden',
-      square && 'aspect-square'
+      'block h-24 rounded object-cover',
+      square && 'aspect-square',
+      'no-js:hidden not-[[src]]:hidden [&[src=""]]:hidden',
+      '[&:is(:has([data-remove-checkbox]:checked)_~_*)]:hidden'
     )}
   />
 </div>
