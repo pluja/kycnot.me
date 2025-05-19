@@ -239,7 +239,7 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
                   ])}
                 />
               </div>
-              <span>Show unmoderated ({pendingCommentsCount})</span>
+              <span>Show unmoderated ({pendingCommentsCount.toLocaleString()})</span>
             </a>
           </div>
         )
@@ -249,15 +249,31 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
 
   <div class="space-y-4">
     {
-      comments.map((comment) => (
-        <CommentItem
-          comment={comment}
-          highlightedCommentId={params.comment}
-          showPending={params.showPending}
-          serviceSlug={service.slug}
-          itemReviewedId={itemReviewedId}
-        />
-      ))
+      comments.length > 0 ? (
+        comments.map((comment) => (
+          <CommentItem
+            comment={comment}
+            highlightedCommentId={params.comment}
+            showPending={params.showPending}
+            serviceSlug={service.slug}
+            itemReviewedId={itemReviewedId}
+          />
+        ))
+      ) : (
+        <div class="text-day-400 my-16 text-center">
+          {pendingCommentsCount > 0 ? (
+            <span>
+              No approved comments, but there are
+              <a href={toggleUrl.toString()} class="inline-flex items-center gap-1">
+                <span class="underline">{pendingCommentsCount.toLocaleString()} unmoderated comments</span>
+                <Icon name="ri:external-link-line" class="inline size-3.5 align-[-0.1em]" />
+              </a>
+            </span>
+          ) : (
+            'No comments yet'
+          )}
+        </div>
+      )
     }
   </div>
 </section>
