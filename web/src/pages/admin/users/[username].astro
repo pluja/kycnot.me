@@ -25,6 +25,9 @@ Astro.locals.banners.addIfSuccess(addAffiliationResult, 'Service affiliation add
 const removeAffiliationResult = Astro.getActionResult(actions.admin.user.serviceAffiliations.remove)
 Astro.locals.banners.addIfSuccess(removeAffiliationResult, 'Service affiliation removed successfully')
 
+const addKarmaTransactionResult = Astro.getActionResult(actions.admin.user.karmaTransactions.add)
+Astro.locals.banners.addIfSuccess(addKarmaTransactionResult, 'Karma transaction added successfully')
+
 const [user, allServices] = await Astro.locals.banners.tryMany([
   [
     'Failed to load user profile',
@@ -574,6 +577,66 @@ if (!user) return Astro.rewrite('/404')
           >
             <Icon name="ri:link" class="mr-1 size-4" />
             Add Service Affiliation
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section
+      class="mt-8 rounded-lg border border-green-500/30 bg-black/40 p-6 shadow-[0_0_15px_rgba(34,197,94,0.2)] backdrop-blur-xs"
+    >
+      <h2 class="font-title mb-4 text-lg text-green-500">Add Karma Transaction</h2>
+
+      <form
+        method="POST"
+        action={actions.admin.user.karmaTransactions.add}
+        class="mt-6 space-y-4 border-t border-green-500/30 pt-6"
+        data-astro-reload
+      >
+        <input type="hidden" name="userId" value={user.id} />
+
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label class="font-title mb-2 block text-sm text-green-500" for="points"> Points </label>
+            <input
+              type="number"
+              name="points"
+              id="points"
+              required
+              class="font-title w-full rounded-md border border-green-500/30 bg-black/50 text-gray-300 focus:border-green-500 focus:ring-green-500"
+            />
+          </div>
+
+          <div>
+            <label class="font-title mb-2 block text-sm text-green-500" for="action"> Action </label>
+            <input
+              type="text"
+              name="action"
+              id="action"
+              required
+              class="font-title w-full rounded-md border border-green-500/30 bg-black/50 text-gray-300 focus:border-green-500 focus:ring-green-500"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="font-title mb-2 block text-sm text-green-500" for="description"> Description </label>
+          <textarea
+            name="description"
+            id="description"
+            required
+            rows="3"
+            class="font-title w-full rounded-md border border-green-500/30 bg-black/50 text-gray-300 focus:border-green-500 focus:ring-green-500"
+          ></textarea>
+        </div>
+
+        <div>
+          <button
+            type="submit"
+            class="font-title inline-flex items-center justify-center rounded-md border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm text-green-400 shadow-xs transition-colors duration-200 hover:bg-green-500/20 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
+          >
+            <Icon name="ri:add-line" class="mr-1 size-4" />
+            Add Karma Transaction
           </button>
         </div>
       </form>

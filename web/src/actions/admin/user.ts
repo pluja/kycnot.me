@@ -285,4 +285,41 @@ export const adminUserActions = {
       },
     }),
   },
+
+  karmaTransactions: {
+    add: defineProtectedAction({
+      accept: 'form',
+      permissions: 'admin',
+      input: z.object({
+        userId: z.coerce.number().int().positive(),
+        points: z.coerce.number().int(),
+        action: z.string().min(1, 'Action is required'),
+        description: z.string().min(1, 'Description is required'),
+      }),
+      handler: async (input) => {
+        // Check if the user exists
+        const user = await prisma.user.findUnique({
+          where: { id: input.userId },
+          select: { id: true },
+        })
+
+        if (!user) {
+          throw new ActionError({
+            code: 'BAD_REQUEST',
+            message: 'User not found',
+          })
+        }
+
+        await prisma.karmaTransaction.create({
+          data: {
+            userId: input.userId,
+            points: input.points,
+            action: input.action,
+            description: input.description,
+            processed: true,
+          },
+        })
+      },
+    }),
+  },
 }
