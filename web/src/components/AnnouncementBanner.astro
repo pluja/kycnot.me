@@ -1,0 +1,82 @@
+---
+import { Icon } from 'astro-icon/components'
+import { Markdown } from 'astro-remote'
+
+import type { AnnouncementType } from '@prisma/client'
+
+export type Announcement = {
+  id: number
+  title: string
+  content: string
+  type: AnnouncementType
+  startDate: Date
+  endDate: Date | null
+  isActive: boolean
+}
+
+export type Props = {
+  announcements: Announcement[]
+}
+
+const { announcements } = Astro.props
+
+// Get icon and class based on announcement type
+const getTypeInfo = (type: AnnouncementType) => {
+  switch (type) {
+    case 'INFO':
+      return {
+        icon: 'ri:information-line',
+        containerClass: 'bg-blue-900/40 border-blue-500/30',
+        titleClass: 'text-blue-400',
+        contentClass: 'text-blue-300',
+      }
+    case 'WARNING':
+      return {
+        icon: 'ri:alert-line',
+        containerClass: 'bg-yellow-900/40 border-yellow-500/30',
+        titleClass: 'text-yellow-400',
+        contentClass: 'text-yellow-300',
+      }
+    case 'ALERT':
+      return {
+        icon: 'ri:error-warning-line',
+        containerClass: 'bg-red-900/40 border-red-500/30',
+        titleClass: 'text-red-400',
+        contentClass: 'text-red-300',
+      }
+    default:
+      return {
+        icon: 'ri:information-line',
+        containerClass: 'bg-blue-900/40 border-blue-500/30',
+        titleClass: 'text-blue-400',
+        contentClass: 'text-blue-300',
+      }
+  }
+}
+---
+
+{
+  announcements.length > 0 && (
+    <div class="mb-4 flex flex-col items-center space-y-1">
+      {announcements.map((announcement) => {
+        const typeInfo = getTypeInfo(announcement.type)
+
+        return (
+          <div
+            class={`flex flex-row items-center rounded border ${typeInfo.containerClass} mx-auto w-auto max-w-full px-3 py-2`}
+          >
+            <Icon name={typeInfo.icon} class={`size-4 flex-shrink-0 ${typeInfo.titleClass} mr-2`} />
+            <div class="flex min-w-0 flex-col">
+              <span class={`text-sm leading-tight font-bold ${typeInfo.titleClass} truncate`}>
+                {announcement.title}
+              </span>
+              <span class={`text-xs ${typeInfo.contentClass} truncate leading-snug [&_a]:underline`}>
+                <Markdown content={announcement.content} />
+              </span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}

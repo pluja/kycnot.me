@@ -24,7 +24,7 @@ DROP FUNCTION IF EXISTS handle_suggestion_status_change();
 CREATE OR REPLACE FUNCTION insert_karma_transaction(
     p_user_id INT,
     p_points INT,
-    p_action TEXT,
+    p_action "KarmaTransactionAction",
     p_comment_id INT,
     p_description TEXT,
     p_suggestion_id INT DEFAULT NULL
@@ -65,7 +65,7 @@ BEGIN
         PERFORM insert_karma_transaction(
             NEW."authorId",
             1,
-            'comment_approved',
+            'COMMENT_APPROVED',
             NEW.id,
             format('Your comment #comment-%s in %s has been approved!', 
                 NEW.id, 
@@ -86,7 +86,7 @@ BEGIN
         PERFORM insert_karma_transaction(
             NEW."authorId",
             5,
-            'comment_verified',
+            'COMMENT_VERIFIED',
             NEW.id,
             format('Your comment #comment-%s in %s has been verified!', 
                 NEW.id, 
@@ -108,7 +108,7 @@ BEGIN
         PERFORM insert_karma_transaction(
             NEW."authorId",
             -10,
-            'comment_spam',
+            'COMMENT_SPAM',
             NEW.id,
             format('Your comment #comment-%s in %s has been marked as spam.', 
                 NEW.id, 
@@ -120,7 +120,7 @@ BEGIN
         PERFORM insert_karma_transaction(
             NEW."authorId",
             10,
-            'comment_spam_reverted',
+            'COMMENT_SPAM_REVERTED',
             NEW.id,
             format('Your comment #comment-%s in %s is no longer marked as spam.', 
                 NEW.id, 
@@ -136,7 +136,7 @@ CREATE OR REPLACE FUNCTION handle_comment_vote_change()
 RETURNS TRIGGER AS $$
 DECLARE
     karma_points INT;
-    vote_action TEXT;
+    vote_action "KarmaTransactionAction";
     vote_description TEXT;
     comment_author_id INT;
     service_name TEXT;
@@ -151,7 +151,7 @@ BEGIN
     IF TG_OP = 'INSERT' THEN
         -- New vote
         karma_points := CASE WHEN NEW.downvote THEN -1 ELSE 1 END;
-        vote_action := CASE WHEN NEW.downvote THEN 'comment_downvote' ELSE 'comment_upvote' END;
+        vote_action := CASE WHEN NEW.downvote THEN 'COMMENT_DOWNVOTE' ELSE 'COMMENT_UPVOTE' END;
         vote_description := format('Your comment #comment-%s in %s received %s', 
             NEW."commentId", 
             service_name,
@@ -160,7 +160,7 @@ BEGIN
     ELSIF TG_OP = 'DELETE' THEN
         -- Removed vote
         karma_points := CASE WHEN OLD.downvote THEN 1 ELSE -1 END;
-        vote_action := 'comment_vote_removed';
+        vote_action := 'COMMENT_VOTE_REMOVED';
         vote_description := format('A vote was removed from your comment #comment-%s in %s', 
             OLD."commentId",
             service_name);
@@ -168,7 +168,7 @@ BEGIN
     ELSIF TG_OP = 'UPDATE' THEN
         -- Changed vote (from upvote to downvote or vice versa)
         karma_points := CASE WHEN NEW.downvote THEN -2 ELSE 2 END;
-        vote_action := CASE WHEN NEW.downvote THEN 'comment_downvote' ELSE 'comment_upvote' END;
+        vote_action := CASE WHEN NEW.downvote THEN 'COMMENT_DOWNVOTE' ELSE 'COMMENT_UPVOTE' END;
         vote_description := format('Your comment #comment-%s in %s vote changed to %s', 
             NEW."commentId",
             service_name,
@@ -243,7 +243,7 @@ BEGIN
         PERFORM insert_karma_transaction(
             NEW."userId",
             10,
-            'suggestion_approved',
+            'SUGGESTION_APPROVED',
             NULL, -- p_comment_id (not applicable)
             format('Your suggestion for service ''%s'' has been approved!', service_name),
             NEW.id -- p_suggestion_id
@@ -263,3 +263,24 @@ CREATE TRIGGER suggestion_status_change_trigger
     ON "ServiceSuggestion"
     FOR EACH ROW
     EXECUTE FUNCTION handle_suggestion_status_change();
+
+-- Function to handle manual karma adjustments
+CREATE OR REPLACE FUNCTION handle_manual_karma_adjustment()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Only process MANUAL_ADJUSTMENT transactions that are not yet processed
+    IF NEW.processed = false AND NEW.action = 'MANUAL_ADJUSTMENT' THEN
+        -- Update user's total karma
+        PERFORM update_user_karma(NEW."userId", NEW.points);
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger for manual karma adjustments
+CREATE TRIGGER manual_karma_adjustment_trigger
+    AFTER INSERT
+    ON "KarmaTransaction"
+    FOR EACH ROW
+    EXECUTE FUNCTION handle_manual_karma_adjustment();

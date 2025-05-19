@@ -4,6 +4,7 @@ import { z } from 'astro:schema'
 import { groupBy, orderBy } from 'lodash-es'
 import seedrandom from 'seedrandom'
 
+import AnnouncementBanner from '../components/AnnouncementBanner.astro'
 import Button from '../components/Button.astro'
 import Pagination from '../components/Pagination.astro'
 import ServiceFiltersPill from '../components/ServiceFiltersPill.astro'
@@ -501,7 +502,18 @@ const filtersOptions = {
 
 export type ServicesFiltersOptions = typeof filtersOptions
 
-//
+const currentDate = new Date()
+const activeAnnouncements = await prisma.announcement.findMany({
+  where: {
+    isActive: true,
+    startDate: { lte: currentDate },
+    OR: [{ endDate: null }, { endDate: { gt: currentDate } }],
+  },
+  orderBy: [
+    { type: 'desc' }, // ALERT first, then WARNING, then INFO
+    { createdAt: 'desc' },
+  ],
+})
 ---
 
 <BaseLayout
@@ -517,6 +529,9 @@ export type ServicesFiltersOptions = typeof filtersOptions
     },
   ]}
 >
+  <!-- Display announcements at the top of the page -->
+  <AnnouncementBanner announcements={activeAnnouncements} />
+
   <div class="flex flex-col gap-4 sm:flex-row sm:gap-8">
     <div class="flex items-stretch sm:hidden">
       {

@@ -166,6 +166,24 @@ enum ServiceSuggestionStatusChange {
   STATUS_CHANGED_TO_WITHDRAWN
 }
 
+enum KarmaTransactionAction {
+  COMMENT_APPROVED
+  COMMENT_VERIFIED
+  COMMENT_SPAM
+  COMMENT_SPAM_REVERTED
+  COMMENT_UPVOTE
+  COMMENT_DOWNVOTE
+  COMMENT_VOTE_REMOVED
+  SUGGESTION_APPROVED
+  MANUAL_ADJUSTMENT
+}
+
+enum AnnouncementType {
+  INFO
+  WARNING
+  ALERT
+}
+
 model Notification {
   id        Int              @id @default(autoincrement())
   userId    Int
@@ -445,20 +463,21 @@ model User {
   /// Computed via trigger. Do not update through prisma.
   totalKarma      Int     @default(0)
 
-  createdAt               DateTime                     @default(now())
-  updatedAt               DateTime                     @default(now()) @updatedAt
-  lastLoginAt             DateTime                     @default(now())
-  comments                Comment[]
-  karmaTransactions       KarmaTransaction[]
-  commentVotes            CommentVote[]
-  suggestions             ServiceSuggestion[]
-  suggestionMessages      ServiceSuggestionMessage[]
-  internalNotes           InternalUserNote[]           @relation("UserRecievedNotes")
-  addedInternalNotes      InternalUserNote[]           @relation("UserAddedNotes")
-  verificationRequests    ServiceVerificationRequest[]
-  notifications           Notification[]               @relation("NotificationOwner")
-  notificationPreferences NotificationPreferences?
-  serviceAffiliations     ServiceUser[]                @relation("UserServices")
+  createdAt                DateTime                     @default(now())
+  updatedAt                DateTime                     @default(now()) @updatedAt
+  lastLoginAt              DateTime                     @default(now())
+  comments                 Comment[]
+  karmaTransactions        KarmaTransaction[]
+  grantedKarmaTransactions KarmaTransaction[]           @relation("KarmaGrantedBy")
+  commentVotes             CommentVote[]
+  suggestions              ServiceSuggestion[]
+  suggestionMessages       ServiceSuggestionMessage[]
+  internalNotes            InternalUserNote[]           @relation("UserRecievedNotes")
+  addedInternalNotes       InternalUserNote[]           @relation("UserAddedNotes")
+  verificationRequests     ServiceVerificationRequest[]
+  notifications            Notification[]               @relation("NotificationOwner")
+  notificationPreferences  NotificationPreferences?
+  serviceAffiliations      ServiceUser[]                @relation("UserServices")
 
   @@index([createdAt])
   @@index([totalKarma])
@@ -489,24 +508,27 @@ model ServiceAttribute {
 }
 
 model KarmaTransaction {
-  id           Int                @id @default(autoincrement())
-  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId       Int
-  action       String
-  points       Int                @default(0)
-  comment      Comment?           @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  commentId    Int?
-  suggestion   ServiceSuggestion? @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
-  suggestionId Int?
-  description  String
-  processed    Boolean            @default(false)
-  createdAt    DateTime           @default(now())
+  id              Int                    @id @default(autoincrement())
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          Int
+  action          KarmaTransactionAction
+  points          Int                    @default(0)
+  comment         Comment?               @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId       Int?
+  suggestion      ServiceSuggestion?     @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  suggestionId    Int?
+  description     String
+  processed       Boolean                @default(false)
+  createdAt       DateTime               @default(now())
+  grantedBy       User?                  @relation("KarmaGrantedBy", fields: [grantedByUserId], references: [id], onDelete: SetNull)
+  grantedByUserId Int?
 
   @@index([createdAt])
   @@index([userId])
   @@index([processed])
   @@index([suggestionId])
   @@index([commentId])
+  @@index([grantedByUserId])
 }
 
 enum VerificationStepStatus {
@@ -587,4 +609,18 @@ model ServiceUser {
   @@index([userId])
   @@index([serviceId])
   @@index([role])
+}
+
+model Announcement {
+  id        Int              @id @default(autoincrement())
+  title     String
+  content   String
+  type      AnnouncementType
+  startDate DateTime
+  endDate   DateTime?
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @default(now()) @updatedAt
+
+  @@index([isActive, startDate, endDate])
 }

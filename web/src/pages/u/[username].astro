@@ -1,13 +1,17 @@
 ---
 import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
 import { Picture } from 'astro:assets'
 import { sortBy } from 'lodash-es'
 
 import defaultServiceImage from '../../assets/fallback-service-image.jpg'
 import AdminOnly from '../../components/AdminOnly.astro'
 import BadgeSmall from '../../components/BadgeSmall.astro'
+import InputSubmitButton from '../../components/InputSubmitButton.astro'
+import InputTextArea from '../../components/InputTextArea.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import Tooltip from '../../components/Tooltip.astro'
+import { getKarmaTransactionActionInfo } from '../../constants/karmaTransactionActions'
 import { karmaUnlocks } from '../../constants/karmaUnlocks'
 import { SUPPORT_EMAIL } from '../../constants/project'
 import { getServiceSuggestionStatusInfo } from '../../constants/serviceSuggestionStatus'
@@ -57,6 +61,12 @@ const user = await Astro.locals.banners.try('user', async () => {
             action: true,
             description: true,
             createdAt: true,
+            grantedBy: {
+              select: {
+                name: true,
+                displayName: true,
+              },
+            },
             comment: {
               select: {
                 id: true,
@@ -139,6 +149,21 @@ const user = await Astro.locals.banners.try('user', async () => {
             },
           },
           orderBy: [{ role: 'asc' }, { service: { name: 'asc' } }],
+        },
+        internalNotes: {
+          select: {
+            id: true,
+            content: true,
+            createdAt: true,
+            addedByUser: {
+              select: {
+                name: true,
+                displayName: true,
+                picture: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
         },
       },
     })
@@ -255,6 +280,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
           <Tooltip
             as="a"
             href={`/account/impersonate?targetUserId=${user.id}&redirect=${encodeURIComponent(Astro.url.href)}`}
+            data-astro-prefetch="tap"
             class="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-sm text-amber-400 shadow-xs transition-colors duration-200 hover:bg-amber-500/20 focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
             text="Impersonate (admin)"
           >
@@ -452,6 +478,58 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
       </div>
     </div>
   </section>
+
+  <AdminOnly>
+    <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+      <header>
+        <h2 class="font-title text-day-200 mb-6 text-center text-2xl font-bold">
+          Internal Notes <span class="text-day-400 text-sm font-normal">(Admin only)</span>
+        </h2>
+      </header>
+      {
+        user.internalNotes.length === 0 ? (
+          <p class="text-day-400 text-center">No internal notes yet.</p>
+        ) : (
+          <div class="space-y-4">
+            {user.internalNotes.map((note) => (
+              <div class="border-night-400 bg-night-600 rounded-lg border p-4">
+                <div class="mb-2 flex items-center gap-2">
+                  {!!note.addedByUser?.picture && (
+                    <img
+                      src={note.addedByUser.picture}
+                      alt=""
+                      width={24}
+                      height={24}
+                      class="size-6 rounded-full"
+                    />
+                  )}
+                  <span class="text-day-100 font-bold">
+                    {note.addedByUser ? (note.addedByUser.displayName ?? note.addedByUser.name) : 'System'}
+                  </span>
+                  <span class="text-day-400 text-sm">
+                    <TimeFormatted date={note.createdAt} hourPrecision />
+                  </span>
+                </div>
+                <div class="text-day-200 whitespace-pre-wrap">{note.content}</div>
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      <form
+        method="POST"
+        action={actions.admin.user.internalNotes.add}
+        data-note-edit-form
+        class="mt-4 space-y-4"
+      >
+        <input type="hidden" name="userId" value={user.id} />
+
+        <InputTextArea label="Add a note" name="content" inputProps={{ class: 'bg-night-700' }} />
+        <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
+      </form>
+    </section>
+  </AdminOnly>
 
   <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
     <header>
@@ -879,29 +957,46 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                 </tr>
               </thead>
               <tbody class="divide-night-400/10 divide-y">
-                {user.karmaTransactions.map((transaction) => (
-                  <tr class="hover:bg-night-500/5">
-                    <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">{transaction.action}</td>
-                    <td class="text-day-300 px-4 py-3">{transaction.description}</td>
-                    <td
-                      class={cn(
-                        'px-4 py-3 text-right text-xs whitespace-nowrap',
-                        transaction.points >= 0 ? 'text-green-400' : 'text-red-400'
-                      )}
-                    >
-                      {transaction.points >= 0 && '+'}
-                      {transaction.points}
-                    </td>
-                    <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
-                      <TimeFormatted
-                        date={transaction.createdAt}
-                        prefix={false}
-                        hourPrecision
-                        caseType="sentence"
-                      />
-                    </td>
-                  </tr>
-                ))}
+                {user.karmaTransactions.map((transaction) => {
+                  const actionInfo = getKarmaTransactionActionInfo(transaction.action)
+                  return (
+                    <tr class="hover:bg-night-500/5">
+                      <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
+                        <span class="inline-flex items-center gap-1">
+                          <Icon name={actionInfo.icon} class="size-4" />
+                          {actionInfo.label}
+                          {transaction.action === 'MANUAL_ADJUSTMENT' && transaction.grantedBy && (
+                            <a
+                              href={`/u/${transaction.grantedBy.name}`}
+                              class="text-day-500 ml-1 hover:underline"
+                            >
+                              {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
+                              by {transaction.grantedBy.displayName || transaction.grantedBy.name}
+                            </a>
+                          )}
+                        </span>
+                      </td>
+                      <td class="text-day-300 px-4 py-3">{transaction.description}</td>
+                      <td
+                        class={cn(
+                          'px-4 py-3 text-right text-xs whitespace-nowrap',
+                          transaction.points >= 0 ? 'text-green-400' : 'text-red-400'
+                        )}
+                      >
+                        {transaction.points >= 0 && '+'}
+                        {transaction.points}
+                      </td>
+                      <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
+                        <TimeFormatted
+                          date={transaction.createdAt}
+                          prefix={false}
+                          hourPrecision
+                          caseType="sentence"
+                        />
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

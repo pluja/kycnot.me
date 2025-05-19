@@ -54,11 +54,8 @@ export const adminUserActions = {
         .nullable()
         .default(null) // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         .transform((val) => val || null),
-      picture: z.string().max(255, 'Picture URL must be less than 255 characters').nullable().default(null),
       pictureFile: z.instanceof(File).optional(),
-      verifier: z.boolean().default(false),
-      admin: z.boolean().default(false),
-      spammer: z.boolean().default(false),
+      role: z.enum(['admin', 'verifier', 'spammer']),
       verifiedLink: z
         .string()
         .url('Invalid URL')
@@ -72,7 +69,7 @@ export const adminUserActions = {
         .default(null) // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         .transform((val) => val || null),
     }),
-    handler: async ({ id, picture, pictureFile, ...valuesToUpdate }) => {
+    handler: async ({ id, pictureFile, ...valuesToUpdate }) => {
       const user = await prisma.user.findUnique({
         where: {
           id,
@@ -89,10 +86,10 @@ export const adminUserActions = {
         })
       }
 
-      let pictureUrl = picture ?? null
-      if (pictureFile && pictureFile.size > 0) {
-        pictureUrl = await saveFileLocally(pictureFile, pictureFile.name, 'users/pictures/')
-      }
+      const pictureUrl =
+        pictureFile && pictureFile.size > 0
+          ? await saveFileLocally(pictureFile, pictureFile.name, 'users/pictures/')
+          : null
 
       const updatedUser = await prisma.user.update({
         where: { id: user.id },
@@ -293,10 +290,9 @@ export const adminUserActions = {
       input: z.object({
         userId: z.coerce.number().int().positive(),
         points: z.coerce.number().int(),
-        action: z.string().min(1, 'Action is required'),
         description: z.string().min(1, 'Description is required'),
       }),
-      handler: async (input) => {
+      handler: async (input, context) => {
         // Check if the user exists
         const user = await prisma.user.findUnique({
           where: { id: input.userId },
@@ -314,9 +310,9 @@ export const adminUserActions = {
           data: {
             userId: input.userId,
             points: input.points,
-            action: input.action,
+            action: 'MANUAL_ADJUSTMENT',
             description: input.description,
-            processed: true,
+            grantedByUserId: context.locals.user.id,
           },
         })
       },

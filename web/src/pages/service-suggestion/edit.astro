@@ -88,8 +88,11 @@ if (!service) return Astro.rewrite('/404')
       label="Note for Moderators"
       name="notes"
       value={params.notes}
-      rows={10}
-      placeholder="List the changes you want us to make to the service. Example: 'Add X, Y and Z attributes' 'Monero is accepted'. Provide supporting evidence."
+      inputProps={{
+        rows: 10,
+        placeholder:
+          'List the changes you want us to make to the service. Example: "Add X, Y and Z attributes" "Monero is accepted". Provide supporting evidence.',
+      }}
       error={inputErrors.notes}
     />
 

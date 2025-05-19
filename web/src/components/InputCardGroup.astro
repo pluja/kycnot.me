@@ -9,29 +9,33 @@ import InputWrapper from './InputWrapper.astro'
 import type { MarkdownString } from '../lib/markdown'
 import type { ComponentProps } from 'astro/types'
 
-type Props = Omit<ComponentProps<typeof InputWrapper>, 'children' | 'inputId'> & {
+type Props<Multiple extends boolean = false> = Omit<
+  ComponentProps<typeof InputWrapper>,
+  'children' | 'inputId'
+> & {
   options: {
     label: string
     value: string
     icon?: string
     iconClass?: string
     description?: MarkdownString
+    disabled?: boolean
   }[]
   disabled?: boolean
-  selectedValue?: string
+  selectedValue?: Multiple extends true ? string[] : string
   cardSize?: 'lg' | 'md' | 'sm'
   iconSize?: 'md' | 'sm'
-  multiple?: boolean
+  multiple?: Multiple
 }
 
 const {
   options,
   disabled,
-  selectedValue,
+  selectedValue = undefined as string[] | string | undefined,
   cardSize = 'sm',
   iconSize = 'sm',
   class: className,
-  multiple,
+  multiple = false as boolean,
   ...wrapperProps
 } = Astro.props
 
@@ -40,6 +44,7 @@ const inputId = Astro.locals.makeId(`input-${wrapperProps.name}`)
 const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
 ---
 
+{/* eslint-disable @typescript-eslint/prefer-nullish-coalescing */}
 <InputWrapper inputId={inputId} class={cn('@container', className)} {...wrapperProps}>
   <div
     class={cn(
@@ -62,7 +67,7 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
             'has-checked:border-green-700 has-checked:bg-green-700/20 has-checked:ring-1 has-checked:ring-green-700',
             multiple &&
               'has-focus-visible:border-day-300 has-focus-visible:ring-2 has-focus-visible:ring-green-700 has-focus-visible:ring-offset-1',
-            disabled && 'cursor-not-allowed opacity-50'
+            'has-[input:disabled]:cursor-not-allowed has-[input:disabled]:opacity-50'
           )}
         >
           <input
@@ -70,9 +75,13 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
             type={multiple ? 'checkbox' : 'radio'}
             name={wrapperProps.name}
             value={option.value}
-            checked={selectedValue === option.value}
+            checked={
+              Array.isArray(selectedValue)
+                ? selectedValue.includes(option.value)
+                : selectedValue === option.value
+            }
             class="peer sr-only"
-            disabled={disabled}
+            disabled={disabled || option.disabled}
           />
           <div class="flex items-center gap-1.5">
             {option.icon && (

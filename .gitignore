@@ -13,3 +13,4 @@ dump*.sql
 *.log
 *.bak
 migrate.py
+sync-all.sh

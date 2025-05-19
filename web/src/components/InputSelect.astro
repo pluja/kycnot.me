@@ -1,0 +1,48 @@
+---
+import { omit } from 'lodash-es'
+
+import { cn } from '../lib/cn'
+import { baseInputClassNames } from '../lib/formInputs'
+
+import InputWrapper from './InputWrapper.astro'
+
+import type { ComponentProps, HTMLAttributes } from 'astro/types'
+
+type Props = Omit<ComponentProps<typeof InputWrapper>, 'children' | 'inputId' | 'required'> & {
+  options: {
+    label: string
+    value: string
+    disabled?: boolean
+  }[]
+  selectProps?: Omit<HTMLAttributes<'select'>, 'name'>
+}
+
+const { options, selectProps, ...wrapperProps } = Astro.props
+
+const inputId = selectProps?.id ?? Astro.locals.makeId(`input-${wrapperProps.name}`)
+const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
+---
+
+<InputWrapper inputId={inputId} required={selectProps?.required} {...wrapperProps}>
+  <select
+    transition:persist
+    {...omit(selectProps, ['class', 'id', 'name'])}
+    id={inputId}
+    class={cn(
+      baseInputClassNames.input,
+      'appearance-none',
+      selectProps?.class,
+      hasError && baseInputClassNames.error,
+      !!selectProps?.disabled && baseInputClassNames.disabled
+    )}
+    name={wrapperProps.name}
+  >
+    {
+      options.map((option) => (
+        <option value={option.value} disabled={option.disabled}>
+          {option.label}
+        </option>
+      ))
+    }
+  </select>
+</InputWrapper>

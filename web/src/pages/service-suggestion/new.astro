@@ -184,31 +184,40 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       label="Description"
       name="description"
       id="description"
-      required
-      maxlength={SUGGESTION_DESCRIPTION_MAX_LENGTH}
+      inputProps={{
+        required: true,
+        maxlength: SUGGESTION_DESCRIPTION_MAX_LENGTH,
+      }}
       error={inputErrors.description}
     />
 
     <InputTextArea
       label="Service URLs"
       name="serviceUrls"
-      required
-      placeholder="https://example1.com\nhttps://example2.org"
+      inputProps={{
+        required: true,
+        placeholder: 'https://example1.com\nhttps://example2.org',
+      }}
       error={inputErrors.serviceUrls}
     />
 
     <InputTextArea
       label="Terms of Service URLs"
       name="tosUrls"
-      required
-      placeholder="https://example1.com/tos\nhttps://example2.org/terms"
+      inputProps={{
+        required: true,
+        placeholder: 'https://example1.com/tos\nhttps://example2.org/terms',
+      }}
       error={inputErrors.tosUrls}
     />
 
     <InputTextArea
       label="Onion URLs"
       name="onionUrls"
-      placeholder="http://example1.onion\nhttp://example2.onion"
+      inputProps={{
+        required: true,
+        placeholder: 'http://example1.onion\nhttp://example2.onion',
+      }}
       error={inputErrors.onionUrls}
     />
 
@@ -276,7 +285,9 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       name="notes"
       id="notes"
       error={inputErrors.notes}
-      maxlength={SUGGESTION_NOTES_MAX_LENGTH}
+      inputProps={{
+        maxlength: SUGGESTION_NOTES_MAX_LENGTH,
+      }}
     />
 
     <Captcha action={actions.serviceSuggestion.createService} />

@@ -9,6 +9,7 @@ import BadgeSmall from '../../components/BadgeSmall.astro'
 import Button from '../../components/Button.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import Tooltip from '../../components/Tooltip.astro'
+import { getKarmaTransactionActionInfo } from '../../constants/karmaTransactionActions'
 import { karmaUnlocks, karmaUnlocksById } from '../../constants/karmaUnlocks'
 import { SUPPORT_EMAIL } from '../../constants/project'
 import { getServiceSuggestionStatusInfo } from '../../constants/serviceSuggestionStatus'
@@ -61,6 +62,12 @@ const user = await Astro.locals.banners.try('user', async () => {
             action: true,
             description: true,
             createdAt: true,
+            grantedBy: {
+              select: {
+                name: true,
+                displayName: true,
+              },
+            },
             comment: {
               select: {
                 id: true,
@@ -864,24 +871,41 @@ if (!user) return Astro.rewrite('/404')
                 </tr>
               </thead>
               <tbody class="divide-night-400/10 divide-y">
-                {user.karmaTransactions.map((transaction) => (
-                  <tr class="hover:bg-night-500/5">
-                    <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">{transaction.action}</td>
-                    <td class="text-day-300 px-4 py-3">{transaction.description}</td>
-                    <td
-                      class={cn(
-                        'px-4 py-3 text-right text-xs whitespace-nowrap',
-                        transaction.points >= 0 ? 'text-green-400' : 'text-red-400'
-                      )}
-                    >
-                      {transaction.points >= 0 && '+'}
-                      {transaction.points}
-                    </td>
-                    <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
-                      {new Date(transaction.createdAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
+                {user.karmaTransactions.map((transaction) => {
+                  const actionInfo = getKarmaTransactionActionInfo(transaction.action)
+                  return (
+                    <tr class="hover:bg-night-500/5">
+                      <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
+                        <span class="inline-flex items-center gap-1">
+                          <Icon name={actionInfo.icon} class="size-4" />
+                          {actionInfo.label}
+                          {transaction.action === 'MANUAL_ADJUSTMENT' && transaction.grantedBy && (
+                            <a
+                              href={`/u/${transaction.grantedBy.name}`}
+                              class="text-day-500 ml-1 hover:underline"
+                            >
+                              {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
+                              by {transaction.grantedBy.displayName || transaction.grantedBy.name}
+                            </a>
+                          )}
+                        </span>
+                      </td>
+                      <td class="text-day-300 px-4 py-3">{transaction.description}</td>
+                      <td
+                        class={cn(
+                          'px-4 py-3 text-right text-xs whitespace-nowrap',
+                          transaction.points >= 0 ? 'text-green-400' : 'text-red-400'
+                        )}
+                      >
+                        {transaction.points >= 0 && '+'}
+                        {transaction.points}
+                      </td>
+                      <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
+                        {new Date(transaction.createdAt).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

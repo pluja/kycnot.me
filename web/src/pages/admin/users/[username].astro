@@ -1,12 +1,20 @@
 ---
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
+import { Image } from 'astro:assets'
 
-import Tooltip from '../../../components/Tooltip.astro'
+import BadgeSmall from '../../../components/BadgeSmall.astro'
+import Button from '../../../components/Button.astro'
+import InputCardGroup from '../../../components/InputCardGroup.astro'
+import InputImageFile from '../../../components/InputImageFile.astro'
+import InputSelect from '../../../components/InputSelect.astro'
+import InputSubmitButton from '../../../components/InputSubmitButton.astro'
+import InputText from '../../../components/InputText.astro'
+import InputTextArea from '../../../components/InputTextArea.astro'
+import TimeFormatted from '../../../components/TimeFormatted.astro'
+import { getServiceUserRoleInfo, serviceUserRoles } from '../../../constants/serviceUserRoles'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { prisma } from '../../../lib/prisma'
-import { transformCase } from '../../../lib/strings'
-import { timeAgo } from '../../../lib/timeAgo'
 
 const { username } = Astro.params
 
@@ -56,6 +64,8 @@ const [user, allServices] = await Astro.locals.banners.tryMany([
                 select: {
                   id: true,
                   name: true,
+                  displayName: true,
+                  picture: true,
                 },
               },
             },
@@ -105,543 +115,321 @@ const [user, allServices] = await Astro.locals.banners.tryMany([
 if (!user) return Astro.rewrite('/404')
 ---
 
-<BaseLayout pageTitle={`User: ${user.name}`} htmx>
-  <div class="container mx-auto max-w-2xl py-8">
-    <div class="mb-6 flex items-center justify-between">
-      <h1 class="font-title text-2xl text-green-400">User Profile: {user.name}</h1>
-      <a
-        href="/admin/users"
-        class="font-title inline-flex items-center justify-center rounded-md border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm text-green-400 shadow-xs transition-colors duration-200 hover:bg-green-500/20 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-      >
-        <Icon name="ri:arrow-left-line" class="mr-1 size-4" />
-        Back to Users
-      </a>
+<BaseLayout
+  pageTitle={`User: ${user.name}`}
+  htmx
+  widthClassName="max-w-screen-lg"
+  className={{ main: 'space-y-24' }}
+>
+  <div class="mt-12">
+    {
+      !!user.picture && (
+        <Image
+          src={user.picture}
+          alt=""
+          width={80}
+          height={80}
+          class="mx-auto mb-2 block size-20 rounded-full"
+        />
+      )
+    }
+    <h1
+      class="font-title mb-2 flex items-center justify-center gap-2 text-center text-3xl leading-none font-bold"
+    >
+      {user.displayName ? `${user.displayName} (${user.name})` : user.name}
+    </h1>
+
+    <div class="mb-4 flex flex-wrap justify-center gap-2">
+      {user.admin && <BadgeSmall color="green" text="Admin" icon="ri:shield-check-fill" />}
+      {user.verified && <BadgeSmall color="cyan" text="Verified" icon="ri:verified-badge-fill" />}
+      {user.verifier && <BadgeSmall color="blue" text="Verifier" icon="ri:check-fill" />}
+      {user.spammer && <BadgeSmall color="red" text="Spammer" icon="ri:alert-fill" />}
     </div>
 
-    <section
-      class="rounded-lg border border-green-500/30 bg-black/40 p-6 shadow-[0_0_15px_rgba(34,197,94,0.2)] backdrop-blur-xs"
-    >
-      <div class="mb-6 flex items-center gap-4">
-        {
-          user.picture ? (
-            <img src={user.picture} alt="" class="h-16 w-16 rounded-full ring-2 ring-green-500/30" />
-          ) : (
-            <div class="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 ring-2 ring-green-500/30">
-              <span class="font-title text-2xl text-green-500">{user.name.charAt(0) || 'A'}</span>
-            </div>
-          )
-        }
-        <div>
-          <h2 class="font-title text-lg text-green-400">{user.name}</h2>
-          <div class="mt-1 flex gap-2">
-            {
-              user.admin && (
-                <span class="font-title rounded-full border border-red-500/50 bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
-                  admin
-                </span>
-              )
-            }
-            {
-              user.verified && (
-                <span class="font-title rounded-full border border-blue-500/50 bg-blue-500/20 px-2 py-0.5 text-xs text-blue-400">
-                  verified
-                </span>
-              )
-            }
-            {
-              user.verifier && (
-                <span class="font-title rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                  verifier
-                </span>
-              )
-            }
-          </div>
-        </div>
-      </div>
-
-      <form
-        method="POST"
-        action={actions.admin.user.update}
-        class="space-y-4 border-t border-green-500/30 pt-6"
-        enctype="multipart/form-data"
-      >
-        <input type="hidden" name="id" value={user.id} />
-
-        <div>
-          <label class="font-title mb-2 block text-sm text-green-500" for="name"> Name </label>
-          <input
-            transition:persist
-            type="text"
-            name="name"
-            id="name"
-            value={user.name}
-            required
-            class="font-title w-full rounded-md border border-green-500/30 bg-black/50 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-          />
-          {
-            updateInputErrors.name && (
-              <p class="font-title mt-1 text-sm text-red-500">{updateInputErrors.name.join(', ')}</p>
-            )
-          }
-        </div>
-
-        <div>
-          <label class="font-title mb-2 block text-sm text-green-500" for="displayName"> Display Name </label>
-          <input
-            transition:persist
-            type="text"
-            name="displayName"
-            maxlength={50}
-            id="displayName"
-            value={user.displayName ?? ''}
-            class="font-title w-full rounded-md border border-green-500/30 bg-black/50 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-          />
-          {
-            Array.isArray(updateInputErrors.displayName) && updateInputErrors.displayName.length > 0 && (
-              <p class="font-title mt-1 text-sm text-red-500">{updateInputErrors.displayName.join(', ')}</p>
-            )
-          }
-        </div>
-
-        <div>
-          <label class="font-title mb-2 block text-sm text-green-500" for="link"> Link </label>
-          <input
-            transition:persist
-            type="url"
-            name="link"
-            id="link"
-            value={user.link ?? ''}
-            class="font-title w-full rounded-md border border-green-500/30 bg-black/50 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-          />
-          {
-            updateInputErrors.link && (
-              <p class="font-title mt-1 text-sm text-red-500">{updateInputErrors.link.join(', ')}</p>
-            )
-          }
-        </div>
-
-        <div>
-          <label class="font-title mb-2 block text-sm text-green-500" for="picture">
-            Picture url or path
-          </label>
-          <input
-            transition:persist
-            type="text"
-            name="picture"
-            id="picture"
-            value={user.picture ?? ''}
-            class="font-title w-full rounded-md border border-green-500/30 bg-black/50 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-          />
-          {
-            updateInputErrors.picture && (
-              <p class="font-title mt-1 text-sm text-red-500">{updateInputErrors.picture.join(', ')}</p>
-            )
-          }
-        </div>
-
-        <div>
-          <label class="font-title mb-2 block text-sm text-green-500" for="pictureFile">
-            Profile Picture Upload
-          </label>
-          <input
-            transition:persist
-            type="file"
-            name="pictureFile"
-            id="pictureFile"
-            accept="image/*"
-            class="font-title file:font-title block w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 file:mr-3 file:rounded-md file:border-0 file:bg-green-500/30 file:px-3 file:py-1 file:text-gray-300 focus:border-green-500 focus:ring-green-500"
-          />
-          <p class="font-title text-xs text-gray-400">
-            Upload a square image for best results. Supported formats: JPG, PNG, WebP, AVIF, JXL. Max size:
-            5MB.
-          </p>
-        </div>
-
-        <div class="flex gap-6">
-          <label class="flex items-center gap-2">
-            <input
-              transition:persist
-              type="checkbox"
-              name="admin"
-              checked={user.admin}
-              class="rounded-sm border-green-500/30 bg-black/50 text-green-500 focus:ring-green-500 focus:ring-offset-black"
-            />
-            <span class="font-title text-sm text-green-500">Admin</span>
-          </label>
-
-          <Tooltip
-            as="label"
-            class="flex cursor-not-allowed items-center gap-2"
-            text="Automatically set based on verified link"
-          >
-            <input
-              type="checkbox"
-              name="verified"
-              checked={user.verified}
-              class="rounded-sm border-green-500/30 bg-black/50 text-green-500 focus:ring-green-500 focus:ring-offset-black"
-              disabled
-            />
-            <span class="font-title text-sm text-green-500">Verified</span>
-          </Tooltip>
-
-          <label class="flex items-center gap-2">
-            <input
-              transition:persist
-              type="checkbox"
-              name="verifier"
-              checked={user.verifier}
-              class="rounded-sm border-green-500/30 bg-black/50 text-green-500 focus:ring-green-500 focus:ring-offset-black"
-            />
-            <span class="font-title text-sm text-green-500">Verifier</span>
-          </label>
-
-          <label class="flex items-center gap-2">
-            <input
-              transition:persist
-              type="checkbox"
-              name="spammer"
-              checked={user.spammer}
-              class="rounded-sm border-red-500/30 bg-black/50 text-red-500 focus:ring-red-500 focus:ring-offset-black"
-            />
-            <span class="font-title text-sm text-red-500">Spammer</span>
-          </label>
-        </div>
-
-        {
-          updateInputErrors.admin && (
-            <p class="font-title mt-1 text-sm text-red-500">{updateInputErrors.admin.join(', ')}</p>
-          )
-        }
-        {
-          updateInputErrors.verifier && (
-            <p class="font-title mt-1 text-sm text-red-500">{updateInputErrors.verifier.join(', ')}</p>
-          )
-        }
-        {
-          updateInputErrors.spammer && (
-            <p class="font-title mt-1 text-sm text-red-500">{updateInputErrors.spammer.join(', ')}</p>
-          )
-        }
-
-        <div>
-          <label class="font-title mb-2 block text-sm text-green-500" for="verifiedLink">
-            Verified Link
-          </label>
-          <input
-            transition:persist
-            type="url"
-            name="verifiedLink"
-            id="verifiedLink"
-            value={user.verifiedLink}
-            class="font-title w-full rounded-md border border-green-500/30 bg-black/50 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-          />
-          {
-            updateInputErrors.verifiedLink && (
-              <p class="font-title mt-1 text-sm text-red-500">{updateInputErrors.verifiedLink.join(', ')}</p>
-            )
-          }
-        </div>
-
-        <div class="flex gap-4 pt-4">
-          <button
-            type="submit"
-            class="font-title inline-flex items-center justify-center rounded-md border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm text-green-400 shadow-xs transition-colors duration-200 hover:bg-green-500/20 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-          >
-            <Icon name="ri:save-line" class="mr-2 size-4" />
-            Save
-          </button>
-        </div>
-      </form>
+    <div class="flex justify-center gap-2">
+      <Button
+        as="a"
+        href={`/u/${user.name}`}
+        icon="ri:global-line"
+        color="success"
+        shadow
+        size="sm"
+        label="View public profile"
+      />
       {
-        Astro.locals.user && user.id !== Astro.locals.user.id && (
-          <a
+        Astro.locals.user && user.id !== Astro.locals.user.id && !user.admin && (
+          <Button
+            as="a"
             href={`/account/impersonate?targetUserId=${user.id}&redirect=/account`}
-            class="font-title mt-4 inline-flex items-center justify-center rounded-md border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-sm text-yellow-400 shadow-xs transition-colors duration-200 hover:bg-yellow-500/20 focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-          >
-            <Icon name="ri:spy-line" class="mr-2 size-4" />
-            Impersonate
-          </a>
+            data-astro-prefetch="tap"
+            icon="ri:spy-line"
+            color="gray"
+            size="sm"
+            label="Impersonate"
+          />
         )
       }
-    </section>
+    </div>
+  </div>
 
-    <section
-      class="mt-8 rounded-lg border border-green-500/30 bg-black/40 p-6 shadow-[0_0_15px_rgba(34,197,94,0.2)] backdrop-blur-xs"
-    >
-      <h2 class="font-title mb-4 text-lg text-green-500">Internal Notes</h2>
+  <form method="POST" action={actions.admin.user.update} enctype="multipart/form-data" class="space-y-2">
+    <h2 class="font-title text-center text-3xl leading-none font-bold">Edit profile</h2>
 
-      {
-        user.internalNotes.length === 0 ? (
-          <p class="text-gray-400">No internal notes yet.</p>
-        ) : (
-          <div class="space-y-4">
-            {user.internalNotes.map((note) => (
-              <div data-note-id={note.id} class="rounded-lg border border-green-500/30 bg-black/50 p-4">
-                <div class="mb-2 flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <span class="font-title text-xs text-gray-200">
-                      {note.addedByUser ? note.addedByUser.name : 'System'}
-                    </span>
-                    <span class="font-title text-xs text-gray-500">
-                      {transformCase(timeAgo.format(note.createdAt, 'twitter-minute-now'), 'sentence')}
-                    </span>
-                  </div>
+    <input type="hidden" name="id" value={user.id} />
 
-                  <div class="flex items-center gap-2">
-                    <label class="font-title inline-flex cursor-pointer items-center justify-center rounded-md border border-yellow-500/30 bg-yellow-500/10 px-2 py-1 text-xs text-yellow-400 shadow-xs transition-colors duration-200 hover:bg-yellow-500/20 focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden">
-                      <input
-                        type="checkbox"
-                        class="peer sr-only"
-                        data-edit-note-checkbox
-                        data-note-id={note.id}
-                      />
-                      <Icon name="ri:edit-line" class="size-3" />
-                    </label>
+    <div class="grid grid-cols-2 gap-x-4 gap-y-2">
+      <InputText
+        label="Name"
+        name="name"
+        error={updateInputErrors.name}
+        inputProps={{ value: user.name, required: true }}
+      />
 
-                    <form method="POST" action={actions.admin.user.internalNotes.delete} class="inline-flex">
-                      <input type="hidden" name="noteId" value={note.id} />
-                      <button
-                        type="submit"
-                        class="font-title inline-flex items-center justify-center rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-400 shadow-xs transition-colors duration-200 hover:bg-red-500/20 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-                      >
-                        <Icon name="ri:delete-bin-line" class="size-3" />
-                      </button>
-                    </form>
-                  </div>
+      <InputText
+        label="Display Name"
+        name="displayName"
+        error={updateInputErrors.displayName}
+        inputProps={{ value: user.displayName ?? '', maxlength: 50 }}
+      />
+
+      <InputText
+        label="Link"
+        name="link"
+        error={updateInputErrors.link}
+        inputProps={{ value: user.link ?? '', type: 'url' }}
+      />
+
+      <InputText
+        label="Verified Link"
+        name="verifiedLink"
+        error={updateInputErrors.verifiedLink}
+        inputProps={{ value: user.verifiedLink, type: 'url' }}
+      />
+    </div>
+
+    <InputImageFile
+      label="Profile Picture Upload"
+      name="pictureFile"
+      value={user.picture}
+      error={updateInputErrors.pictureFile}
+      square
+      description="Upload a square image for best results. Supported formats: JPG, PNG, WebP, AVIF, JXL. Max size: 5MB."
+    />
+
+    <InputCardGroup
+      name="role"
+      label="Role"
+      options={[
+        { label: 'Admin', value: 'admin', icon: 'ri:shield-check-fill' },
+        { label: 'Verified', value: 'verified', icon: 'ri:verified-badge-fill', disabled: true },
+        { label: 'Verifier', value: 'verifier', icon: 'ri:check-fill' },
+        { label: 'Spammer', value: 'spammer', icon: 'ri:alert-fill' },
+      ]}
+      selectedValue={[
+        user.admin ? 'admin' : null,
+        user.verified ? 'verified' : null,
+        user.verifier ? 'verifier' : null,
+        user.spammer ? 'spammer' : null,
+      ].filter((v) => v !== null)}
+      required
+      cardSize="sm"
+      iconSize="sm"
+      multiple
+      error={updateInputErrors.role}
+    />
+
+    <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
+  </form>
+
+  <section class="space-y-2">
+    <h2 class="font-title text-center text-3xl leading-none font-bold">Internal Notes</h2>
+
+    {
+      user.internalNotes.length === 0 ? (
+        <p class="text-day-300 text-center">No internal notes yet.</p>
+      ) : (
+        <div class="space-y-4">
+          {user.internalNotes.map((note) => (
+            <div data-note-id={note.id} class="border-night-400 bg-night-600 rounded-lg border p-4 shadow-sm">
+              <div class="mb-1 flex items-center justify-between gap-4">
+                <div class="flex items-center gap-1">
+                  {!!note.addedByUser?.picture && (
+                    <Image
+                      src={note.addedByUser.picture}
+                      alt=""
+                      width={12}
+                      height={12}
+                      class="size-6 rounded-full"
+                    />
+                  )}
+                  <span class="text-day-100 font-medium">
+                    {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
+                    {note.addedByUser ? note.addedByUser.displayName || note.addedByUser.name : 'System'}
+                  </span>
+                  <TimeFormatted date={note.createdAt} hourPrecision class="text-day-300 ms-1 text-sm" />
                 </div>
-                <div data-note-content>
-                  <p class="font-title text-sm whitespace-pre-wrap text-gray-300">{note.content}</p>
-                </div>
-                <form
-                  method="POST"
-                  action={actions.admin.user.internalNotes.update}
-                  data-note-edit-form
-                  class="mt-2 hidden"
-                >
-                  <input type="hidden" name="noteId" value={note.id} />
-                  <textarea
-                    name="content"
-                    rows="3"
-                    class="font-title min-h-12 w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-sm text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-                    data-trim-content
-                  >
-                    {note.content}
-                  </textarea>
 
-                  <div class="mt-2 flex justify-end gap-2">
-                    <button
-                      type="button"
-                      data-cancel-edit
-                      class="font-title inline-flex items-center justify-center rounded-md border border-gray-500/30 bg-gray-500/10 px-3 py-1 text-xs text-gray-400 shadow-xs transition-colors duration-200 hover:bg-gray-500/20 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-                    >
-                      Cancel
+                <div class="flex items-center">
+                  <label class="text-day-300 hover:text-day-100 cursor-pointer p-1 transition-colors">
+                    <input
+                      type="checkbox"
+                      class="peer sr-only"
+                      data-edit-note-checkbox
+                      data-note-id={note.id}
+                    />
+                    <Icon name="ri:edit-line" class="size-5" />
+                  </label>
+
+                  <form method="POST" action={actions.admin.user.internalNotes.delete} class="contents">
+                    <input type="hidden" name="noteId" value={note.id} />
+                    <button type="submit" class="text-day-300 p-1 transition-colors hover:text-red-400">
+                      <Icon name="ri:delete-bin-line" class="size-5" />
                     </button>
-                    <button
-                      type="submit"
-                      class="font-title inline-flex items-center justify-center rounded-md border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs text-green-400 shadow-xs transition-colors duration-200 hover:bg-green-500/20 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-                    >
-                      Save
-                    </button>
-                  </div>
-                </form>
+                  </form>
+                </div>
               </div>
-            ))}
-          </div>
-        )
-      }
 
-      <form method="POST" action={actions.admin.user.internalNotes.add} class="mt-4 space-y-2">
-        <input type="hidden" name="userId" value={user.id} />
-        <textarea
-          name="content"
-          placeholder="Add a note..."
-          rows="3"
-          class="font-title min-h-12 w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-sm text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-        ></textarea>
-        <button
-          type="submit"
-          class="font-title inline-flex items-center justify-center rounded-md border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm text-green-400 shadow-xs transition-colors duration-200 hover:bg-green-500/20 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-        >
-          <Icon name="ri:add-line" class="mr-1 size-4" />
-          Add
-        </button>
-      </form>
-    </section>
+              <div data-note-content>
+                <p class="text-day-200 whitespace-pre-wrap">{note.content}</p>
+              </div>
 
-    <section
-      class="mt-8 rounded-lg border border-green-500/30 bg-black/40 p-6 shadow-[0_0_15px_rgba(34,197,94,0.2)] backdrop-blur-xs"
-    >
-      <h2 class="font-title mb-4 text-lg text-green-500">Service Affiliations</h2>
+              <form
+                method="POST"
+                action={actions.admin.user.internalNotes.update}
+                data-note-edit-form
+                class="mt-4 hidden space-y-4"
+              >
+                <input type="hidden" name="noteId" value={note.id} />
+                <InputTextArea
+                  label="Note Content"
+                  name="content"
+                  value={note.content}
+                  inputProps={{ class: 'bg-night-700' }}
+                />
+                <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
+              </form>
+            </div>
+          ))}
+        </div>
+      )
+    }
 
-      {
-        user.serviceAffiliations.length === 0 ? (
-          <p class="text-gray-400">No service affiliations yet.</p>
-        ) : (
-          <div class="space-y-4">
-            {user.serviceAffiliations.map((affiliation) => (
-              <div class="flex items-center justify-between rounded-lg border border-green-500/30 bg-black/50 p-4">
-                <div>
-                  <div class="flex items-center gap-2">
-                    <a
-                      href={`/service/${affiliation.service.slug}`}
-                      class="font-title text-sm text-green-400 hover:underline"
-                    >
-                      {affiliation.service.name}
-                    </a>
-                    <span
-                      class={`font-title rounded-full px-2 py-0.5 text-xs ${
-                        affiliation.role === 'OWNER'
-                          ? 'border border-purple-500/50 bg-purple-500/20 text-purple-400'
-                          : affiliation.role === 'ADMIN'
-                            ? 'border border-red-500/50 bg-red-500/20 text-red-400'
-                            : affiliation.role === 'MODERATOR'
-                              ? 'border border-orange-500/50 bg-orange-500/20 text-orange-400'
-                              : affiliation.role === 'SUPPORT'
-                                ? 'border border-blue-500/50 bg-blue-500/20 text-blue-400'
-                                : 'border border-green-500/50 bg-green-500/20 text-green-400'
-                      }`}
-                    >
-                      {affiliation.role.toLowerCase()}
-                    </span>
-                  </div>
-                  <div class="mt-1 flex items-center gap-2">
-                    <span class="font-title text-xs text-gray-500">
-                      {transformCase(timeAgo.format(affiliation.createdAt, 'twitter-minute-now'), 'sentence')}
-                    </span>
-                  </div>
-                </div>
+    <form method="POST" action={actions.admin.user.internalNotes.add} class="mt-10 space-y-2">
+      <h3 class="font-title mb-0 text-center text-xl leading-none font-bold">Add Note</h3>
+
+      <input type="hidden" name="userId" value={user.id} />
+      <InputTextArea
+        label="Note Content"
+        name="content"
+        inputProps={{ placeholder: 'Add a note...', rows: 3 }}
+      />
+      <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />
+    </form>
+  </section>
+
+  <section class="space-y-2">
+    <h2 class="font-title text-center text-3xl leading-none font-bold">Service Affiliations</h2>
+
+    {
+      user.serviceAffiliations.length === 0 ? (
+        <p class="text-day-200 text-center">No service affiliations yet.</p>
+      ) : (
+        <div class="grid grid-cols-2 gap-x-4">
+          {user.serviceAffiliations.map((affiliation) => {
+            const roleInfo = getServiceUserRoleInfo(affiliation.role)
+            return (
+              <div class="bg-night-600 border-night-400 flex items-center justify-start gap-2 rounded-lg border px-3 py-2">
+                <BadgeSmall color={roleInfo.color} text={roleInfo.label} icon={roleInfo.icon} />
+                <span class="text-day-400 text-sm">at</span>
+                <a
+                  href={`/service/${affiliation.service.slug}`}
+                  class="text-day-100 hover:text-day-50 flex items-center gap-1 leading-none font-medium hover:underline"
+                >
+                  <span>{affiliation.service.name}</span>
+                  <Icon name="ri:external-link-line" class="text-day-400 size-3.5" />
+                </a>
+                <TimeFormatted
+                  date={affiliation.createdAt}
+                  hourPrecision
+                  class="text-day-400 ms-auto me-2 text-sm"
+                />
 
                 <form
                   method="POST"
                   action={actions.admin.user.serviceAffiliations.remove}
-                  class="inline-flex"
                   data-astro-reload
+                  class="contents"
                 >
                   <input type="hidden" name="id" value={affiliation.id} />
-                  <button
-                    type="submit"
-                    class="font-title inline-flex items-center justify-center rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-400 shadow-xs transition-colors duration-200 hover:bg-red-500/20 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-                  >
-                    <Icon name="ri:delete-bin-line" class="size-3" />
+                  <button type="submit" class="text-day-300 transition-colors hover:text-red-400">
+                    <Icon name="ri:delete-bin-line" class="size-5" />
                   </button>
                 </form>
               </div>
-            ))}
-          </div>
-        )
-      }
-
-      <form
-        method="POST"
-        action={actions.admin.user.serviceAffiliations.add}
-        class="mt-6 space-y-4 border-t border-green-500/30 pt-6"
-        data-astro-reload
-      >
-        <input type="hidden" name="userId" value={user.id} />
-
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
-            <label class="font-title mb-2 block text-sm text-green-500" for="serviceId"> Service </label>
-            <select
-              name="serviceId"
-              id="serviceId"
-              required
-              class="font-title w-full rounded-md border border-green-500/30 bg-black/50 text-gray-300 focus:border-green-500 focus:ring-green-500"
-            >
-              <option value="">Select a service</option>
-              {allServices.map((service) => <option value={service.id}>{service.name}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label class="font-title mb-2 block text-sm text-green-500" for="role"> Role </label>
-            <select
-              name="role"
-              id="role"
-              required
-              class="font-title w-full rounded-md border border-green-500/30 bg-black/50 text-gray-300 focus:border-green-500 focus:ring-green-500"
-            >
-              <option value="OWNER">Owner</option>
-              <option value="ADMIN">Admin</option>
-              <option value="MODERATOR">Moderator</option>
-              <option value="SUPPORT">Support</option>
-              <option value="TEAM_MEMBER">Team Member</option>
-            </select>
-          </div>
+            )
+          })}
         </div>
+      )
+    }
 
-        <div>
-          <button
-            type="submit"
-            class="font-title inline-flex items-center justify-center rounded-md border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm text-green-400 shadow-xs transition-colors duration-200 hover:bg-green-500/20 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-          >
-            <Icon name="ri:link" class="mr-1 size-4" />
-            Add Service Affiliation
-          </button>
-        </div>
-      </form>
-    </section>
-
-    <section
-      class="mt-8 rounded-lg border border-green-500/30 bg-black/40 p-6 shadow-[0_0_15px_rgba(34,197,94,0.2)] backdrop-blur-xs"
+    <form
+      method="POST"
+      action={actions.admin.user.serviceAffiliations.add}
+      data-astro-reload
+      class="mt-10 space-y-2"
     >
-      <h2 class="font-title mb-4 text-lg text-green-500">Add Karma Transaction</h2>
+      <h3 class="font-title mb-0 text-center text-xl leading-none font-bold">Add Affiliation</h3>
 
-      <form
-        method="POST"
-        action={actions.admin.user.karmaTransactions.add}
-        class="mt-6 space-y-4 border-t border-green-500/30 pt-6"
-        data-astro-reload
-      >
-        <input type="hidden" name="userId" value={user.id} />
+      <input type="hidden" name="userId" value={user.id} />
 
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
-            <label class="font-title mb-2 block text-sm text-green-500" for="points"> Points </label>
-            <input
-              type="number"
-              name="points"
-              id="points"
-              required
-              class="font-title w-full rounded-md border border-green-500/30 bg-black/50 text-gray-300 focus:border-green-500 focus:ring-green-500"
-            />
-          </div>
+      <InputSelect
+        name="serviceId"
+        label="Service"
+        options={allServices.map((service) => ({
+          label: service.name,
+          value: service.id.toString(),
+        }))}
+        selectProps={{ required: true }}
+      />
 
-          <div>
-            <label class="font-title mb-2 block text-sm text-green-500" for="action"> Action </label>
-            <input
-              type="text"
-              name="action"
-              id="action"
-              required
-              class="font-title w-full rounded-md border border-green-500/30 bg-black/50 text-gray-300 focus:border-green-500 focus:ring-green-500"
-            />
-          </div>
-        </div>
+      <InputCardGroup
+        name="role"
+        label="Role"
+        options={serviceUserRoles.map((role) => ({
+          label: role.label,
+          value: role.value,
+          icon: role.icon,
+        }))}
+        required
+        cardSize="sm"
+        iconSize="sm"
+      />
 
-        <div>
-          <label class="font-title mb-2 block text-sm text-green-500" for="description"> Description </label>
-          <textarea
-            name="description"
-            id="description"
-            required
-            rows="3"
-            class="font-title w-full rounded-md border border-green-500/30 bg-black/50 text-gray-300 focus:border-green-500 focus:ring-green-500"
-          ></textarea>
-        </div>
+      <InputSubmitButton label="Add Affiliation" icon="ri:link" hideCancel />
+    </form>
+  </section>
 
-        <div>
-          <button
-            type="submit"
-            class="font-title inline-flex items-center justify-center rounded-md border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm text-green-400 shadow-xs transition-colors duration-200 hover:bg-green-500/20 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-          >
-            <Icon name="ri:add-line" class="mr-1 size-4" />
-            Add Karma Transaction
-          </button>
-        </div>
-      </form>
-    </section>
-  </div>
+  <form method="POST" action={actions.admin.user.karmaTransactions.add} data-astro-reload class="space-y-2">
+    <h2 class="font-title text-center text-3xl leading-none font-bold">Grant/Remove Karma</h2>
+
+    <input type="hidden" name="userId" value={user.id} />
+
+    <InputText
+      label="Points"
+      name="points"
+      error={addKarmaTransactionResult?.error?.message}
+      inputProps={{ type: 'number', required: true }}
+    />
+
+    <InputTextArea
+      label="Description"
+      name="description"
+      error={addKarmaTransactionResult?.error?.message}
+      inputProps={{ required: true }}
+    />
+
+    <InputSubmitButton label="Submit" icon="ri:add-line" hideCancel />
+  </form>
 </BaseLayout>
 
 <script>
@@ -656,7 +444,6 @@ if (!user) return Astro.rewrite('/404')
 
         const noteContent = noteDiv.querySelector<HTMLDivElement>('[data-note-content]')
         const editForm = noteDiv.querySelector<HTMLFormElement>('[data-note-edit-form]')
-        const cancelButton = noteDiv.querySelector<HTMLButtonElement>('[data-cancel-edit]')
 
         if (noteContent && editForm) {
           if (target.checked) {
@@ -667,23 +454,7 @@ if (!user) return Astro.rewrite('/404')
             editForm.classList.add('hidden')
           }
         }
-
-        if (cancelButton) {
-          cancelButton.addEventListener('click', () => {
-            target.checked = false
-            noteContent?.classList.remove('hidden')
-            editForm?.classList.add('hidden')
-          })
-        }
       })
-    })
-  })
-</script>
-
-<script>
-  document.addEventListener('astro:page-load', () => {
-    document.querySelectorAll<HTMLTextAreaElement>('[data-trim-content]').forEach((textarea) => {
-      textarea.value = textarea.value.trim()
     })
   })
 </script>

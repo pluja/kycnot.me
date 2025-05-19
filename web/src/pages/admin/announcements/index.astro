@@ -1,0 +1,808 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions, isInputError } from 'astro:actions'
+import { z } from 'astro:schema'
+
+import { adminAnnouncementActions } from '../../../actions/admin/announcement'
+import SortArrowIcon from '../../../components/SortArrowIcon.astro'
+import TimeFormatted from '../../../components/TimeFormatted.astro'
+import Tooltip from '../../../components/Tooltip.astro'
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
+import { prisma } from '../../../lib/prisma'
+
+import type { AnnouncementType, Prisma } from '@prisma/client'
+
+const { data: filters } = zodParseQueryParamsStoringErrors(
+  {
+    'sort-by': z
+      .enum(['title', 'type', 'startDate', 'endDate', 'isActive', 'createdAt'])
+      .default('createdAt'),
+    'sort-order': z.enum(['asc', 'desc']).default('desc'),
+    search: z.string().optional(),
+    type: z.enum(['INFO', 'WARNING', 'ALERT']).optional(),
+    status: z.enum(['active', 'inactive']).optional(),
+  },
+  Astro
+)
+
+// Set up Prisma orderBy with correct typing
+const prismaOrderBy = {
+  [filters['sort-by']]: filters['sort-order'] === 'asc' ? 'asc' : 'desc',
+} as const satisfies Prisma.AnnouncementOrderByWithRelationInput
+
+// Build where clause based on filters
+const whereClause: Prisma.AnnouncementWhereInput = {}
+
+if (filters.search) {
+  whereClause.OR = [
+    { title: { contains: filters.search, mode: 'insensitive' } },
+    { content: { contains: filters.search, mode: 'insensitive' } },
+  ]
+}
+
+if (filters.type) {
+  whereClause.type = filters.type as AnnouncementType
+}
+
+if (filters.status) {
+  whereClause.isActive = filters.status === 'active'
+}
+
+// Retrieve announcements from the database
+const announcements = await prisma.announcement.findMany({
+  where: whereClause,
+  orderBy: prismaOrderBy,
+})
+
+// Helper for generating sort URLs
+const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
+  const currentSortBy = filters['sort-by']
+  const currentSortOrder = filters['sort-order']
+  const newSortOrder = currentSortBy === slug && currentSortOrder === 'asc' ? 'desc' : 'asc'
+  const searchParams = new URLSearchParams(Astro.url.search)
+  searchParams.set('sort-by', slug)
+  searchParams.set('sort-order', newSortOrder)
+  return `/admin/announcements?${searchParams.toString()}`
+}
+
+// Get type badge class based on announcement type
+const getTypeBadgeClass = (type: AnnouncementType) => {
+  switch (type) {
+    case 'INFO':
+      return 'bg-blue-900/30 text-blue-400'
+    case 'WARNING':
+      return 'bg-yellow-900/30 text-yellow-400'
+    case 'ALERT':
+      return 'bg-red-900/30 text-red-400'
+    default:
+      return 'bg-zinc-900/30 text-zinc-400'
+  }
+}
+
+// Current date for form min values
+const currentDate = new Date().toISOString().slice(0, 16) // Format: YYYY-MM-DDThh:mm
+
+// Default new announcement
+const newAnnouncement = {
+  title: '',
+  content: '',
+  type: 'INFO' as const,
+  startDate: currentDate,
+  endDate: '',
+  isActive: true,
+}
+
+// Get action results
+const createResult = Astro.getActionResult(adminAnnouncementActions.create)
+const updateResult = Astro.getActionResult(adminAnnouncementActions.update)
+const deleteResult = Astro.getActionResult(adminAnnouncementActions.delete)
+const toggleResult = Astro.getActionResult(adminAnnouncementActions.toggleActive)
+
+// Add success messages to banners
+Astro.locals.banners.addIfSuccess(createResult, 'Announcement created successfully!')
+Astro.locals.banners.addIfSuccess(updateResult, 'Announcement updated successfully!')
+Astro.locals.banners.addIfSuccess(deleteResult, 'Announcement deleted successfully!')
+Astro.locals.banners.addIfSuccess(
+  toggleResult,
+  (data) => `Announcement ${data.updatedAnnouncement.isActive ? 'activated' : 'deactivated'} successfully!`
+)
+
+// Add error messages to banners
+if (createResult?.error) {
+  const err = createResult.error
+  Astro.locals.banners.add({
+    uiMessage: err.message,
+    type: 'error',
+    origin: 'action',
+    error: err,
+  })
+}
+if (updateResult?.error) {
+  const err = updateResult.error
+  Astro.locals.banners.add({
+    uiMessage: err.message,
+    type: 'error',
+    origin: 'action',
+    error: err,
+  })
+}
+if (deleteResult?.error) {
+  const err = deleteResult.error
+  Astro.locals.banners.add({
+    uiMessage: err.message,
+    type: 'error',
+    origin: 'action',
+    error: err,
+  })
+}
+if (toggleResult?.error) {
+  const err = toggleResult.error
+  Astro.locals.banners.add({
+    uiMessage: err.message,
+    type: 'error',
+    origin: 'action',
+    error: err,
+  })
+}
+---
+
+<BaseLayout pageTitle="Announcement Management" widthClassName="max-w-screen-xl">
+  <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+    <h1 class="font-title text-2xl font-bold text-white">Announcement Management</h1>
+    <div class="mt-2 flex items-center gap-4 sm:mt-0">
+      <span class="text-sm text-zinc-400">{announcements.length} announcements</span>
+    </div>
+  </div>
+
+  <div class="mb-6 rounded-lg border border-zinc-700 bg-zinc-800/50 p-4 shadow-lg">
+    <form method="GET" class="grid gap-3 md:grid-cols-3" autocomplete="off">
+      <div>
+        <label for="search" class="block text-xs font-medium text-zinc-400">Search</label>
+        <input
+          type="text"
+          name="search"
+          id="search"
+          value={filters.search}
+          placeholder="Search by title or content..."
+          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label for="type-filter" class="block text-xs font-medium text-zinc-400">Type</label>
+        <select
+          name="type"
+          id="type-filter"
+          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+        >
+          <option value="" selected={!filters.type}>All Types</option>
+          <option value="INFO" selected={filters.type === 'INFO'}>Info</option>
+          <option value="WARNING" selected={filters.type === 'WARNING'}>Warning</option>
+          <option value="ALERT" selected={filters.type === 'ALERT'}>Alert</option>
+        </select>
+      </div>
+      <div>
+        <label for="status-filter" class="block text-xs font-medium text-zinc-400">Status</label>
+        <div class="mt-1 flex">
+          <select
+            name="status"
+            id="status-filter"
+            class="w-full rounded-l-md border border-r-0 border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+          >
+            <option value="" selected={!filters.status}>All Statuses</option>
+            <option value="active" selected={filters.status === 'active'}>Active</option>
+            <option value="inactive" selected={filters.status === 'inactive'}>Inactive</option>
+          </select>
+          <button
+            type="submit"
+            class="inline-flex items-center rounded-r-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+          >
+            <Icon name="ri:search-2-line" class="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Create New Announcement Form -->
+  <div class="mb-6">
+    <button
+      id="toggle-new-announcement-form"
+      class="mb-4 inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+    >
+      <Icon name="ri:add-line" class="mr-1 h-4 w-4" />
+      Create New Announcement
+    </button>
+
+    <div
+      id="new-announcement-form"
+      class="hidden rounded-lg border border-zinc-700 bg-zinc-800/50 p-4 shadow-lg"
+    >
+      <h2 class="font-title mb-4 text-lg font-semibold text-blue-400">Create New Announcement</h2>
+      <form method="POST" action={actions.admin.announcement.create} class="grid gap-4 md:grid-cols-2">
+        <div class="space-y-3 md:col-span-2">
+          <div>
+            <label for="title" class="block text-xs font-medium text-zinc-400">Title*</label>
+            <input
+              type="text"
+              name="title"
+              id="title"
+              required
+              maxlength="255"
+              placeholder="Announcement Title"
+              value={newAnnouncement.title}
+              class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label for="content" class="block text-xs font-medium text-zinc-400">Content*</label>
+            <textarea
+              name="content"
+              id="content"
+              required
+              maxlength="1000"
+              rows="3"
+              placeholder="Announcement Content"
+              class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+              >{newAnnouncement.content}</textarea
+            >
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <div>
+            <label for="type" class="block text-xs font-medium text-zinc-400">Type*</label>
+            <select
+              name="type"
+              id="type"
+              required
+              class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            >
+              <option value="INFO" selected={true}>Info</option>
+              <option value="WARNING" selected={false}>Warning</option>
+              <option value="ALERT" selected={false}>Alert</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="startDate" class="block text-xs font-medium text-zinc-400">Start Date & Time*</label>
+            <input
+              type="datetime-local"
+              name="startDate"
+              id="startDate"
+              required
+              min={currentDate}
+              value={newAnnouncement.startDate}
+              class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label for="endDate" class="block text-xs font-medium text-zinc-400"
+              >End Date & Time (Optional)</label
+            >
+            <input
+              type="datetime-local"
+              name="endDate"
+              id="endDate"
+              min={currentDate}
+              value={newAnnouncement.endDate}
+              class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <div class="flex items-center">
+            <input
+              type="checkbox"
+              name="isActive"
+              id="isActive"
+              value="true"
+              checked={newAnnouncement.isActive}
+              class="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-blue-600 focus:ring-blue-500"
+            />
+            <label for="isActive" class="ml-2 block text-sm text-zinc-400">Active</label>
+          </div>
+
+          <div class="pt-4">
+            <button
+              type="submit"
+              class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+            >
+              <Icon name="ri:save-line" class="mr-1 h-4 w-4" />
+              Create Announcement
+            </button>
+
+            <button
+              type="button"
+              id="cancel-create"
+              class="ml-2 inline-flex items-center rounded-md border border-zinc-600 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-700 focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Announcement Modal -->
+  <dialog
+    id="edit-announcement-modal"
+    class="m-auto w-full max-w-2xl rounded-lg border border-zinc-700 bg-zinc-800 p-0 backdrop:bg-black/70"
+  >
+    <div class="p-4">
+      <div class="mb-4 flex items-center justify-between border-b border-zinc-700 pb-3">
+        <h3 class="font-title text-lg font-semibold text-blue-400">Edit Announcement</h3>
+        <button type="button" class="close-modal text-zinc-400 hover:text-zinc-200">
+          <Icon name="ri:close-line" class="h-6 w-6" />
+        </button>
+      </div>
+
+      <form
+        method="POST"
+        action={actions.admin.announcement.update}
+        id="edit-form"
+        class="grid gap-4 md:grid-cols-2"
+      >
+        <input type="hidden" name="id" id="edit-id" />
+
+        <div class="space-y-3 md:col-span-2">
+          <div>
+            <label for="edit-title" class="block text-xs font-medium text-zinc-400">Title*</label>
+            <input
+              type="text"
+              name="title"
+              id="edit-title"
+              required
+              maxlength="255"
+              class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label for="edit-content" class="block text-xs font-medium text-zinc-400">Content*</label>
+            <textarea
+              name="content"
+              id="edit-content"
+              required
+              maxlength="1000"
+              rows="3"
+              class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <div>
+            <label for="edit-type" class="block text-xs font-medium text-zinc-400">Type*</label>
+            <select
+              name="type"
+              id="edit-type"
+              required
+              class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            >
+              <option value="INFO" selected={true}>Info</option>
+              <option value="WARNING" selected={false}>Warning</option>
+              <option value="ALERT" selected={false}>Alert</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="edit-startDate" class="block text-xs font-medium text-zinc-400"
+              >Start Date & Time*</label
+            >
+            <input
+              type="datetime-local"
+              name="startDate"
+              id="edit-startDate"
+              required
+              class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label for="edit-endDate" class="block text-xs font-medium text-zinc-400"
+              >End Date & Time (Optional)</label
+            >
+            <input
+              type="datetime-local"
+              name="endDate"
+              id="edit-endDate"
+              class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <div class="flex items-center">
+            <input
+              type="checkbox"
+              name="isActive"
+              id="edit-isActive"
+              value="true"
+              class="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-blue-600 focus:ring-blue-500"
+            />
+            <label for="edit-isActive" class="ml-2 block text-sm text-zinc-400">Active</label>
+          </div>
+
+          <div class="pt-4">
+            <button
+              type="submit"
+              class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+            >
+              <Icon name="ri:save-line" class="mr-1 h-4 w-4" />
+              Update Announcement
+            </button>
+
+            <button
+              type="button"
+              class="close-modal ml-2 inline-flex items-center rounded-md border border-zinc-600 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-700 focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Delete Confirmation Modal -->
+  <dialog
+    id="delete-confirmation-modal"
+    class="m-auto max-w-md rounded-lg border border-zinc-700 bg-zinc-800 p-0 backdrop:bg-black/70"
+  >
+    <div class="p-4">
+      <div class="mb-4 flex items-center justify-between border-b border-zinc-700 pb-3">
+        <h3 class="font-title text-lg font-semibold text-red-400">Confirm Deletion</h3>
+        <button type="button" class="close-modal text-zinc-400 hover:text-zinc-200">
+          <Icon name="ri:close-line" class="h-6 w-6" />
+        </button>
+      </div>
+
+      <p class="mb-4 text-sm text-zinc-300">
+        Are you sure you want to delete this announcement? This action cannot be undone.
+      </p>
+
+      <form method="POST" action={actions.admin.announcement.delete} id="delete-form">
+        <input type="hidden" name="id" id="delete-id" />
+        <div class="flex justify-end gap-2">
+          <button
+            type="button"
+            class="close-modal inline-flex items-center rounded-md border border-zinc-600 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-700 focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+          >
+            <Icon name="ri:delete-bin-line" class="mr-1 h-4 w-4" />
+            Delete
+          </button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Announcements Table -->
+  <div class="rounded-lg border border-zinc-700 bg-zinc-800/50 shadow-lg">
+    <div class="sticky top-0 z-10 border-b border-zinc-700 bg-zinc-800/90 px-4 py-3 backdrop-blur-sm">
+      <h2 class="font-title font-semibold text-blue-400">Announcements List</h2>
+      <div class="mt-1 text-xs text-zinc-400 md:hidden">
+        <span>Scroll horizontally to see more →</span>
+      </div>
+    </div>
+    <div class="scrollbar-thin max-w-full overflow-x-auto">
+      <div class="min-w-[1200px]">
+        <table class="w-full divide-y divide-zinc-700">
+          <thead class="bg-zinc-900/30">
+            <tr>
+              <th
+                class="w-[20%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('title')} class="flex items-center hover:text-zinc-200">
+                  Title
+                  <SortArrowIcon active={filters['sort-by'] === 'title'} sortOrder={filters['sort-order']} />
+                </a>
+              </th>
+              <th
+                class="w-[10%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('type')} class="flex items-center hover:text-zinc-200">
+                  Type
+                  <SortArrowIcon active={filters['sort-by'] === 'type'} sortOrder={filters['sort-order']} />
+                </a>
+              </th>
+              <th
+                class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('startDate')} class="flex items-center hover:text-zinc-200">
+                  Start Date
+                  <SortArrowIcon
+                    active={filters['sort-by'] === 'startDate'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('endDate')} class="flex items-center hover:text-zinc-200">
+                  End Date
+                  <SortArrowIcon
+                    active={filters['sort-by'] === 'endDate'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                class="w-[10%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a
+                  href={makeSortUrl('isActive')}
+                  class="flex items-center justify-center hover:text-zinc-200"
+                >
+                  Status
+                  <SortArrowIcon
+                    active={filters['sort-by'] === 'isActive'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('createdAt')} class="flex items-center hover:text-zinc-200">
+                  Created At
+                  <SortArrowIcon
+                    active={filters['sort-by'] === 'createdAt'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                class="w-[15%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-700 bg-zinc-800/10">
+            {
+              announcements.length === 0 && (
+                <tr>
+                  <td colspan="7" class="px-4 py-8 text-center text-zinc-400">
+                    <Icon name="ri:information-line" class="mb-2 inline-block size-8" />
+                    <p class="text-lg">No announcements found matching your criteria.</p>
+                    <p class="text-sm">Try adjusting your search or filters, or create a new announcement.</p>
+                  </td>
+                </tr>
+              )
+            }
+            {
+              announcements.map((announcement) => (
+                <tr class="group hover:bg-zinc-700/30">
+                  <td class="px-4 py-3 text-sm">
+                    <div class="font-medium text-zinc-200">{announcement.title}</div>
+                    <div class="mt-1 line-clamp-1 text-xs text-zinc-400">{announcement.content}</div>
+                  </td>
+                  <td class="px-4 py-3 text-left text-sm">
+                    <span
+                      class={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium ${getTypeBadgeClass(announcement.type)}`}
+                    >
+                      {announcement.type}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-left text-sm text-zinc-300">
+                    <TimeFormatted date={announcement.startDate} hourPrecision={false} prefix={false} />
+                  </td>
+                  <td class="px-4 py-3 text-left text-sm text-zinc-300">
+                    {announcement.endDate ? (
+                      <TimeFormatted date={announcement.endDate} hourPrecision={false} prefix={false} />
+                    ) : (
+                      <span class="text-zinc-500">—</span>
+                    )}
+                  </td>
+                  <td class="px-4 py-3 text-center text-sm">
+                    <span
+                      class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${announcement.isActive ? 'bg-green-900/30 text-green-400' : 'bg-zinc-700/50 text-zinc-400'}`}
+                    >
+                      {announcement.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-left text-sm text-zinc-400">
+                    <TimeFormatted date={announcement.createdAt} hourPrecision hoursShort prefix={false} />
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="flex justify-center gap-2">
+                      <Tooltip
+                        as="button"
+                        type="button"
+                        data-id={announcement.id}
+                        class="edit-button inline-flex items-center rounded-md border border-blue-500/50 bg-blue-500/20 px-1 py-1 text-xs text-blue-400 transition-colors hover:bg-blue-500/30"
+                        text="Edit"
+                        data-announcement={JSON.stringify(announcement)}
+                      >
+                        <Icon name="ri:edit-line" class="size-4" />
+                      </Tooltip>
+
+                      <form
+                        method="POST"
+                        action={actions.admin.announcement.toggleActive}
+                        class="inline-block"
+                        data-confirm={`Are you sure you want to ${announcement.isActive ? 'deactivate' : 'activate'} this announcement?`}
+                      >
+                        <input type="hidden" name="id" value={announcement.id} />
+                        <input type="hidden" name="isActive" value={String(!announcement.isActive)} />
+                        <button
+                          type="submit"
+                          class={`rounded-md border px-1 py-1 text-xs transition-colors ${
+                            announcement.isActive
+                              ? 'border-yellow-500/50 bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
+                              : 'border-green-500/50 bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                          }`}
+                        >
+                          <Tooltip text={announcement.isActive ? 'Deactivate' : 'Activate'}>
+                            <Icon
+                              name={announcement.isActive ? 'ri:pause-circle-line' : 'ri:play-circle-line'}
+                              class="size-4"
+                            />
+                          </Tooltip>
+                        </button>
+                      </form>
+
+                      <form
+                        method="POST"
+                        action={actions.admin.announcement.delete}
+                        class="inline-block"
+                        data-confirm="Are you sure you want to delete this announcement?"
+                      >
+                        <input type="hidden" name="id" value={announcement.id} />
+                        <button
+                          type="submit"
+                          class="rounded-md border border-red-500/50 bg-red-500/20 px-1 py-1 text-xs text-red-400 transition-colors hover:bg-red-500/30"
+                        >
+                          <Tooltip text="Delete">
+                            <Icon name="ri:delete-bin-line" class="size-4" />
+                          </Tooltip>
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .text-2xs {
+    font-size: 0.6875rem;
+    line-height: 1rem;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(30, 41, 59, 0.2);
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(75, 85, 99, 0.5);
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.6);
+  }
+  @media (max-width: 768px) {
+    .scrollbar-thin {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(75, 85, 99, 0.5) rgba(30, 41, 59, 0.2);
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+  /* Fix for date input appearance in dark mode */
+  input[type='date'] {
+    color-scheme: dark;
+  }
+</style>
+
+<script>
+  // Toggle Create Form
+  const toggleFormBtn = document.getElementById('toggle-new-announcement-form')
+  const newAnnouncementForm = document.getElementById('new-announcement-form')
+  const cancelCreateBtn = document.getElementById('cancel-create')
+
+  toggleFormBtn?.addEventListener('click', () => {
+    newAnnouncementForm?.classList.toggle('hidden')
+  })
+
+  cancelCreateBtn?.addEventListener('click', () => {
+    newAnnouncementForm?.classList.add('hidden')
+  })
+
+  // Edit Modal functionality
+  const editModal = document.getElementById('edit-announcement-modal') as HTMLDialogElement
+  const editButtons = document.querySelectorAll('.edit-button')
+  const editForm = document.getElementById('edit-form') as HTMLFormElement
+
+  editButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const announcementData = JSON.parse(button.getAttribute('data-announcement') || '{}')
+
+      const idInput = document.getElementById('edit-id') as HTMLInputElement
+      const titleInput = document.getElementById('edit-title') as HTMLInputElement
+      const contentInput = document.getElementById('edit-content') as HTMLTextAreaElement
+      const typeSelect = document.getElementById('edit-type') as HTMLSelectElement
+      const startDateInput = document.getElementById('edit-startDate') as HTMLInputElement
+      const endDateInput = document.getElementById('edit-endDate') as HTMLInputElement
+      const isActiveCheckbox = document.getElementById('edit-isActive') as HTMLInputElement
+
+      idInput.value = announcementData.id.toString()
+      titleInput.value = announcementData.title
+      contentInput.value = announcementData.content
+      typeSelect.value = announcementData.type
+
+      // Format dates for the date inputs (YYYY-MM-DDThh:mm)
+      const formatDateForInput = (dateString: string | null) => {
+        if (!dateString) return ''
+        const date = new Date(dateString)
+        return date.toISOString().slice(0, 16)
+      }
+
+      startDateInput.value = formatDateForInput(announcementData.startDate) ?? ''
+      endDateInput.value = formatDateForInput(announcementData.endDate) ?? ''
+      isActiveCheckbox.checked = announcementData.isActive
+
+      editModal?.showModal()
+    })
+  })
+
+  // Delete Modal functionality
+  const deleteModal = document.getElementById('delete-confirmation-modal') as HTMLDialogElement
+  const deleteButtons = document.querySelectorAll('.delete-button')
+  const deleteForm = document.getElementById('delete-form') as HTMLFormElement
+
+  deleteButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const id = button.getAttribute('data-id')
+      const deleteIdInput = document.getElementById('delete-id') as HTMLInputElement
+      deleteIdInput.value = id || ''
+      deleteModal?.showModal()
+    })
+  })
+
+  // Close Modal buttons
+  const closeModalButtons = document.querySelectorAll('.close-modal')
+  closeModalButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const modal = button.closest('dialog')
+      modal?.close()
+    })
+  })
+
+  // Close modals when clicking outside
+  const dialogs = document.querySelectorAll('dialog')
+  dialogs.forEach((dialog) => {
+    dialog.addEventListener('click', (e) => {
+      const rect = dialog.getBoundingClientRect()
+      const isInDialog =
+        rect.top <= e.clientY &&
+        e.clientY <= rect.top + rect.height &&
+        rect.left <= e.clientX &&
+        e.clientX <= rect.left + rect.width
+      if (!isInDialog) {
+        dialog.close()
+      }
+    })
+  })
+</script>
