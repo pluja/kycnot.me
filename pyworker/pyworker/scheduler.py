@@ -126,9 +126,9 @@ class TaskScheduler:
                     self.logger.info(f"Running task '{task_name}'")
                     # Use task instance as a context manager to ensure
                     # a single database connection is used for the entire task
-                    with task_info["instance"] as task_instance:
-                        # Execute the task instance's run method directly
-                        task_instance.run()
+                    with task_info["instance"]:
+                        # Execute the registered task function with its arguments
+                        task_info["func"](*task_info["args"], **task_info["kwargs"])
                     self.logger.info(f"Task '{task_name}' completed")
                 except Exception as e:
                     self.logger.exception(f"Error running task '{task_name}': {e}")
