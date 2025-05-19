@@ -8,6 +8,7 @@ DROP TRIGGER IF EXISTS comment_suspicious_change_trigger ON "Comment";
 DROP TRIGGER IF EXISTS comment_upvote_change_trigger ON "Comment";
 DROP TRIGGER IF EXISTS comment_vote_change_trigger ON "CommentVote";
 DROP TRIGGER IF EXISTS suggestion_status_change_trigger ON "ServiceSuggestion";
+DROP TRIGGER IF EXISTS manual_karma_adjustment_trigger ON "KarmaTransaction";
 
 -- Drop existing functions
 DROP FUNCTION IF EXISTS handle_comment_upvote_change();
@@ -19,6 +20,7 @@ DROP FUNCTION IF EXISTS handle_comment_vote_change();
 DROP FUNCTION IF EXISTS insert_karma_transaction();
 DROP FUNCTION IF EXISTS update_user_karma();
 DROP FUNCTION IF EXISTS handle_suggestion_status_change();
+DROP FUNCTION IF EXISTS handle_manual_karma_adjustment();
 
 -- Helper function to insert karma transaction
 CREATE OR REPLACE FUNCTION insert_karma_transaction(
