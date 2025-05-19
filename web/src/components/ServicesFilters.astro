@@ -97,8 +97,7 @@ const {
   <!-- Type Filter -->
   <fieldset class="mb-6">
     <legend class="font-title mb-3 leading-none text-green-500">Type</legend>
-    <input type="checkbox" id="show-more-categories" class="peer hidden" hx-preserve data-show-more-input />
-    <ul class="not-peer-checked:[&>li:not([data-show-always])]:hidden">
+    <ul class="[&:not(:has(~_.peer:checked))]:[&>li:not([data-show-always])]:hidden">
       {
         options.categories?.map((category) => (
           <li data-show-always={category.showAlways ? '' : undefined}>
@@ -122,15 +121,22 @@ const {
     {
       options.categories.filter((category) => category.showAlways).length < options.categories.length && (
         <>
+          <input
+            type="checkbox"
+            id="show-more-categories"
+            class="peer sr-only"
+            hx-preserve
+            data-show-more-input
+          />
           <label
             for="show-more-categories"
-            class="mt-2 block cursor-pointer text-sm text-green-500 peer-checked:hidden"
+            class="peer-focus-visible:ring-offset-night-700 mt-2 block cursor-pointer rounded-sm text-sm text-green-500 peer-checked:hidden peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2"
           >
             + Show more
           </label>
           <label
             for="show-more-categories"
-            class="mt-2 hidden cursor-pointer text-sm text-green-500 peer-checked:block"
+            class="peer-focus-visible:ring-offset-night-700 mt-2 hidden cursor-pointer rounded-sm text-sm text-green-500 peer-checked:block peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2"
           >
             - Show less
           </label>
@@ -289,14 +295,8 @@ const {
       options.attributesByCategory.map(({ category, attributes }) => (
         <fieldset class="min-w-0">
           <legend class="font-title mb-0.5 text-xs tracking-wide text-white">{category}</legend>
-          <input
-            type="checkbox"
-            id={`show-more-attributes-${category}`}
-            class="peer hidden"
-            hx-preserve
-            data-show-more-input
-          />
-          <ul class="not-peer-checked:[&>li:not([data-show-always])]:hidden">
+
+          <ul class="[:not(:has(~_.peer:checked))]:[&>li:not([data-show-always])]:hidden">
             {attributes.map((attribute) => {
               const inputName = `attr-${attribute.id}` as const
               const yesId = `attr-${attribute.id}=yes` as const
@@ -306,13 +306,13 @@ const {
 
               return (
                 <li data-show-always={attribute.showAlways ? '' : undefined} class="cursor-pointer">
-                  <fieldset class="flex max-w-full min-w-0 cursor-pointer items-center text-sm text-white">
+                  <fieldset class="relative flex max-w-full min-w-0 cursor-pointer items-center text-sm text-white">
                     <legend class="sr-only">
                       {attribute.title} ({attribute._count?.services})
                     </legend>
                     <input
                       type="radio"
-                      class="peer/empty hidden"
+                      class="peer/empty sr-only"
                       id={emptyId}
                       name={inputName}
                       value=""
@@ -324,7 +324,7 @@ const {
                       name={inputName}
                       value="yes"
                       id={yesId}
-                      class="peer/yes hidden"
+                      class="peer/yes sr-only"
                       checked={attribute.value === 'yes'}
                       aria-label="Include"
                     />
@@ -333,38 +333,45 @@ const {
                       name={inputName}
                       value="no"
                       id={noId}
-                      class="peer/no hidden"
+                      class="peer/no sr-only"
                       checked={attribute.value === 'no'}
                       aria-label="Exclude"
                     />
 
+                    <div class="pointer-events-none absolute inset-y-0 -left-[2px] hidden w-[calc(var(--spacing)*4.5*2+1px)] rounded-md border-2 border-blue-500 peer-focus-visible/empty:block peer-focus-visible/no:block peer-focus-visible/yes:block" />
+
                     <label
                       for={yesId}
-                      class="flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-l-sm bg-zinc-950 peer-checked/yes:hidden"
+                      class="border-night-500 bg-night-600 relative flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-l-sm border border-r-0 peer-checked/yes:hidden before:absolute before:-inset-[3px] before:-right-[0.5px]"
                       aria-hidden="true"
                     >
                       <Icon name="ri:check-line" class="size-3" />
                     </label>
                     <label
                       for={emptyId}
-                      class="hidden size-4 shrink-0 cursor-pointer items-center justify-center rounded-l-sm bg-green-600 peer-checked/yes:flex"
+                      class="relative hidden h-4 w-[calc(var(--spacing)*4+0.5px)] shrink-0 cursor-pointer items-center justify-center rounded-l-sm bg-green-600 peer-checked/yes:flex before:absolute before:-inset-[2px] before:-right-[0.5px]"
                       aria-hidden="true"
                     >
                       <Icon name="ri:check-line" class="size-3" />
                     </label>
 
-                    <span class="block h-4 w-px border-y-2 border-zinc-950 bg-zinc-800" aria-hidden="true" />
+                    <span
+                      class="bg-night-400 border-night-500 pointer-events-none block h-4 w-px border-y peer-checked/no:w-[0.5px] peer-checked/yes:w-[0.5px]"
+                      aria-hidden="true"
+                    >
+                      <span class="bg-night-400 border-night-600 block h-full w-px border-y-2" />
+                    </span>
 
                     <label
                       for={noId}
-                      class="flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-r-sm bg-zinc-950 peer-checked/no:hidden"
+                      class="border-night-500 bg-night-600 relative flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-r-sm border border-l-0 peer-checked/no:hidden before:absolute before:-inset-[3px] before:-left-[0.5px]"
                       aria-hidden="true"
                     >
                       <Icon name="ri:close-line" class="size-3" />
                     </label>
                     <label
                       for={emptyId}
-                      class="hidden size-4 shrink-0 cursor-pointer items-center justify-center rounded-r-sm bg-red-600 peer-checked/no:flex"
+                      class="relative hidden size-4 w-[calc(var(--spacing)*4+0.5px)] shrink-0 cursor-pointer items-center justify-center rounded-r-sm bg-red-600 peer-checked/no:flex before:absolute before:-inset-[2px] before:-left-[0.5px]"
                       aria-hidden="true"
                     >
                       <Icon name="ri:close-line" class="size-3" />
@@ -376,8 +383,8 @@ const {
                       aria-hidden="true"
                     >
                       <Icon
-                        name={attribute.icon}
-                        class={cn('mr-2 size-3 shrink-0 opacity-80', attribute.iconClass)}
+                        name={attribute.info.icon}
+                        class={cn('mr-2 size-3 shrink-0 opacity-80', attribute.info.classNames.icon)}
                         aria-hidden="true"
                       />
                       <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
@@ -391,8 +398,8 @@ const {
                       aria-hidden="true"
                     >
                       <Icon
-                        name={attribute.icon}
-                        class={cn('mr-2 size-3 shrink-0 opacity-100', attribute.iconClass)}
+                        name={attribute.info.icon}
+                        class={cn('mr-2 size-3 shrink-0 opacity-100', attribute.info.classNames.icon)}
                         aria-hidden="true"
                       />
                       <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
@@ -405,17 +412,25 @@ const {
               )
             })}
           </ul>
+
           {attributes.filter((attribute) => attribute.showAlways).length < attributes.length && (
             <>
+              <input
+                type="checkbox"
+                id={`show-more-attributes-${category}`}
+                class="peer sr-only"
+                hx-preserve
+                data-show-more-input
+              />
               <label
                 for={`show-more-attributes-${category}`}
-                class="mt-2 block cursor-pointer text-sm text-green-500 peer-checked:hidden"
+                class="peer-focus-visible:ring-offset-night-700 mt-2 block cursor-pointer rounded-sm text-sm text-green-500 peer-checked:hidden peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2"
               >
                 + Show more
               </label>
               <label
                 for={`show-more-attributes-${category}`}
-                class="mt-2 hidden cursor-pointer text-sm text-green-500 peer-checked:block"
+                class="peer-focus-visible:ring-offset-night-700 mt-2 hidden cursor-pointer rounded-sm text-sm text-green-500 peer-checked:block peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2"
               >
                 - Show less
               </label>

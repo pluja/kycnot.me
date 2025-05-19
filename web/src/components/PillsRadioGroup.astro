@@ -17,7 +17,7 @@ const { name, options, selectedValue, class: className, ...rest } = Astro.props
 
 <div
   class={cn(
-    'bg-night-500 divide-night-700 flex divide-x-2 overflow-hidden rounded-md text-[0.6875rem]',
+    'bg-night-500 divide-night-700 has-focus-visible:ring-offset-night-700 flex divide-x-2 overflow-hidden rounded-md text-[0.6875rem] has-focus-visible:ring-2 has-focus-visible:ring-blue-500 has-focus-visible:ring-offset-2',
     className
   )}
   {...rest}
@@ -30,7 +30,7 @@ const { name, options, selectedValue, class: className, ...rest } = Astro.props
           name={name}
           value={option.value}
           checked={selectedValue === option.value}
-          class="peer hidden"
+          class="peer sr-only"
         />
         <span class="peer-checked:bg-night-400 inline-block cursor-pointer px-1.5 py-0.5 text-white peer-checked:text-green-500">
           {option.label}

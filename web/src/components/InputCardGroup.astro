@@ -20,6 +20,7 @@ type Props<Multiple extends boolean = false> = Omit<
     iconClass?: string
     description?: MarkdownString
     disabled?: boolean
+    noTransitionPersist?: boolean
   }[]
   disabled?: boolean
   selectedValue?: Multiple extends true ? string[] : string
@@ -39,13 +40,11 @@ const {
   ...wrapperProps
 } = Astro.props
 
-const inputId = Astro.locals.makeId(`input-${wrapperProps.name}`)
-
 const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
 ---
 
 {/* eslint-disable @typescript-eslint/prefer-nullish-coalescing */}
-<InputWrapper inputId={inputId} class={cn('@container', className)} {...wrapperProps}>
+<InputWrapper class={cn('@container', className)} {...wrapperProps}>
   <div
     class={cn(
       'grid grid-cols-[repeat(auto-fill,minmax(var(--card-min-size),1fr))] gap-2 rounded-lg',
@@ -71,7 +70,7 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
           )}
         >
           <input
-            transition:persist
+            transition:persist={option.noTransitionPersist ? undefined : true}
             type={multiple ? 'checkbox' : 'radio'}
             name={wrapperProps.name}
             value={option.value}

@@ -117,7 +117,6 @@ if (!user) return Astro.rewrite('/404')
 
 <BaseLayout
   pageTitle={`User: ${user.name}`}
-  htmx
   widthClassName="max-w-screen-lg"
   className={{ main: 'space-y-24' }}
 >
@@ -140,9 +139,9 @@ if (!user) return Astro.rewrite('/404')
     </h1>
 
     <div class="mb-4 flex flex-wrap justify-center gap-2">
-      {user.admin && <BadgeSmall color="green" text="Admin" icon="ri:shield-check-fill" />}
+      {user.admin && <BadgeSmall color="green" text="Admin" icon="ri:shield-star-fill" />}
       {user.verified && <BadgeSmall color="cyan" text="Verified" icon="ri:verified-badge-fill" />}
-      {user.verifier && <BadgeSmall color="blue" text="Verifier" icon="ri:check-fill" />}
+      {user.verifier && <BadgeSmall color="blue" text="Moderator" icon="ri:graduation-cap-fill" />}
       {user.spammer && <BadgeSmall color="red" text="Spammer" icon="ri:alert-fill" />}
     </div>
 
@@ -172,7 +171,13 @@ if (!user) return Astro.rewrite('/404')
     </div>
   </div>
 
-  <form method="POST" action={actions.admin.user.update} enctype="multipart/form-data" class="space-y-2">
+  <form
+    method="POST"
+    action={actions.admin.user.update}
+    enctype="multipart/form-data"
+    class="space-y-2"
+    data-astro-reload
+  >
     <h2 class="font-title text-center text-3xl leading-none font-bold">Edit profile</h2>
 
     <input type="hidden" name="id" value={user.id} />
@@ -217,13 +222,19 @@ if (!user) return Astro.rewrite('/404')
     />
 
     <InputCardGroup
-      name="role"
-      label="Role"
+      name="type"
+      label="Type"
       options={[
-        { label: 'Admin', value: 'admin', icon: 'ri:shield-check-fill' },
-        { label: 'Verified', value: 'verified', icon: 'ri:verified-badge-fill', disabled: true },
-        { label: 'Verifier', value: 'verifier', icon: 'ri:check-fill' },
+        { label: 'Admin', value: 'admin', icon: 'ri:shield-star-fill' },
+        { label: 'Moderator', value: 'verifier', icon: 'ri:graduation-cap-fill' },
         { label: 'Spammer', value: 'spammer', icon: 'ri:alert-fill' },
+        {
+          label: 'Verified',
+          value: 'verified',
+          icon: 'ri:verified-badge-fill',
+          disabled: true,
+          noTransitionPersist: true,
+        },
       ]}
       selectedValue={[
         user.admin ? 'admin' : null,
@@ -235,7 +246,7 @@ if (!user) return Astro.rewrite('/404')
       cardSize="sm"
       iconSize="sm"
       multiple
-      error={updateInputErrors.role}
+      error={updateInputErrors.type}
     />
 
     <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
@@ -280,7 +291,12 @@ if (!user) return Astro.rewrite('/404')
                     <Icon name="ri:edit-line" class="size-5" />
                   </label>
 
-                  <form method="POST" action={actions.admin.user.internalNotes.delete} class="contents">
+                  <form
+                    method="POST"
+                    action={actions.admin.user.internalNotes.delete}
+                    class="contents"
+                    data-astro-reload
+                  >
                     <input type="hidden" name="noteId" value={note.id} />
                     <button type="submit" class="text-day-300 p-1 transition-colors hover:text-red-400">
                       <Icon name="ri:delete-bin-line" class="size-5" />
@@ -297,6 +313,7 @@ if (!user) return Astro.rewrite('/404')
                 method="POST"
                 action={actions.admin.user.internalNotes.update}
                 data-note-edit-form
+                data-astro-reload
                 class="mt-4 hidden space-y-4"
               >
                 <input type="hidden" name="noteId" value={note.id} />
@@ -314,7 +331,12 @@ if (!user) return Astro.rewrite('/404')
       )
     }
 
-    <form method="POST" action={actions.admin.user.internalNotes.add} class="mt-10 space-y-2">
+    <form
+      method="POST"
+      action={actions.admin.user.internalNotes.add}
+      class="mt-10 space-y-2"
+      data-astro-reload
+    >
       <h3 class="font-title mb-0 text-center text-xl leading-none font-bold">Add Note</h3>
 
       <input type="hidden" name="userId" value={user.id} />

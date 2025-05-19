@@ -42,7 +42,7 @@ const inputId = id ?? Astro.locals.makeId(`input-${wrapperProps.name}`)
 
     {
       ratings.toSorted().map((rating) => (
-        <label class="relative cursor-pointer [&:has(~_*:hover),&:hover]:[&>[data-star]]:opacity-100!">
+        <label class="relative cursor-pointer [&:has(~_*_*:checked)]:[&>[data-star]]:opacity-100 [&:has(~_*:hover),&:hover]:[&>[data-star]]:opacity-100!">
           <input
             type="radio"
             name={wrapperProps.name}
@@ -54,7 +54,7 @@ const inputId = id ?? Astro.locals.makeId(`input-${wrapperProps.name}`)
           <Icon name="ri:star-line" class="size-6 p-0.5 text-zinc-500" />
           <Icon
             name="ri:star-fill"
-            class="absolute top-0 left-0 size-6 p-0.5 text-yellow-400 not-peer-checked:opacity-0 group-hover/fieldset:opacity-0"
+            class="absolute top-0 left-0 size-6 p-0.5 text-yellow-400 not-peer-checked:opacity-0 group-hover/fieldset:opacity-0!"
             data-star
           />
         </label>

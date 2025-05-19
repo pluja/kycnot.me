@@ -10,6 +10,7 @@ import Pagination from '../components/Pagination.astro'
 import ServiceFiltersPill from '../components/ServiceFiltersPill.astro'
 import ServicesFilters from '../components/ServicesFilters.astro'
 import ServicesSearchResults from '../components/ServicesSearchResults.astro'
+import { getAttributeTypeInfo } from '../constants/attributeTypes'
 import {
   currencies,
   currenciesZodEnumBySlug,
@@ -31,7 +32,7 @@ import { prisma } from '../lib/prisma'
 import { makeSortSeed } from '../lib/sortSeed'
 import { transformCase } from '../lib/strings'
 
-import type { AttributeType, Prisma } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 
 const MIN_CATEGORIES_TO_SHOW = 8
 const MIN_ATTRIBUTES_TO_SHOW = 8
@@ -324,7 +325,10 @@ const [categories, [services, totalServices, hadToIncludeCommunityContributed]] 
         })
         let hadToIncludeCommunityContributed = false
 
-        if (totalServices === 0 && !where.verificationStatus.in.includes('COMMUNITY_CONTRIBUTED')) {
+        if (
+          totalServices === 0 &&
+          areEqualArraysWithoutOrder(where.verificationStatus.in, ['VERIFICATION_FAILED', 'APPROVED'])
+        ) {
           const [unsortedServiceCommunityServices, totalCommunityServices] =
             await prisma.service.findManyAndCount({
               where: {
@@ -408,25 +412,6 @@ const [categories, [services, totalServices, hadToIncludeCommunityContributed]] 
     ],
   ])
 
-const attributeIcons = {
-  GOOD: {
-    icon: 'ri:check-line',
-    iconClass: 'text-green-400',
-  },
-  BAD: {
-    icon: 'ri:close-line',
-    iconClass: 'text-red-400',
-  },
-  WARNING: {
-    icon: 'ri:alert-line',
-    iconClass: 'text-yellow-400',
-  },
-  INFO: {
-    icon: 'ri:information-line',
-    iconClass: 'text-blue-400',
-  },
-} as const satisfies Record<AttributeType, { icon: string; iconClass: string }>
-
 const attributes = await Astro.locals.banners.try(
   'Unable to load attribute filters.',
   () =>
@@ -451,12 +436,14 @@ const attributes = await Astro.locals.banners.try(
 const attributesByCategory = orderBy(
   Object.entries(
     groupBy(
-      attributes.map((attr) => ({
-        ...attr,
-        ...attributeIcons[attr.type],
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        value: filters.attr?.[attr.id] || undefined,
-      })),
+      attributes.map((attr) => {
+        return {
+          info: getAttributeTypeInfo(attr.type),
+          ...attr,
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+          value: filters.attr?.[attr.id] || undefined,
+        }
+      }),
       'category'
     )
   ).map(([category, attributes]) => ({
@@ -533,7 +520,9 @@ const activeAnnouncements = await prisma.announcement.findMany({
   <AnnouncementBanner announcements={activeAnnouncements} />
 
   <div class="flex flex-col gap-4 sm:flex-row sm:gap-8">
-    <div class="flex items-stretch sm:hidden">
+    <div
+      class='[&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-offset-night-700 flex items-stretch sm:hidden [&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-2 [&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-green-500 [&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-offset-2'
+    >
       {
         !hasDefaultFilters ? (
           <div class="-ml-4 flex flex-1 items-center gap-2 overflow-x-auto mask-r-from-[calc(100%-var(--spacing)*16)] pr-12 pl-4">
@@ -656,11 +645,11 @@ const activeAnnouncements = await prisma.announcement.findMany({
       type="checkbox"
       id="show-filters"
       name="show-filters"
-      class="peer hidden"
+      class="peer sr-only sm:hidden"
       checked={Astro.url.searchParams.has('show-filters')}
     />
     <div
-      class="bg-night-700 fixed top-0 left-0 z-50 h-dvh w-dvw shrink-0 translate-y-full overflow-y-auto overscroll-contain border-t border-green-500/30 px-8 pt-4 transition-transform peer-checked:translate-y-0 sm:relative sm:z-auto sm:h-auto sm:w-64 sm:translate-y-0 sm:overflow-visible sm:border-none sm:bg-none sm:p-0"
+      class="bg-night-700 fixed top-0 left-0 z-50 hidden h-dvh w-dvw shrink-0 translate-y-full overflow-y-auto overscroll-contain border-t border-green-500/30 px-8 pt-4 transition-transform peer-checked:translate-y-0 max-sm:peer-checked:block sm:relative sm:z-auto sm:block sm:h-auto sm:w-64 sm:translate-y-0 sm:overflow-visible sm:border-none sm:bg-none sm:p-0"
     >
       <ServicesFilters
         searchResultsId="search-results"

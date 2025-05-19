@@ -203,7 +203,13 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
       }
       {
         comment.author.verifier && !comment.author.admin && (
-          <BadgeSmall icon="ri:shield-check-fill" color="teal" text="Moderator" variant="faded" inlineIcon />
+          <BadgeSmall
+            icon="ri:graduation-cap-fill"
+            color="teal"
+            text="Moderator"
+            variant="faded"
+            inlineIcon
+          />
         )
       }
 

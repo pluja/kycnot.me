@@ -49,7 +49,7 @@ export const {
       value: 'MODERATOR',
       slug: 'moderator',
       label: 'Moderator',
-      icon: 'ri:glasses-2-line',
+      icon: 'ri:graduation-cap-fill',
       order: 3,
       color: 'teal',
     },

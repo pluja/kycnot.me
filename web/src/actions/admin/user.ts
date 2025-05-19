@@ -55,7 +55,7 @@ export const adminUserActions = {
         .default(null) // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         .transform((val) => val || null),
       pictureFile: z.instanceof(File).optional(),
-      role: z.enum(['admin', 'verifier', 'spammer']),
+      type: z.array(z.enum(['admin', 'verifier', 'spammer'])),
       verifiedLink: z
         .string()
         .url('Invalid URL')
@@ -69,7 +69,7 @@ export const adminUserActions = {
         .default(null) // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         .transform((val) => val || null),
     }),
-    handler: async ({ id, pictureFile, ...valuesToUpdate }) => {
+    handler: async ({ id, pictureFile, type, ...valuesToUpdate }) => {
       const user = await prisma.user.findUnique({
         where: {
           id,
@@ -94,9 +94,15 @@ export const adminUserActions = {
       const updatedUser = await prisma.user.update({
         where: { id: user.id },
         data: {
-          ...valuesToUpdate,
+          name: valuesToUpdate.name,
+          link: valuesToUpdate.link,
+          verifiedLink: valuesToUpdate.verifiedLink,
+          displayName: valuesToUpdate.displayName,
           verified: !!valuesToUpdate.verifiedLink,
           picture: pictureUrl,
+          admin: type.includes('admin'),
+          verifier: type.includes('verifier'),
+          spammer: type.includes('spammer'),
         },
         select: selectUserReturnFields,
       })

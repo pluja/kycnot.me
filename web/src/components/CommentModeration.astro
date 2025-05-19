@@ -33,10 +33,10 @@ if (!user || !user.admin || !user.verifier) return null
 ---
 
 <div {...divProps} class={cn('text-xs', className)}>
-  <input type="checkbox" id={`mod-toggle-${String(comment.id)}`} class="peer hidden" />
+  <input type="checkbox" id={`mod-toggle-${String(comment.id)}`} class="peer sr-only" />
   <label
     for={`mod-toggle-${String(comment.id)}`}
-    class="text-day-500 hover:text-day-300 flex cursor-pointer items-center gap-1"
+    class="text-day-500 hover:text-day-300 peer-focus-visible:ring-offset-night-700 inline-flex cursor-pointer items-center gap-1 rounded-sm peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2"
   >
     <Icon name="ri:shield-keyhole-line" class="h-3.5 w-3.5" />
     <span class="text-xs">Moderation</span>
@@ -44,7 +44,7 @@ if (!user || !user.admin || !user.verifier) return null
   </label>
 
   <div
-    class="bg-night-600 border-night-500 mt-2 max-h-0 overflow-hidden rounded-md border opacity-0 transition-all duration-200 ease-in-out peer-checked:max-h-[500px] peer-checked:p-2 peer-checked:opacity-100"
+    class="bg-night-600 border-night-500 mt-2 hidden overflow-hidden rounded-md border peer-checked:block peer-checked:p-2"
   >
     <div class="border-night-500 flex flex-wrap gap-1 border-b pb-2">
       <button

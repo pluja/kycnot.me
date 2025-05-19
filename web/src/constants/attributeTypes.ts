@@ -34,7 +34,7 @@ export const {
     value,
     slug: value ? value.toLowerCase() : '',
     label: value ? transformCase(value, 'title') : String(value),
-    icon: 'ri:question-line',
+    icon: 'ri:question-fill',
     order: Infinity,
     classNames: {
       container: 'bg-current/30',
@@ -50,7 +50,7 @@ export const {
       value: 'BAD',
       slug: 'bad',
       label: 'Bad',
-      icon: 'ri:close-line',
+      icon: 'ri:close-circle-fill',
       order: 1,
       classNames: {
         container: 'bg-red-600/30',
@@ -65,7 +65,7 @@ export const {
       value: 'WARNING',
       slug: 'warning',
       label: 'Warning',
-      icon: 'ri:alert-line',
+      icon: 'ri:alert-fill',
       order: 2,
       classNames: {
         container: 'bg-yellow-600/30',
@@ -80,7 +80,7 @@ export const {
       value: 'GOOD',
       slug: 'good',
       label: 'Good',
-      icon: 'ri:check-line',
+      icon: 'ri:checkbox-circle-fill',
       order: 3,
       classNames: {
         container: 'bg-green-600/30',
@@ -95,7 +95,7 @@ export const {
       value: 'INFO',
       slug: 'info',
       label: 'Info',
-      icon: 'ri:information-line',
+      icon: 'ri:information-fill',
       order: 4,
       classNames: {
         container: 'bg-blue-600/30',

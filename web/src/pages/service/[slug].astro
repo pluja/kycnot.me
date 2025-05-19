@@ -693,10 +693,15 @@ const ogImageTemplateData = {
           </li>
         ))}
 
-        <input type="checkbox" class="peer hidden" id="show-more-links" checked={hiddenLinks.length === 0} />
+        <input
+          type="checkbox"
+          class="peer sr-only checked:hidden"
+          id="show-more-links"
+          checked={hiddenLinks.length === 0}
+        />
 
         {hiddenLinks.length > 0 && (
-          <li class="peer-checked:hidden">
+          <li class="peer-focus-visible:ring-offset-night-700 rounded-full peer-checked:hidden peer-focus-visible:ring-4 peer-focus-visible:ring-orange-500 peer-focus-visible:ring-offset-2">
             <label
               for="show-more-links"
               class="2xs:text-sm 2xs:h-8 2xs:gap-2 2xs:px-4 text-day-100 bg-day-800 hover:bg-day-900 inline-flex h-6 cursor-pointer items-center gap-1 rounded-full px-2 text-xs whitespace-nowrap transition-colors duration-200"
