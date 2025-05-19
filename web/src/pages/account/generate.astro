@@ -1,0 +1,117 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import Button from '../../components/Button.astro'
+import Captcha from '../../components/Captcha.astro'
+import InputHoneypotTrap from '../../components/InputHoneypotTrap.astro'
+import MiniLayout from '../../layouts/MiniLayout.astro'
+import { callActionWithObject } from '../../lib/callActionWithUrlParams'
+import { prettifyUserSecretToken } from '../../lib/userSecretToken'
+
+const generateResult = Astro.getActionResult(actions.account.generate)
+if (generateResult && !generateResult.error) {
+  return Astro.rewrite('/account/welcome')
+}
+
+const data = await callActionWithObject(Astro, actions.account.preGenerateToken, undefined, 'form')
+
+const preGeneratedToken = data?.token
+const prettyToken = preGeneratedToken ? prettifyUserSecretToken(preGeneratedToken) : undefined
+---
+
+{/* eslint-disable astro/jsx-a11y/no-autofocus */}
+
+<MiniLayout
+  pageTitle="Create Account"
+  description="Create a new account"
+  ogImage={{ template: 'generic', title: 'Create Account' }}
+  layoutHeader={{
+    icon: 'ri:user-add-line',
+    title: 'New account',
+    subtitle: 'Zero data, 100% anonymous',
+  }}
+  breadcrumbs={[
+    {
+      name: 'Accounts',
+      url: '/account',
+    },
+    {
+      name: 'Create account',
+    },
+  ]}
+>
+  {
+    Astro.locals.user && (
+      <div class="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/10 p-3">
+        <Icon name="ri:alert-line" class="size-5 text-red-400" />
+        <p class="text-sm text-red-400">You will be logged out of your current account.</p>
+      </div>
+    )
+  }
+
+  <form method="POST" action={`/account/welcome${actions.account.generate}`}>
+    {/* Hack to make password managers suggest saving the secret token */}
+    <div class="-z-50 m-0 mb-2 grid h-4 grid-cols-2">
+      <input
+        class="block cursor-default border-none bg-transparent text-transparent outline-hidden"
+        type="text"
+        id="username"
+        name="username"
+        value={prettyToken}
+        autocomplete="off"
+        tabindex="-1"
+        data-override-value-hack
+        data-override-value={prettyToken}
+      />
+      <input
+        class="block cursor-default border-none bg-transparent text-transparent outline-hidden"
+        type="password"
+        id="password"
+        name="password"
+        value={prettyToken}
+        autocomplete="off"
+        tabindex="-1"
+        data-override-value-hack
+        data-override-value={prettyToken}
+      />
+    </div>
+
+    <input type="hidden" name="secret-token" value={preGeneratedToken} autocomplete="off" />
+
+    <Captcha action={actions.account.generate} autofocus />
+
+    <InputHoneypotTrap name="message" />
+
+    <Button
+      type="submit"
+      label="Create account"
+      icon="ri:user-add-line"
+      class="mt-14 flex w-full"
+      color="success"
+      shadow
+      size="lg"
+    />
+  </form>
+</MiniLayout>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Optional script for password manager integration.      //
+  // Makes password managers suggest saving the secret     //
+  // token by using hidden username/password fields.       //
+  ////////////////////////////////////////////////////////////
+
+  document.addEventListener('astro:page-load', () => {
+    const inputs = document.querySelectorAll<HTMLInputElement>('input[data-override-value-hack]')
+    inputs.forEach((input) => {
+      input.addEventListener('focus', () => {
+        input.blur()
+      })
+
+      input.addEventListener('input', () => {
+        input.value = input.dataset.overrideValue ?? ''
+      })
+    })
+  })
+</script>

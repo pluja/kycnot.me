@@ -1,0 +1,377 @@
+---
+import { Icon } from 'astro-icon/components'
+import { z } from 'astro:content'
+import { orderBy as lodashOrderBy } from 'lodash-es'
+
+import SortArrowIcon from '../../../components/SortArrowIcon.astro'
+import TimeFormatted from '../../../components/TimeFormatted.astro'
+import Tooltip from '../../../components/Tooltip.astro'
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
+import { pluralize } from '../../../lib/pluralize'
+import { prisma } from '../../../lib/prisma'
+import { formatDateShort } from '../../../lib/timeAgo'
+
+import type { Prisma } from '@prisma/client'
+
+const { data: filters } = zodParseQueryParamsStoringErrors(
+  {
+    'sort-by': z.enum(['name', 'role', 'createdAt', 'karma']).default('createdAt'),
+    'sort-order': z.enum(['asc', 'desc']).default('desc'),
+    search: z.string().optional(),
+    role: z.enum(['user', 'admin', 'verifier', 'verified', 'spammer']).optional(),
+  },
+  Astro
+)
+
+// Set up Prisma orderBy with correct typing
+const prismaOrderBy =
+  filters['sort-by'] === 'name' || filters['sort-by'] === 'createdAt' || filters['sort-by'] === 'karma'
+    ? {
+        [filters['sort-by'] === 'karma' ? 'totalKarma' : filters['sort-by']]:
+          filters['sort-order'] === 'asc' ? 'asc' : 'desc',
+      }
+    : { createdAt: 'desc' as const }
+
+// Build where clause based on role filter
+const whereClause: Prisma.UserWhereInput = {}
+
+if (filters.search) {
+  whereClause.OR = [{ name: { contains: filters.search, mode: 'insensitive' } }]
+}
+
+if (filters.role) {
+  switch (filters.role) {
+    case 'user': {
+      whereClause.admin = false
+      whereClause.verifier = false
+      whereClause.verified = false
+      whereClause.spammer = false
+      break
+    }
+    case 'admin': {
+      whereClause.admin = true
+      break
+    }
+    case 'verifier': {
+      whereClause.verifier = true
+      break
+    }
+    case 'verified': {
+      whereClause.verified = true
+      break
+    }
+    case 'spammer': {
+      whereClause.spammer = true
+      break
+    }
+  }
+}
+
+// Retrieve users from the database
+const dbUsers = await prisma.user.findMany({
+  where: whereClause,
+  select: {
+    id: true,
+    name: true,
+    verified: true,
+    admin: true,
+    verifier: true,
+    spammer: true,
+    totalKarma: true,
+    createdAt: true,
+    updatedAt: true,
+    internalNotes: {
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
+      },
+    },
+    _count: {
+      select: {
+        suggestions: true,
+        comments: true,
+      },
+    },
+  },
+  orderBy: prismaOrderBy,
+})
+
+const users =
+  filters['sort-by'] === 'role'
+    ? lodashOrderBy(dbUsers, [(u) => (u.admin ? 'admin' : 'user')], [filters['sort-order']])
+    : dbUsers
+
+const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
+  const currentSortBy = filters['sort-by']
+  const currentSortOrder = filters['sort-order']
+  const newSortOrder = currentSortBy === slug && currentSortOrder === 'asc' ? 'desc' : 'asc'
+  const searchParams = new URLSearchParams(Astro.url.search)
+  searchParams.set('sort-by', slug)
+  searchParams.set('sort-order', newSortOrder)
+  return `/admin/users?${searchParams.toString()}`
+}
+---
+
+<BaseLayout pageTitle="User Management" widthClassName="max-w-screen-xl">
+  <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+    <h1 class="font-title text-2xl font-bold text-white">User Management</h1>
+    <div class="mt-2 flex items-center gap-4 sm:mt-0">
+      <span class="text-sm text-zinc-400">{users.length} users</span>
+    </div>
+  </div>
+
+  <div class="mb-6 rounded-lg border border-zinc-700 bg-zinc-800/50 p-4 shadow-lg">
+    <form method="GET" class="grid gap-3 md:grid-cols-2" autocomplete="off">
+      <div>
+        <label for="search" class="block text-xs font-medium text-zinc-400">Search</label>
+        <input
+          type="text"
+          name="search"
+          id="search"
+          value={filters.search}
+          placeholder="Search by name..."
+          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label for="role-filter" class="block text-xs font-medium text-zinc-400">Filter by Role/Status</label>
+        <div class="mt-1 flex">
+          <select
+            name="role"
+            id="role-filter"
+            class="w-full rounded-l-md border border-r-0 border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+          >
+            <option value="" selected={!filters.role}>All Users</option>
+            <option value="user" selected={filters.role === 'user'}>Regular Users</option>
+            <option value="admin" selected={filters.role === 'admin'}>Admins</option>
+            <option value="verifier" selected={filters.role === 'verifier'}>Verifiers</option>
+            <option value="verified" selected={filters.role === 'verified'}>Verified Users</option>
+            <option value="spammer" selected={filters.role === 'spammer'}>Spammers</option>
+          </select>
+          <button
+            type="submit"
+            class="inline-flex items-center rounded-r-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
+          >
+            <Icon name="ri:search-2-line" class="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="rounded-lg border border-zinc-700 bg-zinc-800/50 shadow-lg">
+    <div class="sticky top-0 z-10 border-b border-zinc-700 bg-zinc-800/90 px-4 py-3 backdrop-blur-sm">
+      <h2 class="font-title font-semibold text-blue-400">Users List</h2>
+      <div class="mt-1 text-xs text-zinc-400 md:hidden">
+        <span>Scroll horizontally to see more →</span>
+      </div>
+    </div>
+    <div class="scrollbar-thin max-w-full overflow-x-auto">
+      <div class="min-w-[900px]">
+        <table class="w-full divide-y divide-zinc-700">
+          <thead class="bg-zinc-900/30">
+            <tr>
+              <th
+                class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('name')} class="flex items-center hover:text-zinc-200">
+                  Name <SortArrowIcon
+                    active={filters['sort-by'] === 'name'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                class="w-[15%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                Status
+              </th>
+              <th
+                class="w-[10%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('role')} class="flex items-center hover:text-zinc-200">
+                  Role <SortArrowIcon
+                    active={filters['sort-by'] === 'role'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                class="w-[10%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('karma')} class="flex items-center justify-center hover:text-zinc-200">
+                  Karma <SortArrowIcon
+                    active={filters['sort-by'] === 'karma'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                class="w-[15%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a
+                  href={makeSortUrl('createdAt')}
+                  class="flex items-center justify-center hover:text-zinc-200"
+                >
+                  Joined <SortArrowIcon
+                    active={filters['sort-by'] === 'createdAt'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                class="w-[15%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                Activity
+              </th>
+              <th
+                class="w-[15%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-700 bg-zinc-800/10">
+            {
+              users.map((user) => (
+                <tr
+                  id={`user-${user.id}`}
+                  class={`group hover:bg-zinc-700/30 ${user.spammer ? 'bg-red-900/10' : ''}`}
+                >
+                  <td class="px-4 py-3 text-sm font-medium text-zinc-200">
+                    <div>{user.name}</div>
+                    {user.internalNotes.length > 0 && (
+                      <Tooltip
+                        class="text-2xs mt-1 text-yellow-400"
+                        position="right"
+                        text={user.internalNotes
+                          .map(
+                            (note) =>
+                              `${formatDateShort(note.createdAt, {
+                                prefix: false,
+                                hourPrecision: true,
+                                caseType: 'sentence',
+                              })}: ${note.content}`
+                          )
+                          .join('\n\n')}
+                      >
+                        <Icon name="ri:sticky-note-line" class="mr-1 inline-block size-3" />
+                        {user.internalNotes.length} internal {pluralize('note', user.internalNotes.length)}
+                      </Tooltip>
+                    )}
+                  </td>
+                  <td class="px-4 py-3 text-sm">
+                    <div class="flex flex-col items-center gap-1.5">
+                      {user.spammer && (
+                        <span class="inline-flex items-center gap-1 rounded-md bg-red-900/30 px-2 py-0.5 text-xs font-medium text-red-400">
+                          <Icon name="ri:spam-2-fill" class="size-3.5" />
+                          Spammer
+                        </span>
+                      )}
+                      {user.verified && (
+                        <span class="inline-flex items-center gap-1 rounded-md bg-green-900/30 px-2 py-0.5 text-xs font-medium text-green-400">
+                          <Icon name="ri:checkbox-circle-fill" class="size-3.5" />
+                          Verified
+                        </span>
+                      )}
+                      {user.verifier && (
+                        <span class="inline-flex items-center gap-1 rounded-md bg-blue-900/30 px-2 py-0.5 text-xs font-medium text-blue-400">
+                          <Icon name="ri:shield-check-fill" class="size-3.5" />
+                          Verifier
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td class="px-4 py-3 text-sm">
+                    <span
+                      class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${user.admin ? 'bg-purple-900/30 text-purple-300' : 'bg-zinc-700 text-zinc-300'}`}
+                    >
+                      {user.admin ? 'Admin' : 'User'}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-center text-sm">
+                    <span
+                      class={`font-medium ${user.totalKarma >= 100 ? 'text-green-400' : user.totalKarma >= 0 ? 'text-zinc-300' : 'text-red-400'}`}
+                    >
+                      {user.totalKarma}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-center text-sm text-zinc-400">
+                    <TimeFormatted date={user.createdAt} hourPrecision hoursShort prefix={false} />
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="flex justify-center gap-3">
+                      <div class="flex flex-col items-center" title="Suggestions">
+                        <span class="text-2xs text-zinc-400">Suggestions</span>
+                        <span class="inline-flex items-center rounded-full bg-green-900/30 px-2.5 py-0.5 text-xs font-medium text-green-300">
+                          {user._count.suggestions}
+                        </span>
+                      </div>
+                      <div class="flex flex-col items-center" title="Comments">
+                        <span class="text-2xs text-zinc-400">Comments</span>
+                        <span class="inline-flex items-center rounded-full bg-purple-900/30 px-2.5 py-0.5 text-xs font-medium text-purple-300">
+                          {user._count.comments}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="flex justify-center gap-2">
+                      <Tooltip
+                        as="a"
+                        href={`/account/impersonate?targetUserId=${user.id}&redirect=/account`}
+                        class="inline-flex items-center rounded-md border border-orange-500/50 bg-orange-500/20 px-1 py-1 text-xs text-orange-400 transition-colors hover:bg-orange-500/30"
+                        text="Impersonate"
+                      >
+                        <Icon name="ri:spy-line" class="size-4" />
+                      </Tooltip>
+                      <Tooltip
+                        as="a"
+                        href={`/admin/users/${user.name}`}
+                        class="inline-flex items-center rounded-md border border-blue-500/50 bg-blue-500/20 px-1 py-1 text-xs text-blue-400 transition-colors hover:bg-blue-500/30"
+                        text="Edit"
+                      >
+                        <Icon name="ri:edit-line" class="size-4" />
+                      </Tooltip>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .text-2xs {
+    font-size: 0.6875rem;
+    line-height: 1rem;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(30, 41, 59, 0.2);
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(75, 85, 99, 0.5);
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.6);
+  }
+  @media (max-width: 768px) {
+    .scrollbar-thin {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(75, 85, 99, 0.5) rgba(30, 41, 59, 0.2);
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+</style>

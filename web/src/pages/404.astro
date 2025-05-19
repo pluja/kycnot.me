@@ -1,0 +1,101 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import BaseLayout from '../layouts/BaseLayout.astro'
+---
+
+<BaseLayout
+  pageTitle="404: Page Not Found"
+  description="The page doesn't exist, double check the URL."
+  className={{
+    main: 'm-0 -mt-16 flex max-w-none flex-col items-center justify-center bg-[#737373] pt-16 text-[#fafafa] [--speed:2s] perspective-distant [&_*]:[transform-style:preserve-3d]',
+    footer: 'bg-black',
+  }}
+  widthClassName="max-w-none"
+>
+  <h1
+    data-text="404"
+    data-animation-title
+    class="m-0 mb-4 text-[clamp(5rem,40vmin,15rem)] font-extrabold tracking-[clamp(0.5rem,2vmin,2rem)]"
+  >
+    404
+  </h1>
+  <div class="pointer-events-none fixed inset-0 overflow-hidden">
+    <div class="absolute top-1/2 left-1/2 h-[250vmax] w-[250vmax] -translate-x-1/2 -translate-y-1/2">
+      <div data-animation-cloak></div>
+    </div>
+  </div>
+
+  <div class="text-center leading-relaxed">
+    <h2 class="font-title mb-2 text-3xl tracking-wider text-balance uppercase">Page not found</h2>
+    <p class="mb-12 text-base text-balance">The page doesn't exist, double check the URL.</p>
+    <a
+      href="/"
+      class="group inline-flex items-center gap-4 rounded-lg border-2 border-zinc-100 bg-zinc-900 px-6 py-2 text-lg tracking-wider text-white uppercase transition-colors hover:bg-zinc-800"
+    >
+      <Icon
+        name="ri:arrow-left-line"
+        class="-mx-1 h-5 w-5 transition-transform group-hover:-translate-x-1 group-active:translate-x-0"
+      />
+      Home
+    </a>
+  </div>
+</BaseLayout>
+
+<style>
+  @property --swing-x {
+    initial-value: 0;
+    inherits: false;
+    syntax: '<integer>';
+  }
+
+  @property --swing-y {
+    initial-value: 0;
+    inherits: false;
+    syntax: '<integer>';
+  }
+
+  [data-animation-title] {
+    animation: swing var(--speed) infinite alternate ease-in-out;
+    transform: translate3d(0, 0, 0vmin);
+    --x: calc(50% + (var(--swing-x) * 0.5) * 1%);
+    background: radial-gradient(#e6e6e6, #7a7a7a 45%) var(--x) 100%/200% 200%;
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+
+  [data-animation-title]:after {
+    animation: swing var(--speed) infinite alternate ease-in-out;
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    color: #000;
+    filter: blur(1.5vmin);
+    transform: scale(1.05) translate3d(0, 12%, -10vmin)
+      translate(calc((var(--swing-x, 0) * 0.05) * 1%), calc((var(--swing-y) * 0.05) * 1%));
+  }
+
+  [data-animation-cloak] {
+    animation: swing var(--speed) infinite alternate-reverse ease-in-out;
+    height: 100%;
+    width: 100%;
+    transform-origin: 50% 30%;
+    transform: rotate(calc(var(--swing-x) * -0.25deg));
+    background: radial-gradient(40% 40% at 50% 42%, transparent, #000 35%);
+  }
+
+  @keyframes swing {
+    0% {
+      --swing-x: -100;
+      --swing-y: -100;
+    }
+    50% {
+      --swing-y: 0;
+    }
+    100% {
+      --swing-y: -100;
+      --swing-x: 100;
+    }
+  }
+</style>

@@ -1,0 +1,76 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import BaseLayout from '../../layouts/BaseLayout.astro'
+
+import type { ComponentProps } from 'astro/types'
+
+type AdminLink = {
+  icon: ComponentProps<typeof Icon>['name']
+  title: string
+  href: string
+  description: string
+}
+
+const adminLinks: AdminLink[] = [
+  {
+    icon: 'ri:box-3-line',
+    title: 'Services',
+    href: '/admin/services',
+    description: 'Manage your available services',
+  },
+  {
+    icon: 'ri:file-list-3-line',
+    title: 'Attributes',
+    href: '/admin/attributes',
+    description: 'Configure service attributes',
+  },
+  {
+    icon: 'ri:user-3-line',
+    title: 'Users',
+    href: '/admin/users',
+    description: 'Manage user accounts',
+  },
+  {
+    icon: 'ri:chat-settings-line',
+    title: 'Comments',
+    href: '/admin/comments',
+    description: 'Moderate user comments',
+  },
+  {
+    icon: 'ri:lightbulb-line',
+    title: 'Service suggestions',
+    href: '/admin/service-suggestions',
+    description: 'Review and manage service suggestions',
+  },
+]
+---
+
+<BaseLayout pageTitle="Admin Dashboard" widthClassName="max-w-screen-xl">
+  <h1 class="font-title mb-8 text-3xl font-bold text-zinc-100">
+    <Icon name="ri:home-gear-line" class="me-1 inline-block size-10 align-[-0.35em]" />
+    Admin Dashboard
+  </h1>
+
+  <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+    {
+      adminLinks.map((link) => (
+        <a
+          href={link.href}
+          class="group block rounded-lg border border-zinc-800 bg-gradient-to-br from-zinc-900/90 to-zinc-900/50 p-6 shadow-lg backdrop-blur-xs transition-all duration-300 hover:-translate-y-0.5 hover:from-zinc-800/90 hover:to-zinc-800/50 hover:shadow-xl hover:shadow-zinc-900/20"
+        >
+          <div class="mb-4 flex items-center gap-3">
+            <Icon
+              name={link.icon}
+              class="h-6 w-6 text-zinc-400 transition-colors group-hover:text-green-400"
+            />
+            <h2 class="font-title text-xl font-semibold text-zinc-100 transition-colors group-hover:text-green-400">
+              {link.title}
+            </h2>
+          </div>
+          <p class="text-sm text-zinc-400">{link.description}</p>
+        </a>
+      ))
+    }
+  </div>
+</BaseLayout>

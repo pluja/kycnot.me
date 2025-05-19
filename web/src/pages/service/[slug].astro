@@ -1,0 +1,1506 @@
+---
+import { VerificationStepStatus } from '@prisma/client'
+import { Icon } from 'astro-icon/components'
+import { Markdown } from 'astro-remote'
+import { Schema } from 'astro-seo-schema'
+import { actions } from 'astro:actions'
+import { Picture } from 'astro:assets'
+import { head, orderBy, shuffle, sortBy, tail } from 'lodash-es'
+
+import AdminOnly from '../../components/AdminOnly.astro'
+import BadgeSmall from '../../components/BadgeSmall.astro'
+import BadgeStandard from '../../components/BadgeStandard.astro'
+import Button from '../../components/Button.astro'
+import CommentSection from '../../components/CommentSection.astro'
+import CommentSummary from '../../components/CommentSummary.astro'
+import DropdownButton from '../../components/DropdownButton.astro'
+import DropdownButtonItemForm from '../../components/DropdownButtonItemForm.astro'
+import DropdownButtonItemLink from '../../components/DropdownButtonItemLink.astro'
+import FormatTimeInterval from '../../components/FormatTimeInterval.astro'
+import { makeOgImageUrl, type OgImageAllTemplatesWithProps } from '../../components/OgImage'
+import ScoreGauge from '../../components/ScoreGauge.astro'
+import ScoreSquare from '../../components/ScoreSquare.astro'
+import ServiceLinkButton from '../../components/ServiceLinkButton.astro'
+import TimeFormatted from '../../components/TimeFormatted.astro'
+import Tooltip from '../../components/Tooltip.astro'
+import VerificationWarningBanner from '../../components/VerificationWarningBanner.astro'
+import { getAttributeCategoryInfo } from '../../constants/attributeCategories'
+import { getAttributeTypeInfo } from '../../constants/attributeTypes'
+import { currencies, getCurrencyInfo } from '../../constants/currencies'
+import { getEventTypeInfo } from '../../constants/eventTypes'
+import { getKycLevelInfo, kycLevels } from '../../constants/kycLevels'
+import { serviceVisibilitiesById } from '../../constants/serviceVisibility'
+import { getTosHighlightRatingInfo } from '../../constants/tosHighlightRating'
+import { getUserSentimentInfo } from '../../constants/userSentiment'
+import { getVerificationStatusInfo, verificationStatusesByValue } from '../../constants/verificationStatus'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { someButNotAll, undefinedIfEmpty } from '../../lib/arrays'
+import { makeNonDbAttributes, sortAttributes } from '../../lib/attributes'
+import { cn } from '../../lib/cn'
+import { formatContactMethod } from '../../lib/contactMethods'
+import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
+import { formatNumber, type FormatNumberOptions } from '../../lib/numbers'
+import { pluralize } from '../../lib/pluralize'
+import { prisma } from '../../lib/prisma'
+import { makeLoginUrl } from '../../lib/redirectUrls'
+import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
+import { transformCase } from '../../lib/strings'
+import { urlDomain } from '../../lib/urls'
+
+import type { BreadcrumArray } from '../../components/BaseHead.astro'
+import type { Prisma } from '@prisma/client'
+import type { ContactPoint, ListItem, Organization, Review, WebPage, WithContext } from 'schema-dts'
+
+const { slug } = Astro.params
+
+const user = Astro.locals.user
+
+const result = Astro.getActionResult(actions.service.requestVerification)
+
+const now = new Date()
+
+const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany([
+  [
+    'Error fetching service',
+    async () =>
+      prisma.service.findUnique({
+        where: { slug },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          description: true,
+          kycLevel: true,
+          overallScore: true,
+          privacyScore: true,
+          trustScore: true,
+          verificationStatus: true,
+          serviceVisibility: true,
+          verificationSummary: true,
+          verificationProofMd: true,
+          tosUrls: true,
+          serviceUrls: true,
+          onionUrls: true,
+          i2pUrls: true,
+          referral: true,
+          imageUrl: true,
+          listedAt: true,
+          createdAt: true,
+          acceptedCurrencies: true,
+          tosReview: true,
+          tosReviewAt: true,
+          userSentiment: true,
+          userSentimentAt: true,
+          averageUserRating: true,
+          isRecentlyListed: true,
+          contactMethods: {
+            select: {
+              iconId: true,
+              value: true,
+            },
+          },
+          attributes: {
+            select: {
+              attribute: {
+                select: {
+                  id: true,
+                  type: true,
+                  category: true,
+                  title: true,
+                  description: true,
+                  privacyPoints: true,
+                  trustPoints: true,
+                },
+              },
+            },
+          },
+          categories: {
+            select: {
+              icon: true,
+              name: true,
+              slug: true,
+            },
+          },
+          events: {
+            where: {
+              visible: true,
+            },
+            select: {
+              title: true,
+              content: true,
+              type: true,
+              startedAt: true,
+              endedAt: true,
+              source: true,
+            },
+          },
+          suggestions: {
+            select: {
+              id: true,
+              status: true,
+            },
+            where: {
+              userId: user?.id,
+            },
+          },
+          verificationRequests: {
+            select: {
+              id: true,
+              userId: true,
+            },
+          },
+          verificationSteps: {
+            select: {
+              title: true,
+              description: true,
+              status: true,
+              evidenceMd: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+          _count: {
+            select: {
+              comments: {
+                where: {
+                  ratingActive: true,
+                  status: {
+                    in: ['APPROVED', 'VERIFIED'],
+                  },
+                  parentId: null,
+                  suspicious: false,
+                },
+              },
+            },
+          },
+        },
+      }),
+    null,
+  ],
+  [
+    'Error while fetching notification preferences',
+    () =>
+      user
+        ? getOrCreateNotificationPreferences(user.id, {
+            id: true,
+            onRootCommentCreatedForServices: {
+              where: { slug },
+              select: { id: true },
+            },
+            onEventCreatedForServices: {
+              where: { slug },
+              select: { id: true },
+            },
+            onVerificationChangeForServices: {
+              where: { slug },
+              select: { id: true },
+            },
+          })
+        : null,
+    null,
+  ],
+])
+
+const makeWatchingDetails = (
+  dbNotificationPreferences: Prisma.NotificationPreferencesGetPayload<{
+    select: {
+      onRootCommentCreatedForServices: {
+        select: { id: true }
+      }
+      onEventCreatedForServices: {
+        select: { id: true }
+      }
+      onVerificationChangeForServices: {
+        select: { id: true }
+      }
+    }
+  }> | null,
+  serviceId: number | undefined
+) => {
+  if (!dbNotificationPreferences || !serviceId) return null
+
+  const comments = dbNotificationPreferences.onRootCommentCreatedForServices.some(
+    ({ id }) => id === serviceId
+  )
+  const events = dbNotificationPreferences.onEventCreatedForServices.some(({ id }) => id === serviceId)
+  const verification = dbNotificationPreferences.onVerificationChangeForServices.some(
+    ({ id }) => id === serviceId
+  )
+  const all = comments && events && verification
+
+  return {
+    comments,
+    events,
+    verification,
+    all: all ? true : someButNotAll(comments, events, verification) ? null : false,
+  } as const
+}
+
+const watchingDetails = makeWatchingDetails(dbNotificationPreferences, service?.id)
+
+if (!service) return Astro.rewrite('/404')
+
+if (service.serviceVisibility !== 'PUBLIC' && service.serviceVisibility !== 'UNLISTED') {
+  return Astro.rewrite('/404')
+}
+
+const statusIcon = {
+  ...verificationStatusesByValue,
+  APPROVED: undefined,
+}[service.verificationStatus]
+
+const shuffledLinks = {
+  clearnet: shuffle(service.serviceUrls),
+  onion: shuffle(service.onionUrls),
+  i2p: shuffle(service.i2pUrls),
+}
+const shownLinks = [head(shuffledLinks.clearnet), head(shuffledLinks.onion), head(shuffledLinks.i2p)].filter(
+  (url) => url !== undefined
+)
+const hiddenLinks = [
+  ...tail(shuffledLinks.clearnet),
+  ...tail(shuffledLinks.onion),
+  ...tail(shuffledLinks.i2p),
+]
+
+const kycLevelInfo = getKycLevelInfo(`${service.kycLevel}`)
+const userSentiment = service.userSentiment
+  ? { ...service.userSentiment, info: getUserSentimentInfo(service.userSentiment.sentiment) }
+  : null
+
+const attributes = sortAttributes([
+  ...makeNonDbAttributes(service, { filter: true }),
+  ...service.attributes.map(({ attribute }) => ({
+    ...attribute,
+    links:
+      attribute.type === 'GOOD' || attribute.type === 'INFO'
+        ? [
+            {
+              url: `/?attr-${attribute.id}=yes`,
+              label: 'Search with this',
+              icon: 'ri:search-line',
+            },
+          ]
+        : [
+            {
+              url: `/?attr-${attribute.id}=yes`,
+              label: 'With this',
+              icon: 'ri:search-line',
+            },
+            {
+              url: `/?attr-${attribute.id}=no`,
+              label: 'Without this',
+              icon: 'ri:search-line',
+            },
+          ],
+  })),
+]).map((attribute) => ({
+  ...attribute,
+  categoryInfo: getAttributeCategoryInfo(attribute.category),
+  typeInfo: getAttributeTypeInfo(attribute.type),
+}))
+
+const statusInfo = getVerificationStatusInfo(service.verificationStatus)
+
+const hasRequestedVerification =
+  !!user && service.verificationRequests.some((request) => request.userId === user.id)
+
+const VerificationRequestElement = user ? 'button' : 'a'
+
+const getVerificationStepStatusInfo = (status: VerificationStepStatus) => {
+  switch (status) {
+    case VerificationStepStatus.PENDING:
+      return {
+        text: 'Pending',
+        icon: 'ri:loader-2-line',
+        color: 'gray',
+        timelineIconClass: 'text-gray-400',
+      } as const
+    case VerificationStepStatus.IN_PROGRESS:
+      return {
+        text: 'In Progress',
+        icon: 'ri:loader-4-line',
+        color: 'blue',
+        timelineIconClass: 'text-blue-400 animate-spin',
+      } as const
+    case VerificationStepStatus.PASSED:
+      return {
+        text: 'Passed',
+        icon: 'ri:check-line',
+        color: 'green',
+        timelineIconClass: 'text-green-400',
+      } as const
+    case VerificationStepStatus.FAILED:
+      return {
+        text: 'Failed',
+        icon: 'ri:close-line',
+        color: 'red',
+        timelineIconClass: 'text-red-400',
+      } as const
+    default:
+      return {
+        text: 'Unknown',
+        icon: 'ri:question-mark',
+        color: 'gray',
+        timelineIconClass: 'text-gray-500',
+      } as const
+  }
+}
+const itemReviewedId = new URL(`/service/${service.slug}`, Astro.url).href
+
+const ogImageTemplateData = {
+  template: 'generic',
+  title: service.name,
+} satisfies OgImageAllTemplatesWithProps
+---
+
+<BaseLayout
+  pageTitle={service.name}
+  description={service.description ||
+    'View details about this service including privacy score, features, currencies accepted, and user reviews.'}
+  ogImage={ogImageTemplateData}
+  widthClassName="max-w-screen-lg"
+  htmx
+  schemas={[
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      '@id': itemReviewedId,
+      name: service.name,
+      sameAs: undefinedIfEmpty([...service.serviceUrls, ...service.onionUrls, ...service.i2pUrls]),
+      description: service.description || undefined,
+      image: service.imageUrl ?? undefined,
+      mainEntityOfPage: new URL(`/service/${service.slug}`, Astro.url).href,
+      contactPoint: undefinedIfEmpty(
+        service.contactMethods
+          .map((method) => ({
+            ...method,
+            ...(formatContactMethod(method.value) ?? { type: 'unknown', formattedValue: method.value }),
+          }))
+          .map<ContactPoint | null>(({ type, formattedValue }) => {
+            switch (type) {
+              case 'telephone': {
+                return {
+                  '@type': 'ContactPoint',
+                  telephone: formattedValue,
+                }
+              }
+              case 'email': {
+                return {
+                  '@type': 'ContactPoint',
+                  email: formattedValue,
+                }
+              }
+              default: {
+                return null
+              }
+            }
+          })
+          .filter((value) => value !== null)
+      ),
+    } satisfies WithContext<Organization>,
+
+    {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: service.name,
+      url: Astro.url.href,
+      mainEntity: {
+        '@id': itemReviewedId,
+      },
+      datePublished: service.listedAt?.toISOString(),
+      dateCreated: service.createdAt.toISOString(),
+      image: makeOgImageUrl(ogImageTemplateData, Astro.url),
+    } satisfies WithContext<WebPage>,
+  ]}
+  breadcrumbs={[
+    ...service.categories.map(
+      (category) =>
+        [
+          {
+            name: 'Services',
+            url: '/',
+          },
+          {
+            name: category.name,
+            url: `/service/?categories=${category.slug}`,
+          },
+          {
+            name: service.name,
+            url: `/service/${service.slug}`,
+          },
+        ] satisfies BreadcrumArray
+    ),
+    ...service.acceptedCurrencies.map((currency) => {
+      const currencyInfo = getCurrencyInfo(currency)
+      return [
+        {
+          name: 'Services',
+          url: '/',
+        },
+        {
+          name: currencyInfo.name,
+          url: `/service/?currencies=${currencyInfo.slug}`,
+        },
+        {
+          name: service.name,
+          url: `/service/${service.slug}`,
+        },
+      ] satisfies BreadcrumArray
+    }),
+  ]}
+>
+  {
+    service.serviceVisibility === 'UNLISTED' && (
+      <div class={cn('mb-4 rounded-md bg-yellow-900/50 p-2 text-sm text-yellow-400')}>
+        <Icon
+          name={serviceVisibilitiesById.UNLISTED.icon}
+          class={cn('me-1.5 inline-block size-4 align-[-0.15em]', serviceVisibilitiesById.UNLISTED.iconClass)}
+        />
+        Unlisted service, only accessible via direct link and won't appear in searches.
+      </div>
+    )
+  }
+  <VerificationWarningBanner service={service} />
+
+  {
+    service.verificationSteps.some((step) => step.status === VerificationStepStatus.FAILED) && (
+      <div class="mb-4 flex items-center gap-2 rounded-md bg-red-900/50 p-2 text-sm text-red-300">
+        <Icon name="ri:error-warning-line" class="inline-block size-4 shrink-0" />
+        <span>
+          This service has failed one or more verification steps. Review the verification details carefully.
+        </span>
+      </div>
+    )
+  }
+
+  <div class="flex items-center gap-4">
+    {
+      !!service.imageUrl && (
+        <Picture
+          src={service.imageUrl}
+          formats={['jxl', 'avif', 'webp']}
+          alt={service.name || "Service's logo"}
+          class="size-12 shrink-0 rounded-sm object-contain"
+          width={48}
+          height={48}
+        />
+      )
+    }
+    <h1 class="font-title flex-1 text-2xl leading-tight font-bold tracking-wider text-white">
+      {service.name}{
+        !!statusIcon && (
+          <Tooltip text={statusIcon.label} position="right">
+            <Icon
+              name={statusIcon.icon}
+              class={cn('ms-2 box-content inline-block size-6 shrink-0 pb-0.5', statusIcon.classNames.icon)}
+            />
+          </Tooltip>
+        )
+      }
+    </h1>
+
+    <div class="flex items-center justify-center gap-2 sm:gap-4">
+      {
+        user ? (
+          <DropdownButton
+            label="Watch"
+            icon="ri:eye-line"
+            classNames={{
+              label: 'hidden sm:inline-block',
+              arrow: 'hidden sm:inline-block',
+              button: 'px-2 sm:px-4',
+            }}
+          >
+            <DropdownButtonItemForm
+              action={actions.notification.preferences.watchService}
+              method="post"
+              data={{ serviceId: service.id, watchType: 'all', value: !watchingDetails?.all }}
+              label="All"
+              icon="ri:alert-line"
+              class="font-bold"
+            >
+              {!!watchingDetails && (
+                <slot slot="end">
+                  <input
+                    type="checkbox"
+                    disabled
+                    checked={watchingDetails.all}
+                    data-mark-indeterminate={watchingDetails.all === null ? 'true' : 'false'}
+                    class="pointer-events-none"
+                  />
+                </slot>
+              )}
+            </DropdownButtonItemForm>
+
+            <DropdownButtonItemForm
+              action={actions.notification.preferences.watchService}
+              method="post"
+              data={{ serviceId: service.id, watchType: 'comments', value: !watchingDetails?.comments }}
+              label="Comments"
+              icon="ri:chat-1-line"
+            >
+              {!!watchingDetails && (
+                <slot slot="end">
+                  <input
+                    type="checkbox"
+                    disabled
+                    checked={watchingDetails.comments}
+                    class="pointer-events-none"
+                  />
+                </slot>
+              )}
+            </DropdownButtonItemForm>
+
+            <DropdownButtonItemForm
+              action={actions.notification.preferences.watchService}
+              method="post"
+              data={{ serviceId: service.id, watchType: 'events', value: !watchingDetails?.events }}
+              label="Events"
+              icon="ri:calendar-line"
+            >
+              {!!watchingDetails && (
+                <slot slot="end">
+                  <input
+                    type="checkbox"
+                    disabled
+                    checked={watchingDetails.events}
+                    class="pointer-events-none"
+                  />
+                </slot>
+              )}
+            </DropdownButtonItemForm>
+
+            <DropdownButtonItemForm
+              action={actions.notification.preferences.watchService}
+              method="post"
+              data={{
+                serviceId: service.id,
+                watchType: 'verification',
+                value: !watchingDetails?.verification,
+              }}
+              label="Verification"
+              icon="ri:check-line"
+            >
+              {!!watchingDetails && (
+                <slot slot="end">
+                  <input
+                    type="checkbox"
+                    disabled
+                    checked={watchingDetails.verification}
+                    class="pointer-events-none"
+                  />
+                </slot>
+              )}
+            </DropdownButtonItemForm>
+          </DropdownButton>
+        ) : (
+          <a
+            href={makeLoginUrl(Astro.url)}
+            data-astro-reload
+            class="border-night-500 bg-night-800 hover:bg-night-900 focus-visible:bg-night-900 focus-visible:text-day-200 hover:text-day-200 inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm shadow-sm transition-colors duration-200"
+            aria-haspopup="true"
+          >
+            <Icon name="ri:eye-line" class="size-4" />
+            <span class="hidden sm:inline-block">Watch</span>
+          </a>
+        )
+      }
+
+      <DropdownButton
+        label="Contribute"
+        icon="ri:edit-line"
+        class="2xs:block hidden"
+        classNames={{
+          label: 'hidden md:inline-block',
+          arrow: 'hidden md:inline-block',
+          button: 'px-2 md:px-4',
+        }}
+      >
+        <DropdownButtonItemLink
+          href={`/service-suggestion/edit?serviceId=${service.id}`}
+          label="Edit"
+          icon="ri:edit-line"
+        />
+        <DropdownButtonItemLink
+          href={`/service/${service.slug}#comments`}
+          label="Review"
+          icon="ri:star-line"
+        />
+        <AdminOnly>
+          <DropdownButtonItemLink
+            href={`/admin/services/${service.slug}/edit`}
+            label="Edit (Admin)"
+            icon="ri:edit-box-line"
+          />
+        </AdminOnly>
+      </DropdownButton>
+    </div>
+  </div>
+
+  <div
+    class={cn('mt-2 flex flex-row items-start gap-2', {
+      'xs:flex-row xs:items-start flex-col-reverse items-center': service.categories.length >= 3,
+    })}
+  >
+    <ul
+      class={cn('flex flex-1 flex-wrap justify-start gap-2', {
+        'xs:justify-start justify-center': service.categories.length >= 3,
+      })}
+      aria-label="Categories"
+    >
+      {
+        service.categories.map((category) => (
+          <BadgeStandard as="li" icon={category.icon} text={category.name} />
+        ))
+      }
+    </ul>
+
+    <div class="flex px-1 py-0.5">
+      {
+        currencies.map((currency) => {
+          const isAccepted = service.acceptedCurrencies.includes(currency.id)
+
+          return (
+            <Tooltip text={currency.name}>
+              <Icon
+                name={currency.icon}
+                class={cn('text-day-600 box-content size-4 p-1', {
+                  'text-white': isAccepted,
+                })}
+              />
+            </Tooltip>
+          )
+        })
+      }
+    </div>
+  </div>
+
+  <div class="prose prose-sm prose-invert text-day-400 mt-2 text-pretty">
+    <Markdown content={service.description} />
+  </div>
+
+  {
+    shownLinks.length + hiddenLinks.length > 0 && (
+      <ul aria-label="Service links" class="xs:justify-start mt-4 flex flex-wrap justify-center gap-2">
+        {shownLinks.map((url) => (
+          <li>
+            <ServiceLinkButton
+              url={url}
+              referral={service.referral}
+              enableMinWidth={shuffledLinks.onion.length + shuffledLinks.i2p.length > 0}
+            />
+          </li>
+        ))}
+
+        <input type="checkbox" class="peer hidden" id="show-more-links" checked={hiddenLinks.length === 0} />
+
+        {hiddenLinks.length > 0 && (
+          <li class="peer-checked:hidden">
+            <label
+              for="show-more-links"
+              class="2xs:text-sm 2xs:h-8 2xs:gap-2 2xs:px-4 text-day-100 bg-day-800 hover:bg-day-900 inline-flex h-6 cursor-pointer items-center gap-1 rounded-full px-2 text-xs whitespace-nowrap transition-colors duration-200"
+            >
+              +{hiddenLinks.length.toLocaleString()} more
+            </label>
+          </li>
+        )}
+
+        {hiddenLinks.map((url) => (
+          <li class="hidden peer-checked:block">
+            <ServiceLinkButton
+              url={url}
+              referral={service.referral}
+              enableMinWidth={shuffledLinks.onion.length + shuffledLinks.i2p.length > 0}
+            />
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  {
+    service.contactMethods.length > 0 && (
+      <ul class="xs:justify-start mt-4 inline-flex flex-wrap justify-center">
+        {service.contactMethods.map((method) => {
+          const methodInfo = formatContactMethod(method.value)
+
+          return (
+            <li>
+              <a
+                href={method.value}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-day-300 hover:text-day-200 flex items-center gap-1 px-2 py-1 hover:underline"
+              >
+                <Icon name={method.iconId} class="text-day-200 h-5 w-5" />
+                <span>{methodInfo?.formattedValue ?? method.value}</span>
+              </a>
+            </li>
+          )
+        })}
+      </ul>
+    )
+  }
+
+  <h2 class="font-title border-day-500 text-day-200 mt-6 mb-3 border-b text-lg font-bold" id="scores">
+    Scores
+  </h2>
+  <div class="xs:gap-8 flex flex-row flex-wrap items-stretch justify-center gap-4 sm:justify-between">
+    <div class="flex max-w-84 flex-grow flex-row items-center justify-evenly gap-4">
+      <ScoreSquare score={service.overallScore} label="Overall" itemReviewedId={itemReviewedId} />
+
+      <div class="bg-day-800 h-12 w-px flex-shrink-0 self-center"></div>
+
+      <ScoreGauge score={service.privacyScore} label="Privacy" itemReviewedId={itemReviewedId} />
+
+      <ScoreGauge score={service.trustScore} label="Trust" itemReviewedId={itemReviewedId} />
+    </div>
+    <div
+      class="@container flex max-w-112 flex-shrink-0 flex-grow-100 basis-64 flex-row items-start rounded-lg bg-white px-3 py-2 text-black"
+    >
+      <Schema
+        item={{
+          '@context': 'https://schema.org',
+          '@type': 'Review',
+          itemReviewed: { '@id': itemReviewedId },
+          reviewAspect: 'KYC Level',
+          name: kycLevelInfo.name,
+          reviewBody: kycLevelInfo.description,
+          reviewRating: {
+            '@type': 'Rating',
+            ratingValue: kycLevelInfo.value,
+            bestRating: kycLevels.length - 1,
+            worstRating: 0,
+          },
+          author: KYCNOTME_SCHEMA_MINI,
+        } satisfies WithContext<Review>}
+      />
+      <div class="mr-2 flex h-full flex-col items-center justify-around @sm:mr-4">
+        <Icon name={kycLevelInfo.icon} class="block size-13 @sm:size-16" />
+        <div class="text-day-600 h-4 text-center text-xs leading-none whitespace-nowrap @sm:text-sm">
+          <span class="font-title">lvl.</span>
+          <span class="text-day-700 text-base leading-none font-bold tracking-wider @sm:text-lg"
+            >{kycLevelInfo.value}</span
+          ><span class="text-day-500 tracking-wider">/<span>{kycLevels.length - 1}</span></span>
+        </div>
+      </div>
+
+      <dl class="flex-grow-5 basis-0">
+        <dt class="text-base font-bold text-pretty">{kycLevelInfo.name}</dt>
+        <dd class="text-day-700 mt-1 font-sans text-sm text-pretty">
+          {kycLevelInfo.description}
+        </dd>
+      </dl>
+    </div>
+  </div>
+
+  {
+    attributes.length > 0 && (
+      <ul class="mt-4 grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-2 md:gap-3">
+        {attributes.map((attribute) => {
+          const baseFormatOptions = {
+            roundDigits: 2,
+            showSign: true,
+            removeTrailingZeros: true,
+          } as const satisfies FormatNumberOptions
+          const weights = [
+            {
+              type: 'privacy',
+              label: 'Privacy',
+              value: attribute.privacyPoints,
+              formatOptions: baseFormatOptions,
+            },
+            {
+              type: 'trust',
+              label: 'Trust',
+              value: attribute.trustPoints,
+              formatOptions: baseFormatOptions,
+            },
+          ] as const satisfies {
+            type: string
+            label: string
+            value: number
+            formatOptions: FormatNumberOptions
+          }[]
+
+          return (
+            <li>
+              <details class="group/attribute">
+                <summary
+                  class={cn(
+                    'bg-night-400 font-title flex cursor-pointer items-center rounded-md p-2 text-sm text-pretty select-none',
+                    attribute.typeInfo.classNames.container,
+                    attribute.typeInfo.classNames.text
+                  )}
+                >
+                  <Icon
+                    name={attribute.categoryInfo.icon}
+                    class={cn('mr-2 size-4 flex-shrink-0', attribute.typeInfo.classNames.icon)}
+                  />
+                  <span>{attribute.title}</span>
+                  <Icon
+                    name="ri:arrow-down-s-line"
+                    class={cn(
+                      'ml-auto size-5 group-open/attribute:rotate-180',
+                      attribute.typeInfo.classNames.icon
+                    )}
+                  />
+                </summary>
+
+                <div
+                  class={cn(
+                    'text-day-300 border-night-400 bg-night-400/20 mx-2 rounded-b-lg border-2 border-t-0 p-3 pt-2 text-xs',
+                    attribute.typeInfo.classNames.subcontainer,
+                    attribute.typeInfo.classNames.text
+                  )}
+                >
+                  <div class="prose prose-sm prose-invert prose-p:my-1 prose-p:last:mb-0 prose-p:first:mt-0 text-xs leading-normal text-pretty text-current">
+                    <Markdown content={attribute.description} />
+                  </div>
+
+                  <div class="mt-1 flex justify-evenly gap-4">
+                    {weights.map((w) => (
+                      <div class="text-day-200 inline-flex basis-12 flex-col items-center">
+                        <span
+                          class={cn('text-base', attribute.typeInfo.classNames.textLight, {
+                            'text-red-400': w.value < 0,
+                            'text-green-400': w.value > 0,
+                            'opacity-50': w.value === 0,
+                          })}
+                        >
+                          {formatNumber(w.value, w.formatOptions)}
+                        </span>
+                        <span
+                          class={cn(
+                            'text-2xs font-bold text-white uppercase',
+                            attribute.typeInfo.classNames.textLight
+                          )}
+                        >
+                          {w.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div class="mt-2 flex flex-row gap-2">
+                    {attribute.links.map((link) => (
+                      <a
+                        href={link.url}
+                        class={cn(
+                          'flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 font-semibold whitespace-nowrap transition-colors',
+                          attribute.typeInfo.classNames.button
+                        )}
+                      >
+                        <Icon name={link.icon} class="size-4" />
+                        {link.label}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              </details>
+            </li>
+          )
+        })}
+      </ul>
+    )
+  }
+
+  <div class="xs:gap-x-6 mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs">
+    <a
+      href="/about#service-scores"
+      class="text-day-400 hover:text-day-200 inline-flex items-center gap-1 transition-colors hover:underline"
+    >
+      <Icon name="ri:information-line" class="size-3" />
+      Learn about scores
+    </a>
+    <a
+      href="/attributes"
+      class="text-day-400 hover:text-day-200 inline-flex items-center gap-1 transition-colors hover:underline"
+    >
+      <Icon name="ri:information-line" class="size-3" />
+      Attributes list
+    </a>
+  </div>
+
+  <h2 class="font-title border-day-500 text-day-200 mt-6 mb-3 border-b text-lg font-bold">
+    Terms of Service Review
+  </h2>
+  {
+    service.verificationStatus === 'VERIFICATION_SUCCESS' || service.verificationStatus === 'APPROVED' ? (
+      service.tosReview ? (
+        <>
+          <Schema
+            item={
+              {
+                '@context': 'https://schema.org',
+                '@type': 'Review',
+                itemReviewed: { '@id': itemReviewedId },
+                reviewAspect: 'Terms of Service',
+                name: 'Terms of Service Review',
+                reviewBody: service.tosReview.summary,
+                datePublished: service.tosReviewAt?.toISOString(),
+                author: KYCNOTME_SCHEMA_MINI,
+                positiveNotes: service.tosReview.highlights
+                  .filter((h) => h.rating === 'positive')
+                  .map(
+                    (h, i) =>
+                      ({
+                        '@type': 'ListItem',
+                        position: i + 1,
+                        name: h.title,
+                        description: h.content,
+                      }) satisfies ListItem
+                  ),
+                negativeNotes: service.tosReview.highlights
+                  .filter((h) => h.rating === 'negative')
+                  .map(
+                    (h, i) =>
+                      ({
+                        '@type': 'ListItem',
+                        position: i + 1,
+                        name: h.title,
+                        description: h.content,
+                      }) satisfies ListItem
+                  ),
+              } satisfies WithContext<Review>
+            }
+          />
+
+          <div class="flex flex-col sm:flex-row sm:gap-6">
+            <div class="prose prose-invert prose-sm bg-night-800 max-w-none flex-1 rounded-lg px-4 py-2 text-pretty sm:px-6 sm:py-4">
+              {service.tosReview.summary ? (
+                <Markdown content={service.tosReview.summary} />
+              ) : (
+                <p>No summary available</p>
+              )}
+            </div>
+          </div>
+
+          <div class="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-6">
+            {sortBy(
+              service.tosReview.highlights.map((highlight) => ({
+                ...highlight,
+                ratingInfo: getTosHighlightRatingInfo(highlight.rating),
+              })),
+              'ratingInfo.order'
+            ).map((highlight) => (
+              <div
+                class={cn(
+                  'border-l-2 border-l-transparent pl-2 text-pretty',
+                  highlight.ratingInfo.classNames.borderColor
+                )}
+              >
+                <h3 class="font-title font-bold">
+                  <Icon
+                    name={highlight.ratingInfo.icon}
+                    class={cn(
+                      highlight.ratingInfo.classNames.icon,
+                      'me-0.5 inline-block size-4 align-[-0.1em]'
+                    )}
+                  />
+                  <span>{highlight.title}</span>
+                </h3>
+                {!!highlight.content && (
+                  <div class="prose prose-invert prose-sm">
+                    <Markdown content={highlight.content} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <p class="text-day-400 mt-4 text-center text-xs">
+            {!!service.tosReviewAt && (
+              <>
+                Reviewed <TimeFormatted date={service.tosReviewAt} hourPrecision />
+              </>
+            )}
+            {!!service.tosReviewAt && !!service.tosUrls.length && 'from'}
+            {service.tosUrls.map((url) => (
+              <a href={url} class="cursor-pointer hover:underline">
+                {urlDomain(url)}
+              </a>
+            ))}
+          </p>
+          <p class="text-day-600 hover:text-day-400 mb-2 text-center text-xs duration-400">
+            ToS reviews are AI-generated and should be used as a reference only.
+          </p>
+        </>
+      ) : (
+        <div class="text-day-400 my-12 text-center">
+          <p>Not reviewed yet</p>
+          {service.tosUrls.length > 0 && (
+            <p class="mt-2 text-xs">
+              {service.tosUrls.map((url) => (
+                <a href={url} class="hover:underline">
+                  {urlDomain(url)}
+                </a>
+              ))}
+            </p>
+          )}
+        </div>
+      )
+    ) : (
+      <div class="text-day-400 my-8 text-center">
+        <p class="mb-4">Not available on {transformCase(statusInfo.label, 'lower')} services</p>
+        {service.tosUrls.length > 0 && (
+          <p class="mt-2 text-xs">
+            {service.tosUrls.map((url) => (
+              <a href={url} class="hover:underline">
+                {urlDomain(url)}
+              </a>
+            ))}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  <div class="border-day-500 mt-6 mb-3 flex items-center justify-between border-b" id="events">
+    <h2 class="font-title text-day-100 text-lg font-bold">Events</h2>
+    <a
+      href="/events"
+      class="text-day-500 hover:text-day-200 inline-flex items-center gap-1 text-xs leading-none transition-colors hover:underline"
+    >
+      View all
+      <Icon name="ri:arrow-right-s-line" class="size-4" />
+    </a>
+  </div>
+  {
+    service.events.length > 0 ? (
+      <ol class="-mx-4 -mt-1 mb-2 flex items-start overflow-x-auto px-4 pt-1 lg:mask-x-from-[calc(100%-1rem)]">
+        {orderBy(
+          service.events.map((event) => ({
+            ...event,
+            actualEndedAt: event.endedAt ?? now,
+          })),
+          ['actualEndedAt', 'startedAt'],
+          'desc'
+        ).map((event) => {
+          const typeInfo = getEventTypeInfo(event.type)
+
+          return (
+            <li class="relative w-xs max-w-[calc(100vw-3rem)] flex-shrink-0">
+              <div class="flex items-center gap-2">
+                <div
+                  class={cn(
+                    'bg-night-400 ring-night-400/50 z-10 flex size-5 shrink-0 items-center justify-center rounded-full ring-3',
+                    typeInfo.classNames.dot
+                  )}
+                >
+                  <Icon name={typeInfo.icon} class="size-3" />
+                </div>
+                <FormatTimeInterval
+                  as="p"
+                  start={event.startedAt}
+                  end={event.endedAt}
+                  now={now}
+                  class="text-day-300 text-sm leading-none font-normal text-balance"
+                />
+                <div class="bg-day-700 mr-2 flex h-0.5 flex-1" />
+              </div>
+
+              <div class="mt-3 max-w-md pe-8">
+                <h3 class="font-title text-lg leading-tight font-semibold text-pretty text-white">
+                  {event.title}
+                </h3>
+
+                <p class="text-day-400 text-base font-normal text-pretty">{event.content}</p>
+                {event.source && (
+                  <a
+                    href={event.source}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="mt-1 inline-block text-xs text-blue-400 hover:underline"
+                  >
+                    Source
+                  </a>
+                )}
+              </div>
+            </li>
+          )
+        })}
+        <li
+          class="mt-2.25 flex h-0.5 w-full flex-1 self-start bg-linear-[to_right,var(--color-day-700)_50%,transparent_50%] mask-r-from-25% bg-size-[1rem]"
+          aria-hidden
+        />
+      </ol>
+    ) : (
+      <p class="text-day-400 my-12 text-center">No events reported</p>
+    )
+  }
+
+  <div class="xs:gap-x-6 mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs">
+    <a
+      href="/about#events"
+      class="text-day-400 hover:text-day-200 inline-flex items-center gap-1 transition-colors hover:underline"
+    >
+      <Icon name="ri:information-line" class="size-3" />
+      Learn about events
+    </a>
+  </div>
+
+  <h2 class="font-title border-day-500 text-day-200 mt-6 mb-3 border-b text-lg font-bold" id="verification">
+    Verification
+  </h2>
+  <div class={cn('mb-6 rounded-lg p-4', statusInfo.classNames.containerBg)}>
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div class="flex-1">
+        <div class="mb-2 flex items-center gap-2">
+          <div
+            class={cn(
+              'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm',
+              statusInfo.classNames.badgeBig
+            )}
+          >
+            <Icon name={statusInfo.icon} class="size-4" />
+            <span>{statusInfo.label}</span>
+          </div>
+
+          <p class="text-sm text-current/60">
+            {statusInfo.description}
+          </p>
+        </div>
+
+        {
+          !!service.verificationSummary && (
+            <div class="prose prose-invert prose-sm max-w-none">
+              <Markdown content={service.verificationSummary} />
+            </div>
+          )
+        }
+
+        {
+          service.verificationSteps.length > 0 && (
+            <div class="border-night-500 mt-2 border-t pt-3">
+              <h3 class="font-title mb-2 flex items-center gap-1 text-sm font-semibold">
+                <Icon name="ri:checkbox-multiple-line" class="size-4" />
+                Verification Steps
+              </h3>
+              <ul class="grid gap-2 text-xs">
+                {service.verificationSteps.map((step) => {
+                  const statusInfo = getVerificationStepStatusInfo(step.status)
+                  return (
+                    <li>
+                      <details class="group/step">
+                        <summary class="border-night-600 hover:bg-night-700/50 relative flex cursor-pointer items-center gap-2 rounded p-1.5 select-none">
+                          <div
+                            class={cn('h-1.5 w-1.5 rounded-full', {
+                              'bg-gray-400 shadow-[0_0_3px_1px_rgba(156,163,175,0.7)]':
+                                step.status === VerificationStepStatus.PENDING,
+                              'bg-blue-400 shadow-[0_0_4px_1px_rgba(96,165,250,0.8)]':
+                                step.status === VerificationStepStatus.IN_PROGRESS,
+                              'bg-green-400 shadow-[0_0_4px_1px_rgba(34,197,94,0.8)]':
+                                step.status === VerificationStepStatus.PASSED,
+                              'bg-red-400 shadow-[0_0_4px_1px_rgba(248,113,113,0.8)]':
+                                step.status === VerificationStepStatus.FAILED,
+                            })}
+                          />
+                          <div class="flex flex-1 items-center">
+                            <strong class="mr-1 font-medium text-white">{step.title}</strong>
+                            <span class="text-day-400 mr-1">•</span>
+                            <span
+                              class={cn('mr-2 font-bold', {
+                                'text-gray-400': step.status === VerificationStepStatus.PENDING,
+                                'text-blue-400': step.status === VerificationStepStatus.IN_PROGRESS,
+                                'text-green-400': step.status === VerificationStepStatus.PASSED,
+                                'text-red-400': step.status === VerificationStepStatus.FAILED,
+                              })}
+                            >
+                              {statusInfo.text}
+                            </span>
+                            <Icon
+                              name="ri:arrow-down-s-line"
+                              class="text-day-400 size-3.5 transition-transform group-open/step:rotate-180"
+                            />
+                          </div>
+                        </summary>
+                        <div class="border-night-600 mt-1 ml-3.5 border-l pb-1 pl-3">
+                          <p class="text-day-400 text-2xs mb-1 font-medium">
+                            Added
+                            <TimeFormatted date={step.createdAt} hourPrecision />
+                          </p>
+                          {step.description && (
+                            <div class="text-day-300 my-1 text-xs">{step.description}</div>
+                          )}
+                          {step.evidenceMd && (
+                            <div class="bg-night-900 mt-2 rounded p-2">
+                              <div class="text-day-400 text-2xs mb-1 font-medium">Evidence:</div>
+                              <div class="prose prose-invert prose-xs prose-img:max-w-full text-[11px] leading-relaxed">
+                                <Markdown content={step.evidenceMd} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </details>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )
+        }
+      </div>
+
+      <div class="flex flex-col gap-2">
+        {
+          service.verificationStatus !== 'VERIFICATION_SUCCESS' &&
+            service.verificationStatus !== 'VERIFICATION_FAILED' && (
+              <form
+                method="POST"
+                action={actions.service.requestVerification}
+                id="request-verification-form"
+                hx-post={`${Astro.url.pathname}${actions.service.requestVerification}`}
+                hx-target="#request-verification-form"
+                hx-select="#request-verification-form"
+                hx-swap="outerHTML"
+              >
+                <input type="hidden" name="serviceId" value={service.id} />
+                <input
+                  type="hidden"
+                  name="action"
+                  value={hasRequestedVerification ? 'withdraw' : 'request'}
+                />
+                <VerificationRequestElement
+                  type={VerificationRequestElement === 'button' ? 'submit' : undefined}
+                  href={
+                    VerificationRequestElement === 'a'
+                      ? makeLoginUrl(
+                          (() => {
+                            const url = new URL(Astro.url)
+                            url.hash = '#request-verification-form'
+                            return url
+                          })()
+                        )
+                      : undefined
+                  }
+                  class="border-night-400 bg-night-800 hover:bg-night-900 flex w-full items-center gap-2 rounded-lg border px-4 py-2 text-sm shadow-sm transition-colors duration-200"
+                >
+                  <Icon
+                    name={hasRequestedVerification ? 'ri:chat-delete-line' : 'ri:chat-check-line'}
+                    class="htmx-request:hidden size-4"
+                  />
+                  <Icon name="ri:loader-4-line" class="htmx-request:block hidden size-4 animate-spin" />
+                  <span>{hasRequestedVerification ? 'Withdraw request' : 'Request verification'}</span>
+                </VerificationRequestElement>
+
+                <p class="text-day-500 mt-1 text-center text-xs">
+                  {service.verificationRequests.length.toLocaleString()}{' '}
+                  {pluralize('request', service.verificationRequests.length)}
+                </p>
+                {result?.error && <p class="mt-1 text-center text-xs text-red-500">{result.error.message}</p>}
+              </form>
+            )
+        }
+
+        {
+          service.verificationProofMd && (
+            <Button
+              as="label"
+              for="show-verification-proof"
+              icon="ri:file-text-line"
+              label="Verification audit"
+              color="white"
+            />
+          )
+        }
+      </div>
+    </div>
+
+    {
+      service.verificationProofMd && (
+        <>
+          <input type="checkbox" id="show-verification-proof" class="peer sr-only" />
+          <div class="bg-night-800 mt-4 hidden rounded-md p-4 peer-checked:block" id="verification-proof">
+            <div class="flex items-center justify-between">
+              <h3 class="font-title text-lg font-semibold">Verification proof</h3>
+              <Button as="label" for="show-verification-proof" label="Close" icon="ri:close-line" size="sm" />
+            </div>
+            <div class="prose prose-invert prose-sm mt-4 max-w-none">
+              <Markdown content={service.verificationProofMd} />
+            </div>
+            {service.verificationSteps.length > 0 && (
+              <div class="mt-6">
+                <h4 class="font-title text-md mb-3 font-semibold">Verification Steps</h4>
+                <ul class="-mb-4">
+                  {service.verificationSteps.map((step) => {
+                    const statusInfo = getVerificationStepStatusInfo(step.status)
+
+                    return (
+                      <li class="flex pb-4">
+                        <div class="border-night-500 bg-night-700/50 flex-grow rounded-md border p-2.5 shadow-sm">
+                          <div class="flex items-start justify-between gap-2">
+                            <div class="flex flex-col">
+                              <div class="flex items-center gap-1.5">
+                                <BadgeSmall
+                                  text={statusInfo.text}
+                                  icon={statusInfo.icon}
+                                  color={statusInfo.color}
+                                  inlineIcon={statusInfo.icon === 'ri:loader-4-line'}
+                                  class={cn(
+                                    { 'animate-spin': statusInfo.icon === 'ri:loader-4-line' },
+                                    'shrink-0'
+                                  )}
+                                />
+                                <strong class="text-sm leading-tight font-semibold text-white">
+                                  {step.title}
+                                </strong>
+                              </div>
+                              <p class="text-day-300 mt-1.5 text-xs">{step.description}</p>
+                            </div>
+                            <p class="text-2xs text-day-400 shrink-0 pt-0.5 whitespace-nowrap">
+                              <TimeFormatted date={step.updatedAt} prefix={false} />
+                            </p>
+                          </div>
+
+                          {step.evidenceMd && (
+                            <details class="group/evidence mt-2 text-xs">
+                              <summary class="text-day-400 hover:text-day-200 cursor-pointer py-0.5 text-[11px] font-medium">
+                                Show Evidence
+                              </summary>
+                              <div class="prose prose-invert prose-xs bg-night-900 mt-1.5 rounded p-2 text-[11px] leading-relaxed group-open/evidence:block">
+                                <Markdown content={step.evidenceMd} />
+                              </div>
+                            </details>
+                          )}
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
+        </>
+      )
+    }
+  </div>
+
+  <h2 class="font-title border-day-500 text-day-200 mt-2 mb-3 border-b text-lg font-bold" id="comments">
+    Comments
+  </h2>
+  <div
+    class='grid grid-cols-1 gap-8 [grid-template-areas:"about""rating""ai"] sm:grid-cols-[1fr_1fr] sm:gap-4 sm:[grid-template-areas:"about_ai""rating_ai"]'
+  >
+    <div class="relative rounded-md bg-orange-400/10 p-2 px-2.5 text-xs text-orange-100/70 [grid-area:about]">
+      <p class="font-bold">About comments</p>
+      <ul class="list-disc pl-4">
+        <li>Comments are visible after approval.</li>
+        <li>Moderation is light.</li>
+        <li>Double-check before trusting.</li>
+      </ul>
+      <div class="absolute inset-y-2 right-2 flex flex-col justify-center">
+        <Icon name="ri:alert-line" class="xs:opacity-20 h-full max-h-16 w-auto opacity-10" />
+      </div>
+    </div>
+    <CommentSummary
+      serviceId={service.id}
+      averageUserRating={service.averageUserRating}
+      class="flex-grow [grid-area:rating]"
+      itemReviewedId={itemReviewedId}
+    />
+
+    {
+      userSentiment && service.averageUserRating !== null && (
+        <Schema
+          item={
+            {
+              '@context': 'https://schema.org',
+              '@type': 'Review',
+              itemReviewed: { '@id': itemReviewedId },
+              reviewAspect: 'AI Summary',
+              name: 'AI Summary',
+              reviewBody: userSentiment.summary,
+              datePublished: service.userSentimentAt?.toISOString(),
+              author: {
+                '@type': 'Organization',
+                name: 'KYCnot.me Community',
+              },
+              reviewRating: {
+                '@type': 'Rating',
+                ratingValue: service.averageUserRating,
+                worstRating: 1,
+                bestRating: 5,
+              },
+              positiveNotes: userSentiment.whatUsersLike.map(
+                (item, index) =>
+                  ({
+                    '@type': 'ListItem',
+                    position: index + 1,
+                    name: item,
+                  }) satisfies ListItem
+              ),
+              negativeNotes: userSentiment.whatUsersDislike.map(
+                (item, index) =>
+                  ({
+                    '@type': 'ListItem',
+                    position: index + 1,
+                    name: item,
+                  }) satisfies ListItem
+              ),
+            } satisfies WithContext<Review>
+          }
+        />
+      )
+    }
+
+    <div class="bg-night-800 flex flex-1 flex-grow-3 basis-64 flex-col gap-2 rounded-lg p-3 [grid-area:ai]">
+      <div class="flex flex-row justify-between">
+        <h3 class="font-title leading-none font-bold">
+          <Icon name="ri:sparkling-2-line" class="me-1 inline-block size-4 align-[-0.1em]" />AI Summary
+        </h3>
+        {
+          service.userSentimentAt && (
+            <div class="text-day-500 text-right text-xs">
+              Updated
+              <TimeFormatted date={service.userSentimentAt} hourPrecision />
+            </div>
+          )
+        }
+      </div>
+
+      {
+        userSentiment ? (
+          <>
+            <div class="prose prose-invert prose-sm max-w-none text-sm">
+              <Markdown content={userSentiment.summary} />
+            </div>
+
+            <div class="flex flex-grow items-center justify-evenly">
+              <ul class="text-day-300 inline-grid list-inside list-disc place-items-center text-sm marker:text-green-400 marker:content-['+_']">
+                {userSentiment.whatUsersLike.map((item) => (
+                  <li class="w-full">
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <ul class="text-day-300 inline-grid list-inside list-disc place-items-center text-sm marker:text-red-400 marker:content-['-_']">
+                {userSentiment.whatUsersDislike.map((item) => (
+                  <li class="w-full">
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        ) : (
+          <p class="text-day-400 my-2 flex flex-1 items-center justify-center text-center text-xs">
+            Not reviewed yet
+          </p>
+        )
+      }
+    </div>
+  </div>
+  <CommentSection itemReviewedId={itemReviewedId} service={service} />
+</BaseLayout>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const checkboxes = document.querySelectorAll<HTMLInputElement>('input[data-mark-indeterminate]')
+    checkboxes.forEach((checkbox) => {
+      checkbox.indeterminate = checkbox.dataset.markIndeterminate === 'true'
+    })
+  })
+</script>

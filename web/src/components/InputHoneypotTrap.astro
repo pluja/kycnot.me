@@ -1,0 +1,20 @@
+---
+type Props = {
+  name: string
+}
+
+//
+---
+
+<input
+  type="text"
+  name={Astro.props.name || 'message'}
+  aria-hidden="true"
+  style="display:none !important"
+  autocomplete="off"
+  tabindex="-1"
+  data-1p-ignore
+  data-lpignore="true"
+  data-bwignore
+  data-form-type="other"
+/>

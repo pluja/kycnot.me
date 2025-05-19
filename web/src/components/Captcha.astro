@@ -1,0 +1,80 @@
+---
+import { Icon } from 'astro-icon/components'
+import { isInputError, type ActionAccept, type ActionClient } from 'astro:actions'
+import { Image } from 'astro:assets'
+
+import { CAPTCHA_LENGTH, generateCaptcha } from '../lib/captcha'
+import { cn } from '../lib/cn'
+
+import type { HTMLAttributes } from 'astro/types'
+import type { z } from 'astro:content'
+
+type Props<
+  TAccept extends ActionAccept,
+  TInputSchema extends z.ZodType,
+  TAction extends ActionClient<unknown, TAccept, TInputSchema>,
+> = HTMLAttributes<'div'> & {
+  action: TAction
+}
+
+const { class: className, action: formAction, autofocus, ...htmlProps } = Astro.props
+
+const result = Astro.getActionResult(formAction)
+const inputErrors = isInputError(result?.error) ? result.error.fields : {}
+
+const captcha = generateCaptcha()
+---
+
+{/* eslint-disable astro/jsx-a11y/no-autofocus */}
+
+<div {...htmlProps} class={cn('space-y-3', className)}>
+  <p class="sr-only" id="captcha-instructions">
+    This page requires a visual CAPTCHA to ensure you are a human. If you are unable to complete the CAPTCHA,
+    please email us for assistance. <a href="mailto:contact@kycnot.me">contact@kycnot.me</a>
+  </p>
+
+  <div
+    class="@container flex flex-wrap items-center justify-center gap-2"
+    style={{
+      '--img-width': `${captcha.image.width}px`,
+      '--img-height': `${captcha.image.height}px`,
+      '--img-aspect-ratio': `${captcha.image.width} / ${captcha.image.height}`,
+    }}
+  >
+    <label for="captcha-value">
+      <Image {...captcha.image} alt="CAPTCHA verification" class="w-full max-w-(--img-width) rounded" />
+    </label>
+
+    <Icon name="ri:arrow-right-line" class="size-6 text-zinc-600 @max-[calc(144px*2+8px*2+24px)]:hidden" />
+
+    <input
+      type="text"
+      id="captcha-value"
+      name="captcha-value"
+      required
+      class={cn(
+        'aspect-(--img-aspect-ratio) w-full max-w-(--img-width) min-w-0 rounded-md border border-zinc-700 bg-black/20 py-1.5 pl-[0.9em] font-mono text-sm text-zinc-200 uppercase placeholder:text-zinc-600',
+        'pr-0 tracking-[0.9em] transition-colors focus:border-green-500/50 focus:ring-1 focus:ring-green-500/30 focus:outline-none',
+        inputErrors['captcha-value'] && 'border-red-500/50 focus:border-red-500/50 focus:ring-red-500/30'
+      )}
+      autocomplete="off"
+      pattern="[A-Za-z0-9]*"
+      placeholder={'•'.repeat(CAPTCHA_LENGTH)}
+      maxlength={CAPTCHA_LENGTH}
+      aria-describedby="captcha-instructions"
+      autofocus={autofocus}
+      data-1p-ignore
+      data-lpignore="true"
+      data-bwignore
+      data-form-type="other"
+    />
+  </div>
+
+  {
+    inputErrors['captcha-value'] && (
+      <p class="mt-1 text-center text-xs text-red-500">{inputErrors['captcha-value'].join(', ')}</p>
+    )
+  }
+
+  <input type="hidden" name="captcha-solution-hash" value={captcha.solutionHash} />
+</div>

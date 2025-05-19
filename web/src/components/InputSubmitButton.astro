@@ -1,0 +1,26 @@
+---
+import { cn } from '../lib/cn'
+
+import Button from './Button.astro'
+
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = HTMLAttributes<'div'> & {
+  hideCancel?: boolean
+  icon?: string
+  label?: string
+}
+
+const {
+  hideCancel = false,
+  icon = 'ri:send-plane-2-line',
+  label = 'Submit',
+  class: className,
+  ...htmlProps
+} = Astro.props
+---
+
+<div class={cn('flex justify-between gap-2', className)} {...htmlProps}>
+  {!hideCancel && <Button as="a" href="/" label="Cancel" icon="ri:close-line" color="gray" />}
+  <Button type="submit" label={label} icon={icon} class="ml-auto" color="success" />
+</div>

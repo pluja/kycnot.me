@@ -1,0 +1,128 @@
+---
+import { Icon } from 'astro-icon/components'
+import { Schema } from 'astro-seo-schema'
+import { clamp, round, sum, sumBy } from 'lodash-es'
+
+import { cn } from '../lib/cn'
+import { prisma } from '../lib/prisma'
+
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = HTMLAttributes<'div'> & {
+  serviceId: number
+  itemReviewedId: string
+  averageUserRating?: number | null
+}
+
+const {
+  serviceId,
+  itemReviewedId,
+  averageUserRating: averageUserRatingFromProps,
+  class: className,
+  ...htmlProps
+} = Astro.props
+
+const ratingsFromDb = await prisma.comment.groupBy({
+  by: ['rating'],
+  where: {
+    serviceId,
+    ratingActive: true,
+    status: {
+      in: ['APPROVED', 'VERIFIED'],
+    },
+    parentId: null,
+    suspicious: false,
+  },
+  _count: true,
+})
+
+const ratings = ([5, 4, 3, 2, 1] as const).map((rating) => ({
+  rating,
+  count: ratingsFromDb.find((stat) => stat.rating === rating)?._count ?? 0,
+}))
+
+const totalComments = sumBy(ratings, 'count')
+
+const averageUserRatingFromQuery =
+  totalComments > 0 ? sum(ratings.map((stat) => stat.rating * stat.count)) / totalComments : null
+
+if (averageUserRatingFromProps !== undefined) {
+  if (
+    averageUserRatingFromQuery !== averageUserRatingFromProps ||
+    (averageUserRatingFromQuery !== null &&
+      averageUserRatingFromProps !== null &&
+      round(averageUserRatingFromQuery, 2) !== round(averageUserRatingFromProps, 2))
+  ) {
+    console.error(
+      `The averageUserRating of the comments shown is different from the averageUserRating from the database. Service ID: ${serviceId} ratingUi: ${averageUserRatingFromQuery} ratingDb: ${averageUserRatingFromProps}`
+    )
+  }
+}
+
+const averageUserRating =
+  averageUserRatingFromProps === undefined ? averageUserRatingFromQuery : averageUserRatingFromProps
+---
+
+<div {...htmlProps} class={cn('flex flex-wrap items-center justify-center gap-4', className)}>
+  {
+    averageUserRating !== null && (
+      <Schema
+        item={{
+          '@context': 'https://schema.org',
+          '@type': 'AggregateRating',
+          itemReviewed: { '@id': itemReviewedId },
+          ratingValue: round(averageUserRating, 1),
+          bestRating: 5,
+          worstRating: 1,
+          ratingCount: totalComments,
+        }}
+      />
+    )
+  }
+
+  <div class="flex flex-col items-center">
+    <div class="mb-1 text-5xl">
+      {averageUserRating !== null ? round(averageUserRating, 1).toLocaleString() : '-'}
+    </div>
+    <div class="flex items-center space-x-1">
+      {
+        ([1, 2, 3, 4, 5] as const).map((rating) => (
+          <div
+            class="relative size-5"
+            style={`--percent: ${clamp((averageUserRating ?? 0) - (rating - 1), 0, 1) * 100}%`}
+          >
+            <Icon name="ri:star-line" class="absolute inset-0 size-full text-zinc-500" />
+            <Icon
+              name="ri:star-fill"
+              class="absolute inset-0 size-full text-yellow-400 [clip-path:inset(0_calc(100%_-_var(--percent))_0_0)]"
+            />
+          </div>
+        ))
+      }
+    </div>
+    <div class="mt-1 text-sm text-zinc-400">
+      {totalComments.toLocaleString()} ratings
+    </div>
+  </div>
+
+  <div class="grid min-w-32 flex-1 grid-cols-[auto_1fr_auto] items-center gap-1">
+    {
+      ratings.map(({ rating, count }) => {
+        const percent = totalComments > 0 ? (count / totalComments) * 100 : null
+        return (
+          <>
+            <div class="text-center text-xs text-zinc-400" aria-label={`${rating} stars`}>
+              {rating.toLocaleString()}
+            </div>
+            <div class="h-2 flex-1 overflow-hidden rounded-full bg-zinc-700">
+              <div class="h-full w-(--percent) bg-yellow-400" style={`--percent: ${percent ?? 0}%`} />
+            </div>
+            <div class="text-right text-xs text-zinc-400">
+              {[<span>{round(percent ?? 0).toLocaleString()}</span>, <span class="text-zinc-500">%</span>]}
+            </div>
+          </>
+        )
+      })
+    }
+  </div>
+</div>

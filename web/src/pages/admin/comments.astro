@@ -1,0 +1,237 @@
+---
+import { z } from 'astro/zod'
+
+import CommentModeration from '../../components/CommentModeration.astro'
+import {
+  commentStatusFilters,
+  commentStatusFiltersZodEnum,
+  getCommentStatusFilterInfo,
+  getCommentStatusFilterValue,
+} from '../../constants/commentStatusFilters'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { cn } from '../../lib/cn'
+import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
+import { prisma } from '../../lib/prisma'
+import { urlWithParams } from '../../lib/urls'
+
+const user = Astro.locals.user
+if (!user || (!user.admin && !user.verifier)) {
+  return Astro.rewrite('/404')
+}
+
+const { data: params } = zodParseQueryParamsStoringErrors(
+  {
+    status: commentStatusFiltersZodEnum.default('all'),
+    page: z.number().int().positive().default(1),
+  },
+  Astro
+)
+const PAGE_SIZE = 20
+
+const statusFilter = getCommentStatusFilterInfo(params.status)
+
+const [comments = [], totalComments = 0] = await Astro.locals.banners.try(
+  'Error fetching comments',
+  async () =>
+    prisma.comment.findManyAndCount({
+      where: statusFilter.whereClause,
+      include: {
+        author: true,
+        service: {
+          select: {
+            name: true,
+            slug: true,
+          },
+        },
+        parent: {
+          include: {
+            author: true,
+          },
+        },
+        votes: true,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      skip: (params.page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+  []
+)
+const totalPages = Math.ceil(totalComments / PAGE_SIZE)
+---
+
+<BaseLayout pageTitle="Comment Moderation" widthClassName="max-w-screen-xl">
+  <div class="mb-8">
+    <h1 class="font-title mb-4 text-2xl text-green-500">&gt; comments.moderate</h1>
+
+    <!-- Status Filters -->
+    <div class="flex flex-wrap gap-2">
+      {
+        commentStatusFilters.map((filter) => (
+          <a
+            href={urlWithParams(Astro.url, { status: filter.value })}
+            class={cn([
+              'font-title rounded-md border px-3 py-1 text-sm',
+              params.status === filter.value
+                ? filter.styles.filter
+                : 'border-zinc-700 transition-colors hover:border-green-500/50',
+            ])}
+          >
+            {filter.label}
+          </a>
+        ))
+      }
+    </div>
+  </div>
+
+  <!-- Comments List -->
+  <div class="space-y-6">
+    {
+      comments
+        .map((comment) => ({
+          ...comment,
+          statusFilterInfo: getCommentStatusFilterInfo(getCommentStatusFilterValue(comment)),
+        }))
+        .map((comment) => (
+          <div
+            id={`comment-${comment.id.toString()}`}
+            class="rounded-lg border border-zinc-800 bg-black/40 p-6 backdrop-blur-xs"
+          >
+            <div class="mb-4 flex flex-wrap items-center gap-2">
+              {/* Author Info */}
+              <span class="font-title text-sm">{comment.author.name}</span>
+              {comment.author.admin && (
+                <span class="rounded-sm bg-yellow-500/20 px-2 py-0.5 text-[12px] font-medium text-yellow-500">
+                  admin
+                </span>
+              )}
+              {comment.author.verified && !comment.author.admin && (
+                <span class="rounded-sm bg-blue-500/20 px-2 py-0.5 text-[12px] font-medium text-blue-500">
+                  verified
+                </span>
+              )}
+              {comment.author.verifier && !comment.author.admin && (
+                <span class="rounded-sm bg-green-500/20 px-2 py-0.5 text-[12px] font-medium text-green-500">
+                  verifier
+                </span>
+              )}
+
+              {/* Service Link */}
+              <span class="text-xs text-zinc-500">•</span>
+              <a
+                href={`/service/${comment.service.slug}#comment-${comment.id.toString()}`}
+                class="text-sm text-blue-400 transition-colors hover:text-blue-300"
+              >
+                {comment.service.name}
+              </a>
+
+              {/* Date */}
+              <span class="text-xs text-zinc-500">•</span>
+              <span class="text-sm text-zinc-400">{new Date(comment.createdAt).toLocaleString()}</span>
+
+              {/* Status Badges */}
+              <span class={comment.statusFilterInfo.styles.badge}>{comment.statusFilterInfo.label}</span>
+            </div>
+
+            {/* Parent Comment Context */}
+            {comment.parent && (
+              <div class="mb-4 border-l-2 border-zinc-700 pl-4">
+                <div class="mb-1 text-sm text-zinc-500">Replying to {comment.parent.author.name}:</div>
+                <div class="text-sm text-zinc-400">{comment.parent.content}</div>
+              </div>
+            )}
+
+            {/* Comment Content */}
+            <div class="mb-4 text-sm">{comment.content}</div>
+
+            {/* Notes */}
+            {comment.communityNote && (
+              <div class="mt-2">
+                <div class="text-sm font-medium text-green-500">Community Note</div>
+                <p class="text-sm text-gray-300">{comment.communityNote}</p>
+              </div>
+            )}
+            {comment.internalNote && (
+              <div class="mt-2">
+                <div class="text-sm font-medium text-yellow-500">Internal Note</div>
+                <p class="text-sm text-gray-300">{comment.internalNote}</p>
+              </div>
+            )}
+            {comment.privateContext && (
+              <div class="mt-2">
+                <div class="text-sm font-medium text-blue-500">Private Context</div>
+                <p class="text-sm text-gray-300">{comment.privateContext}</p>
+              </div>
+            )}
+
+            {comment.orderId && (
+              <div class="mt-2">
+                <div class="text-sm font-medium text-purple-500">Order ID</div>
+                <div class="flex items-center gap-2">
+                  <p class="text-sm text-gray-300">{comment.orderId}</p>
+                  {comment.orderIdStatus && (
+                    <span
+                      class={cn(
+                        'rounded-sm px-1.5 py-0.5 text-xs',
+                        comment.orderIdStatus === 'APPROVED' && 'bg-green-500/20 text-green-400',
+                        comment.orderIdStatus === 'REJECTED' && 'bg-red-500/20 text-red-400',
+                        comment.orderIdStatus === 'PENDING' && 'bg-blue-500/20 text-blue-400'
+                      )}
+                    >
+                      {comment.orderIdStatus}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {(comment.kycRequested || comment.fundsBlocked) && (
+              <div class="mt-2">
+                <div class="text-sm font-medium text-red-500">Issue Flags</div>
+                <div class="flex flex-wrap gap-2">
+                  {comment.kycRequested && (
+                    <span class="rounded-sm bg-red-500/20 px-1.5 py-0.5 text-xs text-red-400">
+                      KYC Requested
+                    </span>
+                  )}
+                  {comment.fundsBlocked && (
+                    <span class="rounded-sm bg-red-500/20 px-1.5 py-0.5 text-xs text-red-400">
+                      Funds Blocked
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <CommentModeration class="mt-2" comment={comment} />
+          </div>
+        ))
+    }
+  </div>
+
+  <!-- Pagination -->
+  {
+    totalPages > 1 && (
+      <div class="mt-8 flex justify-center gap-2">
+        {params.page > 1 && (
+          <a
+            href={urlWithParams(Astro.url, { page: params.page - 1 })}
+            class="font-title rounded-md border border-zinc-700 px-3 py-1 text-sm transition-colors hover:border-green-500/50"
+          >
+            Previous
+          </a>
+        )}
+        <span class="font-title px-3 py-1 text-sm">
+          Page {params.page} of {totalPages}
+        </span>
+        {params.page < totalPages && (
+          <a
+            href={urlWithParams(Astro.url, { page: params.page + 1 })}
+            class="font-title rounded-md border border-zinc-700 px-3 py-1 text-sm transition-colors hover:border-green-500/50"
+          >
+            Next
+          </a>
+        )}
+      </div>
+    )
+  }
+</BaseLayout>

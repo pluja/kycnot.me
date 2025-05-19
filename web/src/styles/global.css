@@ -1,0 +1,133 @@
+@import 'tailwindcss';
+
+@plugin "@tailwindcss/forms";
+@plugin 'tailwind-htmx';
+@plugin '@tailwindcss/typography';
+
+@custom-variant theme-midnight {
+  &:where([data-theme='midnight'] *) {
+    @slot;
+  }
+}
+
+@custom-variant js {
+  &:is(.js *) {
+    @slot;
+  }
+}
+
+@custom-variant no-js {
+  &:not(.js *) {
+    @slot;
+  }
+}
+
+@layer base {
+  button:not(:disabled),
+  [role='button']:not(:disabled),
+  label[for] {
+    cursor: pointer;
+  }
+
+  input[type='checkbox']:not(.unset) {
+    @apply border-day-300 checked:ring-day-300 cursor-pointer rounded border-2 text-green-600 shadow-sm ring-0 ring-current ring-offset-0 transition-all duration-100 not-checked:bg-zinc-800 checked:border-current focus-visible:ring-2;
+  }
+
+  input[type='radio']:not(.unset) {
+    @apply border-day-300 checked:ring-day-300 cursor-pointer rounded-full border-2 text-green-600 shadow-sm ring-0 ring-current ring-offset-0 transition-all duration-100 not-checked:bg-zinc-800 checked:border-current focus-visible:ring-2;
+  }
+
+  .prose {
+    @apply prose-headings:font-title;
+  }
+}
+
+@theme inline {
+  --font-title: 'Space Grotesk Variable', var(--font-sans), 'sans-serif';
+}
+
+@theme {
+  --text-2xs: 0.65rem;
+}
+
+@theme {
+  --breakpoint-xs: 475px;
+  --breakpoint-2xs: 375px;
+}
+
+@theme {
+  --color-score-1: #e26136;
+  --color-score-2: #eba370;
+  --color-score-3: #eddb82;
+  --color-score-4: #8de2d7;
+  --color-score-5: #3cdd71;
+
+  --color-score-saturate-1: #ff0000;
+  --color-score-saturate-2: #ff7300;
+  --color-score-saturate-3: #ffff00;
+  --color-score-saturate-4: #00ffff;
+  --color-score-saturate-5: #7cff00;
+
+  --color-day-50: oklch(97.13% 0.002 165.08);
+  --color-day-100: oklch(94.73% 0.003 165.07);
+  --color-day-200: oklch(89.62% 0.006 170.43);
+  --color-day-300: oklch(83.81% 0.01 171.74);
+  --color-day-400: oklch(74.95% 0.015 169.09);
+  --color-day-500: oklch(66.18% 0.02 171.17);
+  --color-day-600: oklch(56.71% 0.022 172.22);
+  --color-day-700: oklch(46.55% 0.018 170.35);
+  --color-day-800: oklch(34.77% 0.012 171.06);
+  --color-day-900: oklch(30.05% 0.01 179.07);
+  --color-day-950: oklch(27.08% 0.008 196.85);
+
+  --color-night-50: oklch(90.58% 0.009 171.78);
+  --color-night-100: oklch(80.76% 0.017 178.15);
+  --color-night-200: oklch(61.23% 0.035 173.55);
+  --color-night-300: oklch(36.23% 0.018 174.61);
+  --color-night-400: oklch(33.22% 0.017 172.96);
+  --color-night-500: oklch(28.79% 0.013 180.38);
+  --color-night-600: oklch(25.59% 0.012 178.46);
+  --color-night-700: oklch(22.09% 0.008 182.2);
+  --color-night-800: oklch(18.65% 0.007 178.83);
+  --color-night-900: oklch(13.3% 0.002 196.91);
+  --color-night-950: oklch(11.97% 0.004 145.32);
+}
+
+@layer utilities {
+  .text-shadow-glow {
+    text-shadow:
+      0 0 16px color-mix(in oklab, currentColor 30%, transparent),
+      0 0 4px color-mix(in oklab, currentColor 60%, transparent);
+  }
+  .drop-shadow-glow {
+    filter: drop-shadow(0 0 16px color-mix(in oklab, currentColor 30%, transparent))
+      drop-shadow(0 0 4px color-mix(in oklab, currentColor 60%, transparent));
+  }
+}
+
+@theme {
+  --ease-in-sine: cubic-bezier(0.12, 0, 0.39, 0);
+  --ease-out-sine: cubic-bezier(0.61, 1, 0.88, 1);
+  --ease-in-out-sine: cubic-bezier(0.37, 0, 0.63, 1);
+  --ease-in-quad: cubic-bezier(0.11, 0, 0.5, 0);
+  --ease-out-quad: cubic-bezier(0.5, 1, 0.89, 1);
+  --ease-in-out-quad: cubic-bezier(0.45, 0, 0.55, 1);
+  --ease-in-cubic: cubic-bezier(0.32, 0, 0.67, 0);
+  --ease-out-cubic: cubic-bezier(0.33, 1, 0.68, 1);
+  --ease-in-out-cubic: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-in-quart: cubic-bezier(0.5, 0, 0.75, 0);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-in-quint: cubic-bezier(0.64, 0, 0.78, 0);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-quint: cubic-bezier(0.83, 0, 0.17, 1);
+  --ease-in-expo: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-expo: cubic-bezier(0.87, 0, 0.13, 1);
+  --ease-in-circ: cubic-bezier(0.55, 0, 1, 0.45);
+  --ease-out-circ: cubic-bezier(0, 0.55, 0.45, 1);
+  --ease-in-out-circ: cubic-bezier(0.85, 0, 0.15, 1);
+  --ease-in-back: cubic-bezier(0.36, 0, 0.66, -0.56);
+  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-in-out-back: cubic-bezier(0.68, -0.6, 0.32, 1.6);
+}

@@ -1,0 +1,36 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../lib/cn'
+
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = HTMLAttributes<'a'> & {
+  text: string
+  searchParamName: string
+  searchParamValue?: string
+  icon?: string
+  iconClass?: string
+}
+
+const { text, searchParamName, searchParamValue, icon, iconClass, class: className, ...aProps } = Astro.props
+
+const makeUrlWithoutFilter = (filter: string, value?: string) => {
+  const url = new URL(Astro.url)
+  url.searchParams.delete(filter, value)
+  return url.toString()
+}
+---
+
+<a
+  href={makeUrlWithoutFilter(searchParamName, searchParamValue)}
+  {...aProps}
+  class={cn(
+    'bg-night-800 hover:bg-night-900 border-night-400 flex h-8 shrink-0 items-center gap-2 rounded-full border px-3 text-sm text-white',
+    className
+  )}
+>
+  {icon && <Icon name={icon} class={cn('size-4', iconClass)} />}
+  {text}
+  <Icon name="ri:close-large-line" class="text-day-400 size-4" />
+</a>

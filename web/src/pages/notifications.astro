@@ -1,0 +1,332 @@
+---
+import { z } from 'astro/zod'
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import Button from '../components/Button.astro'
+import TimeFormatted from '../components/TimeFormatted.astro'
+import Tooltip from '../components/Tooltip.astro'
+import { getNotificationTypeInfo } from '../constants/notificationTypes'
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { cn } from '../lib/cn'
+import { getOrCreateNotificationPreferences } from '../lib/notificationPreferences'
+import { makeNotificationContent, makeNotificationLink, makeNotificationTitle } from '../lib/notifications'
+import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
+import { prisma } from '../lib/prisma'
+import { makeLoginUrl } from '../lib/redirectUrls'
+
+const user = Astro.locals.user
+if (!user) return Astro.redirect(makeLoginUrl(Astro.url))
+
+const PAGE_SIZE = 20
+
+const { data: params } = zodParseQueryParamsStoringErrors(
+  {
+    page: z.coerce.number().int().min(1).default(1),
+  },
+  Astro
+)
+const skip = (params.page - 1) * PAGE_SIZE
+
+const [dbNotifications, notificationPreferences, totalNotifications] = await Astro.locals.banners.tryMany([
+  [
+    'Error while fetching notifications',
+    () =>
+      prisma.notification.findMany({
+        where: {
+          userId: user.id,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip,
+        take: PAGE_SIZE,
+        select: {
+          id: true,
+          type: true,
+          createdAt: true,
+          read: true,
+          aboutAccountStatusChange: true,
+          aboutCommentStatusChange: true,
+          aboutServiceVerificationStatusChange: true,
+          aboutSuggestionStatusChange: true,
+          aboutComment: {
+            select: {
+              id: true,
+              author: {
+                select: {
+                  id: true,
+                },
+              },
+              status: true,
+              content: true,
+              communityNote: true,
+              service: {
+                select: {
+                  slug: true,
+                  name: true,
+                },
+              },
+              parent: {
+                select: {
+                  author: {
+                    select: {
+                      id: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          aboutServiceSuggestionId: true,
+          aboutServiceSuggestion: {
+            select: {
+              status: true,
+              service: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+          aboutServiceSuggestionMessage: {
+            select: {
+              id: true,
+              content: true,
+              suggestion: {
+                select: {
+                  id: true,
+                  service: {
+                    select: {
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          aboutEvent: {
+            select: {
+              title: true,
+              type: true,
+              service: {
+                select: {
+                  slug: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          aboutService: {
+            select: {
+              slug: true,
+              name: true,
+              verificationStatus: true,
+            },
+          },
+        },
+      }),
+    [],
+  ],
+  [
+    'Error while fetching notification preferences',
+    () =>
+      getOrCreateNotificationPreferences(user.id, {
+        id: true,
+        enableOnMyCommentStatusChange: true,
+        enableAutowatchMyComments: true,
+        enableNotifyPendingRepliesOnWatch: true,
+      }),
+    null,
+  ],
+  [
+    'Error while fetching total notifications',
+    () => prisma.notification.count({ where: { userId: user.id } }),
+    0,
+  ],
+])
+
+const totalPages = Math.ceil(totalNotifications / PAGE_SIZE)
+
+const notificationPreferenceFields = [
+  {
+    id: 'enableOnMyCommentStatusChange',
+    label: 'Notify me when my comment status changes.',
+    icon: 'ri:chat-check-line',
+  },
+  {
+    id: 'enableAutowatchMyComments',
+    label: 'Autowatch my comments to receive notifications when they get a new reply.',
+    icon: 'ri:eye-line',
+  },
+  {
+    id: 'enableNotifyPendingRepliesOnWatch',
+    label: 'Notify me also about unmoderated replies for watched comments.',
+    icon: 'ri:chat-delete-line',
+  },
+] as const satisfies {
+  id: Omit<keyof NonNullable<typeof notificationPreferences>, 'id'>
+  label: string
+  icon: string
+}[]
+
+const notifications = dbNotifications.map((notification) => ({
+  ...notification,
+  typeInfo: getNotificationTypeInfo(notification.type),
+  title: makeNotificationTitle(notification, user),
+  content: makeNotificationContent(notification),
+  link: makeNotificationLink(notification, Astro.url.origin),
+}))
+---
+
+<BaseLayout
+  pageTitle="Notifications"
+  description="View your notifications and manage your notification preferences."
+  widthClassName="max-w-screen-lg"
+  ogImage={{ template: 'generic', title: 'Notifications' }}
+>
+  <section class="mx-auto w-full">
+    <div class="mb-4 flex items-center justify-between">
+      <h1 class="font-title flex items-center text-2xl leading-tight font-bold tracking-wider">
+        <Icon name="ri:notification-line" class="mr-2 size-6 text-zinc-400" />
+        Notifications
+      </h1>
+
+      <form method="POST" action={actions.notification.updateReadStatus}>
+        <input type="hidden" name="notificationId" value="all" />
+        <input type="hidden" name="read" value="true" />
+        <Button
+          type="submit"
+          label="Mark all as read"
+          icon="ri:check-double-line"
+          disabled={notifications.length === 0}
+          color="white"
+        />
+      </form>
+    </div>
+
+    {
+      notifications.length === 0 ? (
+        <div class="flex flex-col items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 p-10 text-center shadow-sm">
+          <Icon name="material-symbols:notifications-outline" class="size-16 text-zinc-600" />
+          <h3 class="font-title mt-2 text-zinc-400">No notifications</h3>
+        </div>
+      ) : (
+        <div class="space-y-2">
+          {notifications.map((notification) => (
+            <div
+              class={cn('rounded-lg border border-l-4 border-zinc-800 bg-zinc-900 p-3 shadow-sm', {
+                'border-l-blue-600': !notification.read,
+              })}
+            >
+              <div class="flex items-start justify-between">
+                <div class="flex items-start gap-3">
+                  <div class="mt-0.5 rounded-md bg-zinc-800 p-2">
+                    <Icon name={notification.typeInfo.icon} class="size-5 text-zinc-300" />
+                  </div>
+
+                  <div>
+                    <div class="font-medium text-zinc-200">{notification.title}</div>
+                    <p class="text-sm text-zinc-400">{notification.content}</p>
+                    <div class="mt-1 text-xs text-zinc-500">
+                      <TimeFormatted date={notification.createdAt} prefix={false} caseType="sentence" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <form method="POST" action={actions.notification.updateReadStatus}>
+                    <input type="hidden" name="notificationId" value={notification.id} />
+                    <input type="hidden" name="read" value={notification.read ? 'false' : 'true'} />
+                    <Tooltip
+                      as="button"
+                      text={notification.read ? 'Mark as unread' : 'Mark as read'}
+                      position="left"
+                      type="submit"
+                      class="flex size-8 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-zinc-400 transition-colors duration-200 hover:bg-zinc-700 hover:text-zinc-200"
+                    >
+                      <Icon name={notification.read ? 'ri:eye-close-line' : 'ri:eye-line'} class="size-4" />
+                    </Tooltip>
+                  </form>
+                  {notification.link && (
+                    <a
+                      href={notification.link}
+                      class="flex size-8 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-zinc-400 transition-colors duration-200 hover:bg-zinc-700 hover:text-zinc-200"
+                    >
+                      <Icon name="ri:arrow-right-line" class="size-4" />
+                      <span class="sr-only">View details</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {totalPages > 1 && (
+            <div class="mt-8 flex justify-center gap-4">
+              <form method="GET" action="/notifications" class="inline">
+                <input type="hidden" name="page" value={params.page - 1} />
+                <button
+                  type="submit"
+                  class="rounded-md border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-200 transition-colors duration-200 hover:bg-zinc-700"
+                  disabled={params.page <= 1}
+                >
+                  Previous
+                </button>
+              </form>
+              <span class="inline-flex items-center px-2 text-sm text-zinc-400">
+                Page {params.page} of {totalPages}
+              </span>
+              <form method="GET" action="/notifications" class="inline">
+                <input type="hidden" name="page" value={params.page + 1} />
+                <button
+                  type="submit"
+                  class="rounded-md border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-200 transition-colors duration-200 hover:bg-zinc-700"
+                  disabled={params.page >= totalPages}
+                >
+                  Next
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    {
+      !!notificationPreferences && (
+        <div class="mt-8">
+          <h2 class="font-title mb-3 flex items-center border-b border-zinc-800 text-lg font-bold">
+            <Icon name="ri:settings-3-line" class="mr-2 size-5 text-zinc-400" />
+            Notification Settings
+          </h2>
+
+          <form
+            method="POST"
+            action={actions.notification.preferences.update}
+            class="rounded-lg border border-zinc-800 bg-zinc-900 p-4 shadow-sm"
+          >
+            {notificationPreferenceFields.map((field) => (
+              <label class="flex items-center justify-between rounded-md p-2 transition-colors duration-200 hover:bg-zinc-800">
+                <span class="flex items-center text-zinc-300">
+                  <Icon name={field.icon} class="mr-2 size-5 text-zinc-400" />
+                  {field.label}
+                </span>
+                <input
+                  type="checkbox"
+                  name={field.id}
+                  checked={notificationPreferences[field.id]}
+                  class="size-4 rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-blue-600"
+                />
+              </label>
+            ))}
+
+            <div class="mt-4 flex justify-end">
+              <Button type="submit" label="Save" icon="ri:save-line" color="success" />
+            </div>
+          </form>
+        </div>
+      )
+    }
+  </section>
+</BaseLayout>

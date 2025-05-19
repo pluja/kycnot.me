@@ -1,0 +1,65 @@
+---
+import { Icon } from 'astro-icon/components'
+import { omit } from 'lodash-es'
+
+import { cn } from '../lib/cn'
+import { baseInputClassNames } from '../lib/formInputs'
+
+import InputWrapper from './InputWrapper.astro'
+
+import type { ComponentProps, HTMLAttributes } from 'astro/types'
+
+type Props = Omit<ComponentProps<typeof InputWrapper>, 'children' | 'inputId' | 'required'> & {
+  inputProps?: Omit<HTMLAttributes<'input'>, 'name'>
+  inputIcon?: string
+  inputIconClass?: string
+}
+
+const { inputProps, inputIcon, inputIconClass, ...wrapperProps } = Astro.props
+
+const inputId = inputProps?.id ?? Astro.locals.makeId(`input-${wrapperProps.name}`)
+const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
+---
+
+<InputWrapper inputId={inputId} required={inputProps?.required} {...wrapperProps}>
+  {
+    inputIcon ? (
+      <div class="relative">
+        <input
+          transition:persist
+          {...omit(inputProps, ['class', 'id', 'name'])}
+          id={inputId}
+          class={cn(
+            baseInputClassNames.input,
+            !!inputIcon && 'pl-10',
+            inputProps?.class,
+            hasError && baseInputClassNames.error,
+            !!inputProps?.disabled && baseInputClassNames.disabled
+          )}
+          name={wrapperProps.name}
+        />
+        <Icon
+          name={inputIcon}
+          class={cn(
+            'text-day-300 pointer-events-none absolute top-1/2 left-5.5 size-5 -translate-1/2',
+            inputIconClass
+          )}
+        />
+      </div>
+    ) : (
+      <input
+        transition:persist
+        {...omit(inputProps, ['class', 'id', 'name'])}
+        id={inputId}
+        class={cn(
+          baseInputClassNames.input,
+          !!inputIcon && 'pl-10',
+          inputProps?.class,
+          hasError && baseInputClassNames.error,
+          !!inputProps?.disabled && baseInputClassNames.disabled
+        )}
+        name={wrapperProps.name}
+      />
+    )
+  }
+</InputWrapper>

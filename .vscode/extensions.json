@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "astro-build.astro-vscode",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "davidanson.vscode-markdownlint",
+    "golang.go",
+    "bradlc.vscode-tailwindcss",
+    "craigrbroughton.htmx-attributes",
+    "nefrob.vscode-just-syntax"
+  ],
+  "unwantedRecommendations": []
+}
