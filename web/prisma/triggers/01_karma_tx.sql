@@ -26,21 +26,24 @@ DROP FUNCTION IF EXISTS handle_manual_karma_adjustment();
 CREATE OR REPLACE FUNCTION insert_karma_transaction(
     p_user_id INT,
     p_points INT,
-    p_action "KarmaTransactionAction",
+    p_action TEXT,
     p_comment_id INT,
     p_description TEXT,
     p_suggestion_id INT DEFAULT NULL
 ) RETURNS VOID AS $$
 BEGIN
     INSERT INTO "KarmaTransaction" (
-        "userId", "points", "action", "commentId", 
-        "suggestionId",
-        "description", "processed", "createdAt"
-    ) 
+        "userId", "points", "action", "commentId", "suggestionId", "description", "processed", "createdAt"
+    )
     VALUES (
-        p_user_id, p_points, p_action, p_comment_id, 
+        p_user_id,
+        p_points,
+        p_action::"KarmaTransactionAction",
+        p_comment_id,
         p_suggestion_id,
-        p_description, true, NOW()
+        p_description,
+        true,
+        NOW()
     );
 END;
 $$ LANGUAGE plpgsql;
