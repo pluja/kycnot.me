@@ -14,4 +14,7 @@ export const splashTexts: string[] = [
   'Ditch the gatekeepers.',
   'Own your identity.',
   'Financial privacy matters.',
+  'Surveillance is the enemy of the soul.',
+  'Privacy is freedom.',
+  'Privacy is the freedom to try things out.',
 ]
