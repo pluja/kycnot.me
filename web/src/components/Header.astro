@@ -35,6 +35,7 @@ const splashText = showSplashText ? sample(splashTexts) : null
       'border-red-900 bg-red-500/60': !!actualUser,
     }
   )}
+  transition:name="header-container"
 >
   <nav class={cn('container mx-auto flex h-full w-full items-stretch justify-between px-4', classNames?.nav)}>
     <div class="@container -ml-4 flex max-w-[192px] grow-99999 items-center">

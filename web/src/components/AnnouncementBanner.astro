@@ -1,57 +1,89 @@
 ---
 import { Icon } from 'astro-icon/components'
-import { Markdown } from 'astro-remote'
 
 import { getAnnouncementTypeInfo } from '../constants/announcementTypes'
 import { cn } from '../lib/cn'
 
 import type { Prisma } from '@prisma/client'
+import type { HTMLAttributes } from 'astro/types'
 
-type Props = {
-  announcements:
-    | Prisma.AnnouncementGetPayload<{
-        select: {
-          id: true
-          title: true
-          content: true
-          type: true
-          startDate: true
-          endDate: true
-          isActive: true
-        }
-      }>[]
-    | null
-    | undefined
+type Props = HTMLAttributes<'div'> & {
+  announcement: Prisma.AnnouncementGetPayload<{
+    select: {
+      id: true
+      content: true
+      type: true
+      link: true
+      linkText: true
+      startDate: true
+      endDate: true
+      isActive: true
+    }
+  }>
 }
 
-const { announcements } = Astro.props
+const { announcement, class: className, ...props } = Astro.props
+
+const typeInfo = getAnnouncementTypeInfo(announcement.type)
+
+const Tag = announcement.link ? 'a' : 'div'
 ---
 
-{
-  !!announcements && announcements.length > 0 && (
-    <div class="mb-4 flex flex-col items-center space-y-1">
-      {announcements.map((announcement) => {
-        const typeInfo = getAnnouncementTypeInfo(announcement.type)
-
-        return (
-          <div
-            class={cn(
-              'mx-auto flex w-auto max-w-full flex-row items-center rounded border px-3 py-2',
-              typeInfo.classNames.container
-            )}
-          >
-            <Icon name={typeInfo.icon} class={cn('mr-2 size-4 flex-shrink-0', typeInfo.classNames.title)} />
-            <div class="flex min-w-0 flex-col">
-              <span class={cn('truncate text-sm leading-tight font-bold', typeInfo.classNames.title)}>
-                {announcement.title}
-              </span>
-              <span class={cn('truncate text-xs leading-snug [&_a]:underline', typeInfo.classNames.content)}>
-                <Markdown content={announcement.content} />
-              </span>
-            </div>
-          </div>
-        )
-      })}
+<Tag
+  href={announcement.link}
+  target={announcement.link ? '_blank' : undefined}
+  rel="noopener noreferrer"
+  class={cn(
+    'group relative isolate z-50 flex items-center justify-center gap-x-6 overflow-hidden border-b border-zinc-800 bg-black px-6 py-2 focus-visible:outline-none sm:px-3.5',
+    className
+  )}
+  {...props}
+>
+  <div
+    aria-hidden="true"
+    class="pointer-events-none absolute top-1/2 left-[max(-7rem,calc(50%-52rem))] -z-10 -translate-y-1/2 transform-gpu blur-2xl"
+  >
+    <div
+      class={cn(
+        'aspect-[577/310] w-[36.0625rem] bg-gradient-to-r from-green-500 to-green-700 opacity-20',
+        typeInfo.classNames.bg
+      )}
+      style="clip-path:polygon(74.8% 41.9%, 97.2% 73.2%, 100% 34.9%, 92.5% 0.4%, 87.5% 0%, 75% 28.6%, 58.5% 54.6%, 50.1% 56.8%, 46.9% 44%, 48.3% 17.4%, 24.7% 53.9%, 0% 27.9%, 11.9% 74.2%, 24.9% 54.1%, 68.6% 100%, 74.8% 41.9%)"
+    >
     </div>
-  )
-}
+  </div>
+  <div
+    aria-hidden="true"
+    class="pointer-events-none absolute top-1/2 left-[max(45rem,calc(50%+8rem))] -z-10 -translate-y-1/2 transform-gpu blur-2xl"
+  >
+    <div
+      class={cn(
+        'aspect-[577/310] w-[36.0625rem] bg-gradient-to-r from-green-500 to-green-700 opacity-30',
+        typeInfo.classNames.bg
+      )}
+      style="clip-path:polygon(74.8% 41.9%, 97.2% 73.2%, 100% 34.9%, 92.5% 0.4%, 87.5% 0%, 75% 28.6%, 58.5% 54.6%, 50.1% 56.8%, 46.9% 44%, 48.3% 17.4%, 24.7% 53.9%, 0% 27.9%, 11.9% 74.2%, 24.9% 54.1%, 68.6% 100%, 74.8% 41.9%)"
+    >
+    </div>
+  </div>
+
+  <div class="flex items-center justify-between gap-x-3 md:justify-center">
+    <div class={cn('flex items-center gap-x-3', typeInfo.classNames.icon)}>
+      <Icon name={typeInfo.icon} class={cn('size-5 flex-shrink-0')} />
+      <span
+        class={cn(
+          'font-title bg-[linear-gradient(90deg,var(--gradient-edge,#FFEBF9)_0%,var(--gradient-center,#8a56cc)_50%,var(--gradient-edge,#FFEBF9)_100%)] bg-clip-text text-sm leading-tight text-transparent [&_a]:underline',
+          typeInfo.classNames.content
+        )}
+      >
+        {announcement.content}
+      </span>
+    </div>
+  </div>
+
+  <div
+    class="text-day-300 group-focus-visible:outline-primary transition-background relative inline-flex h-full min-w-[120px] cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-full border border-white/20 bg-black/10 p-[1px] px-3 py-1 text-sm font-medium shadow-sm backdrop-blur-3xl transition-colors group-hover:bg-white/5 group-focus-visible:ring-2 group-focus-visible:ring-blue-500 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-black/80"
+  >
+    {announcement.linkText}
+    <Icon name="ri:arrow-right-line" class="size-4 transition-transform group-hover:translate-x-0.5" />
+  </div>
+</Tag>

@@ -6,13 +6,17 @@ import { z } from 'astro:schema'
 import { adminAnnouncementActions } from '../../../actions/admin/announcement'
 import Button from '../../../components/Button.astro'
 import InputCardGroup from '../../../components/InputCardGroup.astro'
-import InputSelect from '../../../components/InputSelect.astro'
 import InputSubmitButton from '../../../components/InputSubmitButton.astro'
 import InputText from '../../../components/InputText.astro'
 import InputTextArea from '../../../components/InputTextArea.astro'
 import SortArrowIcon from '../../../components/SortArrowIcon.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
 import Tooltip from '../../../components/Tooltip.astro'
+import {
+  announcementTypes,
+  getAnnouncementTypeInfo,
+  zodAnnouncementTypesById,
+} from '../../../constants/announcementTypes'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
 import { prisma } from '../../../lib/prisma'
@@ -26,7 +30,7 @@ const { data: filters } = zodParseQueryParamsStoringErrors(
       .default('createdAt'),
     'sort-order': z.enum(['asc', 'desc']).default('desc'),
     search: z.string().optional(),
-    type: z.enum(['INFO', 'WARNING', 'ALERT']).optional(),
+    type: zodAnnouncementTypesById.optional(),
     status: z.enum(['active', 'inactive']).optional(),
   },
   Astro
@@ -41,10 +45,7 @@ const prismaOrderBy = {
 const whereClause: Prisma.AnnouncementWhereInput = {}
 
 if (filters.search) {
-  whereClause.OR = [
-    { title: { contains: filters.search, mode: 'insensitive' } },
-    { content: { contains: filters.search, mode: 'insensitive' } },
-  ]
+  whereClause.OR = [{ content: { contains: filters.search, mode: 'insensitive' } }]
 }
 
 if (filters.type) {
@@ -72,32 +73,19 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
   return `/admin/announcements?${searchParams.toString()}`
 }
 
-// Get type badge class based on announcement type
-const getTypeBadgeClass = (type: AnnouncementType) => {
-  switch (type) {
-    case 'INFO':
-      return 'bg-blue-900/30 text-blue-400'
-    case 'WARNING':
-      return 'bg-yellow-900/30 text-yellow-400'
-    case 'ALERT':
-      return 'bg-red-900/30 text-red-400'
-    default:
-      return 'bg-zinc-900/30 text-zinc-400'
-  }
-}
-
 // Current date for form min values
 const currentDate = new Date().toISOString().slice(0, 16) // Format: YYYY-MM-DDThh:mm
 
 // Default new announcement
 const newAnnouncement = {
-  title: '',
   content: '',
   type: 'INFO' as const,
+  link: null,
+  linkText: null,
   startDate: currentDate,
   endDate: '',
-  isActive: true,
-}
+  isActive: true as boolean,
+} satisfies Prisma.AnnouncementCreateInput
 
 // Get action results
 const createResult = Astro.getActionResult(adminAnnouncementActions.create)
@@ -184,9 +172,13 @@ if (toggleResult?.error) {
           class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
         >
           <option value="" selected={!filters.type}>All Types</option>
-          <option value="INFO" selected={filters.type === 'INFO'}>Info</option>
-          <option value="WARNING" selected={filters.type === 'WARNING'}>Warning</option>
-          <option value="ALERT" selected={filters.type === 'ALERT'}>Alert</option>
+          {
+            announcementTypes.map((type) => (
+              <option value={type.value} selected={filters.type === type.value}>
+                {type.label}
+              </option>
+            ))
+          }
         </select>
       </div>
       <div>
@@ -229,20 +221,8 @@ if (toggleResult?.error) {
       <h2 class="font-title mb-4 text-lg font-semibold text-blue-400">Create New Announcement</h2>
       <form method="POST" action={actions.admin.announcement.create} class="grid gap-4 md:grid-cols-2">
         <div class="space-y-3 md:col-span-2">
-          <InputText
-            label="Title*"
-            name="title"
-            error={createInputErrors.title}
-            inputProps={{
-              required: true,
-              maxlength: 255,
-              placeholder: 'Announcement Title',
-              value: newAnnouncement.title,
-            }}
-          />
-
           <InputTextArea
-            label="Content*"
+            label="Content"
             name="content"
             error={createInputErrors.content}
             value={newAnnouncement.content}
@@ -256,23 +236,41 @@ if (toggleResult?.error) {
         </div>
 
         <div class="space-y-3">
-          <InputSelect
-            label="Type*"
-            name="type"
-            error={createInputErrors.type}
-            options={[
-              { label: 'Info', value: 'INFO' },
-              { label: 'Warning', value: 'WARNING' },
-              { label: 'Alert', value: 'ALERT' },
-            ]}
-            selectProps={{
-              required: true,
-              value: newAnnouncement.type,
+          <InputText
+            label="Link"
+            name="link"
+            error={createInputErrors.link}
+            inputProps={{
+              type: 'url',
+              placeholder: 'https://example.com',
             }}
+          />
+          <InputText
+            label="Link Text "
+            name="linkText"
+            error={createInputErrors.linkText}
+            inputProps={{
+              placeholder: 'Link Text',
+            }}
+          />
+        </div>
+
+        <div class="space-y-3">
+          <InputCardGroup
+            label="Type"
+            name="type"
+            options={announcementTypes.map((type) => ({
+              label: type.label,
+              value: type.value,
+              icon: type.icon,
+            }))}
+            cardSize="sm"
+            required
+            selectedValue={newAnnouncement.type}
           />
 
           <InputText
-            label="Start Date & Time*"
+            label="Start Date & Time"
             name="startDate"
             error={createInputErrors.startDate}
             inputProps={{
@@ -283,7 +281,7 @@ if (toggleResult?.error) {
           />
 
           <InputText
-            label="End Date & Time (Optional)"
+            label="End Date & Time"
             name="endDate"
             error={createInputErrors.endDate}
             inputProps={{
@@ -307,7 +305,7 @@ if (toggleResult?.error) {
           />
 
           <div class="pt-4">
-            <InputSubmitButton label="Create Announcement" icon="ri:save-line" />
+            <InputSubmitButton label="Create Announcement" icon="ri:save-line" hideCancel />
             <button
               type="button"
               id="cancel-create"
@@ -455,198 +453,215 @@ if (toggleResult?.error) {
               )
             }
             {
-              announcements.map((announcement) => (
-                <>
-                  <tr class="group hover:bg-zinc-700/30">
-                    <td class="px-4 py-3 text-sm">
-                      <div class="font-medium text-zinc-200">{announcement.title}</div>
-                      <div class="mt-1 line-clamp-1 text-xs text-zinc-400">{announcement.content}</div>
-                    </td>
-                    <td class="px-4 py-3 text-left text-sm">
-                      <span
-                        class={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium ${getTypeBadgeClass(announcement.type)}`}
-                      >
-                        {announcement.type}
-                      </span>
-                    </td>
-                    <td class="px-4 py-3 text-left text-sm text-zinc-300">
-                      <TimeFormatted date={announcement.startDate} hourPrecision={false} prefix={false} />
-                    </td>
-                    <td class="px-4 py-3 text-left text-sm text-zinc-300">
-                      {announcement.endDate ? (
-                        <TimeFormatted date={announcement.endDate} hourPrecision={false} prefix={false} />
-                      ) : (
-                        <span class="text-zinc-500">—</span>
-                      )}
-                    </td>
-                    <td class="px-4 py-3 text-center text-sm">
-                      <span
-                        class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${announcement.isActive ? 'bg-green-900/30 text-green-400' : 'bg-zinc-700/50 text-zinc-400'}`}
-                      >
-                        {announcement.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td class="px-4 py-3 text-left text-sm text-zinc-400">
-                      <TimeFormatted date={announcement.createdAt} hourPrecision hoursShort prefix={false} />
-                    </td>
-                    <td class="px-4 py-3">
-                      <div class="flex justify-center gap-2">
-                        <Tooltip
-                          as="button"
-                          type="button"
-                          data-id={announcement.id}
-                          class="edit-button inline-flex items-center rounded-md border border-blue-500/50 bg-blue-500/20 px-1 py-1 text-xs text-blue-400 transition-colors hover:bg-blue-500/30"
-                          text="Edit"
-                          onclick={`document.getElementById('edit-announcement-form-${announcement.id}').classList.toggle('hidden')`}
-                        >
-                          <Icon name="ri:edit-line" class="size-4" />
-                        </Tooltip>
+              announcements.map((announcement) => {
+                const announcementTypeInfo = getAnnouncementTypeInfo(announcement.type)
 
+                return (
+                  <>
+                    <tr class="group hover:bg-zinc-700/30">
+                      <td class="px-4 py-3 text-sm">
+                        <div class="line-clamp-2 text-zinc-400">{announcement.content}</div>
+                      </td>
+                      <td class="px-4 py-3 text-left text-sm">
+                        <span
+                          class={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium ${announcementTypeInfo.classNames.badge}`}
+                        >
+                          <Icon name={announcementTypeInfo.icon} class="me-1 size-3" />
+                          {announcementTypeInfo.label}
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-left text-sm text-zinc-300">
+                        <TimeFormatted date={announcement.startDate} hourPrecision={false} prefix={false} />
+                      </td>
+                      <td class="px-4 py-3 text-left text-sm text-zinc-300">
+                        {announcement.endDate ? (
+                          <TimeFormatted date={announcement.endDate} hourPrecision={false} prefix={false} />
+                        ) : (
+                          <span class="text-zinc-500">—</span>
+                        )}
+                      </td>
+                      <td class="px-4 py-3 text-center text-sm">
+                        <span
+                          class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${announcement.isActive ? 'bg-green-900/30 text-green-400' : 'bg-zinc-700/50 text-zinc-400'}`}
+                        >
+                          {announcement.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-left text-sm text-zinc-400">
+                        <TimeFormatted
+                          date={announcement.createdAt}
+                          hourPrecision
+                          hoursShort
+                          prefix={false}
+                        />
+                      </td>
+                      <td class="px-4 py-3">
+                        <div class="flex justify-center gap-2">
+                          <Tooltip
+                            as="button"
+                            type="button"
+                            data-id={announcement.id}
+                            class="edit-button inline-flex items-center rounded-md border border-blue-500/50 bg-blue-500/20 px-1 py-1 text-xs text-blue-400 transition-colors hover:bg-blue-500/30"
+                            text="Edit"
+                            onclick={`document.getElementById('edit-announcement-form-${announcement.id}').classList.toggle('hidden')`}
+                          >
+                            <Icon name="ri:edit-line" class="size-4" />
+                          </Tooltip>
+
+                          <form
+                            method="POST"
+                            action={actions.admin.announcement.toggleActive}
+                            class="inline-block"
+                            data-confirm={`Are you sure you want to ${announcement.isActive ? 'deactivate' : 'activate'} this announcement?`}
+                          >
+                            <input type="hidden" name="id" value={announcement.id} />
+                            <input type="hidden" name="isActive" value={String(!announcement.isActive)} />
+                            <button
+                              type="submit"
+                              class={`rounded-md border px-1 py-1 text-xs transition-colors ${
+                                announcement.isActive
+                                  ? 'border-yellow-500/50 bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
+                                  : 'border-green-500/50 bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                              }`}
+                            >
+                              <Tooltip text={announcement.isActive ? 'Deactivate' : 'Activate'}>
+                                <Icon
+                                  name={
+                                    announcement.isActive ? 'ri:pause-circle-line' : 'ri:play-circle-line'
+                                  }
+                                  class="size-4"
+                                />
+                              </Tooltip>
+                            </button>
+                          </form>
+
+                          <form
+                            method="POST"
+                            action={actions.admin.announcement.delete}
+                            class="inline-block"
+                            data-confirm="Are you sure you want to delete this announcement?"
+                          >
+                            <input type="hidden" name="id" value={announcement.id} />
+                            <button
+                              type="submit"
+                              class="rounded-md border border-red-500/50 bg-red-500/20 px-1 py-1 text-xs text-red-400 transition-colors hover:bg-red-500/30"
+                            >
+                              <Tooltip text="Delete">
+                                <Icon name="ri:delete-bin-line" class="size-4" />
+                              </Tooltip>
+                            </button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr id={`edit-announcement-form-${announcement.id}`} class="hidden bg-zinc-700/20">
+                      <td colspan="7" class="p-4">
+                        <h3 class="font-title text-md mb-3 font-semibold text-blue-300">
+                          Edit: {announcement.content}
+                        </h3>
                         <form
                           method="POST"
-                          action={actions.admin.announcement.toggleActive}
-                          class="inline-block"
-                          data-confirm={`Are you sure you want to ${announcement.isActive ? 'deactivate' : 'activate'} this announcement?`}
+                          action={actions.admin.announcement.update}
+                          class="grid gap-4 md:grid-cols-2"
                         >
                           <input type="hidden" name="id" value={announcement.id} />
-                          <input type="hidden" name="isActive" value={String(!announcement.isActive)} />
-                          <button
-                            type="submit"
-                            class={`rounded-md border px-1 py-1 text-xs transition-colors ${
-                              announcement.isActive
-                                ? 'border-yellow-500/50 bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
-                                : 'border-green-500/50 bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                            }`}
-                          >
-                            <Tooltip text={announcement.isActive ? 'Deactivate' : 'Activate'}>
-                              <Icon
-                                name={announcement.isActive ? 'ri:pause-circle-line' : 'ri:play-circle-line'}
-                                class="size-4"
-                              />
-                            </Tooltip>
-                          </button>
-                        </form>
 
-                        <form
-                          method="POST"
-                          action={actions.admin.announcement.delete}
-                          class="inline-block"
-                          data-confirm="Are you sure you want to delete this announcement?"
-                        >
-                          <input type="hidden" name="id" value={announcement.id} />
-                          <button
-                            type="submit"
-                            class="rounded-md border border-red-500/50 bg-red-500/20 px-1 py-1 text-xs text-red-400 transition-colors hover:bg-red-500/30"
-                          >
-                            <Tooltip text="Delete">
-                              <Icon name="ri:delete-bin-line" class="size-4" />
-                            </Tooltip>
-                          </button>
-                        </form>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr id={`edit-announcement-form-${announcement.id}`} class="hidden bg-zinc-700/20">
-                    <td colspan="7" class="p-4">
-                      <h3 class="font-title text-md mb-3 font-semibold text-blue-300">
-                        Edit: {announcement.title}
-                      </h3>
-                      <form
-                        method="POST"
-                        action={actions.admin.announcement.update}
-                        class="grid gap-4 md:grid-cols-2"
-                      >
-                        <input type="hidden" name="id" value={announcement.id} />
-
-                        <div class="space-y-3 md:col-span-2">
-                          <InputText
-                            label="Title*"
-                            name="title"
-                            inputProps={{
-                              id: `edit-title-${announcement.id}`,
-                              required: true,
-                              maxlength: 255,
-                              value: announcement.title,
-                            }}
-                          />
-                          <InputTextArea
-                            label="Content*"
-                            name="content"
-                            value={announcement.content}
-                            inputProps={{
-                              id: `edit-content-${announcement.id}`,
-                              required: true,
-                              maxlength: 1000,
-                              rows: 3,
-                            }}
-                          />
-                        </div>
-
-                        <div class="space-y-3">
-                          <InputSelect
-                            label="Type*"
-                            name="type"
-                            options={[
-                              { label: 'Info', value: 'INFO' },
-                              { label: 'Warning', value: 'WARNING' },
-                              { label: 'Alert', value: 'ALERT' },
-                            ]}
-                            selectProps={{
-                              id: `edit-type-${announcement.id}`,
-                              required: true,
-                              value: announcement.type,
-                            }}
-                          />
-                          <InputText
-                            label="Start Date & Time*"
-                            name="startDate"
-                            inputProps={{
-                              id: `edit-startDate-${announcement.id}`,
-                              type: 'datetime-local',
-                              required: true,
-                              value: new Date(announcement.startDate).toISOString().slice(0, 16),
-                            }}
-                          />
-                          <InputText
-                            label="End Date & Time (Optional)"
-                            name="endDate"
-                            inputProps={{
-                              id: `edit-endDate-${announcement.id}`,
-                              type: 'datetime-local',
-                              value: announcement.endDate
-                                ? new Date(announcement.endDate).toISOString().slice(0, 16)
-                                : '',
-                            }}
-                          />
-                        </div>
-
-                        <div class="space-y-3">
-                          <InputCardGroup
-                            name="isActive"
-                            label="Status"
-                            options={[
-                              { label: 'Active', value: 'true' },
-                              { label: 'Inactive', value: 'false' },
-                            ]}
-                            selectedValue={announcement.isActive ? 'true' : 'false'}
-                            cardSize="sm"
-                          />
-                          <div class="pt-4">
-                            <InputSubmitButton label="Save Changes" icon="ri:save-line" hideCancel={true} />
-                            <Button
-                              type="button"
-                              label="Cancel"
-                              color="gray"
-                              onclick={`document.getElementById('edit-announcement-form-${announcement.id}').classList.toggle('hidden')`}
-                              class="ml-2"
+                          <div class="space-y-3 md:col-span-2">
+                            <InputTextArea
+                              label="Content"
+                              name="content"
+                              value={announcement.content}
+                              inputProps={{
+                                required: true,
+                                maxlength: 1000,
+                                rows: 3,
+                              }}
                             />
                           </div>
-                        </div>
-                      </form>
-                    </td>
-                  </tr>
-                </>
-              ))
+
+                          <div class="space-y-3">
+                            <InputText
+                              label="Link"
+                              name="link"
+                              inputProps={{
+                                type: 'url',
+                                placeholder: 'https://example.com',
+                                value: announcement.link,
+                              }}
+                            />
+                            <InputText
+                              label="Link Text"
+                              name="linkText"
+                              inputProps={{
+                                placeholder: 'Link Text',
+                                value: announcement.linkText,
+                              }}
+                            />
+                          </div>
+
+                          <div class="space-y-3">
+                            <InputCardGroup
+                              label="Type"
+                              name="type"
+                              options={announcementTypes.map((type) => ({
+                                label: type.label,
+                                value: type.value,
+                                icon: type.icon,
+                              }))}
+                              cardSize="sm"
+                              required
+                              selectedValue={announcement.type}
+                            />
+
+                            <InputText
+                              label="Start Date & Time"
+                              name="startDate"
+                              inputProps={{
+                                type: 'datetime-local',
+                                required: true,
+                                value: new Date(announcement.startDate).toISOString().slice(0, 16),
+                              }}
+                            />
+                            <InputText
+                              label="End Date & Time"
+                              name="endDate"
+                              inputProps={{
+                                type: 'datetime-local',
+                                value: announcement.endDate
+                                  ? new Date(announcement.endDate).toISOString().slice(0, 16)
+                                  : '',
+                              }}
+                            />
+                          </div>
+
+                          <div class="space-y-3">
+                            <InputCardGroup
+                              name="isActive"
+                              label="Status"
+                              options={[
+                                { label: 'Active', value: 'true' },
+                                { label: 'Inactive', value: 'false' },
+                              ]}
+                              selectedValue={announcement.isActive ? 'true' : 'false'}
+                              cardSize="sm"
+                            />
+                            <div class="pt-4">
+                              <InputSubmitButton label="Save Changes" icon="ri:save-line" hideCancel />
+                              <Button
+                                type="button"
+                                label="Cancel"
+                                color="gray"
+                                onclick={`document.getElementById('edit-announcement-form-${announcement.id}').classList.toggle('hidden')`}
+                                class="ml-2"
+                              />
+                            </div>
+                          </div>
+                        </form>
+                      </td>
+                    </tr>
+                  </>
+                )
+              })
             }
           </tbody>
         </table>

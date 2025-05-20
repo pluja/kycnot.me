@@ -613,9 +613,10 @@ model ServiceUser {
 
 model Announcement {
   id        Int              @id @default(autoincrement())
-  title     String
   content   String
   type      AnnouncementType
+  link      String?
+  linkText  String?
   startDate DateTime
   endDate   DateTime?
   isActive  Boolean          @default(true)

@@ -14,6 +14,7 @@ import {
   EventType,
   type User,
   ServiceUserRole,
+  AnnouncementType,
 } from '@prisma/client'
 import { uniqBy } from 'lodash-es'
 import { generateUsername } from 'unique-username-generator'
@@ -981,6 +982,22 @@ const generateFakeInternalNote = (userId: number, addedByUserId?: number) =>
     addedByUser: addedByUserId ? { connect: { id: addedByUserId } } : undefined,
   }) satisfies Prisma.InternalUserNoteCreateInput
 
+const generateFakeAnnouncement = () => {
+  const type = faker.helpers.arrayElement(Object.values(AnnouncementType))
+  const startDate = faker.date.past()
+  const endDate = faker.helpers.maybe(() => faker.date.future(), { probability: 0.3 })
+
+  return {
+    content: faker.lorem.sentence(),
+    type,
+    link: faker.internet.url(),
+    linkText: faker.lorem.word({ length: 2 }),
+    startDate,
+    endDate,
+    isActive: true,
+  } as const satisfies Prisma.AnnouncementCreateInput
+}
+
 async function runFaker() {
   await prisma.$transaction(
     async (tx) => {
@@ -1004,6 +1021,7 @@ async function runFaker() {
           await tx.category.deleteMany()
           await tx.internalUserNote.deleteMany()
           await tx.user.deleteMany()
+          await tx.announcement.deleteMany()
           console.info('✅ Existing data cleaned up')
         } catch (error) {
           console.error('❌ Error cleaning up data:', error)
@@ -1307,6 +1325,11 @@ async function runFaker() {
           )
         })
       )
+
+      // ---- Create announcement ----
+      await tx.announcement.create({
+        data: generateFakeAnnouncement(),
+      })
     },
     {
       timeout: 1000 * 60 * 10, // 10 minutes

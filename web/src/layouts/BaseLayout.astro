@@ -1,8 +1,10 @@
 ---
+import AnnouncementBanner from '../components/AnnouncementBanner.astro'
 import BaseHead from '../components/BaseHead.astro'
 import Footer from '../components/Footer.astro'
 import Header from '../components/Header.astro'
 import { cn } from '../lib/cn'
+import { prisma } from '../lib/prisma'
 
 import type { AstroChildren } from '../lib/astro'
 import type { ComponentProps } from 'astro/types'
@@ -42,6 +44,31 @@ const {
 
 const actualErrors = [...errors, ...Astro.locals.banners.errors]
 const actualSuccess = [...success, ...Astro.locals.banners.successes]
+
+const currentDate = new Date()
+const announcement = await Astro.locals.banners.try(
+  'Unable to load announcements.',
+  () =>
+    prisma.announcement.findFirst({
+      where: {
+        isActive: true,
+        startDate: { lte: currentDate },
+        OR: [{ endDate: null }, { endDate: { gt: currentDate } }],
+      },
+      select: {
+        id: true,
+        content: true,
+        type: true,
+        link: true,
+        linkText: true,
+        startDate: true,
+        endDate: true,
+        isActive: true,
+      },
+      orderBy: [{ type: 'desc' }, { createdAt: 'desc' }],
+    }),
+  null
+)
 ---
 
 <html lang="en" transition:name="root" transition:animate="none">
@@ -51,6 +78,7 @@ const actualSuccess = [...success, ...Astro.locals.banners.successes]
     <BaseHead {...baseHeadProps} />
   </head>
   <body class={cn('bg-night-700 text-day-300 flex min-h-dvh flex-col *:shrink-0', className?.body)}>
+    {announcement && <AnnouncementBanner announcement={announcement} transition:name="header-announcement" />}
     <Header
       classNames={{
         nav: cn(

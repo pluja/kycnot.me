@@ -1,4 +1,4 @@
-import { type Prisma, type PrismaClient, type AnnouncementType } from '@prisma/client'
+import { type Prisma, type PrismaClient } from '@prisma/client'
 import { ActionError } from 'astro:actions'
 import { z } from 'zod'
 
@@ -9,9 +9,10 @@ const prisma = prismaInstance as PrismaClient
 
 const selectAnnouncementReturnFields = {
   id: true,
-  title: true,
   content: true,
   type: true,
+  link: true,
+  linkText: true,
   startDate: true,
   endDate: true,
   isActive: true,
@@ -24,12 +25,18 @@ export const adminAnnouncementActions = {
     accept: 'form',
     permissions: 'admin',
     input: z.object({
-      title: z.string().min(1, 'Title is required').max(255, 'Title must be less than 255 characters'),
       content: z
         .string()
         .min(1, 'Content is required')
         .max(1000, 'Content must be less than 1000 characters'),
       type: z.enum(['INFO', 'WARNING', 'ALERT']),
+      link: z.string().url().nullable().optional(),
+      linkText: z
+        .string()
+        .min(1, 'Link text is required')
+        .max(255, 'Link text must be less than 255 characters')
+        .nullable()
+        .optional(),
       startDate: z.coerce.date(),
       endDate: z.coerce.date().nullable().optional(),
       isActive: z.coerce.boolean().default(true),
@@ -37,8 +44,13 @@ export const adminAnnouncementActions = {
     handler: async (input) => {
       const announcement = await prisma.announcement.create({
         data: {
-          ...input,
-          endDate: input.endDate || null,
+          content: input.content,
+          type: input.type,
+          startDate: input.startDate,
+          isActive: input.isActive,
+          link: input.link ?? null,
+          linkText: input.linkText ?? null,
+          endDate: input.endDate ?? null,
         },
         select: selectAnnouncementReturnFields,
       })
@@ -52,12 +64,18 @@ export const adminAnnouncementActions = {
     permissions: 'admin',
     input: z.object({
       id: z.coerce.number().int().positive(),
-      title: z.string().min(1, 'Title is required').max(255, 'Title must be less than 255 characters'),
       content: z
         .string()
         .min(1, 'Content is required')
         .max(1000, 'Content must be less than 1000 characters'),
       type: z.enum(['INFO', 'WARNING', 'ALERT']),
+      link: z.string().url().nullable().optional(),
+      linkText: z
+        .string()
+        .min(1, 'Link text is required')
+        .max(255, 'Link text must be less than 255 characters')
+        .nullable()
+        .optional(),
       startDate: z.coerce.date(),
       endDate: z.coerce.date().nullable().optional(),
       isActive: z.coerce.boolean().default(true),
@@ -82,8 +100,13 @@ export const adminAnnouncementActions = {
       const updatedAnnouncement = await prisma.announcement.update({
         where: { id: announcement.id },
         data: {
-          ...input,
-          endDate: input.endDate || null,
+          content: input.content,
+          type: input.type,
+          startDate: input.startDate,
+          isActive: input.isActive,
+          link: input.link ?? null,
+          linkText: input.linkText ?? null,
+          endDate: input.endDate ?? null,
         },
         select: selectAnnouncementReturnFields,
       })
