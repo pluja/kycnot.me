@@ -74,6 +74,18 @@ export default defineConfig({
         url: true,
         optional: false,
       }),
+      I2P_ADDRESS: envField.string({
+        context: 'server',
+        access: 'public',
+        url: true,
+        optional: false,
+      }),
+      ONION_ADDRESS: envField.string({
+        context: 'server',
+        access: 'public',
+        url: true,
+        optional: false,
+      }),
 
       REDIS_URL: envField.string({
         context: 'server',

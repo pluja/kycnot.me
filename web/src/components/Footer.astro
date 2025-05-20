@@ -1,6 +1,6 @@
 ---
 import { Icon } from 'astro-icon/components'
-import { SOURCE_CODE_URL } from 'astro:env/server'
+import { SOURCE_CODE_URL, I2P_ADDRESS, ONION_ADDRESS } from 'astro:env/server'
 
 import { cn } from '../lib/cn'
 
@@ -11,8 +11,20 @@ type Props = HTMLAttributes<'footer'>
 const links = [
   {
     href: SOURCE_CODE_URL,
-    label: 'Source Code',
+    label: 'Code',
     icon: 'ri:git-repository-line',
+    external: true,
+  },
+  {
+    href: ONION_ADDRESS,
+    label: 'Tor',
+    icon: 'onion',
+    external: true,
+  },
+  {
+    href: I2P_ADDRESS,
+    label: 'I2P',
+    icon: 'i2p',
     external: true,
   },
   {
