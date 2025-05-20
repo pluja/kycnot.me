@@ -186,7 +186,8 @@ if (redirectUrl) return Astro.redirect(redirectUrl.toString())
 
 export type ServicesFiltersObject = typeof filters
 
-const [categories, [services, totalServices, hadToIncludeCommunityContributed]] =
+const currentDate = new Date()
+const [categories, [services, totalServices, hadToIncludeCommunityContributed], activeAnnouncements] =
   await Astro.locals.banners.tryMany([
     [
       'Unable to load category filters.',
@@ -410,6 +411,28 @@ const [categories, [services, totalServices, hadToIncludeCommunityContributed]] 
       },
       [[] as [], 0, false] as const,
     ],
+    [
+      'Unable to load announcements.',
+      () =>
+        prisma.announcement.findMany({
+          where: {
+            isActive: true,
+            startDate: { lte: currentDate },
+            OR: [{ endDate: null }, { endDate: { gt: currentDate } }],
+          },
+          select: {
+            id: true,
+            title: true,
+            content: true,
+            type: true,
+            startDate: true,
+            endDate: true,
+            isActive: true,
+          },
+          orderBy: [{ type: 'desc' }, { createdAt: 'desc' }],
+        }),
+      [],
+    ],
   ])
 
 const attributes = await Astro.locals.banners.try(
@@ -489,18 +512,7 @@ const filtersOptions = {
 
 export type ServicesFiltersOptions = typeof filtersOptions
 
-const currentDate = new Date()
-const activeAnnouncements = await prisma.announcement.findMany({
-  where: {
-    isActive: true,
-    startDate: { lte: currentDate },
-    OR: [{ endDate: null }, { endDate: { gt: currentDate } }],
-  },
-  orderBy: [
-    { type: 'desc' }, // ALERT first, then WARNING, then INFO
-    { createdAt: 'desc' },
-  ],
-})
+//
 ---
 
 <BaseLayout
@@ -516,7 +528,6 @@ const activeAnnouncements = await prisma.announcement.findMany({
     },
   ]}
 >
-  <!-- Display announcements at the top of the page -->
   <AnnouncementBanner announcements={activeAnnouncements} />
 
   <div class="flex flex-col gap-4 sm:flex-row sm:gap-8">

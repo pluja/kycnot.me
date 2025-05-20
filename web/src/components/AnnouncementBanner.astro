@@ -2,75 +2,50 @@
 import { Icon } from 'astro-icon/components'
 import { Markdown } from 'astro-remote'
 
-import type { AnnouncementType } from '@prisma/client'
+import { getAnnouncementTypeInfo } from '../constants/announcementTypes'
+import { cn } from '../lib/cn'
 
-export type Announcement = {
-  id: number
-  title: string
-  content: string
-  type: AnnouncementType
-  startDate: Date
-  endDate: Date | null
-  isActive: boolean
-}
+import type { Prisma } from '@prisma/client'
 
-export type Props = {
-  announcements: Announcement[]
+type Props = {
+  announcements:
+    | Prisma.AnnouncementGetPayload<{
+        select: {
+          id: true
+          title: true
+          content: true
+          type: true
+          startDate: true
+          endDate: true
+          isActive: true
+        }
+      }>[]
+    | null
+    | undefined
 }
 
 const { announcements } = Astro.props
-
-// Get icon and class based on announcement type
-const getTypeInfo = (type: AnnouncementType) => {
-  switch (type) {
-    case 'INFO':
-      return {
-        icon: 'ri:information-line',
-        containerClass: 'bg-blue-900/40 border-blue-500/30',
-        titleClass: 'text-blue-400',
-        contentClass: 'text-blue-300',
-      }
-    case 'WARNING':
-      return {
-        icon: 'ri:alert-line',
-        containerClass: 'bg-yellow-900/40 border-yellow-500/30',
-        titleClass: 'text-yellow-400',
-        contentClass: 'text-yellow-300',
-      }
-    case 'ALERT':
-      return {
-        icon: 'ri:error-warning-line',
-        containerClass: 'bg-red-900/40 border-red-500/30',
-        titleClass: 'text-red-400',
-        contentClass: 'text-red-300',
-      }
-    default:
-      return {
-        icon: 'ri:information-line',
-        containerClass: 'bg-blue-900/40 border-blue-500/30',
-        titleClass: 'text-blue-400',
-        contentClass: 'text-blue-300',
-      }
-  }
-}
 ---
 
 {
-  announcements.length > 0 && (
+  !!announcements && announcements.length > 0 && (
     <div class="mb-4 flex flex-col items-center space-y-1">
       {announcements.map((announcement) => {
-        const typeInfo = getTypeInfo(announcement.type)
+        const typeInfo = getAnnouncementTypeInfo(announcement.type)
 
         return (
           <div
-            class={`flex flex-row items-center rounded border ${typeInfo.containerClass} mx-auto w-auto max-w-full px-3 py-2`}
+            class={cn(
+              'mx-auto flex w-auto max-w-full flex-row items-center rounded border px-3 py-2',
+              typeInfo.classNames.container
+            )}
           >
-            <Icon name={typeInfo.icon} class={`size-4 flex-shrink-0 ${typeInfo.titleClass} mr-2`} />
+            <Icon name={typeInfo.icon} class={cn('mr-2 size-4 flex-shrink-0', typeInfo.classNames.title)} />
             <div class="flex min-w-0 flex-col">
-              <span class={`text-sm leading-tight font-bold ${typeInfo.titleClass} truncate`}>
+              <span class={cn('truncate text-sm leading-tight font-bold', typeInfo.classNames.title)}>
                 {announcement.title}
               </span>
-              <span class={`text-xs ${typeInfo.contentClass} truncate leading-snug [&_a]:underline`}>
+              <span class={cn('truncate text-xs leading-snug [&_a]:underline', typeInfo.classNames.content)}>
                 <Markdown content={announcement.content} />
               </span>
             </div>
