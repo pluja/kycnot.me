@@ -1,6 +1,6 @@
 ---
 import { Icon } from 'astro-icon/components'
-import QRCode from 'qrcode'
+import * as QRCode from 'qrcode'
 
 import { cn } from '../lib/cn'
 
@@ -26,7 +26,7 @@ function getAddressURI(address: string, cryptoName: string) {
 }
 
 const qrCodeDataURL = await QRCode.toDataURL(getAddressURI(address, cryptoName), {
-  width: 128,
+  width: 256,
   margin: 1,
   color: {
     dark: '#ffffff',
@@ -41,13 +41,18 @@ const qrCodeDataURL = await QRCode.toDataURL(getAddressURI(address, cryptoName),
       <Icon name={cryptoIcon} class="size-6 text-white" />
       <span class="font-title text-base font-semibold text-white">{cryptoName}</span>
     </div>
-    <p class="px-7 font-mono text-base leading-snug tracking-wide break-all text-white">
-      <span
-        class="cursor-pointer select-all"
-        set:html={address.length > 12
-          ? `<span class="font-bold mr-0.5 text-green-500">${address.substring(0, 6)}</span>${address.substring(6, address.length - 6)}<span class="font-bold ml-0.5 text-green-500">${address.substring(address.length - 6)}</span>`
-          : `<span class="font-bold">${address}</span>`}
-      />
+    <p
+      class="cursor-pointer px-7 font-mono text-base leading-snug tracking-wide break-all text-white select-all"
+    >
+      {
+        address.length > 12
+          ? [
+              <span class="mr-0.5 font-bold text-green-500">{address.substring(0, 6)}</span>,
+              address.substring(6, address.length - 6),
+              <span class="ml-0.5 font-bold text-green-500">{address.substring(address.length - 6)}</span>,
+            ]
+          : address
+      }
     </p>
   </div>
   <img
@@ -55,6 +60,6 @@ const qrCodeDataURL = await QRCode.toDataURL(getAddressURI(address, cryptoName),
     alt={`${cryptoName} QR code`}
     width="128"
     height="128"
-    class="mr-4 hidden size-36 rounded sm:block"
+    class="mr-4 hidden size-32 rounded sm:block"
   />
 </div>

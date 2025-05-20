@@ -159,17 +159,15 @@ const splashText = showSplashText ? sample(splashTexts) : null
                 <Icon name="ri:user-shared-2-line" class="size-4" />
               </a>
             ) : (
-              DEPLOYMENT_MODE !== 'production' && (
-                <a
-                  href="/account/logout"
-                  data-astro-prefetch="tap"
-                  class="xs:px-3 2xs:px-2 last:xs:-mr-3 last:2xs:-mr-2 flex h-full items-center px-1 text-sm text-stone-100 transition-colors last:-mr-1 hover:text-stone-200"
-                  transition:name="header-logout-link"
-                  aria-label="Logout"
-                >
-                  <Icon name="ri:logout-box-r-line" class="size-4" />
-                </a>
-              )
+              <a
+                href="/account/logout"
+                data-astro-prefetch="tap"
+                class="xs:px-3 2xs:px-2 last:xs:-mr-3 last:2xs:-mr-2 flex h-full items-center px-1 text-sm text-stone-100 transition-colors last:-mr-1 hover:text-stone-200"
+                transition:name="header-logout-link"
+                aria-label="Logout"
+              >
+                <Icon name="ri:logout-box-r-line" class="size-4" />
+              </a>
             )}
           </>
         ) : (
