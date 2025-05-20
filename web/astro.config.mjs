@@ -42,6 +42,10 @@ export default defineConfig({
     open: false,
     allowedHosts: [new URL(SITE_URL).hostname],
   },
+  image: {
+    domains: [new URL(SITE_URL).hostname],
+    remotePatterns: [{ protocol: 'https' }],
+  },
   redirects: {
     // #region Redirects from old website
     '/pending': '/?verification=verified&verification=approved&verification=community',

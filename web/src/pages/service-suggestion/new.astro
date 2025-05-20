@@ -65,7 +65,12 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
 <BaseLayout
   pageTitle="New service"
   description="Suggest a new service to be added to KYCnot.me"
-  ogImage={{ template: 'generic', title: 'New service' }}
+  ogImage={{
+    template: 'generic',
+    title: 'New service',
+    description: 'Suggest a new service to be listed',
+    icon: 'ri:add-circle-line',
+  }}
   widthClassName="max-w-screen-md"
   breadcrumbs={[
     {

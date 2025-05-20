@@ -4,6 +4,7 @@ title: About
 author: KYCnot.me
 pubDate: 2025-05-15
 description: 'Learn how KYCnot.me website works and about our mission to protect privacy in cryptocurrency.'
+icon: 'ri:information-line'
 ---
 
 ## What is this page?

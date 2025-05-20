@@ -17,7 +17,12 @@ const prettyToken = result ? prettifyUserSecretToken(result.data.token) : null
 <MiniLayout
   pageTitle="Welcome"
   description="New account welcome page"
-  ogImage={{ template: 'generic', title: 'Welcome' }}
+  ogImage={{
+    template: 'generic',
+    title: 'Welcome',
+    description: 'New account welcome page',
+    icon: 'ri:key-2-line',
+  }}
   layoutHeader={{
     icon: 'ri:key-2-line',
     title: 'Save your Login Key',

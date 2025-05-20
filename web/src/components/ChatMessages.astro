@@ -1,8 +1,8 @@
 ---
-import { Picture } from 'astro:assets'
-
 import { cn } from '../lib/cn'
 import { formatDateShort } from '../lib/timeAgo'
+
+import MyPicture from './MyPicture.astro'
 
 import type { Prisma } from '@prisma/client'
 import type { HTMLAttributes } from 'astro/types'
@@ -73,13 +73,12 @@ const { messages, userId, class: className, ...htmlProps } = Astro.props
               {!isCurrentUser && !isNextFromSameUser && (
                 <p class="text-day-500 mb-0.5 text-xs">
                   {!!message.user.picture && (
-                    <Picture
+                    <MyPicture
                       src={message.user.picture}
                       height={16}
                       width={16}
                       class="inline-block rounded-full align-[-0.33em]"
                       alt=""
-                      formats={['jxl', 'avif', 'webp']}
                     />
                   )}
                   {message.user.name}

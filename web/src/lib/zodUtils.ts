@@ -50,7 +50,6 @@ export const ACCEPTED_IMAGE_TYPES = [
   'image/svg+xml',
   'image/png',
   'image/jpeg',
-  'image/jxl',
   'image/avif',
   'image/webp',
 ] as const satisfies string[]
@@ -66,7 +65,7 @@ export const imageFileSchema = z
   )
   .refine(
     (file) => !file || ACCEPTED_IMAGE_TYPES.some((type) => file.type === type),
-    'Only SVG, PNG, JPG, JPEG XL, AVIF, WebP formats are supported.'
+    'Only SVG, PNG, JPG, AVIF, WebP formats are supported.'
   )
 
 export const imageFileSchemaRequired = imageFileSchema.refine((file) => !!file, 'Required')

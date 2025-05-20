@@ -30,7 +30,12 @@ const message = Astro.url.searchParams.get('message')
 <MiniLayout
   pageTitle="Login"
   description="Login to your account"
-  ogImage={{ template: 'generic', title: 'Login' }}
+  ogImage={{
+    template: 'generic',
+    title: 'Login',
+    description: message ?? 'Enter your login key',
+    icon: 'ri:login-box-line',
+  }}
   layoutHeader={{
     icon: 'ri:user-line',
     title: 'Welcome back',

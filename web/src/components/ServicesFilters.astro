@@ -3,11 +3,11 @@ import { Icon } from 'astro-icon/components'
 
 import { kycLevels } from '../constants/kycLevels'
 import { cn } from '../lib/cn'
+import { makeOverallScoreInfo } from '../lib/overallScore'
 import { type ServicesFiltersObject, type ServicesFiltersOptions } from '../pages/index.astro'
 
 import Button from './Button.astro'
 import PillsRadioGroup from './PillsRadioGroup.astro'
-import { makeOverallScoreInfo } from './ScoreSquare.astro'
 import Tooltip from './Tooltip.astro'
 
 import type { HTMLAttributes } from 'astro/types'

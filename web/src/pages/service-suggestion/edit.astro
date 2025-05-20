@@ -65,7 +65,12 @@ if (!service) return Astro.rewrite('/404')
 <BaseLayout
   pageTitle="Edit service"
   description="Suggest an edit to service"
-  ogImage={{ template: 'generic', title: 'Edit service' }}
+  ogImage={{
+    template: 'generic',
+    title: 'Edit service',
+    description: 'Suggest an edit to service',
+    icon: 'ri:edit-line',
+  }}
   widthClassName="max-w-screen-md"
   breadcrumbs={[
     {

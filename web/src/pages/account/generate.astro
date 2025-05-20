@@ -25,7 +25,12 @@ const prettyToken = preGeneratedToken ? prettifyUserSecretToken(preGeneratedToke
 <MiniLayout
   pageTitle="Create Account"
   description="Create a new account"
-  ogImage={{ template: 'generic', title: 'Create Account' }}
+  ogImage={{
+    template: 'generic',
+    title: 'Create Account',
+    description: 'Zero data, 100% anonymous',
+    icon: 'ri:user-add-line',
+  }}
   layoutHeader={{
     icon: 'ri:user-add-line',
     title: 'New account',

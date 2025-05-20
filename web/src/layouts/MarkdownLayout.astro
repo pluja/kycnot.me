@@ -16,6 +16,7 @@ type Props = ComponentProps<typeof BaseLayout> &
     author: string
     pubDate: string
     description: string
+    icon?: string
   }>
 
 const { frontmatter, schemas, ...baseLayoutProps } = Astro.props
@@ -23,6 +24,8 @@ const publishDate = frontmatter.pubDate ? new Date(frontmatter.pubDate) : null
 const ogImageTemplateData = {
   template: 'generic',
   title: frontmatter.title,
+  description: frontmatter.description,
+  icon: frontmatter.icon,
 } satisfies OgImageAllTemplatesWithProps
 const weAreAuthor = frontmatter.author.toLowerCase().trim() === 'kycnot.me'
 ---

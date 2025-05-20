@@ -4,8 +4,7 @@ import { Icon } from 'astro-icon/components'
 import { Markdown } from 'astro-remote'
 import { Schema } from 'astro-seo-schema'
 import { actions } from 'astro:actions'
-import { Picture } from 'astro:assets'
-import { head, orderBy, shuffle, sortBy, tail } from 'lodash-es'
+import { head, orderBy, pick, shuffle, sortBy, tail } from 'lodash-es'
 
 import AdminOnly from '../../components/AdminOnly.astro'
 import BadgeSmall from '../../components/BadgeSmall.astro'
@@ -17,6 +16,7 @@ import DropdownButton from '../../components/DropdownButton.astro'
 import DropdownButtonItemForm from '../../components/DropdownButtonItemForm.astro'
 import DropdownButtonItemLink from '../../components/DropdownButtonItemLink.astro'
 import FormatTimeInterval from '../../components/FormatTimeInterval.astro'
+import MyPicture from '../../components/MyPicture.astro'
 import { makeOgImageUrl, type OgImageAllTemplatesWithProps } from '../../components/OgImage'
 import ScoreGauge from '../../components/ScoreGauge.astro'
 import ScoreSquare from '../../components/ScoreSquare.astro'
@@ -349,8 +349,12 @@ const getVerificationStepStatusInfo = (status: VerificationStepStatus) => {
 const itemReviewedId = new URL(`/service/${service.slug}`, Astro.url).href
 
 const ogImageTemplateData = {
-  template: 'generic',
+  template: 'service',
   title: service.name,
+  description: service.description,
+  categories: service.categories.map((category) => pick(category, ['name', 'icon'])),
+  score: service.overallScore,
+  imageUrl: service.imageUrl,
 } satisfies OgImageAllTemplatesWithProps
 ---
 
@@ -477,9 +481,8 @@ const ogImageTemplateData = {
   <div class="flex items-center gap-4">
     {
       !!service.imageUrl && (
-        <Picture
+        <MyPicture
           src={service.imageUrl}
-          formats={['jxl', 'avif', 'webp']}
           alt={service.name || "Service's logo"}
           class="size-12 shrink-0 rounded-sm object-contain"
           width={48}

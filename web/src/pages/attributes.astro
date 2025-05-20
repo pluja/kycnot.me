@@ -1,12 +1,11 @@
 ---
 import { Icon } from 'astro-icon/components'
 import { Markdown } from 'astro-remote'
-import { Picture } from 'astro:assets'
 import { z } from 'astro:content'
 import { orderBy } from 'lodash-es'
 
 import BadgeStandard from '../components/BadgeStandard.astro'
-import { makeOverallScoreInfo } from '../components/ScoreSquare.astro'
+import MyPicture from '../components/MyPicture.astro'
 import SortArrowIcon from '../components/SortArrowIcon.astro'
 import { getAttributeCategoryInfo } from '../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../constants/attributeTypes'
@@ -15,6 +14,7 @@ import BaseLayout from '../layouts/BaseLayout.astro'
 import { sortAttributes } from '../lib/attributes'
 import { cn } from '../lib/cn'
 import { formatNumber } from '../lib/numbers'
+import { makeOverallScoreInfo } from '../lib/overallScore'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 
@@ -102,8 +102,13 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
 
 <BaseLayout
   pageTitle="Attributes"
-  description="Browse all available service attributes used to evaluate privacy and trust scores on KYCnot.me."
-  ogImage={{ template: 'generic', title: 'All attributes' }}
+  description="Browse all available service attributes used to evaluate privacy and trust scores."
+  ogImage={{
+    template: 'generic',
+    title: 'All attributes',
+    description: 'Browse all available service attributes',
+    icon: 'ri:list-radio',
+  }}
 >
   <h1 class="font-title mb-2 text-center text-3xl font-bold text-white">Service attributes</h1>
 
@@ -202,12 +207,11 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
                       class="flex items-center gap-2 rounded-md p-2 transition-colors hover:bg-zinc-800"
                     >
                       {service.imageUrl ? (
-                        <Picture
+                        <MyPicture
                           src={service.imageUrl}
                           alt={service.name}
                           width={24}
                           height={24}
-                          formats={['jxl', 'avif', 'webp']}
                           class="size-6 shrink-0 rounded-xs object-contain"
                         />
                       ) : (
@@ -349,12 +353,11 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
                       class="flex items-center gap-2 rounded-md p-2 transition-colors hover:bg-zinc-800"
                     >
                       {service.imageUrl ? (
-                        <Picture
+                        <MyPicture
                           src={service.imageUrl}
                           alt={service.name}
                           width={24}
                           height={24}
-                          formats={['jxl', 'avif', 'webp']}
                           class="size-6 shrink-0 rounded-xs object-contain"
                         />
                       ) : (

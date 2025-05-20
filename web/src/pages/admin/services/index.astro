@@ -2,9 +2,8 @@
 import { ServiceVisibility, VerificationStatus, type Prisma } from '@prisma/client'
 import { z } from 'astro/zod'
 import { Icon } from 'astro-icon/components'
-import { Image } from 'astro:assets'
 
-import defaultImage from '../../../assets/fallback-service-image.jpg'
+import MyPicture from '../../../components/MyPicture.astro'
 import SortArrowIcon from '../../../components/SortArrowIcon.astro'
 import { getKycLevelInfo } from '../../../constants/kycLevels'
 import { getVerificationStatusInfo } from '../../../constants/verificationStatus'
@@ -343,23 +342,14 @@ const truncate = (text: string, length: number) => {
                   <td class="px-4 py-3">
                     <div class="flex items-center space-x-3">
                       <div class="h-10 w-10 flex-shrink-0">
-                        {service.imageUrl ? (
-                          <Image
-                            src={service.imageUrl}
-                            alt={service.name}
-                            width={40}
-                            height={40}
-                            class="h-10 w-10 rounded-md object-cover"
-                          />
-                        ) : (
-                          <Image
-                            src={defaultImage}
-                            alt={service.name}
-                            width={40}
-                            height={40}
-                            class="h-10 w-10 rounded-md object-cover"
-                          />
-                        )}
+                        <MyPicture
+                          src={service.imageUrl}
+                          fallback="service"
+                          alt={service.name}
+                          width={40}
+                          height={40}
+                          class="h-10 w-10 rounded-md object-cover"
+                        />
                       </div>
                       <div class="min-w-0 flex-1">
                         <div class="text-sm font-medium text-zinc-200">{service.name}</div>

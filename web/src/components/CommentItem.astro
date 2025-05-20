@@ -1,5 +1,4 @@
 ---
-import Image from 'astro/components/Image.astro'
 import { Icon } from 'astro-icon/components'
 import { Markdown } from 'astro-remote'
 import { Schema } from 'astro-seo-schema'
@@ -19,6 +18,7 @@ import { formatDateShort } from '../lib/timeAgo'
 import BadgeSmall from './BadgeSmall.astro'
 import CommentModeration from './CommentModeration.astro'
 import CommentReply from './CommentReply.astro'
+import MyPicture from './MyPicture.astro'
 import TimeFormatted from './TimeFormatted.astro'
 import Tooltip from './Tooltip.astro'
 
@@ -158,11 +158,10 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
     <span class="flex items-center gap-1">
       {
         comment.author.picture && (
-          <Image
+          <MyPicture
             src={comment.author.picture}
             alt={`Profile for ${comment.author.displayName ?? comment.author.name}`}
             class="size-6 rounded-full bg-zinc-700 object-cover"
-            loading="lazy"
             height={24}
             width={24}
           />

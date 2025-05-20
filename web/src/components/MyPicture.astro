@@ -1,0 +1,42 @@
+---
+import type { ComponentProps } from 'react'
+
+import { Picture } from 'astro:assets'
+
+import defaultServiceImage from '../assets/fallback-service-image.jpg'
+
+const fallbackImages = {
+  service: defaultServiceImage,
+} as const satisfies Record<string, typeof defaultServiceImage>
+
+type Props = Omit<ComponentProps<typeof Picture>, 'src'> & {
+  src: ComponentProps<typeof Picture>['src'] | null | undefined
+  fallback?: keyof typeof fallbackImages
+}
+
+const {
+  src,
+  formats = ['avif', 'webp'],
+  fallback = undefined as keyof typeof fallbackImages | undefined,
+  height,
+  width,
+  ...props
+} = Astro.props
+
+const fallbackImage = fallback ? fallbackImages[fallback] : undefined
+---
+
+{/* eslint-disable @typescript-eslint/no-explicit-any */}
+{
+  !!(src ?? fallbackImage) && (
+    <Picture
+      src={
+        typeof src === 'string' ? new URL(src, Astro.url).href : ((src ?? fallbackImage) as unknown as string)
+      }
+      formats={formats}
+      height={height ? Number(height) * 2 : undefined}
+      width={width ? Number(width) * 2 : undefined}
+      {...(props as any)}
+    />
+  )
+}

@@ -8,8 +8,8 @@ import {
 } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
-import { Image } from 'astro:assets'
 
+import MyPicture from '../../../../components/MyPicture.astro'
 import { serviceVisibilities } from '../../../../constants/serviceVisibility'
 import BaseLayout from '../../../../layouts/BaseLayout.astro'
 import { cn } from '../../../../lib/cn'
@@ -334,7 +334,7 @@ const buttonSmallWarningClasses = cn(
             {
               service.imageUrl ? (
                 <div class="mt-2 shrink-0">
-                  <Image
+                  <MyPicture
                     src={service.imageUrl}
                     alt="Current service image"
                     width={100}

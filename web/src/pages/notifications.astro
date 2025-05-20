@@ -183,7 +183,12 @@ const notifications = dbNotifications.map((notification) => ({
   pageTitle="Notifications"
   description="View your notifications and manage your notification preferences."
   widthClassName="max-w-screen-lg"
-  ogImage={{ template: 'generic', title: 'Notifications' }}
+  ogImage={{
+    template: 'generic',
+    title: 'Notifications',
+    description: 'View and manage your notifications',
+    icon: 'ri:notification-line',
+  }}
 >
   <section class="mx-auto w-full">
     <div class="mb-4 flex items-center justify-between">

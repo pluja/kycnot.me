@@ -86,7 +86,12 @@ const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
 <BaseLayout
   pageTitle={`${serviceSuggestion.service.name} | Service suggestion`}
   description="View your service suggestion"
-  ogImage={{ template: 'generic', title: serviceSuggestion.service.name }}
+  ogImage={{
+    template: 'generic',
+    title: 'My service suggestions',
+    description: 'View and manage your service suggestion',
+    icon: 'ri:service-line',
+  }}
   widthClassName="max-w-screen-md"
   htmx
   breadcrumbs={[

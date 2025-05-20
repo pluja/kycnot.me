@@ -1,11 +1,10 @@
 ---
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
-import { Picture } from 'astro:assets'
 import { z } from 'astro:content'
 
-import defaultServiceImage from '../../assets/fallback-service-image.jpg'
 import Button from '../../components/Button.astro'
+import MyPicture from '../../components/MyPicture.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import Tooltip from '../../components/Tooltip.astro'
 import {
@@ -72,7 +71,12 @@ const success = !!createResult && !createResult.error
 <BaseLayout
   pageTitle="My service suggestions"
   description="Manage your service suggestions"
-  ogImage={{ template: 'generic', title: 'Service suggestions' }}
+  ogImage={{
+    template: 'generic',
+    title: 'Service suggestions',
+    description: 'Manage your service suggestions',
+    icon: 'ri:service-line',
+  }}
   widthClassName="max-w-screen-md"
   breadcrumbs={[
     {
@@ -122,13 +126,13 @@ const success = !!createResult && !createResult.error
                   href={`/service/${suggestion.service.slug}`}
                   class="inline-flex w-full min-w-32 items-center gap-2 hover:underline"
                 >
-                  <Picture
-                    src={suggestion.service.imageUrl ?? (defaultServiceImage as unknown as string)}
+                  <MyPicture
+                    src={suggestion.service.imageUrl}
+                    fallback="service"
                     alt={suggestion.service.name}
                     width={32}
                     height={32}
                     class="inline-block size-8 min-w-8 shrink-0 rounded-md"
-                    formats={['jxl', 'avif', 'webp']}
                   />
                   <span class="shrink truncate">{suggestion.service.name}</span>
                 </a>

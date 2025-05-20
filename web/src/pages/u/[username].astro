@@ -1,14 +1,13 @@
 ---
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
-import { Picture } from 'astro:assets'
 import { sortBy } from 'lodash-es'
 
-import defaultServiceImage from '../../assets/fallback-service-image.jpg'
 import AdminOnly from '../../components/AdminOnly.astro'
 import BadgeSmall from '../../components/BadgeSmall.astro'
 import InputSubmitButton from '../../components/InputSubmitButton.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
+import MyPicture from '../../components/MyPicture.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import Tooltip from '../../components/Tooltip.astro'
 import { getKarmaTransactionActionInfo } from '../../constants/karmaTransactionActions'
@@ -178,7 +177,13 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
 <BaseLayout
   pageTitle={`${user.name} - Account`}
   description="Manage your user profile"
-  ogImage={{ template: 'generic', title: `${user.name} | Account` }}
+  ogImage={{
+    template: 'generic',
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+    title: user.displayName || user.name,
+    description: 'User profile page',
+    icon: 'ri:user-3-line',
+  }}
   widthClassName="max-w-screen-md"
   className={{
     main: 'space-y-6',
@@ -238,7 +243,13 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
     <header class="flex items-center gap-4">
       {
         user.picture ? (
-          <img src={user.picture} alt="" class="ring-day-500/30 size-16 rounded-full ring-2" />
+          <MyPicture
+            src={user.picture}
+            alt=""
+            class="ring-day-500/30 size-16 rounded-full ring-2"
+            width={64}
+            height={64}
+          />
         ) : (
           <div class="bg-day-500/10 ring-day-500/30 text-day-400 flex size-16 items-center justify-center rounded-full ring-2">
             <Icon name="ri:user-3-line" class="size-8" />
@@ -555,8 +566,9 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                   href={`/service/${affiliation.service.slug}`}
                   class="text-day-300 group flex min-w-32 items-center gap-2 text-sm"
                 >
-                  <Picture
-                    src={affiliation.service.imageUrl ?? (defaultServiceImage as unknown as string)}
+                  <MyPicture
+                    src={affiliation.service.imageUrl}
+                    fallback="service"
                     alt={affiliation.service.name}
                     width={40}
                     height={40}

@@ -1,7 +1,6 @@
 ---
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
-import { Image } from 'astro:assets'
 
 import BadgeSmall from '../../../components/BadgeSmall.astro'
 import Button from '../../../components/Button.astro'
@@ -11,6 +10,7 @@ import InputSelect from '../../../components/InputSelect.astro'
 import InputSubmitButton from '../../../components/InputSubmitButton.astro'
 import InputText from '../../../components/InputText.astro'
 import InputTextArea from '../../../components/InputTextArea.astro'
+import MyPicture from '../../../components/MyPicture.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
 import { getServiceUserRoleInfo, serviceUserRoles } from '../../../constants/serviceUserRoles'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
@@ -123,7 +123,7 @@ if (!user) return Astro.rewrite('/404')
   <div class="mt-12">
     {
       !!user.picture && (
-        <Image
+        <MyPicture
           src={user.picture}
           alt=""
           width={80}
@@ -218,7 +218,7 @@ if (!user) return Astro.rewrite('/404')
       value={user.picture}
       error={updateInputErrors.pictureFile}
       square
-      description="Upload a square image for best results. Supported formats: JPG, PNG, WebP, AVIF, JXL. Max size: 5MB."
+      description="Upload a square image for best results. Supported formats: JPG, PNG, WebP, AVIF. Max size: 5MB."
     />
 
     <InputCardGroup
@@ -265,7 +265,7 @@ if (!user) return Astro.rewrite('/404')
               <div class="mb-1 flex items-center justify-between gap-4">
                 <div class="flex items-center gap-1">
                   {!!note.addedByUser?.picture && (
-                    <Image
+                    <MyPicture
                       src={note.addedByUser.picture}
                       alt=""
                       width={12}
