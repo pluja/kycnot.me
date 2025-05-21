@@ -181,50 +181,50 @@ if (!user) return Astro.rewrite('/404')
   ]}
 >
   <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
-    <header class="flex items-center gap-4">
-      {
-        user.picture ? (
-          <MyPicture
-            src={user.picture}
-            alt=""
-            class="ring-day-500/30 size-16 rounded-full ring-2"
-            width={64}
-            height={64}
-          />
-        ) : (
-          <div class="bg-day-500/10 ring-day-500/30 text-day-400 flex size-16 items-center justify-center rounded-full ring-2">
-            <Icon name="ri:user-3-line" class="size-8" />
-          </div>
-        )
-      }
-      <div>
-        <h1 class="font-title text-lg font-bold tracking-wider text-white">{user.name}</h1>
-        {user.displayName && <p class="text-day-200">{user.displayName}</p>}
-        <div class="mt-1 flex gap-2">
+    <header class="flex flex-wrap items-center justify-center gap-4">
+      <div class="flex grow flex-wrap items-center justify-center gap-4">
+        {
+          user.picture ? (
+            <MyPicture
+              src={user.picture}
+              alt=""
+              class="ring-day-500/30 xs:size-14 size-12 rounded-full ring-2 sm:size-16"
+              width={64}
+              height={64}
+            />
+          ) : (
+            <div class="bg-day-500/10 ring-day-500/30 text-day-400 flex size-16 items-center justify-center rounded-full ring-2">
+              <Icon name="ri:user-3-line" class="size-8" />
+            </div>
+          )
+        }
+        <div class="grow">
+          <h1 class="font-title text-lg font-bold tracking-wider text-white">{user.name}</h1>
+          {user.displayName && <p class="text-day-200">{user.displayName}</p>}
           {
-            user.admin && (
-              <span class="rounded-full border border-red-500/50 bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
-                admin
-              </span>
-            )
-          }
-          {
-            user.verified && (
-              <span class="rounded-full border border-blue-500/50 bg-blue-500/20 px-2 py-0.5 text-xs text-blue-400">
-                verified
-              </span>
-            )
-          }
-          {
-            user.verifier && (
-              <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                verifier
-              </span>
+            (user.admin || user.verified || user.verifier) && (
+              <div class="mt-1 flex gap-2">
+                {user.admin && (
+                  <span class="rounded-full border border-red-500/50 bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
+                    admin
+                  </span>
+                )}
+                {user.verified && (
+                  <span class="rounded-full border border-blue-500/50 bg-blue-500/20 px-2 py-0.5 text-xs text-blue-400">
+                    verified
+                  </span>
+                )}
+                {user.verifier && (
+                  <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
+                    verifier
+                  </span>
+                )}
+              </div>
             )
           }
         </div>
       </div>
-      <nav class="ml-auto flex items-center gap-2">
+      <nav class="flex flex-wrap items-center justify-center gap-2">
         <Tooltip
           as="a"
           href={`/u/${user.name}`}

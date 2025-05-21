@@ -48,7 +48,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
       name="displayName"
       error={inputErrors.displayName}
       inputProps={{
-        value: user.displayName ?? '',
+        value: user.displayName,
         maxlength: 100,
         disabled: !user.karmaUnlocks.displayName,
       }}
@@ -62,7 +62,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
       name="link"
       error={inputErrors.link}
       inputProps={{
-        value: user.link ?? '',
+        value: user.link,
         type: 'url',
         placeholder: 'https://example.com',
         disabled: !user.karmaUnlocks.websiteLink,

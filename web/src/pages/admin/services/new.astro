@@ -64,7 +64,8 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
           id="description"
           required
           class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-        ></textarea>
+          set:text=""
+        />
         {
           inputErrors.description && (
             <p class="font-title mt-1 text-sm text-red-500">{inputErrors.description.join(', ')}</p>
@@ -80,7 +81,9 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
           name="serviceUrls"
           id="serviceUrls"
           rows={3}
-          placeholder="https://example1.com https://example2.com"></textarea>
+          placeholder="https://example1.com https://example2.com"
+          set:text=""
+        />
         {
           inputErrors.serviceUrls && (
             <p class="font-title mt-1 text-sm text-red-500">{inputErrors.serviceUrls.join(', ')}</p>
@@ -96,7 +99,9 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
           name="tosUrls"
           id="tosUrls"
           rows={3}
-          placeholder="https://example1.com/tos https://example2.com/tos"></textarea>
+          placeholder="https://example1.com/tos https://example2.com/tos"
+          set:text=""
+        />
         {
           inputErrors.tosUrls && (
             <p class="font-title mt-1 text-sm text-red-500">{inputErrors.tosUrls.join(', ')}</p>
@@ -112,7 +117,9 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
           name="onionUrls"
           id="onionUrls"
           rows={3}
-          placeholder="http://example.onion"></textarea>
+          placeholder="http://example.onion"
+          set:text=""
+        />
         {
           inputErrors.onionUrls && (
             <p class="font-title mt-1 text-sm text-red-500">{inputErrors.onionUrls.join(', ')}</p>
@@ -266,7 +273,9 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
           class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
           name="verificationSummary"
           id="verificationSummary"
-          rows={3}></textarea>
+          rows={3}
+          set:text=""
+        />
         {
           inputErrors.verificationSummary && (
             <p class="font-title mt-1 text-sm text-red-500">{inputErrors.verificationSummary.join(', ')}</p>
@@ -283,7 +292,9 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
           class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
           name="verificationProofMd"
           id="verificationProofMd"
-          rows={10}></textarea>
+          rows={10}
+          set:text=""
+        />
         {
           inputErrors.verificationProofMd && (
             <p class="font-title mt-1 text-sm text-red-500">{inputErrors.verificationProofMd.join(', ')}</p>

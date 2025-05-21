@@ -39,16 +39,19 @@ const {
   </p>
   {
     (DEPLOYMENT_MODE !== 'production' || Astro.locals.user?.admin) && (
-      <div class="bg-night-800 mt-4 block max-h-96 min-h-32 w-full max-w-4xl overflow-auto rounded-lg p-4 text-left text-sm break-words whitespace-pre-wrap">
-        {error instanceof Error
-          ? error.message
-          : error === undefined
-            ? // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-              message || 'undefined'
-            : typeof error === 'object'
-              ? JSON.stringify(error, null, 2)
-              : String(error as unknown)}
-      </div>
+      <div
+        class="bg-night-800 mt-4 block max-h-96 min-h-32 w-full max-w-4xl overflow-auto rounded-lg p-4 text-left text-sm wrap-anywhere whitespace-pre-wrap"
+        set:text={
+          error instanceof Error
+            ? error.message
+            : error === undefined
+              ? // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+                message || 'undefined'
+              : typeof error === 'object'
+                ? JSON.stringify(error, null, 2)
+                : String(error as unknown)
+        }
+      />
     )
   }
 

@@ -75,9 +75,9 @@ const { messages, userId, class: className, ...htmlProps } = Astro.props
                   {!!message.user.picture && (
                     <MyPicture
                       src={message.user.picture}
-                      height={16}
-                      width={16}
-                      class="inline-block rounded-full align-[-0.33em]"
+                      height={20}
+                      width={20}
+                      class="inline-block size-5 rounded-full align-[-0.5em]"
                       alt=""
                     />
                   )}
@@ -86,16 +86,15 @@ const { messages, userId, class: className, ...htmlProps } = Astro.props
               )}
               <p
                 class={cn(
-                  'rounded-xl p-3 text-sm whitespace-pre-wrap',
+                  'rounded-xl p-3 text-sm wrap-anywhere whitespace-pre-wrap',
                   isCurrentUser ? 'bg-blue-900 text-white' : 'bg-night-500 text-day-300',
                   isCurrentUser ? 'rounded-br-xs' : 'rounded-bl-xs',
                   isCurrentUser && isNextFromSameUser && isNextSameDate && 'rounded-tr-xs',
                   !isCurrentUser && isNextFromSameUser && isNextSameDate && 'rounded-tl-xs'
                 )}
                 id={`message-${message.id.toString()}`}
-              >
-                {message.content}
-              </p>
+                set:text={message.content}
+              />
               {(!isPrevFromSameUser || !isPrevSameDate) && (
                 <p class="text-day-500 mt-0.5 mb-2 text-xs">{message.formattedCreatedAt}</p>
               )}

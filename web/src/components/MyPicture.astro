@@ -4,6 +4,7 @@ import type { ComponentProps } from 'react'
 import { Picture } from 'astro:assets'
 
 import defaultServiceImage from '../assets/fallback-service-image.jpg'
+import { cn } from '../lib/cn'
 
 const fallbackImages = {
   service: defaultServiceImage,
@@ -20,6 +21,7 @@ const {
   fallback = undefined as keyof typeof fallbackImages | undefined,
   height,
   width,
+  pictureAttributes,
   ...props
 } = Astro.props
 
@@ -36,6 +38,10 @@ const fallbackImage = fallback ? fallbackImages[fallback] : undefined
       formats={formats}
       height={height ? Number(height) * 2 : undefined}
       width={width ? Number(width) * 2 : undefined}
+      pictureAttributes={{
+        ...pictureAttributes,
+        class: cn('shrink-0', pictureAttributes?.class),
+      }}
       {...(props as any)}
     />
   )

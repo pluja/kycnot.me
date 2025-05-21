@@ -36,7 +36,7 @@ const {
         class={cn(
           'pointer-events-none hidden select-none group-hover/tooltip:flex',
           'ease-out-cubic scale-75 opacity-0 transition-all transition-discrete duration-100 group-hover/tooltip:scale-100 group-hover/tooltip:opacity-100 starting:group-hover/tooltip:scale-75 starting:group-hover/tooltip:opacity-0',
-          'z-1000 w-max max-w-sm rounded-lg px-3 py-2 font-sans text-sm font-normal tracking-normal text-pretty whitespace-pre-wrap',
+          'z-1000 w-max max-w-sm rounded-lg px-3 py-2 font-sans text-sm font-normal tracking-normal text-pretty wrap-anywhere whitespace-pre-wrap',
           // Position classes
           {
             'absolute -top-2 left-1/2 origin-bottom -translate-x-1/2 translate-y-[calc(-100%+0.5rem)] text-center group-hover/tooltip:-translate-y-full starting:group-hover/tooltip:translate-y-[calc(-100%+0.25rem)]':
@@ -85,9 +85,8 @@ const {
           },
           classNames?.tooltip
         )}
-      >
-        {text}
-      </span>
+        set:text={text}
+      />
     )
   }
 </Component>

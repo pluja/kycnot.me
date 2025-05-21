@@ -32,7 +32,7 @@ export const {
     {
       id: 'HUMAN_PENDING',
       icon: 'ri:question-line',
-      label: 'Pending 2',
+      label: 'Pending',
       creativeWorkStatus: 'Deleted',
     },
     {

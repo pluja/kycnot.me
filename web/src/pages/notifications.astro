@@ -232,7 +232,7 @@ const notifications = dbNotifications.map((notification) => ({
 
                   <div>
                     <div class="font-medium text-zinc-200">{notification.title}</div>
-                    <p class="text-sm text-zinc-400">{notification.content}</p>
+                    <p class="text-sm wrap-anywhere text-zinc-400">{notification.content}</p>
                     <div class="mt-1 text-xs text-zinc-500">
                       <TimeFormatted date={notification.createdAt} prefix={false} caseType="sentence" />
                     </div>

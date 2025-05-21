@@ -45,7 +45,7 @@ const wasRecentlyAdded = isPast(listedDate) && differenceInDays(new Date(), list
         )}
       </p>
       {!!service.verificationSummary && (
-        <div class="mt-2 whitespace-pre-wrap">{service.verificationSummary}</div>
+        <div class="mt-2 wrap-anywhere whitespace-pre-wrap" set:text={service.verificationSummary} />
       )}
     </div>
   ) : service.verificationStatus === 'COMMUNITY_CONTRIBUTED' ? (

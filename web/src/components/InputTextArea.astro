@@ -31,6 +31,7 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
       hasError && baseInputClassNames.error,
       !!inputProps?.disabled && baseInputClassNames.disabled
     )}
-    name={wrapperProps.name}>{value}</textarea
-  >
+    name={wrapperProps.name}
+    set:text={value}
+  />
 </InputWrapper>

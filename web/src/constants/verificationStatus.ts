@@ -70,7 +70,7 @@ export const {
       description:
         'Thoroughly tested and verified by the team. But things might change, this is not a guarantee.',
       privacyPoints: 0,
-      trustPoints: 5,
+      trustPoints: 10,
       classNames: {
         icon: 'text-[#40e6c2]',
         badgeBig: 'bg-green-800/50 text-green-100',

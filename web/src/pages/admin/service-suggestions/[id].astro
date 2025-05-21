@@ -127,7 +127,7 @@ const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
 
         <span class="font-title text-gray-400">Submitted by:</span>
         <span class="text-gray-300">
-          <a href={`/admin/users?name=${serviceSuggestion.user.name}`} class="hover:text-green-500">
+          <a href={`/admin/users/${serviceSuggestion.user.name}`} class="hover:text-green-500">
             {serviceSuggestion.user.name}
           </a>
         </span>
@@ -148,9 +148,10 @@ const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
         serviceSuggestion.notes && (
           <div class="mb-4">
             <h3 class="font-title mb-1 text-sm text-gray-400">Notes from user:</h3>
-            <div class="rounded-md border border-gray-700 bg-black/50 p-3 text-sm whitespace-pre-wrap text-gray-300">
-              {serviceSuggestion.notes}
-            </div>
+            <div
+              class="rounded-md border border-gray-700 bg-black/50 p-3 text-sm wrap-anywhere whitespace-pre-wrap text-gray-300"
+              set:text={serviceSuggestion.notes}
+            />
           </div>
         )
       }

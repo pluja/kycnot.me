@@ -149,9 +149,13 @@ const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
 
     <div class="mt-6">
       <div class="text-day-200 mb-2 text-sm">Notes for moderators:</div>
-      <div class="text-sm whitespace-pre-wrap">
-        {serviceSuggestion.notes ?? <span class="italic">Empty</span>}
-      </div>
+      {
+        serviceSuggestion.notes ? (
+          <div class="text-sm wrap-anywhere whitespace-pre-wrap" set:text={serviceSuggestion.notes} />
+        ) : (
+          <span class="text-sm italic">Empty</span>
+        )
+      }
     </div>
   </section>
 

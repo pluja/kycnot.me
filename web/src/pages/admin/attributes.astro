@@ -180,7 +180,8 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
           required
           rows="3"
           class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-green-500 focus:ring-green-500 focus:outline-none"
-        ></textarea>
+          set:text=""
+        />
         {
           createInputErrors.description && (
             <p class="mt-1 text-sm text-red-400">{createInputErrors.description.join(', ')}</p>
@@ -593,9 +594,8 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
                             required
                             rows="3"
                             class="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
-                          >
-                            {attribute.description}
-                          </textarea>
+                            set:text={attribute.description}
+                          />
                         </div>
 
                         <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">

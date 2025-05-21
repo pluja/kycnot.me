@@ -306,7 +306,7 @@ if (!user) return Astro.rewrite('/404')
               </div>
 
               <div data-note-content>
-                <p class="text-day-200 whitespace-pre-wrap">{note.content}</p>
+                <p class="text-day-200 wrap-anywhere whitespace-pre-wrap" set:text={note.content} />
               </div>
 
               <form

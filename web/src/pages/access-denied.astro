@@ -34,9 +34,10 @@ if (reasonType === 'admin-required' && Astro.locals.user?.admin) {
   <h1 class="font-title mt-8 text-3xl font-semibold tracking-wide text-white sm:mt-12 sm:text-5xl">
     Access denied
   </h1>
-  <p class="mt-8 text-lg leading-7 text-balance whitespace-pre-wrap text-red-400">
-    {reason}
-  </p>
+  <p
+    class="mt-8 text-lg leading-7 text-balance wrap-anywhere whitespace-pre-wrap text-red-400"
+    set:text={reason}
+  />
 
   <div class="mt-12 flex flex-wrap items-center justify-center">
     <a href="/" class="focus-visible:outline-primary group flex items-center gap-2 px-3.5 py-2.5 text-white">

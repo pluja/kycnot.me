@@ -151,15 +151,10 @@ export const accountActions = {
     permissions: 'user',
     input: z.object({
       id: z.coerce.number().int().positive(),
-      displayName: z.string().max(100, 'Display name must be 100 characters or less').optional().nullable(),
-      link: z
-        .string()
-        .url('Must be a valid URL')
-        .max(255, 'URL must be 255 characters or less')
-        .optional()
-        .nullable(),
+      displayName: z.string().max(100, 'Display name must be 100 characters or less').nullable(),
+      link: z.string().url('Must be a valid URL').max(255, 'URL must be 255 characters or less').nullable(),
       pictureFile: imageFileSchema,
-      removePicture: z.coerce.boolean().default(false),
+      removePicture: z.coerce.boolean(),
     }),
     handler: async (input, context) => {
       if (input.id !== context.locals.user.id) {
@@ -170,7 +165,7 @@ export const accountActions = {
       }
 
       if (
-        input.displayName !== undefined &&
+        input.displayName !== null &&
         input.displayName !== context.locals.user.displayName &&
         !context.locals.user.karmaUnlocks.displayName
       ) {
@@ -181,7 +176,7 @@ export const accountActions = {
       }
 
       if (
-        input.link !== undefined &&
+        input.link !== null &&
         input.link !== context.locals.user.link &&
         !context.locals.user.karmaUnlocks.websiteLink
       ) {
@@ -192,6 +187,13 @@ export const accountActions = {
       }
 
       if (input.pictureFile !== undefined && !context.locals.user.karmaUnlocks.profilePicture) {
+        throw new ActionError({
+          code: 'FORBIDDEN',
+          message: makeKarmaUnlockMessage(karmaUnlocksById.profilePicture),
+        })
+      }
+
+      if (input.removePicture && !context.locals.user.karmaUnlocks.profilePicture) {
         throw new ActionError({
           code: 'FORBIDDEN',
           message: makeKarmaUnlockMessage(karmaUnlocksById.profilePicture),
@@ -210,9 +212,13 @@ export const accountActions = {
       const user = await prisma.user.update({
         where: { id: context.locals.user.id },
         data: {
-          displayName: input.displayName ?? null,
-          link: input.link ?? null,
-          picture: input.removePicture ? null : (pictureUrl ?? undefined),
+          displayName: context.locals.user.karmaUnlocks.displayName ? (input.displayName ?? null) : undefined,
+          link: context.locals.user.karmaUnlocks.websiteLink ? (input.link ?? null) : undefined,
+          picture: context.locals.user.karmaUnlocks.profilePicture
+            ? input.removePicture
+              ? null
+              : (pictureUrl ?? undefined)
+            : undefined,
         },
       })
 

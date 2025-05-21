@@ -51,6 +51,15 @@ export const {
       },
     },
     {
+      label: 'Human Pending',
+      value: 'human-pending',
+      whereClause: { status: 'HUMAN_PENDING' },
+      styles: {
+        filter: 'border-blue-500 bg-blue-500/20 text-blue-400',
+        badge: 'rounded-sm bg-blue-500/20 px-2 py-0.5 text-[12px] font-medium text-blue-500',
+      },
+    },
+    {
       label: 'Rejected',
       value: 'rejected',
       whereClause: {
@@ -123,9 +132,11 @@ export function getCommentStatusFilterValue(
   if (comment.suspicious) return 'suspicious'
 
   switch (comment.status) {
-    case 'PENDING':
-    case 'HUMAN_PENDING': {
+    case 'PENDING': {
       return 'pending'
+    }
+    case 'HUMAN_PENDING': {
+      return 'human-pending'
     }
     case 'VERIFIED': {
       return 'verified'

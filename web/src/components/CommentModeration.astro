@@ -110,16 +110,18 @@ if (!user || !user.admin || !user.verifier) return null
       <button
         class={cn(
           'rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-          comment.status === 'PENDING'
+          comment.status === 'PENDING' || comment.status === 'HUMAN_PENDING'
             ? 'border border-blue-500/30 bg-blue-500/20 text-blue-400'
             : 'bg-night-700 hover:bg-blue-500/20 hover:text-blue-400'
         )}
         data-action="status"
-        data-value={comment.status === 'PENDING' ? 'APPROVED' : 'PENDING'}
+        data-value={comment.status === 'PENDING' || comment.status === 'HUMAN_PENDING'
+          ? 'APPROVED'
+          : 'PENDING'}
         data-comment-id={comment.id}
         data-user-id={user.id}
       >
-        {comment.status === 'PENDING' ? 'Approve' : 'Pending'}
+        {comment.status === 'PENDING' || comment.status === 'HUMAN_PENDING' ? 'Approve' : 'Pending'}
       </button>
 
       <button

@@ -211,8 +211,9 @@ const buttonSmallWarningClasses = cn(
             id="description"
             required
             rows={4}
-            class={inputBaseClasses}>{service.description}</textarea
-          >
+            class={inputBaseClasses}
+            set:text={service.description}
+          />
           {
             serviceInputErrors.description && (
               <p class={errorTextClasses}>{serviceInputErrors.description.join(', ')}</p>
@@ -243,8 +244,8 @@ const buttonSmallWarningClasses = cn(
               id="serviceUrls"
               rows={3}
               placeholder="https://example1.com\nhttps://example2.com"
-              >{service.serviceUrls.join('\n')}</textarea
-            >
+              set:text={service.serviceUrls.join('\n')}
+            />
             {
               serviceInputErrors.serviceUrls && (
                 <p class={errorTextClasses}>{serviceInputErrors.serviceUrls.join(', ')}</p>
@@ -260,8 +261,8 @@ const buttonSmallWarningClasses = cn(
               id="tosUrls"
               rows={3}
               placeholder="https://example1.com/tos\nhttps://example2.com/tos"
-              >{service.tosUrls.join('\n')}</textarea
-            >
+              set:text={service.tosUrls.join('\n')}
+            />
             {
               serviceInputErrors.tosUrls && (
                 <p class={errorTextClasses}>{serviceInputErrors.tosUrls.join(', ')}</p>
@@ -277,8 +278,8 @@ const buttonSmallWarningClasses = cn(
               id="onionUrls"
               rows={3}
               placeholder="http://example1.onion\nhttp://example2.onion"
-              >{service.onionUrls.join('\n')}</textarea
-            >
+              set:text={service.onionUrls.join('\n')}
+            />
             {
               serviceInputErrors.onionUrls && (
                 <p class={errorTextClasses}>{serviceInputErrors.onionUrls.join(', ')}</p>
@@ -294,8 +295,8 @@ const buttonSmallWarningClasses = cn(
               id="i2pUrls"
               rows={3}
               placeholder="http://example1.b32.i2p\nhttp://example2.b32.i2p"
-              >{service.i2pUrls.join('\n')}</textarea
-            >
+              set:text={service.i2pUrls.join('\n')}
+            />
             {/* Assuming i2pUrls might have errors, add error display if schema supports it */}
             {
               /* serviceInputErrors.i2pUrls && (
@@ -515,8 +516,9 @@ const buttonSmallWarningClasses = cn(
             class={inputBaseClasses}
             name="verificationSummary"
             id="verificationSummary"
-            rows={4}>{service.verificationSummary}</textarea
-          >
+            rows={4}
+            set:text={service.verificationSummary}
+          />
           {
             serviceInputErrors.verificationSummary && (
               <p class={errorTextClasses}>{serviceInputErrors.verificationSummary.join(', ')}</p>
@@ -531,8 +533,9 @@ const buttonSmallWarningClasses = cn(
             class={inputBaseClasses}
             name="verificationProofMd"
             id="verificationProofMd"
-            rows={8}>{service.verificationProofMd}</textarea
-          >
+            rows={8}
+            set:text={service.verificationProofMd}
+          />
           {
             serviceInputErrors.verificationProofMd && (
               <p class={errorTextClasses}>{serviceInputErrors.verificationProofMd.join(', ')}</p>
@@ -731,9 +734,8 @@ const buttonSmallWarningClasses = cn(
                         required
                         rows={3}
                         class={inputBaseClasses}
-                      >
-                        {event.content}
-                      </textarea>
+                        set:text={event.content}
+                      />
                       {eventUpdateInputErrors.content && (
                         <p class={errorTextClasses}>{eventUpdateInputErrors.content.join(', ')}</p>
                       )}
@@ -847,8 +849,14 @@ const buttonSmallWarningClasses = cn(
             </div>
             <div>
               <label for="newEventContent" class={labelBaseClasses}>Content</label>
-              <textarea name="content" id="newEventContent" required rows={3} class={inputBaseClasses}
-              ></textarea>
+              <textarea
+                name="content"
+                id="newEventContent"
+                required
+                rows={3}
+                class={inputBaseClasses}
+                set:text=""
+              />
               {
                 eventInputErrors.content && (
                   <p class={errorTextClasses}>{eventInputErrors.content.join(', ')}</p>
@@ -1014,9 +1022,8 @@ const buttonSmallWarningClasses = cn(
                         id={`stepDescriptionEdit-${step.id}`}
                         rows={2}
                         class={inputBaseClasses}
-                      >
-                        {step.description}
-                      </textarea>
+                        set:text={step.description}
+                      />
                       {verificationStepUpdateInputErrors.description && (
                         <p class={errorTextClasses}>
                           {verificationStepUpdateInputErrors.description.join(', ')}
@@ -1032,9 +1039,8 @@ const buttonSmallWarningClasses = cn(
                         id={`stepEvidenceMdEdit-${step.id}`}
                         rows={4}
                         class={inputBaseClasses}
-                      >
-                        {step.evidenceMd}
-                      </textarea>
+                        set:text={step.evidenceMd}
+                      />
                       {verificationStepUpdateInputErrors.evidenceMd && (
                         <p class={errorTextClasses}>
                           {verificationStepUpdateInputErrors.evidenceMd.join(', ')}
@@ -1104,8 +1110,14 @@ const buttonSmallWarningClasses = cn(
             </div>
             <div>
               <label for="newStepDescription" class={labelBaseClasses}>Description (Max 200 chars)</label>
-              <textarea name="description" id="newStepDescription" required rows={3} class={inputBaseClasses}
-              ></textarea>
+              <textarea
+                name="description"
+                id="newStepDescription"
+                required
+                rows={3}
+                class={inputBaseClasses}
+                set:text=""
+              />
               {
                 verificationStepInputErrors.description && (
                   <p class={errorTextClasses}>{verificationStepInputErrors.description.join(', ')}</p>
@@ -1114,7 +1126,13 @@ const buttonSmallWarningClasses = cn(
             </div>
             <div>
               <label for="newStepEvidenceMd" class={labelBaseClasses}>Evidence (Markdown)</label>
-              <textarea name="evidenceMd" id="newStepEvidenceMd" rows={5} class={inputBaseClasses}></textarea>
+              <textarea
+                name="evidenceMd"
+                id="newStepEvidenceMd"
+                rows={5}
+                class={inputBaseClasses}
+                set:text=""
+              />
               {
                 verificationStepInputErrors.evidenceMd && (
                   <p class={errorTextClasses}>{verificationStepInputErrors.evidenceMd.join(', ')}</p>
