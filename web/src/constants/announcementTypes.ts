@@ -25,12 +25,12 @@ export const {
   (value): AnnouncementTypeInfo<typeof value> => ({
     value,
     label: value ? transformCase(value.replaceAll('_', ' '), 'title') : String(value),
-    icon: 'ri:information-fill',
+    icon: 'ri:question-line',
     classNames: {
-      container: 'bg-blue-950',
-      bg: 'from-blue-400 to-blue-700',
-      content: '[--gradient-edge:var(--color-blue-100)] [--gradient-center:var(--color-blue-200)]',
-      icon: 'text-blue-400/80',
+      container: 'bg-cyan-950',
+      bg: 'from-cyan-400 to-cyan-700',
+      content: '[--gradient-edge:var(--color-green-100)] [--gradient-center:var(--color-cyan-400)]',
+      icon: 'text-cyan-300/80',
       badge: 'bg-blue-900/30 text-blue-400',
     },
   }),
@@ -38,12 +38,12 @@ export const {
     {
       value: 'INFO',
       label: 'Info',
-      icon: 'ri:information-fill',
+      icon: 'ri:information-line',
       classNames: {
-        container: 'bg-green-950',
-        bg: 'from-green-400 to-green-700',
-        content: '[--gradient-edge:var(--color-green-100)] [--gradient-center:var(--color-lime-200)]',
-        icon: 'text-green-400/80',
+        container: 'bg-cyan-950',
+        bg: 'from-cyan-400 to-cyan-700',
+        content: '[--gradient-edge:var(--color-green-100)] [--gradient-center:var(--color-cyan-400)]',
+        icon: 'text-cyan-300/80',
         badge: 'bg-blue-900/30 text-blue-400',
       },
     },
@@ -54,7 +54,7 @@ export const {
       classNames: {
         container: 'bg-yellow-950',
         bg: 'from-yellow-400 to-yellow-700',
-        content: '[--gradient-edge:var(--color-yellow-100)] [--gradient-center:var(--color-amber-200)]',
+        content: '[--gradient-edge:var(--color-lime-100)] [--gradient-center:var(--color-yellow-400)]',
         icon: 'text-yellow-400/80',
         badge: 'bg-yellow-900/30 text-yellow-400',
       },
@@ -66,7 +66,7 @@ export const {
       classNames: {
         container: 'bg-red-950',
         bg: 'from-red-400 to-red-700',
-        content: '[--gradient-edge:var(--color-red-100)] [--gradient-center:var(--color-rose-200)]',
+        content: '[--gradient-edge:var(--color-red-100)] [--gradient-center:var(--color-rose-400)]',
         icon: 'text-red-400/80',
         badge: 'bg-red-900/30 text-red-400',
       },

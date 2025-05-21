@@ -124,6 +124,13 @@ const [dbNotifications, notificationPreferences, totalNotifications] = await Ast
               verificationStatus: true,
             },
           },
+          aboutKarmaTransaction: {
+            select: {
+              points: true,
+              action: true,
+              description: true,
+            },
+          },
         },
       }),
     [],
@@ -136,6 +143,7 @@ const [dbNotifications, notificationPreferences, totalNotifications] = await Ast
         enableOnMyCommentStatusChange: true,
         enableAutowatchMyComments: true,
         enableNotifyPendingRepliesOnWatch: true,
+        karmaNotificationThreshold: true,
       }),
     null,
   ],
@@ -325,6 +333,23 @@ const notifications = dbNotifications.map((notification) => ({
                 />
               </label>
             ))}
+
+            <div class="mt-4 flex items-center justify-between rounded-md p-2 transition-colors duration-200 hover:bg-zinc-800">
+              <span class="flex items-center text-zinc-300">
+                <Icon name="ri:award-line" class="mr-2 size-5 text-zinc-400" />
+                Notify me when my karma changes by at least
+              </span>
+              <div class="flex items-center gap-2">
+                <input
+                  type="number"
+                  name="karmaNotificationThreshold"
+                  value={notificationPreferences.karmaNotificationThreshold}
+                  min="1"
+                  class="w-20 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-200 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 focus:outline-none"
+                />
+                <span class="text-zinc-400">points</span>
+              </div>
+            </div>
 
             <div class="mt-4 flex justify-end">
               <Button type="submit" label="Save" icon="ri:save-line" color="success" />

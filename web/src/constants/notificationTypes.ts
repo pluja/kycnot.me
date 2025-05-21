@@ -46,11 +46,11 @@ export const {
       icon: 'ri:lightbulb-line',
     },
     // TODO: [KARMA_UNLOCK] Will be added later, when karma unloks are in the database, not in the code.
-    // {
-    //   id: 'KARMA_UNLOCK',
-    //   label: 'Karma unlock',
-    //   icon: 'ri:award-line',
-    // },
+    {
+      id: 'KARMA_CHANGE',
+      label: 'Karma recieved',
+      icon: 'ri:award-line',
+    },
     {
       id: 'ACCOUNT_STATUS_CHANGE',
       label: 'Change in account status',

@@ -135,6 +135,7 @@ enum NotificationType {
   SUGGESTION_MESSAGE
   SUGGESTION_STATUS_CHANGE
   // KARMA_UNLOCK // TODO: [KARMA_UNLOCK] Will be added later, when karma unloks are in the database, not in the code.
+  KARMA_CHANGE
   /// Marked as spammer, promoted to admin, etc.
   ACCOUNT_STATUS_CHANGE
   EVENT_CREATED
@@ -207,6 +208,8 @@ model Notification {
   aboutCommentStatusChange             CommentStatusChange?
   aboutServiceVerificationStatusChange ServiceVerificationStatusChange?
   aboutSuggestionStatusChange          ServiceSuggestionStatusChange?
+  aboutKarmaTransaction                KarmaTransaction?                @relation(fields: [aboutKarmaTransactionId], references: [id])
+  aboutKarmaTransactionId              Int?
 
   @@index([userId])
   @@index([read])
@@ -229,6 +232,7 @@ model NotificationPreferences {
   enableOnMyCommentStatusChange     Boolean @default(true)
   enableAutowatchMyComments         Boolean @default(true)
   enableNotifyPendingRepliesOnWatch Boolean @default(false)
+  karmaNotificationThreshold        Int     @default(10)
 
   onEventCreatedForServices       Service[] @relation("onEventCreatedForServices")
   onRootCommentCreatedForServices Service[] @relation("onRootCommentCreatedForServices")
@@ -522,6 +526,7 @@ model KarmaTransaction {
   createdAt       DateTime               @default(now())
   grantedBy       User?                  @relation("KarmaGrantedBy", fields: [grantedByUserId], references: [id], onDelete: SetNull)
   grantedByUserId Int?
+  Notification    Notification[]
 
   @@index([createdAt])
   @@index([userId])

@@ -1,6 +1,7 @@
 import { accountStatusChangesById } from '../constants/accountStatusChange'
 import { commentStatusChangesById } from '../constants/commentStatusChange'
 import { eventTypesById } from '../constants/eventTypes'
+import { getKarmaTransactionActionInfo } from '../constants/karmaTransactionActions'
 import { serviceVerificationStatusChangesById } from '../constants/serviceStatusChange'
 import { serviceSuggestionStatusChangesById } from '../constants/suggestionStatusChange'
 
@@ -16,6 +17,12 @@ export function makeNotificationTitle(
       aboutCommentStatusChange: true
       aboutServiceVerificationStatusChange: true
       aboutSuggestionStatusChange: true
+      aboutKarmaTransaction: {
+        select: {
+          points: true
+          action: true
+        }
+      }
       aboutComment: {
         select: {
           author: { select: { id: true } }
@@ -137,6 +144,13 @@ export function makeNotificationTitle(
     // case 'KARMA_UNLOCK': {
     //   return 'New karma level unlocked'
     // }
+    case 'KARMA_CHANGE': {
+      if (!notification.aboutKarmaTransaction) return 'Your karma has changed'
+      const { points, action } = notification.aboutKarmaTransaction
+      const sign = points > 0 ? '+' : ''
+      const karmaInfo = getKarmaTransactionActionInfo(action)
+      return `${sign}${points.toLocaleString()} karma for ${karmaInfo.label}`
+    }
     case 'ACCOUNT_STATUS_CHANGE': {
       if (!notification.aboutAccountStatusChange) return 'Your account status has been updated'
       const accountStatusChange = accountStatusChangesById[notification.aboutAccountStatusChange]
@@ -165,6 +179,11 @@ export function makeNotificationContent(
   notification: Prisma.NotificationGetPayload<{
     select: {
       type: true
+      aboutKarmaTransaction: {
+        select: {
+          description: true
+        }
+      }
       aboutComment: {
         select: {
           content: true
@@ -187,6 +206,10 @@ export function makeNotificationContent(
   switch (notification.type) {
     // TODO: [KARMA_UNLOCK] Will be added later, when karma unloks are in the database, not in the code.
     // case 'KARMA_UNLOCK':
+    case 'KARMA_CHANGE': {
+      if (!notification.aboutKarmaTransaction) return null
+      return notification.aboutKarmaTransaction.description
+    }
     case 'SUGGESTION_STATUS_CHANGE':
     case 'ACCOUNT_STATUS_CHANGE':
     case 'SERVICE_VERIFICATION_STATUS_CHANGE': {
@@ -280,6 +303,9 @@ export function makeNotificationLink(
     // case 'KARMA_UNLOCK': {
     //   return `${origin}/account#karma-unlocks`
     // }
+    case 'KARMA_CHANGE': {
+      return `${origin}/account#karma-transactions`
+    }
     case 'ACCOUNT_STATUS_CHANGE': {
       return `${origin}/account#account-status`
     }
