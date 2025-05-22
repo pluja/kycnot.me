@@ -38,8 +38,12 @@ const {
 const hasScams =
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   filters.verification.includes('VERIFICATION_FAILED') || includeScams
+const hasSomeScam = !!services?.some((service) => service.verificationStatus.includes('VERIFICATION_FAILED'))
 
 const hasCommunityContributed = filters.verification.includes('COMMUNITY_CONTRIBUTED')
+const hasSomeCommunityContributed = !!services?.some((service) =>
+  service.verificationStatus.includes('COMMUNITY_CONTRIBUTED')
+)
 
 const totalPages = Math.ceil(total / pageSize) || 1
 ---
@@ -63,29 +67,36 @@ const totalPages = Math.ceil(total / pageSize) || 1
 
   {
     hasScams && hasCommunityContributed && (
-      <div class="font-title mb-6 rounded-lg border border-red-500/30 bg-red-950 p-4 text-sm text-red-500">
-        <Icon name="ri:alert-fill" class="-mr-1 inline-block size-4 text-red-500" />
-        <Icon name="ri:question-line" class="mr-2 inline-block size-4 text-yellow-500" />
-        Showing SCAM and unverified community-contributed services.
-        {includeScams && 'Because there is a text query.'}
+      <div class="font-title mb-6 rounded-lg border border-red-500/30 bg-red-950 px-3 py-2 text-sm text-pretty text-red-500">
+        <Icon name="ri:alert-fill" class="inline-block size-4 shrink-0 align-[-0.2em] text-red-500" />
+        <Icon
+          name="ri:question-line"
+          class="mr-1 inline-block size-4 shrink-0 align-[-0.2em] text-yellow-500"
+        />
+        Results {hasSomeScam || hasSomeCommunityContributed ? 'include' : 'may include'} SCAMS or
+        community-contributed services.
       </div>
     )
   }
 
   {
     hasScams && !hasCommunityContributed && (
-      <div class="font-title mb-6 rounded-lg border border-red-500/30 bg-red-950 p-4 text-sm text-red-500">
-        <Icon name="ri:alert-fill" class="mr-2 inline-block size-4 text-red-500" />
-        {includeScams ? 'Showing SCAM services because there is a text query.' : 'Showing SCAM services!'}
+      <div class="font-title mb-6 rounded-lg border border-red-500/30 bg-red-950 px-3 py-2 text-sm text-pretty text-red-500">
+        <Icon name="ri:alert-fill" class="mr-1 inline-block size-4 shrink-0 align-[-0.2em] text-red-500" />
+        Results {hasSomeScam ? 'include' : 'may include'} SCAM services
       </div>
     )
   }
 
   {
     !hasScams && hasCommunityContributed && (
-      <div class="font-title mb-6 rounded-lg border border-yellow-500/30 bg-yellow-950 p-4 text-sm text-yellow-500">
-        <Icon name="ri:question-line" class="mr-2 inline-block size-4" />
-        Showing unverified community-contributed services, some might be scams.
+      <div class="font-title mb-6 rounded-lg border border-yellow-500/30 bg-yellow-950 px-3 py-2 text-sm text-pretty text-yellow-500">
+        <Icon
+          name="ri:question-line"
+          class="mr-1 inline-block size-4 shrink-0 align-[-0.2em] text-yellow-500"
+        />
+        Results {hasSomeCommunityContributed ? 'include' : 'may include'} unverified community-contributed
+        services, some might be scams.
       </div>
     )
   }
