@@ -310,7 +310,7 @@ const where = {
   ],
 } as const satisfies Prisma.ServiceWhereInput
 
-const [categories, [services, totalServices], countIfIncludingCommunity, attributes] =
+const [categories, [services, totalServices], countCommunityOnly, attributes] =
   await Astro.locals.banners.tryMany([
     [
       'Unable to load category filters.',
@@ -416,10 +416,7 @@ const [categories, [services, totalServices], countIfIncludingCommunity, attribu
           ? prisma.service.count({
               where: {
                 ...where,
-                verificationStatus: {
-                  ...where.verificationStatus,
-                  in: uniq([...where.verificationStatus.in, 'COMMUNITY_CONTRIBUTED'] as const),
-                },
+                verificationStatus: 'COMMUNITY_CONTRIBUTED',
               },
             })
           : null,
@@ -707,7 +704,7 @@ const showFiltersId = 'show-filters'
       sortSeed={filters['sort-seed']}
       filters={filters}
       includeScams={includeScams}
-      countIfIncludingCommunity={countIfIncludingCommunity}
+      countCommunityOnly={countCommunityOnly}
       inlineIcons
     />
   </div>

@@ -22,7 +22,7 @@ type Props = HTMLAttributes<'div'> & {
   sortSeed?: string
   filters: ServicesFiltersObject
   includeScams: boolean
-  countIfIncludingCommunity: number | null
+  countCommunityOnly: number | null
   inlineIcons?: boolean
 }
 
@@ -36,7 +36,7 @@ const {
   class: className,
   filters,
   includeScams,
-  countIfIncludingCommunity,
+  countCommunityOnly,
   inlineIcons,
   ...divProps
 } = Astro.props
@@ -59,8 +59,6 @@ const urlIfIncludingCommunity = urlWithParams(Astro.url, {
     verificationStatusesByValue.COMMUNITY_CONTRIBUTED.slug,
   ]),
 })
-
-const extraIfIncludingCommunity = Math.max(0, (countIfIncludingCommunity ?? 0) - (services?.length ?? 0))
 ---
 
 <div {...divProps} class={cn('flex-1', className)}>
@@ -77,12 +75,12 @@ const extraIfIncludingCommunity = Math.max(0, (countIfIncludingCommunity ?? 0) -
       />
 
       {
-        extraIfIncludingCommunity > 0 && (
+        countCommunityOnly && (
           <>
             <Button
               as="a"
               href={urlIfIncludingCommunity}
-              label={`Include +${extraIfIncludingCommunity.toLocaleString()} community contributed`}
+              label={`Include +${countCommunityOnly.toLocaleString()} community contributed`}
               size="sm"
               class="hidden lg:inline-flex"
               icon="ri:search-line"
@@ -91,7 +89,7 @@ const extraIfIncludingCommunity = Math.max(0, (countIfIncludingCommunity ?? 0) -
             <Button
               as="a"
               href={urlIfIncludingCommunity}
-              label={`Include +${extraIfIncludingCommunity.toLocaleString()}`}
+              label={`Include +${countCommunityOnly.toLocaleString()}`}
               size="sm"
               class="hidden sm:inline-flex lg:hidden"
               icon="ri:search-line"
@@ -112,7 +110,7 @@ const extraIfIncludingCommunity = Math.max(0, (countIfIncludingCommunity ?? 0) -
                 is:inline={inlineIcons}
               />
               Include
-              {extraIfIncludingCommunity.toLocaleString()}
+              {countCommunityOnly.toLocaleString()}
               <Icon
                 name="ri:question-line"
                 class="inline-block size-3.5 shrink-0 align-[-0.15em] text-yellow-200/50"
@@ -198,11 +196,11 @@ const extraIfIncludingCommunity = Math.max(0, (countIfIncludingCommunity ?? 0) -
               inlineIcon={inlineIcons}
             />
           )}
-          {extraIfIncludingCommunity > 0 && (
+          {countCommunityOnly && (
             <Button
               as="a"
               href={urlIfIncludingCommunity}
-              label={`Show ${extraIfIncludingCommunity.toLocaleString()} community contributed`}
+              label={`Show ${countCommunityOnly.toLocaleString()} community contributed`}
               icon="ri:search-line"
               inlineIcon={inlineIcons}
             />
