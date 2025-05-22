@@ -10,6 +10,7 @@ import Pagination from '../components/Pagination.astro'
 import ServiceFiltersPill from '../components/ServiceFiltersPill.astro'
 import ServicesFilters from '../components/ServicesFilters.astro'
 import ServicesSearchResults from '../components/ServicesSearchResults.astro'
+import { getAttributeCategoryInfo } from '../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../constants/attributeTypes'
 import {
   currencies,
@@ -204,233 +205,254 @@ const includeScams =
 
 export type ServicesFiltersObject = typeof filters
 
-const [categories, [services, totalServices]] = await Astro.locals.banners.tryMany([
-  [
-    'Unable to load category filters.',
-    () =>
-      prisma.category.findMany({
-        select: {
-          name: true,
-          slug: true,
-          icon: true,
-          _count: {
-            select: {
-              services: true,
+const groupedAttributes = groupBy(
+  Object.entries(filters.attr ?? {}).flatMap(([key, value]) => {
+    const id = parseIntWithFallback(key)
+    if (id === null) return []
+    return [{ id, value }]
+  }),
+  'value'
+)
+
+const where = {
+  listedAt: {
+    lte: new Date(),
+  },
+  categories: filters.categories.length ? { some: { slug: { in: filters.categories } } } : undefined,
+  verificationStatus: {
+    in: includeScams ? uniq([...filters.verification, 'VERIFICATION_FAILED'] as const) : filters.verification,
+  },
+  serviceVisibility: ServiceVisibility.PUBLIC,
+  overallScore: { gte: filters['min-score'] },
+  acceptedCurrencies: filters.currencies.length
+    ? filters['currency-mode'] === 'and'
+      ? { hasEvery: filters.currencies }
+      : { hasSome: filters.currencies }
+    : undefined,
+  kycLevel: {
+    lte: filters['max-kyc'],
+  },
+  AND: [
+    ...(filters['user-rating'] > 0
+      ? [
+          {
+            averageUserRating: {
+              gte: filters['user-rating'],
             },
-          },
-        },
-      }),
-  ],
-  [
-    'Unable to load services.',
-    async () => {
-      const groupedAttributes = groupBy(
-        Object.entries(filters.attr ?? {}).flatMap(([key, value]) => {
-          const id = parseIntWithFallback(key)
-          if (id === null) return []
-          return [{ id, value }]
-        }),
-        'value'
-      )
-
-      const [unsortedServices, totalServices] = await prisma.service.findManyAndCount({
-        where: {
-          listedAt: {
-            lte: new Date(),
-          },
-          categories: filters.categories.length ? { some: { slug: { in: filters.categories } } } : undefined,
-          verificationStatus: {
-            in: includeScams
-              ? uniq([...filters.verification, 'VERIFICATION_FAILED'] as const)
-              : filters.verification,
-          },
-          serviceVisibility: ServiceVisibility.PUBLIC,
-          overallScore: { gte: filters['min-score'] },
-          acceptedCurrencies: filters.currencies.length
-            ? filters['currency-mode'] === 'and'
-              ? { hasEvery: filters.currencies }
-              : { hasSome: filters.currencies }
-            : undefined,
-          kycLevel: {
-            lte: filters['max-kyc'],
-          },
-          AND: [
-            ...(filters['user-rating'] > 0
-              ? [
-                  {
-                    averageUserRating: {
-                      gte: filters['user-rating'],
+          } satisfies Prisma.ServiceWhereInput,
+        ]
+      : []),
+    ...(filters.q
+      ? [
+          {
+            OR: [
+              { name: { contains: filters.q, mode: 'insensitive' as const } },
+              { description: { contains: filters.q, mode: 'insensitive' as const } },
+            ],
+          } satisfies Prisma.ServiceWhereInput,
+        ]
+      : []),
+    ...(filters.networks.length
+      ? [
+          {
+            OR: [
+              ...(filters.networks.includes('onion') ? [{ onionUrls: { isEmpty: false } }] : []),
+              ...(filters.networks.includes('i2p') ? [{ i2pUrls: { isEmpty: false } }] : []),
+              ...(filters.networks.includes('clearnet') ? [{ serviceUrls: { isEmpty: false } }] : []),
+            ],
+          } satisfies Prisma.ServiceWhereInput,
+        ]
+      : []),
+    ...(filters.attr && (groupedAttributes.yes?.length ?? 0) + (groupedAttributes.no?.length ?? 0) > 0
+      ? [
+          {
+            AND: [
+              ...(groupedAttributes.yes && groupedAttributes.yes.length > 0
+                ? [
+                    {
+                      [filters['attribute-mode'] === 'and' ? 'AND' : 'OR']: groupedAttributes.yes.map(
+                        ({ id }) =>
+                          ({
+                            attributes: {
+                              some: {
+                                attribute: {
+                                  id,
+                                },
+                              },
+                            },
+                          }) satisfies Prisma.ServiceWhereInput
+                      ),
                     },
-                  } satisfies Prisma.ServiceWhereInput,
-                ]
-              : []),
-            ...(filters.q
-              ? [
-                  {
-                    OR: [
-                      { name: { contains: filters.q, mode: 'insensitive' as const } },
-                      { description: { contains: filters.q, mode: 'insensitive' as const } },
-                    ],
-                  } satisfies Prisma.ServiceWhereInput,
-                ]
-              : []),
-            ...(filters.networks.length
-              ? [
-                  {
-                    OR: [
-                      ...(filters.networks.includes('onion') ? [{ onionUrls: { isEmpty: false } }] : []),
-                      ...(filters.networks.includes('i2p') ? [{ i2pUrls: { isEmpty: false } }] : []),
-                      ...(filters.networks.includes('clearnet') ? [{ serviceUrls: { isEmpty: false } }] : []),
-                    ],
-                  } satisfies Prisma.ServiceWhereInput,
-                ]
-              : []),
-            ...(filters.attr && (groupedAttributes.yes?.length ?? 0) + (groupedAttributes.no?.length ?? 0) > 0
-              ? [
-                  {
-                    AND: [
-                      ...(groupedAttributes.yes && groupedAttributes.yes.length > 0
-                        ? [
-                            {
-                              [filters['attribute-mode'] === 'and' ? 'AND' : 'OR']: groupedAttributes.yes.map(
-                                ({ id }) =>
-                                  ({
-                                    attributes: {
-                                      some: {
-                                        attribute: {
-                                          id,
-                                        },
-                                      },
-                                    },
-                                  }) satisfies Prisma.ServiceWhereInput
-                              ),
+                  ]
+                : []),
+              ...(groupedAttributes.no && groupedAttributes.no.length > 0
+                ? [
+                    {
+                      [filters['attribute-mode'] === 'and' ? 'AND' : 'OR']: groupedAttributes.no.map(
+                        ({ id }) =>
+                          ({
+                            attributes: {
+                              none: {
+                                attribute: {
+                                  id,
+                                },
+                              },
                             },
-                          ]
-                        : []),
-                      ...(groupedAttributes.no && groupedAttributes.no.length > 0
-                        ? [
-                            {
-                              [filters['attribute-mode'] === 'and' ? 'AND' : 'OR']: groupedAttributes.no.map(
-                                ({ id }) =>
-                                  ({
-                                    attributes: {
-                                      none: {
-                                        attribute: {
-                                          id,
-                                        },
-                                      },
-                                    },
-                                  }) satisfies Prisma.ServiceWhereInput
-                              ),
-                            },
-                          ]
-                        : []),
-                    ],
-                  },
-                ]
-              : []),
-          ],
-        },
-        select: {
-          id: true,
-          ...(Object.fromEntries(sortOptions.map((option) => [option.orderBy.key, true])) as Record<
-            (typeof sortOptions)[number]['orderBy']['key'],
-            true
-          >),
-        },
-      })
-
-      const rng = seedrandom(filters['sort-seed'])
-      const selectedSort = sortOptions.find((sort) => sort.value === filters.sort) ?? defaultSortOption
-
-      const sortedServices = orderBy(
-        unsortedServices,
-        [selectedSort.orderBy.key, () => rng()],
-        [selectedSort.orderBy.direction, 'asc']
-      ).slice((filters.page - 1) * PAGE_SIZE, filters.page * PAGE_SIZE)
-
-      const unsortedServicesWithInfo = await prisma.service.findMany({
-        where: {
-          id: {
-            in: sortedServices.map((service) => service.id),
+                          }) satisfies Prisma.ServiceWhereInput
+                      ),
+                    },
+                  ]
+                : []),
+            ],
           },
-        },
-        select: {
-          name: true,
-          slug: true,
-          description: true,
-          overallScore: true,
-          privacyScore: true,
-          trustScore: true,
-          kycLevel: true,
-          imageUrl: true,
-          verificationStatus: true,
-          acceptedCurrencies: true,
-          attributes: {
-            select: {
-              attribute: {
-                select: {
-                  id: true,
-                  slug: true,
-                  title: true,
-                  category: true,
-                  type: true,
-                },
+        ]
+      : []),
+  ],
+} as const satisfies Prisma.ServiceWhereInput
+
+const [categories, [services, totalServices], countIfIncludingCommunity, attributes] =
+  await Astro.locals.banners.tryMany([
+    [
+      'Unable to load category filters.',
+      () =>
+        prisma.category.findMany({
+          select: {
+            name: true,
+            slug: true,
+            icon: true,
+            _count: {
+              select: {
+                services: true,
               },
             },
           },
-          categories: {
-            select: {
-              name: true,
-              icon: true,
+        }),
+    ],
+    [
+      'Unable to load services.',
+      async () => {
+        const [unsortedServices, totalServices] = await prisma.service.findManyAndCount({
+          where,
+          select: {
+            id: true,
+            ...(Object.fromEntries(sortOptions.map((option) => [option.orderBy.key, true])) as Record<
+              (typeof sortOptions)[number]['orderBy']['key'],
+              true
+            >),
+          },
+        })
+
+        const rng = seedrandom(filters['sort-seed'])
+        const selectedSort = sortOptions.find((sort) => sort.value === filters.sort) ?? defaultSortOption
+
+        const sortedServices = orderBy(
+          unsortedServices,
+          [selectedSort.orderBy.key, () => rng()],
+          [selectedSort.orderBy.direction, 'asc']
+        ).slice((filters.page - 1) * PAGE_SIZE, filters.page * PAGE_SIZE)
+
+        const unsortedServicesWithInfo = await prisma.service.findMany({
+          where: {
+            id: {
+              in: sortedServices.map((service) => service.id),
             },
           },
-        },
-      })
-
-      const sortedServicesWithInfo = orderBy(
-        unsortedServicesWithInfo,
-        [
-          selectedSort.orderBy.key,
-          // Now we can shuffle indeternimistically, because the pagination was already applied
-          () => Math.random(),
-        ],
-        [selectedSort.orderBy.direction, 'asc']
-      )
-
-      return [sortedServicesWithInfo, totalServices] as const
-    },
-    [[] as [], 0, false] as const,
-  ],
-])
-
-const attributes = await Astro.locals.banners.try(
-  'Unable to load attribute filters.',
-  () =>
-    prisma.attribute.findMany({
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        category: true,
-        type: true,
-        _count: {
           select: {
-            services: true,
+            name: true,
+            slug: true,
+            description: true,
+            overallScore: true,
+            privacyScore: true,
+            trustScore: true,
+            kycLevel: true,
+            imageUrl: true,
+            verificationStatus: true,
+            acceptedCurrencies: true,
+            attributes: {
+              select: {
+                attribute: {
+                  select: {
+                    id: true,
+                    slug: true,
+                    title: true,
+                    category: true,
+                    type: true,
+                  },
+                },
+              },
+            },
+            categories: {
+              select: {
+                name: true,
+                icon: true,
+              },
+            },
           },
-        },
+        })
+
+        const sortedServicesWithInfo = orderBy(
+          unsortedServicesWithInfo,
+          [
+            selectedSort.orderBy.key,
+            // Now we can shuffle indeternimistically, because the pagination was already applied
+            () => Math.random(),
+          ],
+          [selectedSort.orderBy.direction, 'asc']
+        )
+
+        return [sortedServicesWithInfo, totalServices] as const
       },
-      orderBy: [{ category: 'asc' }, { type: 'asc' }, { title: 'asc' }],
-    }),
-  []
-)
+      [[] as [], 0, false] as const,
+    ],
+    [
+      'Unable to load count if including community.',
+      () =>
+        areEqualArraysWithoutOrder(filters.verification, ['VERIFICATION_SUCCESS', 'APPROVED']) ||
+        areEqualArraysWithoutOrder(filters.verification, [
+          'VERIFICATION_SUCCESS',
+          'APPROVED',
+          'VERIFICATION_FAILED',
+        ])
+          ? prisma.service.count({
+              where: {
+                ...where,
+                verificationStatus: {
+                  ...where.verificationStatus,
+                  in: uniq([...where.verificationStatus.in, 'COMMUNITY_CONTRIBUTED'] as const),
+                },
+              },
+            })
+          : null,
+      null,
+    ],
+    [
+      'Unable to load attribute filters.',
+      () =>
+        prisma.attribute.findMany({
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            category: true,
+            type: true,
+            _count: {
+              select: {
+                services: true,
+              },
+            },
+          },
+          orderBy: [{ category: 'asc' }, { type: 'asc' }, { title: 'asc' }],
+        }),
+      [],
+    ],
+  ])
 
 const attributesByCategory = orderBy(
   Object.entries(
     groupBy(
       attributes.map((attr) => {
         return {
-          info: getAttributeTypeInfo(attr.type),
+          typeInfo: getAttributeTypeInfo(attr.type),
           ...attr,
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
           value: filters.attr?.[attr.id] || undefined,
@@ -440,6 +462,7 @@ const attributesByCategory = orderBy(
     )
   ).map(([category, attributes]) => ({
     category,
+    categoryInfo: getAttributeCategoryInfo(category),
     attributes: orderBy(
       attributes,
       ['value', 'type', '_count.services', 'title'],
@@ -684,6 +707,8 @@ const showFiltersId = 'show-filters'
       sortSeed={filters['sort-seed']}
       filters={filters}
       includeScams={includeScams}
+      countIfIncludingCommunity={countIfIncludingCommunity}
+      inlineIcons
     />
   </div>
   {

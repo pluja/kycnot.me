@@ -16,6 +16,4 @@ for trigger_file in prisma/triggers/*.sql; do
   fi
 done
 
-# Start the application
-echo "Starting the application..."
-exec "$@"
+echo "Migrations completed."

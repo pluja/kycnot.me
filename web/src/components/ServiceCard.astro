@@ -88,12 +88,26 @@ const overallScoreInfo = makeOverallScoreInfo(overallScore)
       <h3 class="font-title text-lg leading-none font-medium tracking-wide text-white">
         {name}{
           statusIcon && (
-            <Tooltip text={statusIcon.label} position="right" class="-my-2 shrink-0">
-              <Icon
-                is:inline={inlineIcons}
-                name={statusIcon.icon}
-                class={cn('inline-block size-6 shrink-0 rounded-lg p-1', statusIcon.classNames.icon)}
-              />
+            <Tooltip
+              text={statusIcon.label}
+              position="right"
+              class="-my-2 shrink-0 whitespace-nowrap"
+              enabled={verificationStatus !== 'VERIFICATION_FAILED'}
+            >
+              {[
+                <Icon
+                  is:inline={inlineIcons}
+                  name={statusIcon.icon}
+                  class={cn(
+                    'inline-block size-6 shrink-0 rounded-lg p-1 align-[-0.37em]',
+                    verificationStatus === 'VERIFICATION_FAILED' && 'pr-0',
+                    statusIcon.classNames.icon
+                  )}
+                />,
+                verificationStatus === 'VERIFICATION_FAILED' && (
+                  <span class="text-sm font-bold text-red-500">SCAM</span>
+                ),
+              ]}
             </Tooltip>
           )
         }

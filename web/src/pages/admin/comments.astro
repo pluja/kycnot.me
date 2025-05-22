@@ -82,12 +82,13 @@ const totalPages = Math.ceil(totalComments / PAGE_SIZE)
           <a
             href={urlWithParams(Astro.url, { status: filter.value })}
             class={cn([
-              'font-title rounded-md border px-3 py-1 text-sm',
+              'font-title flex items-center gap-2 rounded-md border px-3 py-1 text-sm',
               params.status === filter.value
                 ? filter.classNames.filter
                 : 'border-zinc-700 transition-colors hover:border-green-500/50',
             ])}
           >
+            <Icon name={filter.icon} class="size-4 shrink-0" />
             {filter.label}
           </a>
         ))

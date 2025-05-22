@@ -19,9 +19,8 @@ ENV HOST=0.0.0.0
 ENV PORT=4321
 EXPOSE 4321
 
-# Add entrypoint script and make it executable
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Add knm-migrate command script and make it executable
+COPY migrate.sh /usr/local/bin/knm-migrate
+RUN chmod +x /usr/local/bin/knm-migrate
 
-ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "./dist/server/entry.mjs"]

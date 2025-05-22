@@ -19,6 +19,7 @@ type Props<Tag extends 'a' | 'button' | 'label' = 'button'> = Polymorphic<
       dataAstroReload?: boolean
       children?: never
       disabled?: boolean
+      inlineIcon?: boolean
     }
 >
 
@@ -143,6 +144,7 @@ const {
   role,
   dataAstroReload,
   disabled,
+  inlineIcon,
   ...htmlProps
 } = Astro.props
 
@@ -164,11 +166,11 @@ const ActualTag = disabled && Tag === 'a' ? 'span' : Tag
   {...dataAstroReload && { 'data-astro-reload': dataAstroReload }}
   {...htmlProps}
 >
-  {!!icon && <Icon name={icon} class={iconSlot({ class: classNames?.icon })} />}
+  {!!icon && <Icon name={icon} class={iconSlot({ class: classNames?.icon })} is:inline={inlineIcon} />}
   {!!label && <span class={labelSlot({ class: classNames?.label })}>{label}</span>}
   {
     !!endIcon && (
-      <Icon name={endIcon} class={endIconSlot({ class: classNames?.endIcon })}>
+      <Icon name={endIcon} class={endIconSlot({ class: classNames?.endIcon })} is:inline={inlineIcon}>
         {endIcon}
       </Icon>
     )

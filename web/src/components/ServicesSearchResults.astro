@@ -1,9 +1,11 @@
 ---
 import { Icon } from 'astro-icon/components'
+import { uniq } from 'lodash-es'
 
+import { verificationStatusesByValue } from '../constants/verificationStatus'
 import { cn } from '../lib/cn'
 import { pluralize } from '../lib/pluralize'
-import { createPageUrl } from '../lib/urls'
+import { createPageUrl, urlWithParams } from '../lib/urls'
 
 import Button from './Button.astro'
 import ServiceCard from './ServiceCard.astro'
@@ -20,6 +22,8 @@ type Props = HTMLAttributes<'div'> & {
   sortSeed?: string
   filters: ServicesFiltersObject
   includeScams: boolean
+  countIfIncludingCommunity: number | null
+  inlineIcons?: boolean
 }
 
 const {
@@ -32,6 +36,8 @@ const {
   class: className,
   filters,
   includeScams,
+  countIfIncludingCommunity,
+  inlineIcons,
   ...divProps
 } = Astro.props
 
@@ -46,34 +52,68 @@ const hasSomeCommunityContributed = !!services?.some((service) =>
 )
 
 const totalPages = Math.ceil(total / pageSize) || 1
+
+const urlIfIncludingCommunity = urlWithParams(Astro.url, {
+  verification: uniq([
+    ...filters.verification.map((v) => verificationStatusesByValue[v].slug),
+    verificationStatusesByValue.COMMUNITY_CONTRIBUTED.slug,
+  ]),
+})
+
+const extraIfIncludingCommunity = Math.max(0, (countIfIncludingCommunity ?? 0) - (services?.length ?? 0))
 ---
 
 <div {...divProps} class={cn('flex-1', className)}>
-  <div class="mb-6 flex items-center justify-between">
+  <div class="flex items-center justify-between">
     <span class="text-day-500 text-sm">
       {total.toLocaleString()}
       {pluralize('result', total)}
+
+      {
+        extraIfIncludingCommunity > 0 && (
+          <Button
+            as="a"
+            href={urlIfIncludingCommunity}
+            label={`Include +${extraIfIncludingCommunity.toLocaleString()} community contributed`}
+            size="sm"
+            class="ml-6 align-[-0.15em]"
+            icon="ri:search-line"
+            inlineIcon={inlineIcons}
+          />
+        )
+      }
 
       <span
         id="search-indicator"
         class="htmx-request:opacity-100 text-white opacity-0 transition-opacity duration-500"
       >
-        <Icon name="ri:loader-4-line" class="inline-block size-4 animate-spin" />
+        <Icon name="ri:loader-4-line" class="inline-block size-4 animate-spin" is:inline={inlineIcons} />
         Loading...
       </span>
     </span>
-    <Button as="a" href="/service-suggestion/new" label="Add service" icon="ri:add-line" />
+    <Button
+      as="a"
+      href="/service-suggestion/new"
+      label="Add service"
+      icon="ri:add-line"
+      inlineIcon={inlineIcons}
+    />
   </div>
 
   {
     hasScams && hasCommunityContributed && (
-      <div class="font-title mb-6 rounded-lg border border-red-500/30 bg-red-950 px-3 py-2 text-sm text-pretty text-red-500">
-        <Icon name="ri:alert-fill" class="inline-block size-4 shrink-0 align-[-0.2em] text-red-500" />
+      <div class="font-title mt-2 rounded-lg bg-red-900/50 px-3 py-2 text-sm text-pretty text-red-400">
+        <Icon
+          name="ri:alert-fill"
+          class="inline-block size-4 shrink-0 align-[-0.2em] text-red-500"
+          is:inline={inlineIcons}
+        />
         <Icon
           name="ri:question-line"
-          class="mr-1 inline-block size-4 shrink-0 align-[-0.2em] text-yellow-500"
+          class="mr-1 inline-block size-4 shrink-0 align-[-0.2em] text-yellow-400"
+          is:inline={inlineIcons}
         />
-        Results {hasSomeScam || hasSomeCommunityContributed ? 'include' : 'may include'} SCAMS or
+        Results {hasSomeScam || hasSomeCommunityContributed ? 'include' : 'may include'} SCAMs or
         community-contributed services.
       </div>
     )
@@ -81,8 +121,12 @@ const totalPages = Math.ceil(total / pageSize) || 1
 
   {
     hasScams && !hasCommunityContributed && (
-      <div class="font-title mb-6 rounded-lg border border-red-500/30 bg-red-950 px-3 py-2 text-sm text-pretty text-red-500">
-        <Icon name="ri:alert-fill" class="mr-1 inline-block size-4 shrink-0 align-[-0.2em] text-red-500" />
+      <div class="font-title mt-2 rounded-lg bg-red-900/50 px-3 py-2 text-sm text-pretty text-red-400">
+        <Icon
+          name="ri:alert-fill"
+          class="mr-1 inline-block size-4 shrink-0 align-[-0.2em] text-red-500"
+          is:inline={inlineIcons}
+        />
         Results {hasSomeScam ? 'include' : 'may include'} SCAM services
       </div>
     )
@@ -90,10 +134,11 @@ const totalPages = Math.ceil(total / pageSize) || 1
 
   {
     !hasScams && hasCommunityContributed && (
-      <div class="font-title mb-6 rounded-lg border border-yellow-500/30 bg-yellow-950 px-3 py-2 text-sm text-pretty text-yellow-500">
+      <div class="font-title mt-2 rounded-lg bg-yellow-600/30 px-3 py-2 text-sm text-pretty text-yellow-200">
         <Icon
           name="ri:question-line"
-          class="mr-1 inline-block size-4 shrink-0 align-[-0.2em] text-yellow-500"
+          class="mr-1 inline-block size-4 shrink-0 align-[-0.2em] text-yellow-400"
+          is:inline={inlineIcons}
         />
         Results {hasSomeCommunityContributed ? 'include' : 'may include'} unverified community-contributed
         services, some might be scams.
@@ -103,26 +148,37 @@ const totalPages = Math.ceil(total / pageSize) || 1
 
   {
     !services || services.length === 0 ? (
-      <div class="sticky top-20 flex flex-col items-center justify-center rounded-lg border border-green-500/30 bg-black/40 p-12 text-center">
-        <Icon name="ri:emotion-sad-line" class="mb-4 size-16 text-green-500/50" />
+      <div class="sticky top-20 mt-6 flex flex-col items-center justify-center py-12 text-center">
+        <Icon name="ri:emotion-sad-line" class="mb-4 size-16 text-green-500/50" is:inline={inlineIcons} />
         <h3 class="font-title mb-3 text-xl text-green-500">No services found</h3>
         <p class="text-day-400">Try adjusting your filters to find more services</p>
-        <a
-          href={Astro.url.pathname}
-          class={cn(
-            'bg-night-800 font-title mt-4 rounded-md px-4 py-2 text-sm tracking-wider text-white uppercase',
-            hasDefaultFilters && 'hidden'
+        <div class="mt-4 flex justify-center gap-2">
+          {!hasDefaultFilters && (
+            <Button
+              as="a"
+              href={Astro.url.pathname}
+              label="Clear filters"
+              icon="ri:close-line"
+              inlineIcon={inlineIcons}
+            />
           )}
-        >
-          Clear filters
-        </a>
+          {extraIfIncludingCommunity > 0 && (
+            <Button
+              as="a"
+              href={urlIfIncludingCommunity}
+              label={`Show ${extraIfIncludingCommunity.toLocaleString()} community contributed`}
+              icon="ri:search-line"
+              inlineIcon={inlineIcons}
+            />
+          )}
+        </div>
       </div>
     ) : (
       <>
-        <div class="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*80),1fr))]">
+        <div class="mt-6 grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*80),1fr))]">
           {services.map((service, i) => (
             <ServiceCard
-              inlineIcons
+              inlineIcons={inlineIcons}
               service={service}
               data-hx-search-results-card
               {...(i === services.length - 1 && currentPage < totalPages
@@ -140,7 +196,11 @@ const totalPages = Math.ceil(total / pageSize) || 1
 
         <div class="no-js:hidden mt-8 flex justify-center" id="infinite-scroll-indicator">
           <div class="htmx-request:opacity-100 flex items-center gap-2 opacity-0 transition-opacity duration-500">
-            <Icon name="ri:loader-4-line" class="size-8 animate-spin text-green-500" />
+            <Icon
+              name="ri:loader-4-line"
+              class="size-8 animate-spin text-green-500"
+              is:inline={inlineIcons}
+            />
             Loading more services...
           </div>
         </div>

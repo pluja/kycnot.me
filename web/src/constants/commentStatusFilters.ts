@@ -48,9 +48,9 @@ export const {
     },
     {
       value: 'pending',
-      label: commentStatusById.PENDING.label,
+      label: 'AI pending',
       color: commentStatusById.PENDING.color,
-      icon: commentStatusById.PENDING.icon,
+      icon: 'ri:robot-2-line',
       whereClause: {
         OR: [{ status: 'PENDING' }, { status: 'HUMAN_PENDING' }],
       },
@@ -60,9 +60,9 @@ export const {
     },
     {
       value: 'human-pending',
-      label: commentStatusById.HUMAN_PENDING.label,
+      label: 'Human needed',
       color: commentStatusById.HUMAN_PENDING.color,
-      icon: commentStatusById.HUMAN_PENDING.icon,
+      icon: 'ri:user-search-line',
       whereClause: { status: 'HUMAN_PENDING' },
       classNames: {
         filter: 'border-blue-500 bg-blue-500/20 text-blue-400',

@@ -70,7 +70,7 @@ services:
     expose:
       - 4321
     healthcheck:
-      test: ["CMD", "curl", "-k", "--silent", "--fail", "http://localhost:4321"]
+      test: ["CMD", "curl", "-k", "--silent", "--fail", "http://localhost:4321/health"]
       interval: 10s
       timeout: 5s
       retries: 5

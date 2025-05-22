@@ -304,9 +304,16 @@ const {
       />
     </div>
     {
-      options.attributesByCategory.map(({ category, attributes }) => (
+      options.attributesByCategory.map(({ categoryInfo, attributes }) => (
         <fieldset class="min-w-0">
-          <legend class="font-title mb-0.5 text-xs tracking-wide text-white">{category}</legend>
+          <legend class="font-title mb-0.5 inline-flex items-center gap-1 text-[0.8125rem] tracking-wide text-white uppercase">
+            <Icon
+              name={categoryInfo.icon}
+              class={cn('size-4 shrink-0 opacity-80', categoryInfo.classNames.icon)}
+              aria-hidden="true"
+            />
+            {categoryInfo.label}
+          </legend>
 
           <ul class="[:not(:has(~_.peer:checked))]:[&>li:not([data-show-always])]:hidden">
             {attributes.map((attribute) => {
@@ -371,11 +378,9 @@ const {
                     </label>
 
                     <span
-                      class="bg-night-400 border-night-500 pointer-events-none block h-4 w-px border-y peer-checked/no:w-[0.5px] peer-checked/yes:w-[0.5px]"
+                      class="bg-night-400 border-night-500 before:bg-night-400 before:border-night-600 pointer-events-none block h-4 w-px border-y peer-checked/no:w-[0.5px] peer-checked/yes:w-[0.5px] before:h-full before:w-px before:border-y-2"
                       aria-hidden="true"
-                    >
-                      <span class="bg-night-400 border-night-600 block h-full w-px border-y-2" />
-                    </span>
+                    />
 
                     <label
                       for={noId}
@@ -398,8 +403,8 @@ const {
                       aria-hidden="true"
                     >
                       <Icon
-                        name={attribute.info.icon}
-                        class={cn('mr-2 size-3 shrink-0 opacity-80', attribute.info.classNames.icon)}
+                        name={attribute.typeInfo.icon}
+                        class={cn('mr-2 size-3 shrink-0 opacity-80', attribute.typeInfo.classNames.icon)}
                         aria-hidden="true"
                       />
                       <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
@@ -413,8 +418,8 @@ const {
                       aria-hidden="true"
                     >
                       <Icon
-                        name={attribute.info.icon}
-                        class={cn('mr-2 size-3 shrink-0 opacity-100', attribute.info.classNames.icon)}
+                        name={attribute.typeInfo.icon}
+                        class={cn('mr-2 size-3 shrink-0 opacity-100', attribute.typeInfo.classNames.icon)}
                         aria-hidden="true"
                       />
                       <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
@@ -432,18 +437,18 @@ const {
             <>
               <input
                 type="checkbox"
-                id={`show-more-attributes-${category}`}
+                id={`show-more-attributes-${categoryInfo.slug}`}
                 class="peer sr-only"
                 hx-preserve
               />
               <label
-                for={`show-more-attributes-${category}`}
+                for={`show-more-attributes-${categoryInfo.slug}`}
                 class="peer-focus-visible:ring-offset-night-700 mt-2 block cursor-pointer rounded-sm text-sm text-green-500 peer-checked:hidden peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2"
               >
                 + Show more
               </label>
               <label
-                for={`show-more-attributes-${category}`}
+                for={`show-more-attributes-${categoryInfo.slug}`}
                 class="peer-focus-visible:ring-offset-night-700 mt-2 hidden cursor-pointer rounded-sm text-sm text-green-500 peer-checked:block peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2"
               >
                 - Show less
