@@ -65,31 +65,63 @@ const extraIfIncludingCommunity = Math.max(0, (countIfIncludingCommunity ?? 0) -
 
 <div {...divProps} class={cn('flex-1', className)}>
   <div class="flex items-center justify-between">
-    <span class="text-day-500 text-sm">
+    <span class="text-day-500 xs:gap-x-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm sm:gap-x-6">
       {total.toLocaleString()}
       {pluralize('result', total)}
 
+      <Icon
+        name="ri:loader-4-line"
+        id="search-indicator"
+        class="htmx-request:opacity-100 xs:-mx-1.5 -mx-1 inline-block size-4 animate-spin text-white opacity-0 transition-opacity duration-500 sm:-mx-3"
+        is:inline={inlineIcons}
+      />
+
       {
         extraIfIncludingCommunity > 0 && (
-          <Button
-            as="a"
-            href={urlIfIncludingCommunity}
-            label={`Include +${extraIfIncludingCommunity.toLocaleString()} community contributed`}
-            size="sm"
-            class="ml-6 align-[-0.15em]"
-            icon="ri:search-line"
-            inlineIcon={inlineIcons}
-          />
+          <>
+            <Button
+              as="a"
+              href={urlIfIncludingCommunity}
+              label={`Include +${extraIfIncludingCommunity.toLocaleString()} community contributed`}
+              size="sm"
+              class="hidden lg:inline-flex"
+              icon="ri:search-line"
+              inlineIcon={inlineIcons}
+            />
+            <Button
+              as="a"
+              href={urlIfIncludingCommunity}
+              label={`Include +${extraIfIncludingCommunity.toLocaleString()}`}
+              size="sm"
+              class="hidden sm:inline-flex lg:hidden"
+              icon="ri:search-line"
+              endIcon="ri:question-line"
+              classNames={{
+                endIcon: 'text-yellow-200/50',
+              }}
+              inlineIcon={inlineIcons}
+            />
+
+            <a
+              href={urlIfIncludingCommunity}
+              class="border-night-500 bg-night-800 flex items-center gap-1 rounded-md border px-2 py-0.5 text-sm sm:hidden"
+            >
+              <Icon
+                name="ri:search-line"
+                class="mr-0.5 inline-block size-3.5 shrink-0 align-[-0.15em]"
+                is:inline={inlineIcons}
+              />
+              Include
+              {extraIfIncludingCommunity.toLocaleString()}
+              <Icon
+                name="ri:question-line"
+                class="inline-block size-3.5 shrink-0 align-[-0.15em] text-yellow-200/50"
+                is:inline={inlineIcons}
+              />
+            </a>
+          </>
         )
       }
-
-      <span
-        id="search-indicator"
-        class="htmx-request:opacity-100 text-white opacity-0 transition-opacity duration-500"
-      >
-        <Icon name="ri:loader-4-line" class="inline-block size-4 animate-spin" is:inline={inlineIcons} />
-        Loading...
-      </span>
     </span>
     <Button
       as="a"
@@ -97,6 +129,10 @@ const extraIfIncludingCommunity = Math.max(0, (countIfIncludingCommunity ?? 0) -
       label="Add service"
       icon="ri:add-line"
       inlineIcon={inlineIcons}
+      class="max-xs:w-9 max-xs:px-0"
+      classNames={{
+        label: 'max-xs:hidden',
+      }}
     />
   </div>
 
@@ -207,4 +243,14 @@ const extraIfIncludingCommunity = Math.max(0, (countIfIncludingCommunity ?? 0) -
       </>
     )
   }
+  <div class="mt-4 text-center">
+    <Button
+      as="a"
+      href="/service-suggestion/new"
+      label="Add service"
+      icon="ri:add-line"
+      inlineIcon={inlineIcons}
+      class="mx-auto"
+    />
+  </div>
 </div>

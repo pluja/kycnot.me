@@ -27,7 +27,7 @@ export type ButtonProps<Tag extends 'a' | 'button' | 'label' = 'button'> = Props
 
 const button = tv({
   slots: {
-    base: 'inline-flex items-center justify-center gap-2 rounded-lg border transition-colors duration-100 focus-visible:ring-2 focus-visible:ring-current focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-hidden',
+    base: 'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border transition-colors duration-100 focus-visible:ring-2 focus-visible:ring-current focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-hidden',
     icon: 'size-4 shrink-0',
     label: 'text-left whitespace-nowrap',
     endIcon: 'size-4 shrink-0',
@@ -50,6 +50,11 @@ const button = tv({
         icon: 'size-5',
         endIcon: 'size-5',
         label: 'font-bold tracking-wider uppercase',
+      },
+    },
+    iconOnly: {
+      true: {
+        base: 'p-0',
       },
     },
     color: {
@@ -122,12 +127,28 @@ const button = tv({
       shadow: true,
       class: 'shadow-blue-500/30',
     },
+    {
+      iconOnly: true,
+      size: 'sm',
+      class: 'w-8',
+    },
+    {
+      iconOnly: true,
+      size: 'md',
+      class: 'w-9',
+    },
+    {
+      iconOnly: true,
+      size: 'lg',
+      class: 'w-10',
+    },
   ],
   defaultVariants: {
     size: 'md',
     color: 'black',
     shadow: false,
     disabled: false,
+    iconOnly: false,
   },
 })
 
@@ -153,7 +174,7 @@ const {
   icon: iconSlot,
   label: labelSlot,
   endIcon: endIconSlot,
-} = button({ size, color, shadow, disabled })
+} = button({ size, color, shadow, disabled, iconOnly: !label && !(!!icon && !!endIcon) })
 
 const ActualTag = disabled && Tag === 'a' ? 'span' : Tag
 ---
