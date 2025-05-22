@@ -10,7 +10,9 @@ import InputWrapper from './InputWrapper.astro'
 import type { ComponentProps, HTMLAttributes } from 'astro/types'
 
 type Props = Omit<ComponentProps<typeof InputWrapper>, 'children' | 'inputId' | 'required'> & {
-  inputProps?: Omit<HTMLAttributes<'input'>, 'name'>
+  inputProps?: Omit<HTMLAttributes<'input'>, 'name'> & {
+    'transition:persist'?: boolean
+  }
   inputIcon?: string
   inputIconClass?: string
 }
@@ -26,7 +28,7 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
     inputIcon ? (
       <div class="relative">
         <input
-          transition:persist
+          transition:persist={inputProps?.['transition:persist'] === false ? undefined : true}
           {...omit(inputProps, ['class', 'id', 'name'])}
           id={inputId}
           class={cn(

@@ -9,10 +9,11 @@ type Props = HTMLAttributes<'div'> & {
     value: HTMLAttributes<'input'>['value']
     label: string
   }[]
+  inputProps?: Omit<HTMLAttributes<'input'>, 'checked' | 'class' | 'name' | 'type' | 'value'>
   selectedValue?: string | null
 }
 
-const { name, options, selectedValue, class: className, ...rest } = Astro.props
+const { name, options, selectedValue, inputProps, class: className, ...rest } = Astro.props
 ---
 
 <div
@@ -31,6 +32,7 @@ const { name, options, selectedValue, class: className, ...rest } = Astro.props
           value={option.value}
           checked={selectedValue === option.value}
           class="peer sr-only"
+          {...inputProps}
         />
         <span class="peer-checked:bg-night-400 inline-block cursor-pointer px-1.5 py-0.5 text-white peer-checked:text-green-500">
           {option.label}

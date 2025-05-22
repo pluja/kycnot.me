@@ -19,7 +19,7 @@ type Props = HTMLAttributes<'div'> & {
   pageSize: number
   sortSeed?: string
   filters: ServicesFiltersObject
-  hadToIncludeCommunityContributed: boolean
+  includeScams: boolean
 }
 
 const {
@@ -31,14 +31,15 @@ const {
   sortSeed,
   class: className,
   filters,
-  hadToIncludeCommunityContributed,
+  includeScams,
   ...divProps
 } = Astro.props
 
-const hasScams = filters.verification.includes('VERIFICATION_FAILED')
-const hasCommunityContributed =
+const hasScams =
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  filters.verification.includes('COMMUNITY_CONTRIBUTED') || hadToIncludeCommunityContributed
+  filters.verification.includes('VERIFICATION_FAILED') || includeScams
+
+const hasCommunityContributed = filters.verification.includes('COMMUNITY_CONTRIBUTED')
 
 const totalPages = Math.ceil(total / pageSize) || 1
 ---
@@ -66,7 +67,7 @@ const totalPages = Math.ceil(total / pageSize) || 1
         <Icon name="ri:alert-fill" class="-mr-1 inline-block size-4 text-red-500" />
         <Icon name="ri:question-line" class="mr-2 inline-block size-4 text-yellow-500" />
         Showing SCAM and unverified community-contributed services.
-        {hadToIncludeCommunityContributed && 'Because there were no other results.'}
+        {includeScams && 'Because there is a text query.'}
       </div>
     )
   }
@@ -75,7 +76,7 @@ const totalPages = Math.ceil(total / pageSize) || 1
     hasScams && !hasCommunityContributed && (
       <div class="font-title mb-6 rounded-lg border border-red-500/30 bg-red-950 p-4 text-sm text-red-500">
         <Icon name="ri:alert-fill" class="mr-2 inline-block size-4 text-red-500" />
-        Showing SCAM services!
+        {includeScams ? 'Showing SCAM services because there is a text query.' : 'Showing SCAM services!'}
       </div>
     )
   }
@@ -84,10 +85,7 @@ const totalPages = Math.ceil(total / pageSize) || 1
     !hasScams && hasCommunityContributed && (
       <div class="font-title mb-6 rounded-lg border border-yellow-500/30 bg-yellow-950 p-4 text-sm text-yellow-500">
         <Icon name="ri:question-line" class="mr-2 inline-block size-4" />
-
-        {hadToIncludeCommunityContributed
-          ? 'Showing unverified community-contributed services, because there were no other results. Some might be scams.'
-          : 'Showing unverified community-contributed services, some might be scams.'}
+        Showing unverified community-contributed services, some might be scams.
       </div>
     )
   }

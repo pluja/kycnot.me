@@ -1,10 +1,11 @@
 ---
 import { ServiceVisibility } from '@prisma/client'
 import { z } from 'astro:schema'
-import { groupBy, orderBy } from 'lodash-es'
+import { groupBy, omit, orderBy, uniq } from 'lodash-es'
 import seedrandom from 'seedrandom'
 
 import Button from '../components/Button.astro'
+import InputText from '../components/InputText.astro'
 import Pagination from '../components/Pagination.astro'
 import ServiceFiltersPill from '../components/ServiceFiltersPill.astro'
 import ServicesFilters from '../components/ServicesFilters.astro'
@@ -26,6 +27,7 @@ import {
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { areEqualArraysWithoutOrder, zodEnumFromConstant } from '../lib/arrays'
 import { parseIntWithFallback } from '../lib/numbers'
+import { areEqualObjectsWithoutOrder } from '../lib/objects'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { makeSortSeed } from '../lib/sortSeed'
@@ -130,9 +132,12 @@ const attributeOptions = [
   prefix: string
 }[]
 
+const ignoredKeysForDefaultData = ['sort-seed']
+
 const {
   data: filters,
   hasDefaultData: hasDefaultFilters,
+  defaultData: defaultFilters,
   redirectUrl,
 } = zodParseQueryParamsStoringErrors(
   {
@@ -164,7 +169,7 @@ const {
   },
   Astro,
   {
-    ignoredKeysForDefaultData: ['sort-seed'],
+    ignoredKeysForDefaultData,
     cleanUrl: {
       removeUneededObjectParams: true,
       removeParams: {
@@ -181,46 +186,63 @@ const {
   }
 )
 
+const hasDefaultFiltersIgnoringQ = areEqualObjectsWithoutOrder(
+  omit(filters, [...ignoredKeysForDefaultData, 'q']),
+  omit(defaultFilters, [...ignoredKeysForDefaultData, 'q'])
+)
+
 if (redirectUrl) return Astro.redirect(redirectUrl.toString())
+
+const includeScams =
+  !!filters.q &&
+  (areEqualArraysWithoutOrder(filters.verification, ['VERIFICATION_SUCCESS', 'APPROVED']) ||
+    areEqualArraysWithoutOrder(filters.verification, [
+      'VERIFICATION_SUCCESS',
+      'APPROVED',
+      'COMMUNITY_CONTRIBUTED',
+    ]))
 
 export type ServicesFiltersObject = typeof filters
 
-const [categories, [services, totalServices, hadToIncludeCommunityContributed]] =
-  await Astro.locals.banners.tryMany([
-    [
-      'Unable to load category filters.',
-      () =>
-        prisma.category.findMany({
-          select: {
-            name: true,
-            slug: true,
-            icon: true,
-            _count: {
-              select: {
-                services: true,
-              },
+const [categories, [services, totalServices]] = await Astro.locals.banners.tryMany([
+  [
+    'Unable to load category filters.',
+    () =>
+      prisma.category.findMany({
+        select: {
+          name: true,
+          slug: true,
+          icon: true,
+          _count: {
+            select: {
+              services: true,
             },
           },
+        },
+      }),
+  ],
+  [
+    'Unable to load services.',
+    async () => {
+      const groupedAttributes = groupBy(
+        Object.entries(filters.attr ?? {}).flatMap(([key, value]) => {
+          const id = parseIntWithFallback(key)
+          if (id === null) return []
+          return [{ id, value }]
         }),
-    ],
-    [
-      'Unable to load services.',
-      async () => {
-        const groupedAttributes = groupBy(
-          Object.entries(filters.attr ?? {}).flatMap(([key, value]) => {
-            const id = parseIntWithFallback(key)
-            if (id === null) return []
-            return [{ id, value }]
-          }),
-          'value'
-        )
-        const where = {
+        'value'
+      )
+
+      const [unsortedServices, totalServices] = await prisma.service.findManyAndCount({
+        where: {
           listedAt: {
             lte: new Date(),
           },
           categories: filters.categories.length ? { some: { slug: { in: filters.categories } } } : undefined,
           verificationStatus: {
-            in: filters.verification,
+            in: includeScams
+              ? uniq([...filters.verification, 'VERIFICATION_FAILED'] as const)
+              : filters.verification,
           },
           serviceVisibility: ServiceVisibility.PUBLIC,
           overallScore: { gte: filters['min-score'] },
@@ -308,108 +330,79 @@ const [categories, [services, totalServices, hadToIncludeCommunityContributed]] 
                 ]
               : []),
           ],
-        } as const satisfies Prisma.ServiceWhereInput
-
-        const select = {
+        },
+        select: {
           id: true,
           ...(Object.fromEntries(sortOptions.map((option) => [option.orderBy.key, true])) as Record<
             (typeof sortOptions)[number]['orderBy']['key'],
             true
           >),
-        } as const satisfies Prisma.ServiceSelect
+        },
+      })
 
-        let [unsortedServices, totalServices] = await prisma.service.findManyAndCount({
-          where,
-          select,
-        })
-        let hadToIncludeCommunityContributed = false
+      const rng = seedrandom(filters['sort-seed'])
+      const selectedSort = sortOptions.find((sort) => sort.value === filters.sort) ?? defaultSortOption
 
-        if (
-          totalServices === 0 &&
-          areEqualArraysWithoutOrder(where.verificationStatus.in, ['VERIFICATION_FAILED', 'APPROVED'])
-        ) {
-          const [unsortedServiceCommunityServices, totalCommunityServices] =
-            await prisma.service.findManyAndCount({
-              where: {
-                ...where,
-                verificationStatus: {
-                  ...where.verificationStatus,
-                  in: [...where.verificationStatus.in, 'COMMUNITY_CONTRIBUTED'],
-                },
-              },
-              select,
-            })
+      const sortedServices = orderBy(
+        unsortedServices,
+        [selectedSort.orderBy.key, () => rng()],
+        [selectedSort.orderBy.direction, 'asc']
+      ).slice((filters.page - 1) * PAGE_SIZE, filters.page * PAGE_SIZE)
 
-          if (totalCommunityServices !== 0) {
-            hadToIncludeCommunityContributed = true
-            unsortedServices = unsortedServiceCommunityServices
-            totalServices = totalCommunityServices
-          }
-        }
-
-        const rng = seedrandom(filters['sort-seed'])
-        const selectedSort = sortOptions.find((sort) => sort.value === filters.sort) ?? defaultSortOption
-
-        const sortedServices = orderBy(
-          unsortedServices,
-          [selectedSort.orderBy.key, () => rng()],
-          [selectedSort.orderBy.direction, 'asc']
-        ).slice((filters.page - 1) * PAGE_SIZE, filters.page * PAGE_SIZE)
-
-        const unsortedServicesWithInfo = await prisma.service.findMany({
-          where: {
-            id: {
-              in: sortedServices.map((service) => service.id),
-            },
+      const unsortedServicesWithInfo = await prisma.service.findMany({
+        where: {
+          id: {
+            in: sortedServices.map((service) => service.id),
           },
-          select: {
-            name: true,
-            slug: true,
-            description: true,
-            overallScore: true,
-            privacyScore: true,
-            trustScore: true,
-            kycLevel: true,
-            imageUrl: true,
-            verificationStatus: true,
-            acceptedCurrencies: true,
-            attributes: {
-              select: {
-                attribute: {
-                  select: {
-                    id: true,
-                    slug: true,
-                    title: true,
-                    category: true,
-                    type: true,
-                  },
+        },
+        select: {
+          name: true,
+          slug: true,
+          description: true,
+          overallScore: true,
+          privacyScore: true,
+          trustScore: true,
+          kycLevel: true,
+          imageUrl: true,
+          verificationStatus: true,
+          acceptedCurrencies: true,
+          attributes: {
+            select: {
+              attribute: {
+                select: {
+                  id: true,
+                  slug: true,
+                  title: true,
+                  category: true,
+                  type: true,
                 },
               },
             },
-            categories: {
-              select: {
-                name: true,
-                icon: true,
-              },
+          },
+          categories: {
+            select: {
+              name: true,
+              icon: true,
             },
           },
-        })
+        },
+      })
 
-        const sortedServicesWithInfo = orderBy(
-          unsortedServicesWithInfo,
-          [
-            selectedSort.orderBy.key,
-            // Now we can shuffle indeternimistically, because the pagination was already applied
-            () => Math.random(),
-          ],
-          [selectedSort.orderBy.direction, 'asc']
-        )
+      const sortedServicesWithInfo = orderBy(
+        unsortedServicesWithInfo,
+        [
+          selectedSort.orderBy.key,
+          // Now we can shuffle indeternimistically, because the pagination was already applied
+          () => Math.random(),
+        ],
+        [selectedSort.orderBy.direction, 'asc']
+      )
 
-        return [sortedServicesWithInfo, totalServices, hadToIncludeCommunityContributed] as const
-      },
-      [[] as [], 0, false] as const,
-    ],
-  ])
+      return [sortedServicesWithInfo, totalServices] as const
+    },
+    [[] as [], 0, false] as const,
+  ],
+])
 
 const attributes = await Astro.locals.banners.try(
   'Unable to load attribute filters.',
@@ -488,7 +481,8 @@ const filtersOptions = {
 
 export type ServicesFiltersOptions = typeof filtersOptions
 
-//
+const searchResultsId = 'search-results'
+const showFiltersId = 'show-filters'
 ---
 
 <BaseLayout
@@ -509,7 +503,33 @@ export type ServicesFiltersOptions = typeof filtersOptions
       class='[&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-offset-night-700 flex items-stretch sm:hidden [&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-2 [&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-green-500 [&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-offset-2'
     >
       {
-        !hasDefaultFilters ? (
+        hasDefaultFilters || hasDefaultFiltersIgnoringQ ? (
+          <form
+            method="GET"
+            hx-get={Astro.url.pathname}
+            hx-trigger="input delay:500ms, keyup[key=='Enter']"
+            hx-target={`#${searchResultsId}`}
+            hx-select={`#${searchResultsId}`}
+            hx-push-url="true"
+            hx-indicator="#search-indicator"
+            class="contents"
+          >
+            <InputText
+              name="q"
+              label="Search..."
+              hideLabel
+              inputIcon="ri:search-line"
+              inputIconClass="text-day-500 size-4.5"
+              inputProps={{
+                placeholder: 'Search',
+                value: filters.q,
+                class: 'bg-night-800 border-night-500',
+                'transition:persist': false,
+              }}
+              class="mr-4 flex-1"
+            />
+          </form>
+        ) : (
           <div class="-ml-4 flex flex-1 items-center gap-2 overflow-x-auto mask-r-from-[calc(100%-var(--spacing)*16)] pr-12 pl-4">
             {filters.q && (
               <ServiceFiltersPill text={`"${filters.q}"`} searchParamName="q" searchParamValue={filters.q} />
@@ -618,12 +638,19 @@ export type ServicesFiltersOptions = typeof filtersOptions
                   )
                 })}
           </div>
-        ) : (
-          <div class="text-day-500 flex flex-1 items-center">No filters</div>
         )
       }
 
-      <Button as="label" for="show-filters" label="Filters" icon="ri:filter-3-line" />
+      <Button
+        as="label"
+        for="show-filters"
+        label="Filters"
+        icon="ri:filter-3-line"
+        class="max-2xs:w-9 max-2xs:px-0"
+        classNames={{
+          label: 'max-2xs:hidden',
+        }}
+      />
     </div>
 
     <input
@@ -637,8 +664,8 @@ export type ServicesFiltersOptions = typeof filtersOptions
       class="bg-night-700 fixed top-0 left-0 z-50 hidden h-dvh w-dvw shrink-0 translate-y-full overflow-y-auto overscroll-contain border-t border-green-500/30 px-8 pt-4 transition-transform peer-checked:translate-y-0 max-sm:peer-checked:block sm:relative sm:z-auto sm:block sm:h-auto sm:w-64 sm:translate-y-0 sm:overflow-visible sm:border-none sm:bg-none sm:p-0"
     >
       <ServicesFilters
-        searchResultsId="search-results"
-        showFiltersId="show-filters"
+        searchResultsId={searchResultsId}
+        showFiltersId={showFiltersId}
         filters={{
           ...filters,
           'sort-seed': makeSortSeed(),
@@ -656,7 +683,7 @@ export type ServicesFiltersOptions = typeof filtersOptions
       pageSize={PAGE_SIZE}
       sortSeed={filters['sort-seed']}
       filters={filters}
-      hadToIncludeCommunityContributed={hadToIncludeCommunityContributed}
+      includeScams={includeScams}
     />
   </div>
   {

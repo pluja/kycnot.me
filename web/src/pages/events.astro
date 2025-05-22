@@ -169,7 +169,7 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
       '[&:has(~[data-has-default-filters="true"])_[data-clear-filters-button]]:hidden'
     )}
     hx-get={Astro.url.pathname}
-    hx-trigger="input from:input, keyup[key=='Enter'], change from:select"
+    hx-trigger="input from:find input, keyup[key=='Enter'], change from:find select"
     hx-target="#events-list-container"
     hx-select="#events-list-container"
     hx-swap="outerHTML"

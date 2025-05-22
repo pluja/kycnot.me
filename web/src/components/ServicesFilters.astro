@@ -34,7 +34,8 @@ const {
 <form
   method="GET"
   hx-get={Astro.url.pathname}
-  hx-trigger={`input delay:500ms from:input[type='text'], keyup[key=='Enter'], change from:input:not([data-show-more-input], #${showFiltersId}), change from:select`}
+  hx-trigger={// NOTE: I need to do the [data-trigger-on-change] hack, because HTMX doesnt suport the :not() selector, and I need to exclude the Show more buttons, and not trigger for inputs outside the form
+  "input delay:500ms from:([data-services-filters-form] input[type='text']), keyup[key=='Enter'], change from:([data-services-filters-form] [data-trigger-on-change])"}
   hx-target={`#${searchResultsId}`}
   hx-select={`#${searchResultsId}`}
   hx-push-url="true"
@@ -44,7 +45,11 @@ const {
     .filter((verification) => verification.default)
     .map((verification) => verification.slug)}
   {...formProps}
-  class={cn('', className)}
+  class={cn(
+    // Check the scam filter when there is a text quey and the user has checked verified and approved
+    'has-[input[name=q]:not(:placeholder-shown)]:has-[&_input[name=verification][value=verified]:checked]:has-[&_input[name=verification][value=approved]:checked]:[&_input[name=verification][value=scam]]:checkbox-force-checked',
+    className
+  )}
 >
   <div class="mb-4 flex items-center justify-between">
     <h2 class="font-title text-xl text-green-500">FILTERS</h2>
@@ -64,6 +69,7 @@ const {
       name="sort"
       id="sort"
       class="border-night-600 bg-night-900 w-full rounded-md border p-2 text-white focus:border-green-500 focus:outline-hidden"
+      data-trigger-on-change
     >
       {
         options.sort.map((option) => (
@@ -108,6 +114,7 @@ const {
                 name="categories"
                 value={category.slug}
                 checked={category.checked}
+                data-trigger-on-change
               />
               <span class="peer-checked:font-bold">
                 {category.name}
@@ -121,13 +128,7 @@ const {
     {
       options.categories.filter((category) => category.showAlways).length < options.categories.length && (
         <>
-          <input
-            type="checkbox"
-            id="show-more-categories"
-            class="peer sr-only"
-            hx-preserve
-            data-show-more-input
-          />
+          <input type="checkbox" id="show-more-categories" class="peer sr-only" hx-preserve />
           <label
             for="show-more-categories"
             class="peer-focus-visible:ring-offset-night-700 mt-2 block cursor-pointer rounded-sm text-sm text-green-500 peer-checked:hidden peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2"
@@ -158,6 +159,7 @@ const {
               name="verification"
               value={verification.slug}
               checked={filters.verification.includes(verification.value)}
+              data-trigger-on-change
             />
             <Icon name={verification.icon} class={cn('size-4', verification.classNames.icon)} />
             <span class="peer-checked:font-bold">{verification.labelShort}</span>
@@ -176,6 +178,9 @@ const {
         options={options.modeOptions}
         selectedValue={filters['currency-mode']}
         class="-my-2"
+        inputProps={{
+          'data-trigger-on-change': true,
+        }}
       />
     </div>
     <div>
@@ -188,6 +193,7 @@ const {
               name="currencies"
               value={currency.slug}
               checked={filters.currencies?.some((id) => id === currency.id)}
+              data-trigger-on-change
             />
             <Icon name={currency.icon} class="size-4" />
             <span class="peer-checked:font-bold">{currency.name}</span>
@@ -210,6 +216,7 @@ const {
               name="networks"
               value={network.slug}
               checked={filters.networks?.some((slug) => slug === network.slug)}
+              data-trigger-on-change
             />
             <Icon name={network.icon} class="size-4" />
             <span class="peer-checked:font-bold">{network.name}</span>
@@ -233,6 +240,7 @@ const {
         id="max-kyc"
         value={filters['max-kyc'] ?? 4}
         class="w-full accent-green-500"
+        data-trigger-on-change
       />
     </div>
     <div class="text-day-400 mt-1 flex justify-between px-1 text-xs">
@@ -261,6 +269,7 @@ const {
         id="user-rating"
         value={filters['user-rating']}
         class="w-full accent-green-500"
+        data-trigger-on-change
       />
     </div>
     <div class="text-day-400 mt-1 flex justify-between px-2 text-xs">
@@ -289,6 +298,9 @@ const {
         options={options.modeOptions}
         selectedValue={filters['attribute-mode']}
         class="-my-2"
+        inputProps={{
+          'data-trigger-on-change': true,
+        }}
       />
     </div>
     {
@@ -318,6 +330,7 @@ const {
                       value=""
                       checked={!attribute.value}
                       aria-label="Ignore"
+                      data-trigger-on-change
                     />
                     <input
                       type="radio"
@@ -327,6 +340,7 @@ const {
                       class="peer/yes sr-only"
                       checked={attribute.value === 'yes'}
                       aria-label="Include"
+                      data-trigger-on-change
                     />
                     <input
                       type="radio"
@@ -336,6 +350,7 @@ const {
                       class="peer/no sr-only"
                       checked={attribute.value === 'no'}
                       aria-label="Exclude"
+                      data-trigger-on-change
                     />
 
                     <div class="pointer-events-none absolute inset-y-0 -left-[2px] hidden w-[calc(var(--spacing)*4.5*2+1px)] rounded-md border-2 border-blue-500 peer-focus-visible/empty:block peer-focus-visible/no:block peer-focus-visible/yes:block" />
@@ -420,7 +435,6 @@ const {
                 id={`show-more-attributes-${category}`}
                 class="peer sr-only"
                 hx-preserve
-                data-show-more-input
               />
               <label
                 for={`show-more-attributes-${category}`}
@@ -455,6 +469,7 @@ const {
         id="min-score"
         value={filters['min-score']}
         class="w-full accent-green-500"
+        data-trigger-on-change
       />
     </div>
     <div class="-mx-1.5 mt-2 flex justify-between px-1">
