@@ -6,6 +6,7 @@ import { orderBy as lodashOrderBy } from 'lodash-es'
 
 import SortArrowIcon from '../../../components/SortArrowIcon.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
+import UserBadge from '../../../components/UserBadge.astro'
 import {
   getServiceSuggestionStatusInfo,
   serviceSuggestionStatuses,
@@ -67,8 +68,9 @@ let suggestions = await prisma.serviceSuggestion.findMany({
     createdAt: true,
     user: {
       select: {
-        id: true,
+        displayName: true,
         name: true,
+        picture: true,
       },
     },
     service: {
@@ -293,9 +295,7 @@ const makeSortUrl = (slug: string) => {
                     </div>
                   </td>
                   <td class="px-4 py-3">
-                    <a href={`/admin/users/${suggestion.user.name}`} class="hover:text-green-500">
-                      {suggestion.user.name}
-                    </a>
+                    <UserBadge user={suggestion.user} size="md" />
                   </td>
                   <td class="px-4 py-3">
                     <form method="POST" action={actions.admin.serviceSuggestions.update}>

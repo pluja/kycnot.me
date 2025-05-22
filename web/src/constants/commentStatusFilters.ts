@@ -1,15 +1,20 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import { commentStatusById } from './commentStatus'
+
+import type BadgeSmall from '../components/BadgeSmall.astro'
 import type { Prisma } from '@prisma/client'
+import type { ComponentProps } from 'astro/types'
 
 type CommentStatusFilterInfo<T extends string | null | undefined = string> = {
   value: T
   label: string
+  color: ComponentProps<typeof BadgeSmall>['color']
+  icon: string
   whereClause: Prisma.CommentWhereInput
-  styles: {
+  classNames: {
     filter: string
-    badge: string
   }
 }
 
@@ -24,9 +29,10 @@ export const {
     value,
     label: value ? transformCase(value, 'title') : String(value),
     whereClause: {},
-    styles: {
+    color: 'gray',
+    icon: 'ri:question-line',
+    classNames: {
       filter: 'border-zinc-700 transition-colors hover:border-green-500/50',
-      badge: '',
     },
   }),
   [
@@ -34,84 +40,92 @@ export const {
       label: 'All',
       value: 'all',
       whereClause: {},
-      styles: {
+      color: 'gray',
+      icon: 'ri:question-line',
+      classNames: {
         filter: 'border-green-500 bg-green-500/20 text-green-400',
-        badge: '',
       },
     },
     {
-      label: 'Pending',
       value: 'pending',
+      label: commentStatusById.PENDING.label,
+      color: commentStatusById.PENDING.color,
+      icon: commentStatusById.PENDING.icon,
       whereClause: {
         OR: [{ status: 'PENDING' }, { status: 'HUMAN_PENDING' }],
       },
-      styles: {
+      classNames: {
         filter: 'border-blue-500 bg-blue-500/20 text-blue-400',
-        badge: 'rounded-sm bg-blue-500/20 px-2 py-0.5 text-[12px] font-medium text-blue-500',
       },
     },
     {
-      label: 'Human Pending',
       value: 'human-pending',
+      label: commentStatusById.HUMAN_PENDING.label,
+      color: commentStatusById.HUMAN_PENDING.color,
+      icon: commentStatusById.HUMAN_PENDING.icon,
       whereClause: { status: 'HUMAN_PENDING' },
-      styles: {
+      classNames: {
         filter: 'border-blue-500 bg-blue-500/20 text-blue-400',
-        badge: 'rounded-sm bg-blue-500/20 px-2 py-0.5 text-[12px] font-medium text-blue-500',
       },
     },
     {
-      label: 'Rejected',
       value: 'rejected',
+      label: commentStatusById.REJECTED.label,
+      color: commentStatusById.REJECTED.color,
+      icon: commentStatusById.REJECTED.icon,
       whereClause: {
         status: 'REJECTED',
       },
-      styles: {
+      classNames: {
         filter: 'border-red-500 bg-red-500/20 text-red-400',
-        badge: 'rounded-sm bg-red-500/20 px-2 py-0.5 text-[12px] font-medium text-red-500',
       },
     },
     {
       label: 'Suspicious',
       value: 'suspicious',
+      color: 'red',
+      icon: 'ri:close-circle-fill',
       whereClause: {
         suspicious: true,
       },
-      styles: {
+      classNames: {
         filter: 'border-red-500 bg-red-500/20 text-red-400',
-        badge: 'rounded-sm bg-red-500/20 px-2 py-0.5 text-[12px] font-medium text-red-500',
       },
     },
     {
-      label: 'Verified',
       value: 'verified',
+      label: commentStatusById.VERIFIED.label,
+      color: commentStatusById.VERIFIED.color,
+      icon: commentStatusById.VERIFIED.icon,
       whereClause: {
         status: 'VERIFIED',
       },
-      styles: {
+      classNames: {
         filter: 'border-blue-500 bg-blue-500/20 text-blue-400',
-        badge: 'rounded-sm bg-blue-500/20 px-2 py-0.5 text-[12px] font-medium text-blue-500',
       },
     },
     {
-      label: 'Approved',
       value: 'approved',
+      label: commentStatusById.APPROVED.label,
+      color: commentStatusById.APPROVED.color,
+      icon: commentStatusById.APPROVED.icon,
       whereClause: {
         status: 'APPROVED',
       },
-      styles: {
+      classNames: {
         filter: 'border-green-500 bg-green-500/20 text-green-400',
-        badge: 'rounded-sm bg-green-500/20 px-2 py-0.5 text-[12px] font-medium text-green-500',
       },
     },
     {
       label: 'Needs Review',
       value: 'needs-review',
+      color: 'yellow',
+      icon: 'ri:question-line',
       whereClause: {
         requiresAdminReview: true,
       },
-      styles: {
+      classNames: {
         filter: 'border-yellow-500 bg-yellow-500/20 text-yellow-400',
-        badge: 'rounded-sm bg-yellow-500/20 px-2 py-0.5 text-[12px] font-medium text-yellow-500',
       },
     },
   ] as const satisfies CommentStatusFilterInfo[]

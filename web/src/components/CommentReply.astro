@@ -11,6 +11,7 @@ import InputHoneypotTrap from './InputHoneypotTrap.astro'
 import InputRating from './InputRating.astro'
 import InputText from './InputText.astro'
 import InputWrapper from './InputWrapper.astro'
+import UserBadge from './UserBadge.astro'
 
 import type { Prisma } from '@prisma/client'
 import type { HTMLAttributes } from 'astro/types'
@@ -67,7 +68,7 @@ const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
             <div class="text-day-400 flex items-center gap-2 text-xs peer-checked/use-form-secret-token:hidden">
               <Icon name="ri:user-line" class="size-3.5" />
               <span>
-                Commenting as: <span class="font-title font-medium text-green-400">{user.name}</span>
+                Commenting as: <UserBadge user={user} size="sm" class="text-green-400" />
               </span>
             </div>
 

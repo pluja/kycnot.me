@@ -78,8 +78,8 @@ export const {
     },
     {
       value: 'MANUAL_ADJUSTMENT',
-      slug: 'manual-adjustment',
-      label: 'Manual adjustment',
+      slug: 'gift',
+      label: 'Gift',
       icon: 'ri:gift-line',
     },
   ] as const satisfies KarmaTransactionActionInfo<KarmaTransactionAction>[]

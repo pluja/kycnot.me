@@ -1,7 +1,12 @@
 ---
 import { z } from 'astro/zod'
+import { Icon } from 'astro-icon/components'
 
+import BadgeSmall from '../../components/BadgeSmall.astro'
 import CommentModeration from '../../components/CommentModeration.astro'
+import MyPicture from '../../components/MyPicture.astro'
+import TimeFormatted from '../../components/TimeFormatted.astro'
+import UserBadge from '../../components/UserBadge.astro'
 import {
   commentStatusFilters,
   commentStatusFiltersZodEnum,
@@ -36,11 +41,18 @@ const [comments = [], totalComments = 0] = await Astro.locals.banners.try(
     prisma.comment.findManyAndCount({
       where: statusFilter.whereClause,
       include: {
-        author: true,
+        author: {
+          select: {
+            name: true,
+            displayName: true,
+            picture: true,
+          },
+        },
         service: {
           select: {
             name: true,
             slug: true,
+            imageUrl: true,
           },
         },
         parent: {
@@ -72,7 +84,7 @@ const totalPages = Math.ceil(totalComments / PAGE_SIZE)
             class={cn([
               'font-title rounded-md border px-3 py-1 text-sm',
               params.status === filter.value
-                ? filter.styles.filter
+                ? filter.classNames.filter
                 : 'border-zinc-700 transition-colors hover:border-green-500/50',
             ])}
           >
@@ -98,22 +110,7 @@ const totalPages = Math.ceil(totalComments / PAGE_SIZE)
           >
             <div class="mb-4 flex flex-wrap items-center gap-2">
               {/* Author Info */}
-              <span class="font-title text-sm">{comment.author.name}</span>
-              {comment.author.admin && (
-                <span class="rounded-sm bg-yellow-500/20 px-2 py-0.5 text-[12px] font-medium text-yellow-500">
-                  admin
-                </span>
-              )}
-              {comment.author.verified && !comment.author.admin && (
-                <span class="rounded-sm bg-blue-500/20 px-2 py-0.5 text-[12px] font-medium text-blue-500">
-                  verified
-                </span>
-              )}
-              {comment.author.verifier && !comment.author.admin && (
-                <span class="rounded-sm bg-green-500/20 px-2 py-0.5 text-[12px] font-medium text-green-500">
-                  verifier
-                </span>
-              )}
+              <UserBadge user={comment.author} size="md" />
 
               {/* Service Link */}
               <span class="text-xs text-zinc-500">•</span>
@@ -121,21 +118,55 @@ const totalPages = Math.ceil(totalComments / PAGE_SIZE)
                 href={`/service/${comment.service.slug}#comment-${comment.id.toString()}`}
                 class="text-sm text-blue-400 transition-colors hover:text-blue-300"
               >
+                {!!comment.service.imageUrl && (
+                  <MyPicture
+                    src={comment.service.imageUrl}
+                    height={16}
+                    width={16}
+                    class="inline-block size-4 rounded-full align-[-0.2em]"
+                    alt=""
+                  />
+                )}
                 {comment.service.name}
               </a>
 
               {/* Date */}
               <span class="text-xs text-zinc-500">•</span>
-              <span class="text-sm text-zinc-400">{new Date(comment.createdAt).toLocaleString()}</span>
+              <TimeFormatted
+                date={comment.createdAt}
+                hourPrecision
+                caseType="sentence"
+                class="text-sm text-zinc-400"
+              />
+
+              <span class="text-xs text-zinc-500">•</span>
 
               {/* Status Badges */}
-              <span class={comment.statusFilterInfo.styles.badge}>{comment.statusFilterInfo.label}</span>
+              <BadgeSmall
+                color={comment.statusFilterInfo.color}
+                text={comment.statusFilterInfo.label}
+                icon={comment.statusFilterInfo.icon}
+                inlineIcon
+              />
+
+              <span class="text-xs text-zinc-500">•</span>
+
+              {/* Link to Comment */}
+              <a
+                href={`/service/${comment.service.slug}?showPending=true#comment-${comment.id.toString()}`}
+                class="text-whit/50 flex items-center gap-1 text-sm transition-colors hover:underline"
+              >
+                <Icon name="ri:link" class="size-4" />
+                Open
+              </a>
             </div>
 
             {/* Parent Comment Context */}
             {comment.parent && (
               <div class="mb-4 border-l-2 border-zinc-700 pl-4">
-                <div class="mb-1 text-sm text-zinc-500">Replying to {comment.parent.author.name}:</div>
+                <div class="mb-1 text-sm opacity-50">
+                  Replying to <UserBadge user={comment.parent.author} size="md" />
+                </div>
                 <div class="text-sm text-zinc-400">{comment.parent.content}</div>
               </div>
             )}

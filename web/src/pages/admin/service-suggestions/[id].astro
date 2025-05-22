@@ -66,6 +66,7 @@ const serviceSuggestion = await Astro.locals.banners.try('Error fetching service
           user: {
             select: {
               id: true,
+              displayName: true,
               name: true,
               picture: true,
             },

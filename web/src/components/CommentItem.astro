@@ -4,6 +4,7 @@ import { Markdown } from 'astro-remote'
 import { Schema } from 'astro-seo-schema'
 import { actions } from 'astro:actions'
 
+import { commentStatusById } from '../constants/commentStatus'
 import { karmaUnlocksById } from '../constants/karmaUnlocks'
 import { getServiceUserRoleInfo } from '../constants/serviceUserRoles'
 import { cn } from '../lib/cn'
@@ -18,9 +19,9 @@ import { formatDateShort } from '../lib/timeAgo'
 import BadgeSmall from './BadgeSmall.astro'
 import CommentModeration from './CommentModeration.astro'
 import CommentReply from './CommentReply.astro'
-import MyPicture from './MyPicture.astro'
 import TimeFormatted from './TimeFormatted.astro'
 import Tooltip from './Tooltip.astro'
+import UserBadge from './UserBadge.astro'
 
 import type { HTMLAttributes } from 'astro/types'
 
@@ -156,27 +157,11 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
     </label>
 
     <span class="flex items-center gap-1">
-      {
-        comment.author.picture && (
-          <MyPicture
-            src={comment.author.picture}
-            alt={`Profile for ${comment.author.displayName ?? comment.author.name}`}
-            class="size-6 rounded-full bg-zinc-700 object-cover"
-            height={24}
-            width={24}
-          />
-        )
-      }
-
-      <a
-        href={`/u/${comment.author.name}`}
-        class={cn([
-          'font-title text-day-300 font-medium hover:underline focus-visible:underline',
-          isAuthor && 'font-medium text-green-500',
-        ])}
-      >
-        {comment.author.displayName ?? comment.author.name}
-      </a>
+      <UserBadge
+        user={comment.author}
+        size="md"
+        class={cn('text-day-300', isAuthor && 'font-medium text-green-500')}
+      />
 
       {
         (comment.author.verified || comment.author.admin || comment.author.verifier) && (
@@ -307,20 +292,35 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
 
     {
       comment.status === 'VERIFIED' && (
-        <BadgeSmall icon="ri:check-double-fill" color="green" text="Verified" inlineIcon />
+        <BadgeSmall
+          icon={commentStatusById.VERIFIED.icon}
+          color={commentStatusById.VERIFIED.color}
+          text={commentStatusById.VERIFIED.label}
+          inlineIcon
+        />
       )
     }
 
     {
       (comment.status === 'PENDING' || comment.status === 'HUMAN_PENDING') &&
         (showPending || isHighlightParent || isAuthorOrPrivileged) && (
-          <BadgeSmall icon="ri:time-fill" color="yellow" text="Unmoderated" inlineIcon />
+          <BadgeSmall
+            icon={commentStatusById.PENDING.icon}
+            color={commentStatusById.PENDING.color}
+            text={commentStatusById.PENDING.label}
+            inlineIcon
+          />
         )
     }
 
     {
       comment.status === 'REJECTED' && isAuthorOrPrivileged && (
-        <BadgeSmall icon="ri:close-circle-fill" color="red" text="Rejected" inlineIcon />
+        <BadgeSmall
+          icon={commentStatusById.REJECTED.icon}
+          color={commentStatusById.REJECTED.color}
+          text={commentStatusById.REJECTED.label}
+          inlineIcon
+        />
       )
     }
 

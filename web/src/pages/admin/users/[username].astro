@@ -116,7 +116,7 @@ if (!user) return Astro.rewrite('/404')
 ---
 
 <BaseLayout
-  pageTitle={`User: ${user.name}`}
+  pageTitle={`${user.displayName ?? user.name} - User`}
   widthClassName="max-w-screen-lg"
   className={{ main: 'space-y-24' }}
 >

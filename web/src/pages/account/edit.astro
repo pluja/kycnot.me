@@ -22,7 +22,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
 ---
 
 <MiniLayout
-  pageTitle={`Edit Profile - ${user.name}`}
+  pageTitle={`Edit Profile - ${user.displayName ?? user.name}`}
   description="Edit your user profile"
   ogImage={{ template: 'generic', title: 'Edit Profile', icon: 'ri:user-settings-line' }}
   layoutHeader={{

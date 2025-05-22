@@ -10,6 +10,7 @@ import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 
 import MyPicture from '../../../../components/MyPicture.astro'
+import UserBadge from '../../../../components/UserBadge.astro'
 import { serviceVisibilities } from '../../../../constants/serviceVisibility'
 import BaseLayout from '../../../../layouts/BaseLayout.astro'
 import { cn } from '../../../../lib/cn'
@@ -80,9 +81,9 @@ const service = await Astro.locals.banners.try('Error fetching service', () =>
           id: true,
           user: {
             select: {
-              id: true,
               name: true,
               displayName: true,
+              picture: true,
             },
           },
           createdAt: true,
@@ -1183,7 +1184,9 @@ const buttonSmallWarningClasses = cn(
                 <tbody class="divide-y divide-zinc-700/80">
                   {service.verificationRequests.map((request) => (
                     <tr class="transition-colors hover:bg-zinc-700/40">
-                      <td class="p-3 text-zinc-300">{request.user.displayName ?? request.user.name}</td>
+                      <td class="p-3 text-zinc-300">
+                        <UserBadge user={request.user} size="md" />
+                      </td>
                       <td class="p-3 text-zinc-400">{new Date(request.createdAt).toLocaleString()}</td>
                     </tr>
                   ))}

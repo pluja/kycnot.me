@@ -467,17 +467,6 @@ const ogImageTemplateData = {
   }
   <VerificationWarningBanner service={service} />
 
-  {
-    service.verificationSteps.some((step) => step.status === VerificationStepStatus.FAILED) && (
-      <div class="mb-4 flex items-center gap-2 rounded-md bg-red-900/50 p-2 text-sm text-red-300">
-        <Icon name="ri:error-warning-line" class="inline-block size-4 shrink-0" />
-        <span>
-          This service has failed one or more verification steps. Review the verification details carefully.
-        </span>
-      </div>
-    )
-  }
-
   <div class="flex items-center gap-4">
     {
       !!service.imageUrl && (

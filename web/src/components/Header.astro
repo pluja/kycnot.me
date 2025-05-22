@@ -12,6 +12,7 @@ import HeaderNotificationIndicator from './HeaderNotificationIndicator.astro'
 import HeaderSplashTextScript from './HeaderSplashTextScript.astro'
 import Logo from './Logo.astro'
 import Tooltip from './Tooltip.astro'
+import UserBadge from './UserBadge.astro'
 
 const user = Astro.locals.user
 const actualUser = Astro.locals.actualUser
@@ -131,9 +132,12 @@ const splashText = showSplashText ? sample(splashTexts) : null
         user ? (
           <>
             {actualUser && (
-              <span class="text-sm text-white/40 hover:text-white" transition:name="header-actual-user-name">
-                ({actualUser.name})
-              </span>
+              <UserBadge
+                user={actualUser}
+                size="sm"
+                class="text-white/40 hover:text-white"
+                transition:name="header-actual-user-name"
+              />
             )}
 
             <HeaderNotificationIndicator
@@ -141,13 +145,17 @@ const splashText = showSplashText ? sample(splashTexts) : null
               transition:name="header-notification-indicator"
             />
 
-            <a
+            <UserBadge
               href="/account"
-              class="xs:px-3 2xs:px-2 last:xs:-mr-3 last:2xs:-mr-2 flex h-full items-center px-1 text-sm text-zinc-400 transition-colors last:-mr-1 hover:text-zinc-300"
+              user={user}
+              size="md"
+              class="xs:px-3 2xs:px-2 last:xs:-mr-3 last:2xs:-mr-2 h-full px-1 text-zinc-400 transition-colors last:-mr-1 hover:text-zinc-300"
+              classNames={{
+                image: 'max-2xs:hidden',
+              }}
               transition:name="header-user-link"
-            >
-              {user.name}
-            </a>
+            />
+
             {actualUser ? (
               <a
                 href={makeUnimpersonateUrl(Astro.url)}

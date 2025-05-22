@@ -10,6 +10,7 @@ import InputTextArea from '../../components/InputTextArea.astro'
 import MyPicture from '../../components/MyPicture.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import Tooltip from '../../components/Tooltip.astro'
+import UserBadge from '../../components/UserBadge.astro'
 import { getKarmaTransactionActionInfo } from '../../constants/karmaTransactionActions'
 import { karmaUnlocks } from '../../constants/karmaUnlocks'
 import { SUPPORT_EMAIL } from '../../constants/project'
@@ -64,6 +65,7 @@ const user = await Astro.locals.banners.try('user', async () => {
               select: {
                 name: true,
                 displayName: true,
+                picture: true,
               },
             },
             comment: {
@@ -175,8 +177,8 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
 ---
 
 <BaseLayout
-  pageTitle={`${user.name} - Account`}
-  description="Manage your user profile"
+  pageTitle={`${user.displayName ?? user.name} - User Profile`}
+  description={`User profile page of ${user.displayName ?? user.name} in KYCnot.me`}
   ogImage={{
     template: 'generic',
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
@@ -204,7 +206,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
         image: user.picture ?? undefined,
         url: new URL(`/u/${user.name}`, Astro.url).href,
         sameAs: user.link ? [user.link] : undefined,
-        description: `User account for ${user.displayName ?? user.name} on KYCnot.me`,
+        description: `User profile page for ${user.displayName ?? user.name} on KYCnot.me`,
         identifier: [user.name, user.id.toString()],
         jobTitle: user.admin ? 'Administrator' : user.verifier ? 'Moderator' : undefined,
         memberOf: KYCNOTME_SCHEMA_MINI,
@@ -259,10 +261,10 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
         }
         <div class="grow">
           <h1 class="font-title text-lg font-bold tracking-wider text-white">
-            {user.name}
+            {user.displayName ?? user.name}
             {isCurrentUser && <span class="text-day-500 font-normal">(You)</span>}
           </h1>
-          {user.displayName && <p class="text-day-200">{user.displayName}</p>}
+          {user.displayName && <p class="text-day-200 font-title">{user.name}</p>}
           <div class="mt-1 flex gap-2">
             {
               user.admin && (
@@ -323,7 +325,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
           )
         }
         <a
-          href={`mailto:${SUPPORT_EMAIL}`}
+          href={`mailto:${SUPPORT_EMAIL}?subject=User report - ${user.displayName ?? user.name}&body=${Astro.locals.user ? `I'm ${Astro.locals.user.displayName ? `${Astro.locals.user.displayName} (${Astro.locals.user.name})` : user.name}. ` : ''}I'm reporting the user ${user.displayName ? `"${user.displayName}" (${user.name})` : `"${user.name}"`} because...`}
           class="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-sm text-red-400 shadow-xs transition-colors duration-200 hover:bg-red-500/20 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
         >
           <Icon name="ri:alert-line" class="size-4" /> Report
@@ -1002,13 +1004,10 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                           <Icon name={actionInfo.icon} class="size-4" />
                           {actionInfo.label}
                           {transaction.action === 'MANUAL_ADJUSTMENT' && transaction.grantedBy && (
-                            <a
-                              href={`/u/${transaction.grantedBy.name}`}
-                              class="text-day-500 ml-1 hover:underline"
-                            >
-                              {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
-                              by {transaction.grantedBy.displayName || transaction.grantedBy.name}
-                            </a>
+                            <>
+                              <span class="text-day-500">from</span>
+                              <UserBadge user={transaction.grantedBy} size="sm" class="text-day-500" />
+                            </>
                           )}
                         </span>
                       </td>

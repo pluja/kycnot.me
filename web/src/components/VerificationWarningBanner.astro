@@ -19,6 +19,11 @@ type Props = {
       verificationSummary: true
       listedAt: true
       createdAt: true
+      verificationSteps: {
+        select: {
+          status: true
+        }
+      }
     }
   }>
 }
@@ -66,4 +71,19 @@ const wasRecentlyAdded = isPast(listedDate) && differenceInDays(new Date(), list
       <span>Basic checks passed, but not fully verified.</span>
     </div>
   ) : null
+}
+
+{
+  service.verificationStatus !== 'VERIFICATION_FAILED' &&
+    service.verificationSteps.some((step) => step.status === 'FAILED') && (
+      <div class="mb-3 flex items-center gap-2 rounded-md bg-red-900/50 p-2 text-sm text-red-400">
+        <Icon
+          name={verificationStatusesByValue.VERIFICATION_FAILED.icon}
+          class={cn('size-5', verificationStatusesByValue.VERIFICATION_FAILED.classNames.icon)}
+        />
+        <span>
+          This service has failed one or more verification steps. Review the verification details carefully.
+        </span>
+      </div>
+    )
 }

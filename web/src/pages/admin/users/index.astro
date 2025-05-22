@@ -6,6 +6,7 @@ import { orderBy as lodashOrderBy } from 'lodash-es'
 import SortArrowIcon from '../../../components/SortArrowIcon.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
 import Tooltip from '../../../components/Tooltip.astro'
+import UserBadge from '../../../components/UserBadge.astro'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
 import { pluralize } from '../../../lib/pluralize'
@@ -74,6 +75,8 @@ const dbUsers = await prisma.user.findMany({
   select: {
     id: true,
     name: true,
+    displayName: true,
+    picture: true,
     verified: true,
     admin: true,
     verifier: true,
@@ -241,10 +244,10 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
                   class={`group hover:bg-zinc-700/30 ${user.spammer ? 'bg-red-900/10' : ''}`}
                 >
                   <td class="px-4 py-3 text-sm font-medium text-zinc-200">
-                    <div>{user.name}</div>
+                    <UserBadge user={user} size="md" class="flex text-white" />
                     {user.internalNotes.length > 0 && (
                       <Tooltip
-                        class="text-2xs mt-1 text-yellow-400"
+                        class="text-2xs font-light text-yellow-200/40"
                         position="right"
                         text={user.internalNotes
                           .map(
@@ -257,7 +260,7 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
                           )
                           .join('\n\n')}
                       >
-                        <Icon name="ri:sticky-note-line" class="mr-1 inline-block size-3" />
+                        <Icon name="ri:sticky-note-line" class="mr-0.5 inline-block size-3" />
                         {user.internalNotes.length} internal {pluralize('note', user.internalNotes.length)}
                       </Tooltip>
                     )}
