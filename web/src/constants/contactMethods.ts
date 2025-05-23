@@ -46,7 +46,7 @@ export const {
     {
       type: 'whatsapp',
       label: 'WhatsApp',
-      matcher: /https?:\/\/(?:www\.)?wa\.me\/(.*)\/?/,
+      matcher: /https?:\/\/(?:www\.)?wa\.me\/(.*)?/,
       formatter: (value) => {
         return parsePhoneNumberWithError(value).formatInternational()
       },
@@ -55,14 +55,14 @@ export const {
     {
       type: 'telegram',
       label: 'Telegram',
-      matcher: /https?:\/\/(?:www\.)?t\.me\/(.*)\/?/,
+      matcher: /https?:\/\/(?:www\.)?t\.me\/(.*)?/,
       formatter: (value) => `t.me/${value}`,
       icon: 'ri:telegram-line',
     },
     {
       type: 'linkedin',
       label: 'LinkedIn',
-      matcher: /https?:\/\/(?:www\.)?linkedin\.com\/(?:in|company)\/(.*)\/?/,
+      matcher: /https?:\/\/(?:www\.)?linkedin\.com\/(?:in|company)\/(.*)?/,
       formatter: (value) => `in/${value}`,
       icon: 'ri:linkedin-box-line',
     },
@@ -76,21 +76,21 @@ export const {
     {
       type: 'x',
       label: 'X',
-      matcher: /https?:\/\/(?:www\.)?x\.com\/(.*)\/?/,
+      matcher: /https?:\/\/(?:www\.)?x\.com\/(.*)?/,
       formatter: (value) => `@${value}`,
       icon: 'ri:twitter-x-line',
     },
     {
       type: 'instagram',
       label: 'Instagram',
-      matcher: /https?:\/\/(?:www\.)?instagram\.com\/(.*)\/?/,
+      matcher: /https?:\/\/(?:www\.)?instagram\.com\/(.*)?/,
       formatter: (value) => `@${value}`,
       icon: 'ri:instagram-line',
     },
     {
       type: 'matrix',
       label: 'Matrix',
-      matcher: /https?:\/\/(?:www\.)?matrix\.to\/#\/(.*)\/?/,
+      matcher: /https?:\/\/(?:www\.)?matrix\.to\/#\/(.*)?/,
       formatter: (value) => value,
       icon: 'ri:hashtag',
     },
