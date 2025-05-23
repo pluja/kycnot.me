@@ -43,7 +43,7 @@ const user = await Astro.locals.banners.try('user', async () => {
         spammer: true,
         verified: true,
         admin: true,
-        verifier: true,
+        moderator: true,
         verifiedLink: true,
         totalKarma: true,
         createdAt: true,
@@ -208,7 +208,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
         sameAs: user.link ? [user.link] : undefined,
         description: `User profile page for ${user.displayName ?? user.name} on KYCnot.me`,
         identifier: [user.name, user.id.toString()],
-        jobTitle: user.admin ? 'Administrator' : user.verifier ? 'Moderator' : undefined,
+        jobTitle: user.admin ? 'Administrator' : user.moderator ? 'Moderator' : undefined,
         memberOf: KYCNOTME_SCHEMA_MINI,
         interactionStatistic: [
           {
@@ -281,9 +281,9 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
               )
             }
             {
-              user.verifier && (
+              user.moderator && (
                 <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                  verifier
+                  moderator
                 </span>
               )
             }
@@ -415,14 +415,14 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                     )
                   }
                   {
-                    user.verifier && (
+                    user.moderator && (
                       <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                        Verifier
+                        Moderator
                       </span>
                     )
                   }
                   {
-                    !user.admin && !user.verified && !user.verifier && (
+                    !user.admin && !user.verified && !user.moderator && (
                       <span class="border-day-700/50 bg-day-700/20 text-day-400 rounded-full border px-2 py-0.5 text-xs">
                         Standard User
                       </span>

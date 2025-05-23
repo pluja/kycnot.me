@@ -9,7 +9,7 @@ import {
 import type { MaybePromise } from 'astro/actions/runtime/utils.js'
 import type { z } from 'astro/zod'
 
-type SpecialUserPermission = 'admin' | 'verified' | 'verifier'
+type SpecialUserPermission = 'admin' | 'verified' | 'moderator'
 type Permission = SpecialUserPermission | 'guest' | 'not-spammer' | 'user'
 
 type ActionAPIContextWithUser = ActionAPIContext & {
@@ -87,8 +87,8 @@ export function defineProtectedAction<
       }
 
       if (
-        (permissions === 'verifier' || (Array.isArray(permissions) && permissions.includes('verifier'))) &&
-        !context.locals.user.verifier
+        (permissions === 'moderator' || (Array.isArray(permissions) && permissions.includes('moderator'))) &&
+        !context.locals.user.moderator
       ) {
         if (context.locals.user.spammer) {
           throw new ActionError({
@@ -98,7 +98,7 @@ export function defineProtectedAction<
         }
         throw new ActionError({
           code: 'FORBIDDEN',
-          message: 'Verifier privileges required.',
+          message: 'Moderator privileges required.',
         })
       }
 

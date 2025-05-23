@@ -61,8 +61,8 @@ const isHighlighted = comment.id === highlightedCommentId
 const userVote = user ? comment.votes.find((v) => v.userId === user.id) : null
 
 const isAuthor = user?.id === comment.author.id
-const isAdminOrVerifier = !!user && (user.admin || user.verifier)
-const isAuthorOrPrivileged = isAuthor || isAdminOrVerifier
+const isAdminOrModerator = !!user && (user.admin || user.moderator)
+const isAuthorOrPrivileged = isAuthor || isAdminOrModerator
 
 // Check if user is new (less than 1 week old)
 const isNewUser =
@@ -75,7 +75,7 @@ const isRatingActive =
   !comment.suspicious &&
   (comment.status === 'APPROVED' || comment.status === 'VERIFIED')
 
-// Skip rendering if comment is not approved/verified and user is not the author or admin/verifier
+// Skip rendering if comment is not approved/verified and user is not the author or admin/moderator
 const shouldShow =
   comment.status === 'APPROVED' ||
   comment.status === 'VERIFIED' ||
@@ -164,10 +164,10 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
       />
 
       {
-        (comment.author.verified || comment.author.admin || comment.author.verifier) && (
+        (comment.author.verified || comment.author.admin || comment.author.moderator) && (
           <Tooltip
             text={`${
-              comment.author.admin || comment.author.verifier
+              comment.author.admin || comment.author.moderator
                 ? `KYCnot.me ${comment.author.admin ? 'Admin' : 'Moderator'}${comment.author.verifiedLink ? '. ' : ''}`
                 : ''
             }${comment.author.verifiedLink ? `Related to ${comment.author.verifiedLink}` : ''}`}
@@ -186,7 +186,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
         )
       }
       {
-        comment.author.verifier && !comment.author.admin && (
+        comment.author.moderator && !comment.author.admin && (
           <BadgeSmall
             icon="ri:graduation-cap-fill"
             color="teal"
@@ -198,14 +198,14 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
       }
 
       {
-        isNewUser && !comment.author.admin && !comment.author.verifier && (
+        isNewUser && !comment.author.admin && !comment.author.moderator && (
           <Tooltip text={`Joined ${formatDateShort(comment.author.createdAt, { hourPrecision: true })}`}>
             <BadgeSmall icon="ri:user-add-fill" color="purple" text="New User" variant="faded" inlineIcon />
           </Tooltip>
         )
       }
       {
-        authorUnlocks.highKarmaBadge && !comment.author.admin && !comment.author.verifier && (
+        authorUnlocks.highKarmaBadge && !comment.author.admin && !comment.author.moderator && (
           <BadgeSmall
             icon={karmaUnlocksById.highKarmaBadge.icon}
             color="lime"
@@ -380,7 +380,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
   }
 
   {
-    user && (user.admin || user.verifier) && comment.internalNote && (
+    user && (user.admin || user.moderator) && comment.internalNote && (
       <div class="mt-2 peer-checked/collapse:hidden">
         <div class="border-l-2 border-red-600 bg-red-900/20 py-0.5 pl-2 text-xs">
           <span class="font-medium text-red-400">Internal note:</span>
@@ -391,7 +391,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
   }
 
   {
-    user && (user.admin || user.verifier) && comment.privateContext && (
+    user && (user.admin || user.moderator) && comment.privateContext && (
       <div class="mt-2 peer-checked/collapse:hidden">
         <div class="border-l-2 border-blue-600 bg-blue-900/20 py-0.5 pl-2 text-xs">
           <span class="font-medium text-blue-400">Private context:</span>

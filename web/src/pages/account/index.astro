@@ -44,7 +44,7 @@ const user = await Astro.locals.banners.try('user', async () => {
         spammer: true,
         verified: true,
         admin: true,
-        verifier: true,
+        moderator: true,
         verifiedLink: true,
         totalKarma: true,
         createdAt: true,
@@ -206,7 +206,7 @@ if (!user) return Astro.rewrite('/404')
           </h1>
           {user.displayName && <p class="text-day-200 font-title">{user.name}</p>}
           {
-            (user.admin || user.verified || user.verifier) && (
+            (user.admin || user.verified || user.moderator) && (
               <div class="mt-1 flex gap-2">
                 {user.admin && (
                   <span class="rounded-full border border-red-500/50 bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
@@ -218,9 +218,9 @@ if (!user) return Astro.rewrite('/404')
                     verified
                   </span>
                 )}
-                {user.verifier && (
+                {user.moderator && (
                   <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                    verifier
+                    moderator
                   </span>
                 )}
               </div>
@@ -356,14 +356,14 @@ if (!user) return Astro.rewrite('/404')
                     )
                   }
                   {
-                    user.verifier && (
+                    user.moderator && (
                       <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                        Verifier
+                        Moderator
                       </span>
                     )
                   }
                   {
-                    !user.admin && !user.verified && !user.verifier && (
+                    !user.admin && !user.verified && !user.moderator && (
                       <span class="border-day-700/50 bg-day-700/20 text-day-400 rounded-full border px-2 py-0.5 text-xs">
                         Standard User
                       </span>

@@ -52,7 +52,7 @@ const [user, allServices] = await Astro.locals.banners.tryMany([
           link: true,
           admin: true,
           verified: true,
-          verifier: true,
+          moderator: true,
           spammer: true,
           verifiedLink: true,
           internalNotes: {
@@ -141,7 +141,7 @@ if (!user) return Astro.rewrite('/404')
     <div class="mb-4 flex flex-wrap justify-center gap-2">
       {user.admin && <BadgeSmall color="green" text="Admin" icon="ri:shield-star-fill" />}
       {user.verified && <BadgeSmall color="cyan" text="Verified" icon="ri:verified-badge-fill" />}
-      {user.verifier && <BadgeSmall color="blue" text="Moderator" icon="ri:graduation-cap-fill" />}
+      {user.moderator && <BadgeSmall color="blue" text="Moderator" icon="ri:graduation-cap-fill" />}
       {user.spammer && <BadgeSmall color="red" text="Spammer" icon="ri:alert-fill" />}
     </div>
 
@@ -226,7 +226,7 @@ if (!user) return Astro.rewrite('/404')
       label="Type"
       options={[
         { label: 'Admin', value: 'admin', icon: 'ri:shield-star-fill' },
-        { label: 'Moderator', value: 'verifier', icon: 'ri:graduation-cap-fill' },
+        { label: 'Moderator', value: 'moderator', icon: 'ri:graduation-cap-fill' },
         { label: 'Spammer', value: 'spammer', icon: 'ri:alert-fill' },
         {
           label: 'Verified',
@@ -239,7 +239,7 @@ if (!user) return Astro.rewrite('/404')
       selectedValue={[
         user.admin ? 'admin' : null,
         user.verified ? 'verified' : null,
-        user.verifier ? 'verifier' : null,
+        user.moderator ? 'moderator' : null,
         user.spammer ? 'spammer' : null,
       ].filter((v) => v !== null)}
       required

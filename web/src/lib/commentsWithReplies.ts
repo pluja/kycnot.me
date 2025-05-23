@@ -31,7 +31,7 @@ const commentReplyQuery = {
         name: true,
         verified: true,
         admin: true,
-        verifier: true,
+        moderator: true,
         createdAt: true,
         displayName: true,
         picture: true,

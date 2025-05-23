@@ -25,12 +25,12 @@ BEGIN
     VALUES (NEW.id, 'ACCOUNT_STATUS_CHANGE', status_change);
   END IF;
 
-  -- Check for verifier status change
-  IF OLD.verifier IS DISTINCT FROM NEW.verifier THEN
-    IF NEW.verifier = true THEN
-      status_change := 'VERIFIER_TRUE';
+  -- Check for moderator status change
+  IF OLD.moderator IS DISTINCT FROM NEW.moderator THEN
+    IF NEW.moderator = true THEN
+      status_change := 'MODERATOR_TRUE';
     ELSE
-      status_change := 'VERIFIER_FALSE';
+      status_change := 'MODERATOR_FALSE';
     END IF;
     INSERT INTO "Notification" ("userId", "type", "aboutAccountStatusChange")
     VALUES (NEW.id, 'ACCOUNT_STATUS_CHANGE', status_change);
@@ -57,6 +57,6 @@ DROP TRIGGER IF EXISTS user_status_change_notifications_trigger ON "User";
 
 -- Create the trigger to fire after updates on specific status columns
 CREATE TRIGGER user_status_change_notifications_trigger
-  AFTER UPDATE OF admin, verified, verifier, spammer ON "User"
+  AFTER UPDATE OF admin, verified, moderator, spammer ON "User"
   FOR EACH ROW
   EXECUTE FUNCTION trigger_user_status_change_notifications();

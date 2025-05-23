@@ -120,8 +120,8 @@ enum AccountStatusChange {
   ADMIN_FALSE
   VERIFIED_TRUE
   VERIFIED_FALSE
-  VERIFIER_TRUE
-  VERIFIER_FALSE
+  MODERATOR_TRUE
+  MODERATOR_FALSE
   SPAMMER_TRUE
   SPAMMER_FALSE
 }
@@ -464,7 +464,7 @@ model User {
   spammer         Boolean @default(false)
   verified        Boolean @default(false)
   admin           Boolean @default(false)
-  verifier        Boolean @default(false)
+  moderator       Boolean @default(false)
   verifiedLink    String?
   secretTokenHash String  @unique
   /// Computed via trigger. Do not update through prisma.

@@ -331,7 +331,7 @@ export const commentActions = {
   }),
 
   moderate: defineProtectedAction({
-    permissions: ['admin', 'verifier'],
+    permissions: ['admin', 'moderator'],
     input: z.object({
       commentId: z.number(),
       userId: z.number(),

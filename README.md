@@ -29,7 +29,7 @@ npm run db-fill-clean
 
 Now open the [.env](web/.env) file and fill in the missing values.
 
-> Default users are created with tokens: `admin`, `verifier`, `verified`, `normal` (configurable via env vars)
+> Default users are created with tokens: `admin`, `moderator`, `verified`, `normal` (configurable via env vars)
 
 ### Running the project
 

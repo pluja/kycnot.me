@@ -131,11 +131,11 @@ export default defineConfig({
         min: 1,
         default: 'admin',
       }),
-      DEV_VERIFIER_USER_SECRET_TOKEN: envField.string({
+      DEV_MODERATOR_USER_SECRET_TOKEN: envField.string({
         context: 'server',
         access: 'secret',
         min: 1,
-        default: 'verifier',
+        default: 'moderator',
       }),
       DEV_VERIFIED_USER_SECRET_TOKEN: envField.string({
         context: 'server',

@@ -29,8 +29,8 @@ const USER_SECRET_TOKEN_DEV_USERS_REGEX = (() => {
       defaultToken: 'admin',
     },
     {
-      envToken: 'DEV_VERIFIER_USER_SECRET_TOKEN',
-      defaultToken: 'verifier',
+      envToken: 'DEV_MODERATOR_USER_SECRET_TOKEN',
+      defaultToken: 'moderator',
     },
     {
       envToken: 'DEV_VERIFIED_USER_SECRET_TOKEN',

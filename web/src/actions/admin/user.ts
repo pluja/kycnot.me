@@ -16,7 +16,7 @@ const selectUserReturnFields = {
   picture: true,
   admin: true,
   verified: true,
-  verifier: true,
+  moderator: true,
   verifiedLink: true,
   secretTokenHash: true,
   totalKarma: true,
@@ -55,7 +55,7 @@ export const adminUserActions = {
         .default(null) // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         .transform((val) => val || null),
       pictureFile: z.instanceof(File).optional(),
-      type: z.array(z.enum(['admin', 'verifier', 'spammer'])),
+      type: z.array(z.enum(['admin', 'moderator', 'spammer'])),
       verifiedLink: z
         .string()
         .url('Invalid URL')
@@ -101,7 +101,7 @@ export const adminUserActions = {
           verified: !!valuesToUpdate.verifiedLink,
           picture: pictureUrl,
           admin: type.includes('admin'),
-          verifier: type.includes('verifier'),
+          moderator: type.includes('moderator'),
           spammer: type.includes('spammer'),
         },
         select: selectUserReturnFields,

@@ -28,8 +28,8 @@ const { comment, class: className, ...divProps } = Astro.props
 
 const user = Astro.locals.user
 
-// Only render for admin/verifier users
-if (!user || !user.admin || !user.verifier) return null
+// Only render for admin/moderator users
+if (!user || !user.admin || !user.moderator) return null
 ---
 
 <div {...divProps} class={cn('text-xs', className)}>

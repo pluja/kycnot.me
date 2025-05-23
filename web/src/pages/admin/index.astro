@@ -9,7 +9,6 @@ type AdminLink = {
   icon: ComponentProps<typeof Icon>['name']
   title: string
   href: string
-  description: string
 }
 
 const adminLinks: AdminLink[] = [
@@ -17,37 +16,36 @@ const adminLinks: AdminLink[] = [
     icon: 'ri:box-3-line',
     title: 'Services',
     href: '/admin/services',
-    description: 'Manage your available services',
   },
   {
     icon: 'ri:file-list-3-line',
     title: 'Attributes',
     href: '/admin/attributes',
-    description: 'Configure service attributes',
   },
   {
     icon: 'ri:user-3-line',
     title: 'Users',
     href: '/admin/users',
-    description: 'Manage user accounts',
   },
   {
     icon: 'ri:chat-settings-line',
     title: 'Comments',
     href: '/admin/comments',
-    description: 'Moderate user comments',
   },
   {
     icon: 'ri:lightbulb-line',
     title: 'Service suggestions',
     href: '/admin/service-suggestions',
-    description: 'Review and manage service suggestions',
   },
   {
     icon: 'ri:megaphone-line',
     title: 'Announcements',
     href: '/admin/announcements',
-    description: 'Manage site announcements',
+  },
+  {
+    icon: 'ri:database-2-line',
+    title: 'Database',
+    href: 'https://db.kycnot.me',
   },
 ]
 ---
@@ -58,23 +56,17 @@ const adminLinks: AdminLink[] = [
     Admin Dashboard
   </h1>
 
-  <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+  <div class="grid grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*40),1fr))] gap-4">
     {
       adminLinks.map((link) => (
         <a
           href={link.href}
-          class="group block rounded-lg border border-zinc-800 bg-gradient-to-br from-zinc-900/90 to-zinc-900/50 p-6 shadow-lg backdrop-blur-xs transition-all duration-300 hover:-translate-y-0.5 hover:from-zinc-800/90 hover:to-zinc-800/50 hover:shadow-xl hover:shadow-zinc-900/20"
+          class="group flex flex-col items-center justify-evenly rounded-lg border border-zinc-800 bg-gradient-to-br from-zinc-900/90 to-zinc-900/50 py-3 text-center shadow-lg backdrop-blur-xs transition-all duration-300 hover:-translate-y-0.5 hover:from-zinc-800/90 hover:to-zinc-800/50 hover:shadow-xl hover:shadow-zinc-900/20"
         >
-          <div class="mb-4 flex items-center gap-3">
-            <Icon
-              name={link.icon}
-              class="h-6 w-6 text-zinc-400 transition-colors group-hover:text-green-400"
-            />
-            <h2 class="font-title text-xl font-semibold text-zinc-100 transition-colors group-hover:text-green-400">
-              {link.title}
-            </h2>
-          </div>
-          <p class="text-sm text-zinc-400">{link.description}</p>
+          <Icon name={link.icon} class="size-8 text-zinc-400 transition-colors group-hover:text-green-400" />
+          <span class="font-title text-xl leading-none font-semibold text-zinc-100 transition-colors group-hover:text-green-400">
+            {link.title}
+          </span>
         </a>
       ))
     }

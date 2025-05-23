@@ -43,14 +43,14 @@ export const {
       notificationTitle: 'Your account is no longer verified',
     },
     {
-      value: 'VERIFIER_TRUE',
-      label: 'Verifier role granted',
-      notificationTitle: 'Verifier role granted',
+      value: 'MODERATOR_TRUE',
+      label: 'Moderator role granted',
+      notificationTitle: 'Moderator role granted',
     },
     {
-      value: 'VERIFIER_FALSE',
-      label: 'Verifier role revoked',
-      notificationTitle: 'Verifier role revoked',
+      value: 'MODERATOR_FALSE',
+      label: 'Moderator role revoked',
+      notificationTitle: 'Moderator role revoked',
     },
     {
       value: 'SPAMMER_TRUE',

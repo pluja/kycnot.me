@@ -85,7 +85,7 @@ async function createAccount(preGeneratedToken?: string) {
       verifiedLink,
       verified: !!verifiedLink,
       admin: faker.datatype.boolean({ probability: 0.1 }),
-      verifier: faker.datatype.boolean({ probability: 0.1 }),
+      moderator: faker.datatype.boolean({ probability: 0.1 }),
     },
     include: {
       serviceAffiliations: true,
@@ -899,19 +899,19 @@ const specialUsersData = {
     envToken: 'DEV_ADMIN_USER_SECRET_TOKEN',
     defaultToken: 'admin',
     admin: true,
-    verifier: true,
+    moderator: true,
     verified: true,
     verifiedLink: 'https://kycnot.me',
     totalKarma: 1001,
     link: 'https://kycnot.me',
     picture: 'https://comments.kycnot.me/api/users/549f290e-0542-4c18-b437-5b64b35758f0/avatar?size=L',
   },
-  verifier: {
-    name: 'verifier_dev',
-    envToken: 'DEV_VERIFIER_USER_SECRET_TOKEN',
-    defaultToken: 'verifier',
+  moderator: {
+    name: 'moderator_dev',
+    envToken: 'DEV_MODERATOR_USER_SECRET_TOKEN',
+    defaultToken: 'moderator',
     admin: false,
-    verifier: true,
+    moderator: true,
     verified: true,
     verifiedLink: 'https://kycnot.me',
     totalKarma: 1001,
@@ -923,7 +923,7 @@ const specialUsersData = {
     envToken: 'DEV_VERIFIED_USER_SECRET_TOKEN',
     defaultToken: 'verified',
     admin: false,
-    verifier: false,
+    moderator: false,
     verified: true,
     verifiedLink: 'https://kycnot.me',
     totalKarma: 1001,
@@ -933,7 +933,7 @@ const specialUsersData = {
     envToken: 'DEV_NORMAL_USER_SECRET_TOKEN',
     defaultToken: 'normal',
     admin: false,
-    verifier: false,
+    moderator: false,
     verified: false,
   },
   spam: {
@@ -941,7 +941,7 @@ const specialUsersData = {
     envToken: 'DEV_SPAM_USER_SECRET_TOKEN',
     defaultToken: 'spam',
     admin: false,
-    verifier: false,
+    moderator: false,
     verified: false,
     totalKarma: -100,
     spammer: true,
@@ -1306,7 +1306,7 @@ async function runFaker() {
               tx.internalUserNote.create({
                 data: generateFakeInternalNote(
                   user.id,
-                  faker.helpers.arrayElement([specialUsers.admin.id, specialUsers.verifier.id])
+                  faker.helpers.arrayElement([specialUsers.admin.id, specialUsers.moderator.id])
                 ),
               })
             )
@@ -1323,7 +1323,7 @@ async function runFaker() {
               tx.internalUserNote.create({
                 data: generateFakeInternalNote(
                   user.id,
-                  faker.helpers.arrayElement([specialUsers.admin.id, specialUsers.verifier.id])
+                  faker.helpers.arrayElement([specialUsers.admin.id, specialUsers.moderator.id])
                 ),
               })
             )

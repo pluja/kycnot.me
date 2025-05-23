@@ -202,7 +202,7 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
           Most Upvotes
         </a>
         {
-          user && (user.admin || user.verifier) && (
+          user && (user.admin || user.moderator) && (
             <a
               href={getSortUrl('status')}
               class={cn([

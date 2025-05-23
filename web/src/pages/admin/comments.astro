@@ -20,7 +20,7 @@ import { prisma } from '../../lib/prisma'
 import { urlWithParams } from '../../lib/urls'
 
 const user = Astro.locals.user
-if (!user || (!user.admin && !user.verifier)) {
+if (!user || (!user.admin && !user.moderator)) {
   return Astro.rewrite('/404')
 }
 

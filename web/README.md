@@ -26,4 +26,4 @@ All commands are run from the root of the project, from a terminal:
 
 > **Note**: `db-fill` and `db-fill-clean` support the `-- --services=n` flag, where n is the number of fake services to add. It defaults to 10. For example, `npm run db-fill -- --services=5` will add 5 fake services.
 
-> **Note**: `db-fill` and `db-fill-clean` create default users with tokens: `admin`, `verifier`, `verified`, `normal` (override with `DEV_*****_USER_SECRET_TOKEN` env vars)
+> **Note**: `db-fill` and `db-fill-clean` create default users with tokens: `admin`, `moderator`, `verified`, `normal` (override with `DEV_*****_USER_SECRET_TOKEN` env vars)
