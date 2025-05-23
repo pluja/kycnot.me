@@ -170,6 +170,25 @@ export default defineConfig({
         url: true,
         optional: false,
       }),
+
+      DATABASE_UI_URL: envField.string({
+        context: 'server',
+        access: 'secret',
+        url: true,
+        optional: false,
+      }),
+
+      RELEASE_NUMBER: envField.number({
+        context: 'server',
+        access: 'public',
+        int: true,
+        optional: true,
+      }),
+      RELEASE_DATE: envField.string({
+        context: 'server',
+        access: 'public',
+        optional: true,
+      }),
     },
   },
 })

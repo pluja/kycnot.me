@@ -1,7 +1,9 @@
 ---
 import { Icon } from 'astro-icon/components'
+import { DATABASE_UI_URL } from 'astro:env/server'
 
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import { cn } from '../../lib/cn'
 
 import type { ComponentProps } from 'astro/types'
 
@@ -9,6 +11,9 @@ type AdminLink = {
   icon: ComponentProps<typeof Icon>['name']
   title: string
   href: string
+  classNames: {
+    base?: string
+  }
 }
 
 const adminLinks: AdminLink[] = [
@@ -16,59 +21,98 @@ const adminLinks: AdminLink[] = [
     icon: 'ri:box-3-line',
     title: 'Services',
     href: '/admin/services',
-  },
-  {
-    icon: 'ri:file-list-3-line',
-    title: 'Attributes',
-    href: '/admin/attributes',
+    classNames: {
+      base: 'text-green-300',
+    },
   },
   {
     icon: 'ri:user-3-line',
     title: 'Users',
     href: '/admin/users',
+    classNames: {
+      base: 'text-red-300',
+    },
   },
   {
-    icon: 'ri:chat-settings-line',
+    icon: 'ri:chat-4-line',
     title: 'Comments',
     href: '/admin/comments',
+    classNames: {
+      base: 'text-yellow-300',
+    },
   },
   {
     icon: 'ri:lightbulb-line',
-    title: 'Service suggestions',
+    title: 'Suggestions',
     href: '/admin/service-suggestions',
+    classNames: {
+      base: 'text-purple-300',
+    },
+  },
+  {
+    icon: 'ri:price-tag-3-line',
+    title: 'Attributes',
+    href: '/admin/attributes',
+    classNames: {
+      base: 'text-blue-300',
+    },
   },
   {
     icon: 'ri:megaphone-line',
     title: 'Announcements',
     href: '/admin/announcements',
+    classNames: {
+      base: 'text-pink-300',
+    },
+  },
+  {
+    icon: 'ri:rocket-2-line',
+    title: 'Releases',
+    href: '/admin/releases',
+    classNames: {
+      base: 'text-orange-300',
+    },
   },
   {
     icon: 'ri:database-2-line',
     title: 'Database',
-    href: 'https://db.kycnot.me',
+    href: DATABASE_UI_URL,
+    classNames: {
+      base: 'text-gray-300',
+    },
   },
 ]
 ---
 
 <BaseLayout pageTitle="Admin Dashboard" widthClassName="max-w-screen-xl">
-  <h1 class="font-title mb-8 text-3xl font-bold text-zinc-100">
+  <h1 class="font-title text-day-100 mb-8 text-3xl font-bold">
     <Icon name="ri:home-gear-line" class="me-1 inline-block size-10 align-[-0.35em]" />
     Admin Dashboard
   </h1>
 
-  <div class="grid grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*40),1fr))] gap-4">
-    {
-      adminLinks.map((link) => (
-        <a
-          href={link.href}
-          class="group flex flex-col items-center justify-evenly rounded-lg border border-zinc-800 bg-gradient-to-br from-zinc-900/90 to-zinc-900/50 py-3 text-center shadow-lg backdrop-blur-xs transition-all duration-300 hover:-translate-y-0.5 hover:from-zinc-800/90 hover:to-zinc-800/50 hover:shadow-xl hover:shadow-zinc-900/20"
-        >
-          <Icon name={link.icon} class="size-8 text-zinc-400 transition-colors group-hover:text-green-400" />
-          <span class="font-title text-xl leading-none font-semibold text-zinc-100 transition-colors group-hover:text-green-400">
-            {link.title}
-          </span>
-        </a>
-      ))
-    }
-  </div>
+  <nav>
+    <ol class="grid grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*40),1fr))] gap-4">
+      {
+        adminLinks.map((link) => (
+          <li
+            class={cn(
+              'group ease-out-back transition-transform duration-250 hover:-translate-y-0.5 hover:scale-105',
+              link.classNames.base
+            )}
+          >
+            <a
+              href={link.href}
+              class="flex min-h-24 flex-col items-center justify-around rounded-lg border border-current/4 bg-current/3 py-3 text-center transition-all duration-250 group-hover:border-current/10 group-hover:bg-current/10 group-hover:shadow-xl"
+            >
+              <Icon
+                name={link.icon}
+                class="size-8 text-current opacity-50 transition-opacity duration-250 group-hover:opacity-100"
+              />
+              <span class="font-title text-xl leading-none font-semibold text-current">{link.title}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ol>
+  </nav>
 </BaseLayout>

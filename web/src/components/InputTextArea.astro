@@ -10,7 +10,7 @@ import type { ComponentProps, HTMLAttributes } from 'astro/types'
 
 type Props = Omit<ComponentProps<typeof InputWrapper>, 'children' | 'inputId' | 'required'> & {
   inputProps?: Omit<HTMLAttributes<'textarea'>, 'name'>
-  value?: string
+  value?: string | null | undefined
 }
 
 const { inputProps, value, ...wrapperProps } = Astro.props

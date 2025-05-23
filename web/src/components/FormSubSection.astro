@@ -1,0 +1,24 @@
+---
+import { cn } from '../lib/cn'
+
+import type { AstroChildren } from '../lib/astro'
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = HTMLAttributes<'section'> & {
+  title: string
+  subtitle?: string
+  heading?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
+  children: AstroChildren
+}
+
+const { title, subtitle, class: className, heading = 'h3', ...props } = Astro.props
+
+const HeadingTag = heading
+---
+
+<section class={cn('mt-6 space-y-2 first:mt-0', className)} {...props}>
+  <HeadingTag class="font-title text-day-400 text-center text-lg font-medium">{title}</HeadingTag>
+  {subtitle && <p class="text-day-400 text-center">{subtitle}</p>}
+
+  <slot />
+</section>

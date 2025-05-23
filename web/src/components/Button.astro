@@ -58,27 +58,17 @@ const button = tv({
       },
     },
     color: {
-      black: {
-        base: 'border-night-500 bg-night-800 hover:bg-night-900 hover:text-day-200 focus-visible:bg-night-500 text-white/50 focus-visible:text-white focus-visible:ring-white',
-      },
-      white: {
-        base: 'border-day-300 bg-day-100 hover:bg-day-200 text-black focus-visible:ring-green-500',
-      },
-      gray: {
-        base: 'border-day-500 bg-day-400 hover:bg-day-500 text-black focus-visible:ring-white',
-      },
-      success: {
-        base: 'border-green-600 bg-green-500 text-black hover:bg-green-600',
-      },
-      error: {
-        base: 'border-red-600 bg-red-500 text-white hover:bg-red-600',
-      },
-      warning: {
-        base: 'border-yellow-600 bg-yellow-500 text-white hover:bg-yellow-600',
-      },
-      info: {
-        base: 'border-blue-600 bg-blue-500 text-white hover:bg-blue-600',
-      },
+      black: '',
+      white: '',
+      gray: '',
+      success: '',
+      danger: '',
+      warning: '',
+      info: '',
+    },
+    variant: {
+      solid: '',
+      faded: '',
     },
     shadow: {
       true: {
@@ -92,6 +82,107 @@ const button = tv({
     },
   },
   compoundVariants: [
+    // Color variants - solid
+    {
+      color: 'black',
+      variant: 'solid',
+      class: {
+        base: 'border-night-500 bg-night-800 hover:bg-night-900 hover:text-day-200 focus-visible:bg-night-500 text-white/50 focus-visible:text-white focus-visible:ring-white',
+      },
+    },
+    {
+      color: 'white',
+      variant: 'solid',
+      class: {
+        base: 'border-day-300 bg-day-100 hover:bg-day-200 text-black focus-visible:ring-green-500',
+      },
+    },
+    {
+      color: 'gray',
+      variant: 'solid',
+      class: {
+        base: 'border-day-500 bg-day-400 hover:bg-day-500 text-black focus-visible:ring-white',
+      },
+    },
+    {
+      color: 'success',
+      variant: 'solid',
+      class: {
+        base: 'border-green-600 bg-green-500 text-black hover:bg-green-600',
+      },
+    },
+    {
+      color: 'danger',
+      variant: 'solid',
+      class: {
+        base: 'border-red-600 bg-red-500 text-white hover:bg-red-600',
+      },
+    },
+    {
+      color: 'warning',
+      variant: 'solid',
+      class: {
+        base: 'border-yellow-600 bg-yellow-500 text-white hover:bg-yellow-600',
+      },
+    },
+    {
+      color: 'info',
+      variant: 'solid',
+      class: {
+        base: 'border-blue-600 bg-blue-500 text-white hover:bg-blue-600',
+      },
+    },
+    // Color variants - faded
+    {
+      color: 'black',
+      variant: 'faded',
+      class: {
+        base: 'border-night-300/30 bg-night-800/30 hover:bg-night-700/50 text-white/70 hover:text-white/90 focus-visible:ring-white/50',
+      },
+    },
+    {
+      color: 'white',
+      variant: 'faded',
+      class: {
+        base: 'border-day-300/30 bg-day-100/30 hover:bg-day-200/50 text-white/70 hover:text-white/90 focus-visible:ring-white/50',
+      },
+    },
+    {
+      color: 'gray',
+      variant: 'faded',
+      class: {
+        base: 'border-day-500/30 bg-day-400/30 hover:bg-day-500/50 text-day-300 hover:text-day-100 focus-visible:ring-white/50',
+      },
+    },
+    {
+      color: 'success',
+      variant: 'faded',
+      class: {
+        base: 'border-green-600/30 bg-green-500/30 text-green-300 hover:bg-green-500/50 hover:text-green-100',
+      },
+    },
+    {
+      color: 'danger',
+      variant: 'faded',
+      class: {
+        base: 'border-red-600/30 bg-red-500/30 text-red-300 hover:bg-red-500/50 hover:text-red-100',
+      },
+    },
+    {
+      color: 'warning',
+      variant: 'faded',
+      class: {
+        base: 'border-yellow-600/30 bg-yellow-500/30 text-yellow-300 hover:bg-yellow-500/50 hover:text-yellow-100',
+      },
+    },
+    {
+      color: 'info',
+      variant: 'faded',
+      class: {
+        base: 'border-blue-600/30 bg-blue-500/30 text-blue-300 hover:bg-blue-500/50 hover:text-blue-100',
+      },
+    },
+    // Shadow variants
     {
       color: 'black',
       shadow: true,
@@ -113,7 +204,7 @@ const button = tv({
       class: 'shadow-green-500/30',
     },
     {
-      color: 'error',
+      color: 'danger',
       shadow: true,
       class: 'shadow-red-500/30',
     },
@@ -127,6 +218,7 @@ const button = tv({
       shadow: true,
       class: 'shadow-blue-500/30',
     },
+    // Icon only variants
     {
       iconOnly: true,
       size: 'sm',
@@ -146,6 +238,7 @@ const button = tv({
   defaultVariants: {
     size: 'md',
     color: 'black',
+    variant: 'solid',
     shadow: false,
     disabled: false,
     iconOnly: false,
@@ -159,6 +252,7 @@ const {
   endIcon,
   size,
   color,
+  variant,
   shadow,
   class: className,
   classNames,
@@ -174,7 +268,7 @@ const {
   icon: iconSlot,
   label: labelSlot,
   endIcon: endIconSlot,
-} = button({ size, color, shadow, disabled, iconOnly: !label && !(!!icon && !!endIcon) })
+} = button({ size, color, variant, shadow, disabled, iconOnly: !label && !(!!icon && !!endIcon) })
 
 const ActualTag = disabled && Tag === 'a' ? 'span' : Tag
 ---

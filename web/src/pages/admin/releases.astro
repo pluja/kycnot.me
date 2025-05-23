@@ -1,0 +1,44 @@
+---
+import { RELEASE_DATE, RELEASE_NUMBER } from 'astro:env/server'
+
+import TimeFormatted from '../../components/TimeFormatted.astro'
+import MiniLayout from '../../layouts/MiniLayout.astro'
+
+const releaseDate =
+  RELEASE_DATE && !isNaN(new Date(RELEASE_DATE).getTime()) ? new Date(RELEASE_DATE) : undefined
+---
+
+<MiniLayout
+  pageTitle="Releases"
+  description="Manage releases"
+  layoutHeader={{
+    icon: 'ri:rocket-2-line',
+    title: 'Releases',
+    subtitle: 'Current release',
+  }}
+  className={{
+    main: 'flex flex-col items-center justify-center text-center',
+  }}
+>
+  <p class="text-day-200 font-title text-center text-6xl font-medium tracking-wider">
+    {RELEASE_NUMBER ? `#${RELEASE_NUMBER}` : '???'}
+  </p>
+  <time class="text-day-400 mt-4 block text-center text-xl" datetime={releaseDate?.toISOString()}>
+    {
+      releaseDate?.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }) ?? 'Unknown release date'
+    }
+  </time>
+  {
+    !!releaseDate && (
+      <p class="text-day-500 mt-2">
+        (<TimeFormatted date={releaseDate} hourPrecision daysUntilDate={Infinity} />)
+      </p>
+    )
+  }
+</MiniLayout>

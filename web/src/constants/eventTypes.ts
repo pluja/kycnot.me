@@ -1,7 +1,9 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import type BadgeSmall from '../components/BadgeSmall.astro'
 import type { EventType } from '@prisma/client'
+import type { ComponentProps } from 'astro/types'
 
 type EventTypeInfo<T extends string | null | undefined = string> = {
   id: T
@@ -12,6 +14,7 @@ type EventTypeInfo<T extends string | null | undefined = string> = {
     dot: string
   }
   icon: string
+  color: ComponentProps<typeof BadgeSmall>['color']
 }
 
 export const {
@@ -32,6 +35,7 @@ export const {
       dot: 'bg-zinc-700 text-zinc-300 ring-zinc-700/50',
     },
     icon: 'ri:question-fill',
+    color: 'gray',
   }),
   [
     {
@@ -43,6 +47,7 @@ export const {
         dot: 'bg-amber-900 text-amber-300 ring-amber-900/50',
       },
       icon: 'ri:error-warning-fill',
+      color: 'yellow',
     },
     {
       id: 'WARNING_SOLVED',
@@ -53,6 +58,7 @@ export const {
         dot: 'bg-green-900 text-green-300 ring-green-900/50',
       },
       icon: 'ri:check-fill',
+      color: 'green',
     },
     {
       id: 'ALERT',
@@ -63,6 +69,7 @@ export const {
         dot: 'bg-red-900 text-red-300 ring-red-900/50',
       },
       icon: 'ri:alert-fill',
+      color: 'red',
     },
     {
       id: 'ALERT_SOLVED',
@@ -73,6 +80,7 @@ export const {
         dot: 'bg-green-900 text-green-300 ring-green-900/50',
       },
       icon: 'ri:check-fill',
+      color: 'green',
     },
     {
       id: 'INFO',
@@ -83,6 +91,7 @@ export const {
         dot: 'bg-blue-900 text-blue-300 ring-blue-900/50',
       },
       icon: 'ri:information-fill',
+      color: 'sky',
     },
     {
       id: 'NORMAL',
@@ -93,6 +102,7 @@ export const {
         dot: 'bg-zinc-700 text-zinc-300 ring-zinc-700/50',
       },
       icon: 'ri:notification-fill',
+      color: 'green',
     },
     {
       id: 'UPDATE',
@@ -103,6 +113,7 @@ export const {
         dot: 'bg-sky-900 text-sky-300 ring-sky-900/50',
       },
       icon: 'ri:pencil-fill',
+      color: 'sky',
     },
   ] as const satisfies EventTypeInfo<EventType>[]
 )

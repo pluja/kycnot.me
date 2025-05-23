@@ -8,7 +8,7 @@ import BaseLayout from './BaseLayout.astro'
 import type { ComponentProps } from 'astro/types'
 
 type Props = Omit<ComponentProps<typeof BaseLayout>, 'widthClassName'> & {
-  layoutHeader: { icon: string; title: string; subtitle: string }
+  layoutHeader: { icon: string; title: string; subtitle?: string }
 }
 
 const { layoutHeader, ...baseLayoutProps } = Astro.props
@@ -28,10 +28,19 @@ const { layoutHeader, ...baseLayoutProps } = Astro.props
       <Icon name={layoutHeader.icon} class="text-night-800 size-8" />
     </div>
 
-    <h1 class="font-title text-day-200 mt-1 text-center text-3xl font-semibold">
+    <h1
+      class={cn(
+        'font-title text-day-200 mt-1 text-center text-3xl font-semibold',
+        !layoutHeader.subtitle && 'xs:mb-8 mb-6'
+      )}
+    >
       {layoutHeader.title}
     </h1>
-    <p class="text-day-500 xs:mb-8 mt-1 mb-6 text-center">{layoutHeader.subtitle}</p>
+    {
+      !!layoutHeader.subtitle && (
+        <p class="text-day-500 xs:mb-8 mt-1 mb-6 text-center">{layoutHeader.subtitle}</p>
+      )
+    }
 
     <slot />
   </div>

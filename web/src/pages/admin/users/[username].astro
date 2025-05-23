@@ -4,6 +4,7 @@ import { actions, isInputError } from 'astro:actions'
 
 import BadgeSmall from '../../../components/BadgeSmall.astro'
 import Button from '../../../components/Button.astro'
+import FormSection from '../../../components/FormSection.astro'
 import InputCardGroup from '../../../components/InputCardGroup.astro'
 import InputImageFile from '../../../components/InputImageFile.astro'
 import InputSelect from '../../../components/InputSelect.astro'
@@ -171,90 +172,88 @@ if (!user) return Astro.rewrite('/404')
     </div>
   </div>
 
-  <form
-    method="POST"
-    action={actions.admin.user.update}
-    enctype="multipart/form-data"
-    class="space-y-2"
-    data-astro-reload
-  >
-    <h2 class="font-title text-center text-3xl leading-none font-bold">Edit profile</h2>
+  <FormSection title="Edit profile">
+    <form
+      method="POST"
+      action={actions.admin.user.update}
+      enctype="multipart/form-data"
+      class="space-y-2"
+      data-astro-reload
+    >
+      <input type="hidden" name="id" value={user.id} />
 
-    <input type="hidden" name="id" value={user.id} />
+      <div class="grid grid-cols-2 gap-x-4 gap-y-2">
+        <InputText
+          label="Name"
+          name="name"
+          error={updateInputErrors.name}
+          inputProps={{ value: user.name, required: true }}
+        />
 
-    <div class="grid grid-cols-2 gap-x-4 gap-y-2">
-      <InputText
-        label="Name"
-        name="name"
-        error={updateInputErrors.name}
-        inputProps={{ value: user.name, required: true }}
+        <InputText
+          label="Display Name"
+          name="displayName"
+          error={updateInputErrors.displayName}
+          inputProps={{ value: user.displayName ?? '', maxlength: 50 }}
+        />
+
+        <InputText
+          label="Link"
+          name="link"
+          error={updateInputErrors.link}
+          inputProps={{ value: user.link ?? '', type: 'url' }}
+        />
+
+        <InputText
+          label="Verified Link"
+          name="verifiedLink"
+          error={updateInputErrors.verifiedLink}
+          inputProps={{ value: user.verifiedLink, type: 'url' }}
+        />
+      </div>
+
+      <InputImageFile
+        label="Profile Picture Upload"
+        name="pictureFile"
+        value={user.picture}
+        error={updateInputErrors.pictureFile}
+        square
+        description="Upload a square image for best results. Supported formats: JPG, PNG, WebP, AVIF. Max size: 5MB."
       />
 
-      <InputText
-        label="Display Name"
-        name="displayName"
-        error={updateInputErrors.displayName}
-        inputProps={{ value: user.displayName ?? '', maxlength: 50 }}
+      <InputCardGroup
+        name="type"
+        label="Type"
+        options={[
+          { label: 'Admin', value: 'admin', icon: 'ri:shield-star-fill' },
+          { label: 'Moderator', value: 'moderator', icon: 'ri:graduation-cap-fill' },
+          { label: 'Spammer', value: 'spammer', icon: 'ri:alert-fill' },
+          {
+            label: 'Verified',
+            value: 'verified',
+            icon: 'ri:verified-badge-fill',
+            disabled: true,
+            noTransitionPersist: true,
+          },
+        ]}
+        selectedValue={[
+          user.admin ? 'admin' : null,
+          user.verified ? 'verified' : null,
+          user.moderator ? 'moderator' : null,
+          user.spammer ? 'spammer' : null,
+        ].filter((v) => v !== null)}
+        required
+        cardSize="sm"
+        iconSize="sm"
+        multiple
+        error={updateInputErrors.type}
       />
 
-      <InputText
-        label="Link"
-        name="link"
-        error={updateInputErrors.link}
-        inputProps={{ value: user.link ?? '', type: 'url' }}
-      />
+      <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
+    </form>
+  </FormSection>
 
-      <InputText
-        label="Verified Link"
-        name="verifiedLink"
-        error={updateInputErrors.verifiedLink}
-        inputProps={{ value: user.verifiedLink, type: 'url' }}
-      />
-    </div>
-
-    <InputImageFile
-      label="Profile Picture Upload"
-      name="pictureFile"
-      value={user.picture}
-      error={updateInputErrors.pictureFile}
-      square
-      description="Upload a square image for best results. Supported formats: JPG, PNG, WebP, AVIF. Max size: 5MB."
-    />
-
-    <InputCardGroup
-      name="type"
-      label="Type"
-      options={[
-        { label: 'Admin', value: 'admin', icon: 'ri:shield-star-fill' },
-        { label: 'Moderator', value: 'moderator', icon: 'ri:graduation-cap-fill' },
-        { label: 'Spammer', value: 'spammer', icon: 'ri:alert-fill' },
-        {
-          label: 'Verified',
-          value: 'verified',
-          icon: 'ri:verified-badge-fill',
-          disabled: true,
-          noTransitionPersist: true,
-        },
-      ]}
-      selectedValue={[
-        user.admin ? 'admin' : null,
-        user.verified ? 'verified' : null,
-        user.moderator ? 'moderator' : null,
-        user.spammer ? 'spammer' : null,
-      ].filter((v) => v !== null)}
-      required
-      cardSize="sm"
-      iconSize="sm"
-      multiple
-      error={updateInputErrors.type}
-    />
-
-    <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
-  </form>
-
-  <section class="space-y-2">
-    <h2 class="font-title text-center text-3xl leading-none font-bold">Internal Notes</h2>
-
+  <FormSection title="Internal Notes">
     {
       user.internalNotes.length === 0 ? (
         <p class="text-day-300 text-center">No internal notes yet.</p>
@@ -294,7 +293,7 @@ if (!user) return Astro.rewrite('/404')
                   <form
                     method="POST"
                     action={actions.admin.user.internalNotes.delete}
-                    class="contents"
+                    class="space-y-2"
                     data-astro-reload
                   >
                     <input type="hidden" name="noteId" value={note.id} />
@@ -347,11 +346,9 @@ if (!user) return Astro.rewrite('/404')
       />
       <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />
     </form>
-  </section>
+  </FormSection>
 
-  <section class="space-y-2">
-    <h2 class="font-title text-center text-3xl leading-none font-bold">Service Affiliations</h2>
-
+  <FormSection title="Service Affiliations">
     {
       user.serviceAffiliations.length === 0 ? (
         <p class="text-day-200 text-center">No service affiliations yet.</p>
@@ -380,7 +377,7 @@ if (!user) return Astro.rewrite('/404')
                   method="POST"
                   action={actions.admin.user.serviceAffiliations.remove}
                   data-astro-reload
-                  class="contents"
+                  class="space-y-2"
                 >
                   <input type="hidden" name="id" value={affiliation.id} />
                   <button type="submit" class="text-day-300 transition-colors hover:text-red-400">
@@ -429,29 +426,29 @@ if (!user) return Astro.rewrite('/404')
 
       <InputSubmitButton label="Add Affiliation" icon="ri:link" hideCancel />
     </form>
-  </section>
+  </FormSection>
 
-  <form method="POST" action={actions.admin.user.karmaTransactions.add} data-astro-reload class="space-y-2">
-    <h2 class="font-title text-center text-3xl leading-none font-bold">Grant/Remove Karma</h2>
+  <FormSection title="Grant/Remove Karma">
+    <form method="POST" action={actions.admin.user.karmaTransactions.add} data-astro-reload class="space-y-2">
+      <input type="hidden" name="userId" value={user.id} />
 
-    <input type="hidden" name="userId" value={user.id} />
+      <InputText
+        label="Points"
+        name="points"
+        error={addKarmaTransactionResult?.error?.message}
+        inputProps={{ type: 'number', required: true }}
+      />
 
-    <InputText
-      label="Points"
-      name="points"
-      error={addKarmaTransactionResult?.error?.message}
-      inputProps={{ type: 'number', required: true }}
-    />
+      <InputTextArea
+        label="Description"
+        name="description"
+        error={addKarmaTransactionResult?.error?.message}
+        inputProps={{ required: true }}
+      />
 
-    <InputTextArea
-      label="Description"
-      name="description"
-      error={addKarmaTransactionResult?.error?.message}
-      inputProps={{ required: true }}
-    />
-
-    <InputSubmitButton label="Submit" icon="ri:add-line" hideCancel />
-  </form>
+      <InputSubmitButton label="Submit" icon="ri:add-line" hideCancel />
+    </form>
+  </FormSection>
 </BaseLayout>
 
 <script>
