@@ -30,14 +30,14 @@ export const {
     {
       type: 'email',
       label: 'Email',
-      matcher: /mailto:(.*)/,
+      matcher: /mailto:(.+)/,
       formatter: (value) => value,
       icon: 'ri:mail-line',
     },
     {
       type: 'telephone',
       label: 'Telephone',
-      matcher: /tel:(.*)/,
+      matcher: /tel:(.+)/,
       formatter: (value) => {
         return parsePhoneNumberWithError(value).formatInternational()
       },
@@ -46,7 +46,7 @@ export const {
     {
       type: 'whatsapp',
       label: 'WhatsApp',
-      matcher: /https?:\/\/(?:www\.)?wa\.me\/(.*)?/,
+      matcher: /https?:\/\/(?:www\.)?wa\.me\/(.+)/,
       formatter: (value) => {
         return parsePhoneNumberWithError(value).formatInternational()
       },
@@ -55,42 +55,35 @@ export const {
     {
       type: 'telegram',
       label: 'Telegram',
-      matcher: /https?:\/\/(?:www\.)?t\.me\/(.*)?/,
+      matcher: /https?:\/\/(?:www\.)?t\.me\/(.+)/,
       formatter: (value) => `t.me/${value}`,
       icon: 'ri:telegram-line',
     },
     {
       type: 'linkedin',
       label: 'LinkedIn',
-      matcher: /https?:\/\/(?:www\.)?linkedin\.com\/(?:in|company)\/(.*)?/,
+      matcher: /https?:\/\/(?:www\.)?linkedin\.com\/(?:in|company)\/(.+)/,
       formatter: (value) => `in/${value}`,
       icon: 'ri:linkedin-box-line',
     },
     {
-      type: 'website',
-      label: 'Website',
-      matcher: /https?:\/\/(?:www\.)?((?:[a-zA-Z0-9-]+\.)+[a-zA-Z]+)/,
-      formatter: (value) => value,
-      icon: 'ri:global-line',
-    },
-    {
       type: 'x',
       label: 'X',
-      matcher: /https?:\/\/(?:www\.)?x\.com\/(.*)?/,
+      matcher: /https?:\/\/(?:www\.)?x\.com\/(.+)/,
       formatter: (value) => `@${value}`,
       icon: 'ri:twitter-x-line',
     },
     {
       type: 'instagram',
       label: 'Instagram',
-      matcher: /https?:\/\/(?:www\.)?instagram\.com\/(.*)?/,
+      matcher: /https?:\/\/(?:www\.)?instagram\.com\/(.+)/,
       formatter: (value) => `@${value}`,
       icon: 'ri:instagram-line',
     },
     {
       type: 'matrix',
       label: 'Matrix',
-      matcher: /https?:\/\/(?:www\.)?matrix\.to\/#\/(.*)?/,
+      matcher: /https?:\/\/(?:www\.)?matrix\.to\/#\/(.+)/,
       formatter: (value) => value,
       icon: 'ri:hashtag',
     },
@@ -100,6 +93,14 @@ export const {
       matcher: /https?:\/\/(?:www\.)?bitcointalk\.org/,
       formatter: () => 'BitcoinTalk',
       icon: 'ri:btc-line',
+    },
+    // Website must go last because it's a catch-all
+    {
+      type: 'website',
+      label: 'Website',
+      matcher: /https?:\/\/(?:www\.)?((?:[a-zA-Z0-9-]+\.)+[a-zA-Z]+)/,
+      formatter: (value) => value,
+      icon: 'ri:global-line',
     },
   ] as const satisfies ContactMethodInfo[]
 )
