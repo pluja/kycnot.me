@@ -18,7 +18,7 @@ const serviceSchemaBase = z.object({
   slug: z
     .string()
     .regex(/^[a-z0-9-]+$/, 'Allowed characters: lowercase letters, numbers, and hyphens')
-    .optional(),
+    .nullable(),
   name: z.string().min(1).max(20),
   description: z.string().min(1),
   serviceUrls: stringListOfUrlsSchemaRequired,
@@ -28,12 +28,12 @@ const serviceSchemaBase = z.object({
   attributes: z.array(z.coerce.number().int().positive()),
   categories: z.array(z.coerce.number().int().positive()).min(1),
   verificationStatus: z.nativeEnum(VerificationStatus),
-  verificationSummary: z.string().optional().nullable().default(null),
-  verificationProofMd: z.string().optional().nullable().default(null),
+  verificationSummary: z.string().nullable(),
+  verificationProofMd: z.string().nullable(),
   acceptedCurrencies: z.array(z.nativeEnum(Currency)),
-  referral: z.string().optional().nullable().default(null),
+  referral: z.string().nullable(),
   imageFile: imageFileSchema,
-  overallScore: zodCohercedNumber(z.number().int().min(0).max(10)).optional(),
+  overallScore: zodCohercedNumber(z.number().int().min(0).max(10)).nullable(),
   serviceVisibility: z.nativeEnum(ServiceVisibility),
 })
 
@@ -187,13 +187,17 @@ export const adminServiceActions = {
     accept: 'form',
     permissions: 'admin',
     input: z.object({
-      label: z.string().min(1).max(50).optional(),
+      label: z.string().min(1).max(50).nullable(),
       value: z.string().url(),
       serviceId: z.number().int().positive(),
     }),
     handler: async (input) => {
       const contactMethod = await prisma.serviceContactMethod.create({
-        data: input,
+        data: {
+          label: input.label,
+          value: input.value,
+          serviceId: input.serviceId,
+        },
       })
       return { contactMethod }
     },
@@ -203,16 +207,19 @@ export const adminServiceActions = {
     accept: 'form',
     permissions: 'admin',
     input: z.object({
-      id: z.number().int().positive().optional(),
-      label: z.string().min(1).max(50).optional(),
+      id: z.number().int().positive(),
+      label: z.string().min(1).max(50).nullable(),
       value: z.string().url(),
       serviceId: z.number().int().positive(),
     }),
     handler: async (input) => {
-      const { id, ...data } = input
       const contactMethod = await prisma.serviceContactMethod.update({
-        where: { id },
-        data,
+        where: { id: input.id },
+        data: {
+          label: input.label,
+          value: input.value,
+          serviceId: input.serviceId,
+        },
       })
       return { contactMethod }
     },

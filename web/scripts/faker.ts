@@ -860,6 +860,22 @@ const generateFakeServiceContactMethod = (serviceId: number) => {
       value: `https://x.com/${faker.internet.username()}`,
     },
     {
+      value: `https://matrix.to/#/@${faker.internet.username()}:${faker.internet.domainName()}`,
+    },
+    {
+      value: `https://instagram.com/${faker.internet.username()}`,
+    },
+    {
+      value: `https://linkedin.com/in/${faker.helpers.slugify(faker.person.fullName())}`,
+    },
+    {
+      label: faker.lorem.word({ length: 2 }),
+      value: `https://bitcointalk.org/index.php?topic=${faker.number.int({ min: 1, max: 1000000 }).toString()}.0`,
+    },
+    {
+      value: `https://bitcointalk.org/index.php?topic=${faker.number.int({ min: 1, max: 1000000 }).toString()}.0`,
+    },
+    {
       value: faker.internet.url(),
     },
     {
@@ -867,7 +883,7 @@ const generateFakeServiceContactMethod = (serviceId: number) => {
       value: faker.internet.url(),
     },
     {
-      value: `https://www.linkedin.com/company/${faker.helpers.slugify(faker.company.name())}`,
+      value: `https://linkedin.com/company/${faker.helpers.slugify(faker.company.name())}`,
     },
   ] as const satisfies Partial<Prisma.ServiceContactMethodCreateInput>[]
 
