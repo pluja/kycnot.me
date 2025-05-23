@@ -18,7 +18,7 @@ const serviceSchemaBase = z.object({
   slug: z
     .string()
     .regex(/^[a-z0-9-]+$/, 'Allowed characters: lowercase letters, numbers, and hyphens')
-    .nullable(),
+    .optional(),
   name: z.string().min(1).max(20),
   description: z.string().min(1),
   serviceUrls: stringListOfUrlsSchemaRequired,
@@ -28,12 +28,12 @@ const serviceSchemaBase = z.object({
   attributes: z.array(z.coerce.number().int().positive()),
   categories: z.array(z.coerce.number().int().positive()).min(1),
   verificationStatus: z.nativeEnum(VerificationStatus),
-  verificationSummary: z.string().nullable(),
-  verificationProofMd: z.string().nullable(),
+  verificationSummary: z.string().optional().nullable().default(null),
+  verificationProofMd: z.string().optional().nullable().default(null),
   acceptedCurrencies: z.array(z.nativeEnum(Currency)),
-  referral: z.string().nullable(),
+  referral: z.string().optional().nullable().default(null),
   imageFile: imageFileSchema,
-  overallScore: zodCohercedNumber(z.number().int().min(0).max(10)).nullable(),
+  overallScore: zodCohercedNumber(z.number().int().min(0).max(10)).optional(),
   serviceVisibility: z.nativeEnum(ServiceVisibility),
 })
 

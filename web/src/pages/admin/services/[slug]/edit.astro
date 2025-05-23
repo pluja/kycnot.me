@@ -170,8 +170,6 @@ const errorTextClasses = 'mt-1 text-xs text-red-400'
       </h1>
       <a
         href={`/service/${service.slug}`}
-        target="_blank"
-        rel="noopener noreferrer"
         class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-sky-400 hover:text-sky-300 hover:underline focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
       >
         <Icon name="ri:external-link-line" class="size-4" />
@@ -1017,12 +1015,10 @@ const errorTextClasses = 'mt-1 text-xs text-red-400'
                       <div class="flex-grow space-y-1">
                         <div class="flex flex-wrap items-center gap-2">
                           <Icon name={contactMethodInfo.icon} class="size-4 text-zinc-300" />
-                          <span class="text-md font-semibold text-zinc-100">
-                            {method.label ?? contactMethodInfo.label}
-                          </span>
+                          <span class="text-md font-semibold text-zinc-100">{contactMethodInfo.label}</span>
                         </div>
                         <p class="text-sm text-pretty text-zinc-400">
-                          {contactMethodInfo.formattedValue}{' '}
+                          {method.label ?? contactMethodInfo.formattedValue}{' '}
                           <span class="text-zinc-500">({method.value})</span>
                         </p>
                       </div>
@@ -1067,7 +1063,7 @@ const errorTextClasses = 'mt-1 text-xs text-red-400'
                           id={`contactLabel-${method.id}`}
                           value={method.label}
                           class={inputBaseClasses}
-                          placeholder={contactMethodInfo.label}
+                          placeholder={contactMethodInfo.formattedValue}
                         />
                       </div>
                       <div>
