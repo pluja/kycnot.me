@@ -14,9 +14,9 @@ import { timeTrapSecretKey } from '../lib/timeTrapSecret'
 
 import type { CommentStatus, Prisma } from '@prisma/client'
 
-const COMMENT_RATE_LIMIT_WINDOW_MINUTES = 5
+const COMMENT_RATE_LIMIT_WINDOW_MINUTES = 2
 const MAX_COMMENTS_PER_WINDOW = 1
-const MAX_COMMENTS_PER_WINDOW_VERIFIED_USER = 5
+const MAX_COMMENTS_PER_WINDOW_VERIFIED_USER = 10
 
 export const commentActions = {
   vote: defineProtectedAction({

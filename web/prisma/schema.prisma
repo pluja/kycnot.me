@@ -397,12 +397,15 @@ model Service {
 }
 
 model ServiceContactMethod {
-  id        Int     @id @default(autoincrement())
-  label     String
+  id    Int     @id @default(autoincrement())
+  /// Only include it if you want to override the formatted value.
+  label String?
   /// Including the protocol (e.g. "mailto:", "tel:", "https://")
-  value     String
-  iconId    String
-  info      String
+  value String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
   services  Service @relation("ServiceToContactMethod", fields: [serviceId], references: [id], onDelete: Cascade)
   serviceId Int
 }

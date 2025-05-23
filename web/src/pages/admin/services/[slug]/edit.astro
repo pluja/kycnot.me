@@ -1,21 +1,23 @@
 ---
-import {
-  AttributeCategory,
-  Currency,
-  EventType,
-  VerificationStatus,
-  VerificationStepStatus,
-} from '@prisma/client'
+import { EventType, VerificationStepStatus } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 
-import MyPicture from '../../../../components/MyPicture.astro'
+import InputCardGroup from '../../../../components/InputCardGroup.astro'
+import InputCheckboxGroup from '../../../../components/InputCheckboxGroup.astro'
+import InputImageFile from '../../../../components/InputImageFile.astro'
+import InputSubmitButton from '../../../../components/InputSubmitButton.astro'
+import InputText from '../../../../components/InputText.astro'
+import InputTextArea from '../../../../components/InputTextArea.astro'
 import UserBadge from '../../../../components/UserBadge.astro'
+import { formatContactMethod } from '../../../../constants/contactMethods'
+import { currencies } from '../../../../constants/currencies'
+import { kycLevels } from '../../../../constants/kycLevels'
 import { serviceVisibilities } from '../../../../constants/serviceVisibility'
+import { verificationStatuses } from '../../../../constants/verificationStatus'
 import BaseLayout from '../../../../layouts/BaseLayout.astro'
 import { cn } from '../../../../lib/cn'
 import { prisma } from '../../../../lib/prisma'
-import { ACCEPTED_IMAGE_TYPES } from '../../../../lib/zodUtils'
 
 const { slug } = Astro.params
 
@@ -131,15 +133,7 @@ const attributes = await Astro.locals.banners.try(
   []
 )
 
-const inputBaseClasses =
-  'w-full rounded-md border-zinc-600 bg-zinc-700/80 p-2 text-zinc-200 placeholder-zinc-400 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm'
-const labelBaseClasses = 'block text-sm font-medium text-zinc-300 mb-1'
-const errorTextClasses = 'mt-1 text-xs text-red-400'
-const checkboxLabelClasses = 'inline-flex items-center text-sm text-zinc-300'
-const checkboxInputClasses =
-  'rounded-sm border-zinc-500 bg-zinc-700 text-sky-500 focus:ring-sky-500 focus:ring-offset-zinc-800'
-
-// Button style constants
+// Button style constants for admin sections (Events, etc.)
 const buttonPrimaryClasses =
   'inline-flex items-center justify-center rounded-md border border-transparent bg-sky-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-zinc-900'
 
@@ -160,6 +154,12 @@ const buttonSmallWarningClasses = cn(
   buttonSmallBaseClasses,
   'text-yellow-400 hover:bg-yellow-700/30 hover:text-yellow-300'
 )
+
+// Legacy classes for existing admin forms (Events, Verification Steps, Contact Methods)
+const inputBaseClasses =
+  'w-full rounded-md border-zinc-600 bg-zinc-700/80 p-2 text-zinc-200 placeholder-zinc-400 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm'
+const labelBaseClasses = 'block text-sm font-medium text-zinc-300 mb-1'
+const errorTextClasses = 'mt-1 text-xs text-red-400'
 ---
 
 <BaseLayout pageTitle={`Edit Service: ${service.name}`}>
@@ -190,430 +190,227 @@ const buttonSmallWarningClasses = cn(
         enctype="multipart/form-data"
       >
         <input type="hidden" name="id" value={service.id} />
+        <InputText
+          label="Name"
+          name="name"
+          inputProps={{
+            required: true,
+            value: service.name,
+          }}
+          error={serviceInputErrors.name}
+        />
+
+        <InputTextArea
+          label="Description"
+          name="description"
+          inputProps={{
+            required: true,
+            rows: 4,
+          }}
+          value={service.description}
+          error={serviceInputErrors.description}
+        />
+
+        <InputText
+          label="Slug (auto-generated if empty)"
+          name="slug"
+          inputProps={{
+            value: service.slug,
+            class: 'font-title',
+          }}
+          error={serviceInputErrors.slug}
+          class="font-title"
+        />
+
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <InputTextArea
+            label="Service URLs (one per line)"
+            name="serviceUrls"
+            inputProps={{
+              rows: 3,
+              placeholder: 'https://example1.com\nhttps://example2.com',
+            }}
+            value={service.serviceUrls.join('\n')}
+            error={serviceInputErrors.serviceUrls}
+          />
+          <InputTextArea
+            label="ToS URLs (one per line)"
+            name="tosUrls"
+            inputProps={{
+              rows: 3,
+              placeholder: 'https://example1.com/tos\nhttps://example2.com/tos',
+            }}
+            value={service.tosUrls.join('\n')}
+            error={serviceInputErrors.tosUrls}
+          />
+          <InputTextArea
+            label="Onion URLs (one per line)"
+            name="onionUrls"
+            inputProps={{
+              rows: 3,
+              placeholder: 'http://example1.onion\nhttp://example2.onion',
+            }}
+            value={service.onionUrls.join('\n')}
+            error={serviceInputErrors.onionUrls}
+          />
+          <InputTextArea
+            label="I2P URLs (one per line)"
+            name="i2pUrls"
+            inputProps={{
+              rows: 3,
+              placeholder: 'http://example1.b32.i2p\nhttp://example2.b32.i2p',
+            }}
+            value={service.i2pUrls.join('\n')}
+          />
+        </div>
+
         <div>
-          <label for="name" class={labelBaseClasses}>Name</label>
-          <input
-            transition:persist
-            type="text"
-            name="name"
-            id="name"
+          <InputImageFile
+            label="Service Image"
+            name="imageFile"
+            description="Square image. At least 192x192px. Transparency supported. Leave empty to keep current image."
+            error={serviceInputErrors.imageFile}
+            square
+            value={service.imageUrl}
+          />
+        </div>
+
+        <div>
+          <InputCheckboxGroup
+            name="categories"
+            label="Categories"
             required
-            value={service.name}
-            class={inputBaseClasses}
+            options={categories.map((category) => ({
+              label: category.name,
+              value: category.id.toString(),
+              icon: category.icon,
+            }))}
+            selectedValues={service.categories.map((c) => c.id.toString())}
+            error={serviceInputErrors.categories}
           />
-          {serviceInputErrors.name && <p class={errorTextClasses}>{serviceInputErrors.name.join(', ')}</p>}
         </div>
 
         <div>
-          <label for="description" class={labelBaseClasses}>Description</label>
-          <textarea
-            transition:persist
-            name="description"
-            id="description"
+          <InputCardGroup
+            name="kycLevel"
+            label="KYC Level"
+            options={kycLevels.map((kycLevel) => ({
+              label: `${kycLevel.name} (${kycLevel.value}/4)`,
+              value: kycLevel.id.toString(),
+              icon: kycLevel.icon,
+              description: kycLevel.description,
+            }))}
+            selectedValue={service.kycLevel.toString()}
+            iconSize="md"
+            cardSize="md"
+            error={serviceInputErrors.kycLevel}
+            class="[&>div]:grid-cols-2 [&>div]:[--card-min-size:16rem]"
+          />
+        </div>
+
+        <div>
+          <InputCheckboxGroup
+            name="attributes"
+            label="Attributes"
+            options={attributes.map((attribute) => ({
+              label: `${attribute.title} (${attribute.category})`,
+              value: attribute.id.toString(),
+            }))}
+            selectedValues={service.attributes.map((a) => a.attribute.id.toString())}
+            error={serviceInputErrors.attributes}
+          />
+        </div>
+
+        <div>
+          <InputCardGroup
+            name="verificationStatus"
+            label="Verification Status"
+            options={verificationStatuses.map((status) => ({
+              label: status.label,
+              value: status.value,
+              icon: status.icon,
+              iconClass: status.classNames.icon,
+              description: status.description,
+            }))}
+            selectedValue={service.verificationStatus}
+            error={serviceInputErrors.verificationStatus}
+            cardSize="md"
+            iconSize="md"
+            class="[&>div]:grid-cols-2 [&>div]:[--card-min-size:16rem]"
+          />
+        </div>
+
+        <div>
+          <InputCardGroup
+            name="acceptedCurrencies"
+            label="Accepted Currencies"
+            options={currencies.map((currency) => ({
+              label: currency.name,
+              value: currency.id,
+              icon: currency.icon,
+            }))}
+            selectedValue={service.acceptedCurrencies}
+            error={serviceInputErrors.acceptedCurrencies}
             required
-            rows={4}
-            class={inputBaseClasses}
-            set:text={service.description}
+            multiple
           />
-          {
-            serviceInputErrors.description && (
-              <p class={errorTextClasses}>{serviceInputErrors.description.join(', ')}</p>
-            )
-          }
         </div>
 
         <div>
-          <label for="slug" class={cn(labelBaseClasses, 'font-title')}>Slug (auto-generated if empty)</label>
-          <input
-            transition:persist
-            type="text"
-            name="slug"
-            id="slug"
-            value={service.slug}
-            class={cn(inputBaseClasses, 'font-title')}
-          />
-          {serviceInputErrors.slug && <p class={errorTextClasses}>{serviceInputErrors.slug.join(', ')}</p>}
-        </div>
-
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <div>
-            <label for="serviceUrls" class={labelBaseClasses}>Service URLs (one per line)</label>
-            <textarea
-              transition:persist
-              class={inputBaseClasses}
-              name="serviceUrls"
-              id="serviceUrls"
-              rows={3}
-              placeholder="https://example1.com\nhttps://example2.com"
-              set:text={service.serviceUrls.join('\n')}
-            />
-            {
-              serviceInputErrors.serviceUrls && (
-                <p class={errorTextClasses}>{serviceInputErrors.serviceUrls.join(', ')}</p>
-              )
-            }
-          </div>
-          <div>
-            <label for="tosUrls" class={labelBaseClasses}>ToS URLs (one per line)</label>
-            <textarea
-              transition:persist
-              class={inputBaseClasses}
-              name="tosUrls"
-              id="tosUrls"
-              rows={3}
-              placeholder="https://example1.com/tos\nhttps://example2.com/tos"
-              set:text={service.tosUrls.join('\n')}
-            />
-            {
-              serviceInputErrors.tosUrls && (
-                <p class={errorTextClasses}>{serviceInputErrors.tosUrls.join(', ')}</p>
-              )
-            }
-          </div>
-          <div>
-            <label for="onionUrls" class={labelBaseClasses}>Onion URLs (one per line)</label>
-            <textarea
-              transition:persist
-              class={inputBaseClasses}
-              name="onionUrls"
-              id="onionUrls"
-              rows={3}
-              placeholder="http://example1.onion\nhttp://example2.onion"
-              set:text={service.onionUrls.join('\n')}
-            />
-            {
-              serviceInputErrors.onionUrls && (
-                <p class={errorTextClasses}>{serviceInputErrors.onionUrls.join(', ')}</p>
-              )
-            }
-          </div>
-          <div>
-            <label for="i2pUrls" class={labelBaseClasses}>I2P URLs (one per line)</label>
-            <textarea
-              transition:persist
-              class={inputBaseClasses}
-              name="i2pUrls"
-              id="i2pUrls"
-              rows={3}
-              placeholder="http://example1.b32.i2p\nhttp://example2.b32.i2p"
-              set:text={service.i2pUrls.join('\n')}
-            />
-            {/* Assuming i2pUrls might have errors, add error display if schema supports it */}
-            {
-              /* serviceInputErrors.i2pUrls && (
-              <p class={errorTextClasses}>{serviceInputErrors.i2pUrls.join(', ')}</p>
-            ) */
-            }
-          </div>
-        </div>
-
-        <div>
-          <div class="flex items-end gap-4">
-            <div class="grow">
-              <label for="imageFile" class={labelBaseClasses}>Service Image</label>
-              <div class="space-y-1">
-                <input
-                  transition:persist
-                  type="file"
-                  name="imageFile"
-                  id="imageFile"
-                  accept={ACCEPTED_IMAGE_TYPES.join(',')}
-                  class={cn(
-                    inputBaseClasses,
-                    'p-0 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-600 file:px-3 file:py-2 file:font-medium file:text-zinc-200 hover:file:bg-zinc-500'
-                  )}
-                />
-                <p class="text-xs text-zinc-400">
-                  Leave empty to keep the current image. Square images (e.g., 256x256) recommended.
-                </p>
-              </div>
-              {
-                serviceInputErrors.imageFile && (
-                  <p class={errorTextClasses}>{serviceInputErrors.imageFile.join(', ')}</p>
-                )
-              }
-            </div>
-            {
-              service.imageUrl ? (
-                <div class="mt-2 shrink-0">
-                  <MyPicture
-                    src={service.imageUrl}
-                    alt="Current service image"
-                    width={100}
-                    height={100}
-                    class="h-24 w-24 rounded-md border border-zinc-600 object-cover"
-                  />
-                </div>
-              ) : (
-                <div class="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg border border-zinc-600 bg-zinc-700/50 text-3xl leading-none text-zinc-500">
-                  <Icon name="ri:image-add-line" class="size-10" />
-                </div>
-              )
-            }
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <div>
-            <label class={labelBaseClasses} for="categories">Categories</label>
-            <div
-              class="mt-1 max-h-48 space-y-1 space-x-2 overflow-y-auto rounded-md border border-zinc-600 bg-zinc-700/30 p-3"
-            >
-              {
-                categories.map((category) => (
-                  <label class={checkboxLabelClasses}>
-                    <input
-                      transition:persist
-                      type="checkbox"
-                      name="categories"
-                      value={category.id}
-                      checked={service.categories.some((c) => c.id === category.id)}
-                      class={cn(checkboxInputClasses, 'mr-1')}
-                    />
-                    <span>{category.name}</span>
-                  </label>
-                ))
-              }
-            </div>
-            {
-              serviceInputErrors.categories && (
-                <p class={errorTextClasses}>{serviceInputErrors.categories.join(', ')}</p>
-              )
-            }
-          </div>
-
-          <div>
-            <label for="kycLevel" class={labelBaseClasses}>KYC Level (0-4)</label>
-            <input
-              transition:persist
-              class={inputBaseClasses}
-              type="number"
-              name="kycLevel"
-              id="kycLevel"
-              min={0}
-              max={4}
-              value={service.kycLevel}
-            />
-            {
-              serviceInputErrors.kycLevel && (
-                <p class={errorTextClasses}>{serviceInputErrors.kycLevel.join(', ')}</p>
-              )
-            }
-          </div>
-        </div>
-
-        <div>
-          <label class={labelBaseClasses} for="attributes">Attributes</label>
-          <div class="space-y-3">
-            {
-              Object.values(AttributeCategory).map((categoryValue) => (
-                <div class="rounded-md border border-zinc-700 bg-zinc-700/30 p-4">
-                  <h4 class="font-title text-md mb-2 font-medium text-zinc-200">{categoryValue}</h4>
-                  <div class="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
-                    {attributes
-                      .filter((attr) => attr.category === categoryValue)
-                      .map((attr) => (
-                        <label class={checkboxLabelClasses}>
-                          <input
-                            transition:persist
-                            type="checkbox"
-                            name="attributes"
-                            value={attr.id}
-                            checked={service.attributes.some((a) => a.attribute.id === attr.id)}
-                            class={cn(checkboxInputClasses, 'mr-2')}
-                          />
-                          <span class="flex items-center gap-1.5">
-                            {attr.title}
-                            <span
-                              class={cn(
-                                'rounded-sm border px-1 py-0.5 text-xs font-medium',
-                                {
-                                  'border-green-500/50 bg-green-500/20 text-green-300': attr.type === 'GOOD',
-                                },
-                                {
-                                  'border-red-500/50 bg-red-500/20 text-red-300': attr.type === 'BAD',
-                                },
-                                {
-                                  'border-yellow-500/50 bg-yellow-500/20 text-yellow-300':
-                                    attr.type === 'WARNING',
-                                },
-                                {
-                                  'border-sky-500/50 bg-sky-500/20 text-sky-300': attr.type === 'INFO',
-                                }
-                              )}
-                            >
-                              {attr.type}
-                            </span>
-                          </span>
-                        </label>
-                      ))}
-                  </div>
-                  {serviceInputErrors.attributes && (
-                    <p class={errorTextClasses}>{serviceInputErrors.attributes.join(', ')}</p>
-                  )}
-                </div>
-              ))
-            }
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <div>
-            <label class={labelBaseClasses} for="verificationStatus">Verification Status</label>
-            <select
-              transition:persist
-              class={inputBaseClasses}
-              name="verificationStatus"
-              id="verificationStatus"
-            >
-              {
-                Object.values(VerificationStatus).map((status) => (
-                  <option value={status} selected={service.verificationStatus === status}>
-                    {status}
-                  </option>
-                ))
-              }
-            </select>
-            {
-              serviceInputErrors.verificationStatus && (
-                <p class={errorTextClasses}>{serviceInputErrors.verificationStatus.join(', ')}</p>
-              )
-            }
-          </div>
-
-          <div>
-            <label class={labelBaseClasses} for="acceptedCurrencies">Accepted Currencies</label>
-            <div
-              class="mt-1 max-h-32 space-y-1 space-x-2 overflow-y-auto rounded-md border border-zinc-600 bg-zinc-700/30 p-3"
-            >
-              {
-                Object.values(Currency).map((currency) => (
-                  <label class={checkboxLabelClasses}>
-                    <input
-                      transition:persist
-                      type="checkbox"
-                      name="acceptedCurrencies"
-                      value={currency}
-                      checked={service.acceptedCurrencies.includes(currency)}
-                      class={cn(checkboxInputClasses, 'mr-1')}
-                    />
-                    <span>{currency}</span>
-                  </label>
-                ))
-              }
-            </div>
-            {
-              serviceInputErrors.acceptedCurrencies && (
-                <p class={errorTextClasses}>{serviceInputErrors.acceptedCurrencies.join(', ')}</p>
-              )
-            }
-          </div>
-        </div>
-
-        <div>
-          <label class={labelBaseClasses} for="verificationSummary">Verification Summary (Markdown)</label>
-          <textarea
-            transition:persist
-            class={inputBaseClasses}
+          <InputTextArea
+            label="Verification Summary (Markdown)"
             name="verificationSummary"
-            id="verificationSummary"
-            rows={4}
-            set:text={service.verificationSummary}
+            inputProps={{
+              rows: 4,
+            }}
+            value={service.verificationSummary ?? undefined}
+            error={serviceInputErrors.verificationSummary}
           />
-          {
-            serviceInputErrors.verificationSummary && (
-              <p class={errorTextClasses}>{serviceInputErrors.verificationSummary.join(', ')}</p>
-            )
-          }
         </div>
 
         <div>
-          <label class={labelBaseClasses} for="verificationProofMd">Verification Proof (Markdown)</label>
-          <textarea
-            transition:persist
-            class={inputBaseClasses}
+          <InputTextArea
+            label="Verification Proof (Markdown)"
             name="verificationProofMd"
-            id="verificationProofMd"
-            rows={8}
-            set:text={service.verificationProofMd}
+            inputProps={{
+              rows: 8,
+            }}
+            value={service.verificationProofMd ?? undefined}
+            error={serviceInputErrors.verificationProofMd}
           />
-          {
-            serviceInputErrors.verificationProofMd && (
-              <p class={errorTextClasses}>{serviceInputErrors.verificationProofMd.join(', ')}</p>
-            )
-          }
         </div>
 
         <div>
-          <label class={labelBaseClasses} for="referral">Referral Code/Link (Optional)</label>
-          <input
-            transition:persist
-            type="text"
+          <InputText
+            label="Referral Code/Link (Optional)"
             name="referral"
-            id="referral"
-            value={service.referral}
-            placeholder="e.g., REFCODE123 or https://example.com?ref=123"
-            class={inputBaseClasses}
+            inputProps={{
+              value: service.referral ?? undefined,
+              placeholder: 'e.g., REFCODE123 or https://example.com?ref=123',
+            }}
+            error={serviceInputErrors.referral}
           />
-          {
-            serviceInputErrors.referral && (
-              <p class={errorTextClasses}>{serviceInputErrors.referral.join(', ')}</p>
-            )
-          }
         </div>
 
         <div>
-          <label class={labelBaseClasses} for="serviceVisibility">Service Visibility</label>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {
-              serviceVisibilities.map((visibility) => (
-                <div class="contents">
-                  <input
-                    transition:persist
-                    type="radio"
-                    name="serviceVisibility"
-                    id={`serviceVisibility-${visibility.value}`}
-                    value={visibility.value}
-                    checked={service.serviceVisibility === visibility.value}
-                    class="peer sr-only"
-                  />
-                  <label
-                    for={`serviceVisibility-${visibility.value}`}
-                    class="group relative cursor-pointer items-start gap-3 rounded-lg border border-zinc-700 bg-zinc-700/50 p-3 transition-all peer-checked:border-sky-500 peer-checked:bg-sky-500/20 peer-checked:ring-1 peer-checked:ring-sky-500 hover:bg-zinc-700/80"
-                  >
-                    <div class="mb-1 flex items-center gap-1.5">
-                      <Icon
-                        name={visibility.icon}
-                        class={cn(
-                          'size-4 text-zinc-300 group-peer-checked:text-sky-400',
-                          visibility.iconClass
-                        )}
-                      />
-                      <span class="text-sm font-medium text-zinc-200 group-peer-checked:text-sky-300">
-                        {visibility.label}
-                      </span>
-                    </div>
-                    <p class="text-xs leading-snug text-zinc-400 group-peer-checked:text-sky-400/80">
-                      {visibility.description}
-                    </p>
-                  </label>
-                </div>
-              ))
-            }
-          </div>
-          {
-            serviceInputErrors.serviceVisibility && (
-              <p class={errorTextClasses}>{serviceInputErrors.serviceVisibility.join(', ')}</p>
-            )
-          }
+          <InputCardGroup
+            name="serviceVisibility"
+            label="Service Visibility"
+            options={serviceVisibilities.map((visibility) => ({
+              label: visibility.label,
+              value: visibility.value,
+              icon: visibility.icon,
+              iconClass: visibility.iconClass,
+              description: visibility.description,
+            }))}
+            selectedValue={service.serviceVisibility}
+            error={serviceInputErrors.serviceVisibility}
+            cardSize="md"
+            iconSize="md"
+          />
         </div>
 
-        <button
-          type="submit"
-          class="inline-flex justify-center rounded-md border border-transparent bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
-        >
-          Update Service
-        </button>
+        <InputSubmitButton label="Update Service" />
       </form>
     </section>
 
@@ -1213,114 +1010,97 @@ const buttonSmallWarningClasses = cn(
           service.contactMethods.length > 0 && (
             <div class="space-y-3">
               <h3 class="font-title mb-2 text-lg font-medium text-zinc-200">Existing Contact Methods</h3>
-              {service.contactMethods.map((method) => (
-                <div class="rounded-md border border-zinc-700 bg-zinc-700/30 p-3">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="flex-grow space-y-1">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <Icon name={method.iconId} class="size-4 text-zinc-300" />
-                        <span class="text-md font-semibold text-zinc-100">{method.label}</span>
+              {service.contactMethods.map((method) => {
+                const contactMethodInfo = formatContactMethod(method.value)
+                return (
+                  <div class="rounded-md border border-zinc-700 bg-zinc-700/30 p-3">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="flex-grow space-y-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <Icon name={contactMethodInfo.icon} class="size-4 text-zinc-300" />
+                          <span class="text-md font-semibold text-zinc-100">
+                            {method.label ?? contactMethodInfo.label}
+                          </span>
+                        </div>
+                        <p class="text-sm text-pretty text-zinc-400">
+                          {contactMethodInfo.formattedValue}{' '}
+                          <span class="text-zinc-500">({method.value})</span>
+                        </p>
                       </div>
-                      <p class="text-sm text-pretty text-zinc-400">{method.value}</p>
-                      {method.info && <p class="text-xs text-zinc-500">{method.info}</p>}
-                    </div>
-                    <div class="flex shrink-0 gap-1.5">
-                      <button
-                        type="button"
-                        class={buttonSmallPrimaryClasses}
-                        title="Edit Contact Method"
-                        onclick={`document.getElementById('edit-contact-method-${method.id}')?.classList.toggle('hidden')`}
-                      >
-                        <Icon name="ri:pencil-line" class="size-4" />
-                      </button>
-                      <form method="POST" action={actions.admin.service.deleteContactMethod} class="inline">
-                        <input type="hidden" name="id" value={method.id} />
+                      <div class="flex shrink-0 gap-1.5">
                         <button
-                          type="submit"
-                          class={buttonSmallDestructiveClasses}
-                          title="Delete Contact Method"
+                          type="button"
+                          class={buttonSmallPrimaryClasses}
+                          title="Edit Contact Method"
+                          onclick={`document.getElementById('edit-contact-method-${method.id}')?.classList.toggle('hidden')`}
                         >
-                          <Icon name="ri:delete-bin-line" class="size-4" />
+                          <Icon name="ri:pencil-line" class="size-4" />
                         </button>
-                      </form>
+                        <form method="POST" action={actions.admin.service.deleteContactMethod} class="inline">
+                          <input type="hidden" name="id" value={method.id} />
+                          <button
+                            type="submit"
+                            class={buttonSmallDestructiveClasses}
+                            title="Delete Contact Method"
+                          >
+                            <Icon name="ri:delete-bin-line" class="size-4" />
+                          </button>
+                        </form>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Edit Contact Method Form - Hidden by default */}
-                  <form
-                    id={`edit-contact-method-${method.id}`}
-                    method="POST"
-                    action={actions.admin.service.updateContactMethod}
-                    class="mt-3 hidden space-y-3 rounded-md border border-zinc-600 bg-zinc-700/40 p-3"
-                  >
-                    <input type="hidden" name="id" value={method.id} />
-                    <input type="hidden" name="serviceId" value={service.id} />
-                    <div>
-                      <label for={`contactLabel-${method.id}`} class={labelBaseClasses}>
-                        Label
-                      </label>
-                      <input
-                        type="text"
-                        name="label"
-                        id={`contactLabel-${method.id}`}
-                        value={method.label}
-                        class={inputBaseClasses}
-                      />
-                    </div>
-                    <div>
-                      <label for={`contactValue-${method.id}`} class={labelBaseClasses}>
-                        Value (with protocol)
-                      </label>
-                      <input
-                        type="text"
-                        name="value"
-                        id={`contactValue-${method.id}`}
-                        value={method.value}
-                        placeholder="e.g., mailto:contact@example.com or https://t.me/example"
-                        class={inputBaseClasses}
-                      />
-                    </div>
-                    <div>
-                      <label for={`contactIcon-${method.id}`} class={labelBaseClasses}>
-                        Icon ID
-                      </label>
-                      <input
-                        type="text"
-                        name="iconId"
-                        id={`contactIcon-${method.id}`}
-                        value={method.iconId}
-                        placeholder="e.g., ri:mail-line or ri:telegram-line"
-                        class={inputBaseClasses}
-                      />
-                    </div>
-                    <div>
-                      <label for={`contactInfo-${method.id}`} class={labelBaseClasses}>
-                        Additional Info (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        name="info"
-                        id={`contactInfo-${method.id}`}
-                        value={method.info}
-                        placeholder="e.g., Available 24/7 or Response within 24h"
-                        class={inputBaseClasses}
-                      />
-                    </div>
-                    <div class="mt-2 flex justify-end gap-2">
-                      <button
-                        type="button"
-                        class={buttonSmallSecondaryClasses}
-                        onclick={`document.getElementById('edit-contact-method-${method.id}')?.classList.add('hidden')`}
-                      >
-                        Cancel
-                      </button>
-                      <button type="submit" class={buttonSmallPrimaryClasses}>
-                        Update Contact Method
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              ))}
+                    {/* Edit Contact Method Form - Hidden by default */}
+                    <form
+                      id={`edit-contact-method-${method.id}`}
+                      method="POST"
+                      action={actions.admin.service.updateContactMethod}
+                      class="mt-3 hidden space-y-3 rounded-md border border-zinc-600 bg-zinc-700/40 p-3"
+                    >
+                      <input type="hidden" name="id" value={method.id} />
+                      <input type="hidden" name="serviceId" value={service.id} />
+                      <div>
+                        <label for={`contactLabel-${method.id}`} class={labelBaseClasses}>
+                          Override Label (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          name="label"
+                          id={`contactLabel-${method.id}`}
+                          value={method.label}
+                          class={inputBaseClasses}
+                          placeholder={contactMethodInfo.label}
+                        />
+                      </div>
+                      <div>
+                        <label for={`contactValue-${method.id}`} class={labelBaseClasses}>
+                          Value (with protocol)
+                        </label>
+                        <input
+                          type="text"
+                          name="value"
+                          id={`contactValue-${method.id}`}
+                          value={method.value}
+                          placeholder="e.g., mailto:contact@example.com or https://t.me/example"
+                          class={inputBaseClasses}
+                        />
+                      </div>
+
+                      <div class="mt-2 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          class={buttonSmallSecondaryClasses}
+                          onclick={`document.getElementById('edit-contact-method-${method.id}')?.classList.add('hidden')`}
+                        >
+                          Cancel
+                        </button>
+                        <button type="submit" class={buttonSmallPrimaryClasses}>
+                          Update Contact Method
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )
+              })}
             </div>
           )
         }
@@ -1344,8 +1124,8 @@ const buttonSmallWarningClasses = cn(
           >
             <input type="hidden" name="serviceId" value={service.id} />
             <div>
-              <label for="newContactLabel" class={labelBaseClasses}>Label</label>
-              <input type="text" name="label" id="newContactLabel" required class={inputBaseClasses} />
+              <label for="newContactLabel" class={labelBaseClasses}>Override Label (Optional)</label>
+              <input type="text" name="label" id="newContactLabel" class={inputBaseClasses} />
             </div>
             <div>
               <label for="newContactValue" class={labelBaseClasses}>Value (with protocol)</label>
@@ -1358,27 +1138,7 @@ const buttonSmallWarningClasses = cn(
                 class={inputBaseClasses}
               />
             </div>
-            <div>
-              <label for="newContactIcon" class={labelBaseClasses}>Icon ID</label>
-              <input
-                type="text"
-                name="iconId"
-                id="newContactIcon"
-                required
-                placeholder="e.g., ri:mail-line or ri:telegram-line"
-                class={inputBaseClasses}
-              />
-            </div>
-            <div>
-              <label for="newContactInfo" class={labelBaseClasses}>Additional Info (Optional)</label>
-              <input
-                type="text"
-                name="info"
-                id="newContactInfo"
-                placeholder="e.g., Available 24/7 or Response within 24h"
-                class={inputBaseClasses}
-              />
-            </div>
+
             <button type="submit" class={buttonPrimaryClasses}>Add Contact Method</button>
           </form>
         </details>

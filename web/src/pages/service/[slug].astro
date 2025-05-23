@@ -26,6 +26,7 @@ import Tooltip from '../../components/Tooltip.astro'
 import VerificationWarningBanner from '../../components/VerificationWarningBanner.astro'
 import { getAttributeCategoryInfo } from '../../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../../constants/attributeTypes'
+import { formatContactMethod } from '../../constants/contactMethods'
 import { currencies, getCurrencyInfo } from '../../constants/currencies'
 import { getEventTypeInfo } from '../../constants/eventTypes'
 import { getKycLevelInfo, kycLevels } from '../../constants/kycLevels'
@@ -37,7 +38,6 @@ import BaseLayout from '../../layouts/BaseLayout.astro'
 import { someButNotAll, undefinedIfEmpty } from '../../lib/arrays'
 import { makeNonDbAttributes, sortAttributes } from '../../lib/attributes'
 import { cn } from '../../lib/cn'
-import { formatContactMethod } from '../../lib/contactMethods'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
 import { formatNumber, type FormatNumberOptions } from '../../lib/numbers'
 import { pluralize } from '../../lib/pluralize'
@@ -95,8 +95,8 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
           isRecentlyListed: true,
           contactMethods: {
             select: {
-              iconId: true,
               value: true,
+              label: true,
             },
           },
           attributes: {
@@ -379,20 +379,22 @@ const ogImageTemplateData = {
         service.contactMethods
           .map((method) => ({
             ...method,
-            ...(formatContactMethod(method.value) ?? { type: 'unknown', formattedValue: method.value }),
+            info: formatContactMethod(method.value),
           }))
-          .map<ContactPoint | null>(({ type, formattedValue }) => {
-            switch (type) {
+          .map<ContactPoint | null>(({ info, label }) => {
+            switch (info.type) {
               case 'telephone': {
                 return {
                   '@type': 'ContactPoint',
-                  telephone: formattedValue,
+                  telephone: info.formattedValue,
+                  name: label ?? info.label,
                 }
               }
               case 'email': {
                 return {
                   '@type': 'ContactPoint',
-                  email: formattedValue,
+                  email: info.formattedValue,
+                  name: label ?? info.label,
                 }
               }
               default: {
@@ -730,8 +732,8 @@ const ogImageTemplateData = {
                 rel="noopener noreferrer"
                 class="text-day-300 hover:text-day-200 flex items-center gap-1 px-2 py-1 hover:underline"
               >
-                <Icon name={method.iconId} class="text-day-200 h-5 w-5" />
-                <span>{methodInfo?.formattedValue ?? method.value}</span>
+                <Icon name={methodInfo.icon} class="text-day-200 h-5 w-5" />
+                <span>{method.label ?? methodInfo.formattedValue}</span>
               </a>
             </li>
           )

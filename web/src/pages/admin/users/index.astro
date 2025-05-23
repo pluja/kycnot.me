@@ -12,6 +12,7 @@ import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
 import { pluralize } from '../../../lib/pluralize'
 import { prisma } from '../../../lib/prisma'
 import { formatDateShort } from '../../../lib/timeAgo'
+import { urlWithParams } from '../../../lib/urls'
 
 import type { Prisma } from '@prisma/client'
 
@@ -106,14 +107,11 @@ const users =
     ? lodashOrderBy(dbUsers, [(u) => (u.admin ? 'admin' : 'user')], [filters['sort-order']])
     : dbUsers
 
-const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
-  const currentSortBy = filters['sort-by']
-  const currentSortOrder = filters['sort-order']
-  const newSortOrder = currentSortBy === slug && currentSortOrder === 'asc' ? 'desc' : 'asc'
-  const searchParams = new URLSearchParams(Astro.url.search)
-  searchParams.set('sort-by', slug)
-  searchParams.set('sort-order', newSortOrder)
-  return `/admin/users?${searchParams.toString()}`
+const makeSortUrl = (sortBy: NonNullable<(typeof filters)['sort-by']>) => {
+  return urlWithParams(Astro.url, {
+    'sort-by': sortBy,
+    'sort-order': filters['sort-by'] === sortBy && filters['sort-order'] === 'asc' ? 'desc' : 'asc',
+  })
 }
 ---
 

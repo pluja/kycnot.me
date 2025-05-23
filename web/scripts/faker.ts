@@ -845,40 +845,29 @@ const generateFakeComment = (userId: number, serviceId: number, parentId?: numbe
 const generateFakeServiceContactMethod = (serviceId: number) => {
   const types = [
     {
-      label: 'Email',
       value: `mailto:${faker.internet.email()}`,
-      iconId: 'ri:mail-line',
-      info: faker.lorem.sentence(),
     },
     {
-      label: 'Phone',
       value: `tel:${faker.phone.number({ style: 'international' })}`,
-      iconId: 'ri:phone-line',
-      info: faker.lorem.sentence(),
     },
     {
-      label: 'WhatsApp',
       value: `https://wa.me/${faker.phone.number({ style: 'international' })}`,
-      iconId: 'ri:whatsapp-line',
-      info: faker.lorem.sentence(),
     },
     {
-      label: 'Telegram',
       value: `https://t.me/${faker.internet.username()}`,
-      iconId: 'ri:telegram-line',
-      info: faker.lorem.sentence(),
     },
     {
-      label: 'Website',
+      value: `https://x.com/${faker.internet.username()}`,
+    },
+    {
       value: faker.internet.url(),
-      iconId: 'ri:global-line',
-      info: faker.lorem.sentence(),
     },
     {
-      label: 'LinkedIn',
+      label: faker.lorem.word({ length: 2 }),
+      value: faker.internet.url(),
+    },
+    {
       value: `https://www.linkedin.com/company/${faker.helpers.slugify(faker.company.name())}`,
-      iconId: 'ri:linkedin-box-line',
-      info: faker.lorem.sentence(),
     },
   ] as const satisfies Partial<Prisma.ServiceContactMethodCreateInput>[]
 

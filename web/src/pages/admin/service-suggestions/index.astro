@@ -2,7 +2,7 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 import { z } from 'astro:content'
-import { orderBy as lodashOrderBy } from 'lodash-es'
+import { orderBy } from 'lodash-es'
 
 import SortArrowIcon from '../../../components/SortArrowIcon.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
@@ -122,21 +122,13 @@ let suggestionsWithDetails = suggestions.map((s) => ({
 }))
 
 if (sortBy === 'service') {
-  suggestionsWithDetails = lodashOrderBy(
-    suggestionsWithDetails,
-    [(s) => s.service.name.toLowerCase()],
-    [sortOrder]
-  )
+  suggestionsWithDetails = orderBy(suggestionsWithDetails, [(s) => s.service.name.toLowerCase()], [sortOrder])
 } else if (sortBy === 'status') {
-  suggestionsWithDetails = lodashOrderBy(suggestionsWithDetails, [(s) => s.statusInfo.label], [sortOrder])
+  suggestionsWithDetails = orderBy(suggestionsWithDetails, [(s) => s.statusInfo.label], [sortOrder])
 } else if (sortBy === 'user') {
-  suggestionsWithDetails = lodashOrderBy(
-    suggestionsWithDetails,
-    [(s) => s.user.name.toLowerCase()],
-    [sortOrder]
-  )
+  suggestionsWithDetails = orderBy(suggestionsWithDetails, [(s) => s.user.name.toLowerCase()], [sortOrder])
 } else if (sortBy === 'messageCount') {
-  suggestionsWithDetails = lodashOrderBy(suggestionsWithDetails, ['messageCount'], [sortOrder])
+  suggestionsWithDetails = orderBy(suggestionsWithDetails, ['messageCount'], [sortOrder])
 }
 
 const suggestionCount = suggestionsWithDetails.length

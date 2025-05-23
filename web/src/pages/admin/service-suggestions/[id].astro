@@ -4,6 +4,7 @@ import { actions } from 'astro:actions'
 
 import Chat from '../../../components/Chat.astro'
 import ServiceCard from '../../../components/ServiceCard.astro'
+import UserBadge from '../../../components/UserBadge.astro'
 import { getServiceSuggestionStatusInfo } from '../../../constants/serviceSuggestionStatus'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { cn } from '../../../lib/cn'
@@ -37,6 +38,8 @@ const serviceSuggestion = await Astro.locals.banners.try('Error fetching service
         select: {
           id: true,
           name: true,
+          displayName: true,
+          picture: true,
         },
       },
       service: {
@@ -127,11 +130,7 @@ const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
         </span>
 
         <span class="font-title text-gray-400">Submitted by:</span>
-        <span class="text-gray-300">
-          <a href={`/admin/users/${serviceSuggestion.user.name}`} class="hover:text-green-500">
-            {serviceSuggestion.user.name}
-          </a>
-        </span>
+        <UserBadge class="text-gray-300" user={serviceSuggestion.user} size="md" />
 
         <span class="font-title text-gray-400">Submitted at:</span>
         <span class="text-gray-300">{serviceSuggestion.createdAt.toLocaleString()}</span>

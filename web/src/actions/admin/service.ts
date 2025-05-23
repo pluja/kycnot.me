@@ -14,7 +14,7 @@ import {
 } from '../../lib/zodUtils'
 
 const serviceSchemaBase = z.object({
-  id: z.number(),
+  id: z.number().int().positive(),
   slug: z
     .string()
     .regex(/^[a-z0-9-]+$/, 'Allowed characters: lowercase letters, numbers, and hyphens')
@@ -54,15 +54,6 @@ const addSlugIfMissing = <
       remove: /[^a-zA-Z0-9\-._]/g,
       replacement: '-',
     }),
-})
-
-const contactMethodSchema = z.object({
-  id: z.number().optional(),
-  label: z.string().min(1).max(50),
-  value: z.string().min(1).max(200),
-  iconId: z.string().min(1).max(50),
-  info: z.string().max(200).optional().default(''),
-  serviceId: z.number(),
 })
 
 export const adminServiceActions = {
@@ -195,7 +186,11 @@ export const adminServiceActions = {
   createContactMethod: defineProtectedAction({
     accept: 'form',
     permissions: 'admin',
-    input: contactMethodSchema.omit({ id: true }),
+    input: z.object({
+      label: z.string().min(1).max(50).optional(),
+      value: z.string().url(),
+      serviceId: z.number().int().positive(),
+    }),
     handler: async (input) => {
       const contactMethod = await prisma.serviceContactMethod.create({
         data: input,
@@ -207,7 +202,12 @@ export const adminServiceActions = {
   updateContactMethod: defineProtectedAction({
     accept: 'form',
     permissions: 'admin',
-    input: contactMethodSchema,
+    input: z.object({
+      id: z.number().int().positive().optional(),
+      label: z.string().min(1).max(50).optional(),
+      value: z.string().url(),
+      serviceId: z.number().int().positive(),
+    }),
     handler: async (input) => {
       const { id, ...data } = input
       const contactMethod = await prisma.serviceContactMethod.update({
@@ -222,7 +222,7 @@ export const adminServiceActions = {
     accept: 'form',
     permissions: 'admin',
     input: z.object({
-      id: z.number(),
+      id: z.number().int().positive(),
     }),
     handler: async (input) => {
       await prisma.serviceContactMethod.delete({
