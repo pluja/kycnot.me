@@ -40,6 +40,7 @@ const {
   hx-select={`#${searchResultsId}`}
   hx-push-url="true"
   hx-indicator="#search-indicator"
+  hx-swap="outerHTML"
   data-services-filters-form
   data-default-verification-filter={options.verification
     .filter((verification) => verification.default)
@@ -107,7 +108,7 @@ const {
       {
         options.categories?.map((category) => (
           <li data-show-always={category.showAlways ? '' : undefined}>
-            <label class="flex cursor-pointer items-center space-x-2 text-sm text-white">
+            <label class="flex cursor-pointer items-center gap-2 text-sm text-white">
               <input
                 type="checkbox"
                 class="peer text-green-500"
@@ -116,6 +117,7 @@ const {
                 checked={category.checked}
                 data-trigger-on-change
               />
+              <Icon name={category.icon} class="size-4" />
               <span class="peer-checked:font-bold">
                 {category.name}
                 <span class="text-day-500 font-normal">{category._count.services}</span>

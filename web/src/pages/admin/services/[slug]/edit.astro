@@ -27,46 +27,54 @@ import { eventTypes, getEventTypeInfo } from '../../../../constants/eventTypes'
 import { kycLevels } from '../../../../constants/kycLevels'
 import { serviceVisibilities } from '../../../../constants/serviceVisibility'
 import { verificationStatuses } from '../../../../constants/verificationStatus'
-import { getVerificationStepStatusInfo } from '../../../../constants/verificationStepStatus'
+import {
+  getVerificationStepStatusInfo,
+  verificationStepStatuses,
+} from '../../../../constants/verificationStepStatus'
 import BaseLayout from '../../../../layouts/BaseLayout.astro'
 import { pluralize } from '../../../../lib/pluralize'
 import { prisma } from '../../../../lib/prisma'
 
 const { slug } = Astro.params
 
-const serviceResult = Astro.getActionResult(actions.admin.service.update)
-const eventCreateResult = Astro.getActionResult(actions.admin.event.create)
-const eventToggleResult = Astro.getActionResult(actions.admin.event.toggle)
-const eventDeleteResult = Astro.getActionResult(actions.admin.event.delete)
-const eventUpdateResult = Astro.getActionResult(actions.admin.event.update)
-const verificationStepCreateResult = Astro.getActionResult(actions.admin.verificationStep.create)
-const verificationStepUpdateResult = Astro.getActionResult(actions.admin.verificationStep.update)
-const verificationStepDeleteResult = Astro.getActionResult(actions.admin.verificationStep.delete)
+if (!slug) return Astro.rewrite('/404')
 
+const serviceResult = Astro.getActionResult(actions.admin.service.update)
 Astro.locals.banners.addIfSuccess(serviceResult, 'Service updated successfully')
-Astro.locals.banners.addIfSuccess(eventCreateResult, 'Event created successfully')
-Astro.locals.banners.addIfSuccess(eventToggleResult, 'Event visibility updated successfully')
-Astro.locals.banners.addIfSuccess(eventDeleteResult, 'Event deleted successfully')
-Astro.locals.banners.addIfSuccess(eventUpdateResult, 'Event updated successfully')
-Astro.locals.banners.addIfSuccess(verificationStepCreateResult, 'Verification step added successfully')
-Astro.locals.banners.addIfSuccess(verificationStepUpdateResult, 'Verification step updated successfully')
-Astro.locals.banners.addIfSuccess(verificationStepDeleteResult, 'Verification step deleted successfully')
+const serviceInputErrors = isInputError(serviceResult?.error) ? serviceResult.error.fields : {}
 
 if (serviceResult && !serviceResult.error && slug !== serviceResult.data.service.slug) {
   return Astro.redirect(`/admin/services/${serviceResult.data.service.slug}/edit`)
 }
 
-const serviceInputErrors = isInputError(serviceResult?.error) ? serviceResult.error.fields : {}
+const eventCreateResult = Astro.getActionResult(actions.admin.event.create)
+Astro.locals.banners.addIfSuccess(eventCreateResult, 'Event created successfully')
 const eventInputErrors = isInputError(eventCreateResult?.error) ? eventCreateResult.error.fields : {}
+
+const eventUpdateResult = Astro.getActionResult(actions.admin.event.update)
+Astro.locals.banners.addIfSuccess(eventUpdateResult, 'Event updated successfully')
 const eventUpdateInputErrors = isInputError(eventUpdateResult?.error) ? eventUpdateResult.error.fields : {}
+
+const eventToggleResult = Astro.getActionResult(actions.admin.event.toggle)
+Astro.locals.banners.addIfSuccess(eventToggleResult, 'Event visibility updated successfully')
+
+const eventDeleteResult = Astro.getActionResult(actions.admin.event.delete)
+Astro.locals.banners.addIfSuccess(eventDeleteResult, 'Event deleted successfully')
+
+const verificationStepCreateResult = Astro.getActionResult(actions.admin.verificationStep.create)
+Astro.locals.banners.addIfSuccess(verificationStepCreateResult, 'Verification step added successfully')
 const verificationStepInputErrors = isInputError(verificationStepCreateResult?.error)
   ? verificationStepCreateResult.error.fields
   : {}
+
+const verificationStepUpdateResult = Astro.getActionResult(actions.admin.verificationStep.update)
+Astro.locals.banners.addIfSuccess(verificationStepUpdateResult, 'Verification step updated successfully')
 const verificationStepUpdateInputErrors = isInputError(verificationStepUpdateResult?.error)
   ? verificationStepUpdateResult.error.fields
   : {}
 
-if (!slug) return Astro.rewrite('/404')
+const verificationStepDeleteResult = Astro.getActionResult(actions.admin.verificationStep.delete)
+Astro.locals.banners.addIfSuccess(verificationStepDeleteResult, 'Verification step deleted successfully')
 
 const [service, categories, attributes] = await Astro.locals.banners.tryMany([
   [
@@ -715,7 +723,7 @@ if (!service) return Astro.rewrite('/404')
                       <InputSelect
                         label="Status"
                         name="status"
-                        options={verificationStatuses.map((status) => ({
+                        options={verificationStepStatuses.map((status) => ({
                           label: status.label,
                           value: status.value,
                         }))}
@@ -763,7 +771,7 @@ if (!service) return Astro.rewrite('/404')
           <InputSelect
             label="Status"
             name="status"
-            options={verificationStatuses.map((status) => ({
+            options={verificationStepStatuses.map((status) => ({
               label: status.label,
               value: status.value,
             }))}

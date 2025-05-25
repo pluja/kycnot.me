@@ -1,0 +1,161 @@
+---
+description: 
+globs: web/src/pages,web/src/components
+alwaysApply: false
+---
+- On .astro files, don't forget to include the three dashes (`---`) at the begining of the file and where the server js ends. I noticed that sometimes you forget them.
+- For icons use the `Icon` component from `astro-icon/components`.
+- For icons use the Remix Icon library preferably.
+- Use the `MyPicture` component from `src/components/MyPicture.astro` for images.
+- When redirecting to login use the `makeLoginUrl` function from [redirectUrls.ts](mdc:web/src/lib/redirectUrls.ts) and if the link is for an `<a>` tag, use the `data-astro-reload` attribute. Similar for the logout and impersonate.
+- Don't use the `web/src/pages/admin` pages as example unless explicitly stated or you're creating/editing an admin page.
+- Checkout the @errorBanners.ts @middleware.ts @env.d.ts to see the avilable Astro.locals values.
+- Avoid duplicating similar html code. You can use jsx for loops, create variables in the constants folder, or create separate components.
+- When redirecting to the 404 not found page, use `Astro.rewrite` (Like this example: `if (!user) return Astro.rewrite('/404')`)
+- Include schema markup in the pages when it makes sense. Examples: [[slug].astro](mdc:web/src/pages/service/[slug].astro)
+- When creating forms, we already have utilities, components and established design patterns. Follow this example. (Note that this example may come slightly outdaded, but the overall philosophy doesn't change)
+  ```astro
+  ---
+  import { actions, isInputError } from 'astro:actions'
+  import { z } from 'astro:content'
+
+  import Captcha from '../../components/Captcha.astro'
+  import InputCardGroup from '../../components/InputCardGroup.astro'
+  import InputCheckboxGroup from '../../components/InputCheckboxGroup.astro'
+  import InputHoneypotTrap from '../../components/InputHoneypotTrap.astro'
+  import InputImageFile from '../../components/InputImageFile.astro'
+  import InputSubmitButton from '../../components/InputSubmitButton.astro'
+  import InputText from '../../components/InputText.astro'
+  import InputTextArea from '../../components/InputTextArea.astro'
+  import { kycLevels } from '../../constants/kycLevels'
+  import BaseLayout from '../../layouts/BaseLayout.astro'
+  import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
+  import { prisma } from '../../lib/prisma'
+  import { makeLoginUrl } from '../../lib/redirectUrls'
+
+  const user = Astro.locals.user
+  if (!user) {
+    return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Login to suggest a new service' }))
+  }
+
+  const result = Astro.getActionResult(actions.serviceSuggestion.editService)
+  if (result && !result.error) {
+    return Astro.redirect(`/service-suggestion/${result.data.serviceSuggestion.id}`)
+  }
+  const inputErrors = isInputError(result?.error) ? result.error.fields : {}
+
+  const { data: params } = zodParseQueryParamsStoringErrors(
+    {
+      serviceId: z.coerce.number().int().positive(),
+      notes: z.string().default(''),
+    },
+    Astro
+  )
+
+  if (!params.serviceId) return Astro.rewrite('/404')
+
+  const service = await Astro.locals.banners.try(
+    'Failed to fetch service',
+    async () =>
+      prisma.service.findUnique({
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          description: true,
+          overallScore: true,
+          kycLevel: true,
+          imageUrl: true,
+          verificationStatus: true,
+          acceptedCurrencies: true,
+          categories: {
+            select: {
+              name: true,
+              icon: true,
+            },
+          },
+        },
+        where: { id: params.serviceId },
+      }),
+    null
+  )
+
+  if (!service) return Astro.rewrite('/404')
+  ---
+
+  <BaseLayout
+    pageTitle="Edit service"
+    description="Suggest an edit to service"
+    ogImage={{
+      template: 'generic',
+      title: 'Edit service',
+      description: 'Suggest an edit to service',
+      icon: 'ri:edit-line',
+    }}
+    widthClassName="max-w-screen-md"
+  >
+    <h1 class="font-title mt-12 mb-6 text-center text-3xl font-bold">Edit service</h1>
+
+    <form method="POST" action={actions.serviceSuggestion.editService} class="space-y-6">
+      <input type="hidden" name="serviceId" value={params.serviceId} />
+
+      <InputText
+        label="Service name"
+        name="name"
+        value={service.name}
+        error={inputErrors.name}
+        inputProps={{ 'data-custom-value': true, required: true }}
+      />
+
+      <InputCardGroup
+        name="kycLevel"
+        label="KYC Level"
+        options={kycLevels.map((kycLevel) => ({
+          label: kycLevel.name,
+          value: kycLevel.id.toString(),
+          icon: kycLevel.icon,
+          description: `${kycLevel.description}\n\n_KYC Level ${kycLevel.value}/5_`,
+        }))}
+        iconSize="md"
+        cardSize="md"
+        required
+        error={inputErrors.kycLevel}
+      />
+
+      <InputCheckboxGroup
+        name="categories"
+        label="Categories"
+        required
+        options={categories.map((category) => ({
+          label: category.name,
+          value: category.id.toString(),
+          icon: category.icon,
+        }))}
+        error={inputErrors.categories}
+      />
+
+      <InputImageFile
+        label="Service Image"
+        name="imageFile"
+        description="Square image. At least 192x192px. Transparency supported."
+        error={inputErrors.imageFile}
+        square
+        required
+      />
+
+      <InputTextArea
+        label="Note for Moderators"
+        name="notes"
+        value={params.notes}
+        inputProps={{ rows: 10 }}
+        error={inputErrors.notes}
+      />
+
+      <Captcha action={actions.serviceSuggestion.createService} />
+
+      <InputHoneypotTrap name="message" />
+
+      <InputSubmitButton hideCancel />
+    </form>
+  </BaseLayout>
+  ```

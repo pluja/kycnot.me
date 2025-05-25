@@ -1,0 +1,26 @@
+---
+description: 
+globs: web/src/pages,web/src/components
+alwaysApply: false
+---
+- Avoid sending JavaScript to the client. The JS send should always be optional.
+- Avoid using client-side JavaScript as much as possible. And if it has to be done, make it optional.
+- To avoid using JavaScript, you can use HTML and CSS features such as hidden checkboxes, deltails tag, etc.
+- The admin pages can use client-side JavaScript.
+- When adding clientside JS do it with HTMX.
+- When adding HTMX, the layout component BaseLayout [BaseLayout.astro](mdc:web/src/layouts/BaseLayout.astro) [BaseHead.astro](mdc:web/src/components/BaseHead.astro) accepts a prop htmx to load it in that page. No need to use a cdn.
+- When adding client scripts remember to use the event `astro:page-load`, `querySelectorAll<Type>` and add an explanation comment, like so:
+
+  ```tsx
+  <script>
+    ////////////////////////////////////////////////////////////
+    // Optional script for __________.                        //
+    // Desctiption goes here...                               //
+    ////////////////////////////////////////////////////////////
+    document.addEventListener('astro:page-load', () => {
+      document.querySelectorAll<HTMLDivElement>('[data-my-div]').forEach((myDiv) => {
+        // Do something
+      })
+    })
+  </script>
+  ```

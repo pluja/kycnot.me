@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+- Instead of using the syntax`Array<T>`, use `T[]`.
+- Use TypeScript `type` over `interface`.
+- You should never add unnecessary or unuseful comments, if you add a comment it must provide some value to the code.

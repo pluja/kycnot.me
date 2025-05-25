@@ -14,3 +14,4 @@ dump*.sql
 *.bak
 migrate.py
 sync-all.sh
+.DS_Store

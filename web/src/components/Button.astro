@@ -2,13 +2,15 @@
 import { Icon } from 'astro-icon/components'
 import { tv, type VariantProps } from 'tailwind-variants'
 
+import { cn } from '../lib/cn'
+
 import type { HTMLAttributes, Polymorphic } from 'astro/types'
 
 type Props<Tag extends 'a' | 'button' | 'label' = 'button'> = Polymorphic<
   Required<Pick<HTMLAttributes<'label'>, Tag extends 'label' ? 'for' : never>> &
     VariantProps<typeof button> & {
       as: Tag
-      label?: string
+      label: string
       icon?: string
       endIcon?: string
       classNames?: {
@@ -55,6 +57,7 @@ const button = tv({
     iconOnly: {
       true: {
         base: 'p-0',
+        label: 'sr-only',
       },
     },
     color: {
@@ -137,49 +140,49 @@ const button = tv({
       color: 'black',
       variant: 'faded',
       class: {
-        base: 'border-night-300/30 bg-night-800/30 hover:bg-night-700/50 text-white/70 hover:text-white/90 focus-visible:ring-white/50',
+        base: 'bg2night-800/15 hover:bg-night-700/30 border-current/30 text-white/70 hover:text-white/90 focus-visible:ring-white/50',
       },
     },
     {
       color: 'white',
       variant: 'faded',
       class: {
-        base: 'border-day-300/30 bg-day-100/30 hover:bg-day-200/50 text-white/70 hover:text-white/90 focus-visible:ring-white/50',
+        base: 'b2-day-100/15 hover:bg-day-200/30 border-current/30 text-white/70 hover:text-white/90 focus-visible:ring-white/50',
       },
     },
     {
       color: 'gray',
       variant: 'faded',
       class: {
-        base: 'border-day-500/30 bg-day-400/30 hover:bg-day-500/50 text-day-300 hover:text-day-100 focus-visible:ring-white/50',
+        base: 'b2-day-400/15 hover:bg-day-500/30 text-day-300 hover:text-day-100 border-current/30 focus-visible:ring-white/50',
       },
     },
     {
       color: 'success',
       variant: 'faded',
       class: {
-        base: 'border-green-600/30 bg-green-500/30 text-green-300 hover:bg-green-500/50 hover:text-green-100',
+        base: 'border-current/20 bg-green-500/15 text-green-300 hover:bg-green-500/30 hover:text-green-100',
       },
     },
     {
       color: 'danger',
       variant: 'faded',
       class: {
-        base: 'border-red-600/30 bg-red-500/30 text-red-300 hover:bg-red-500/50 hover:text-red-100',
+        base: 'border-current/20 bg-red-500/15 text-red-300 hover:bg-red-500/30 hover:text-red-100',
       },
     },
     {
       color: 'warning',
       variant: 'faded',
       class: {
-        base: 'border-yellow-600/30 bg-yellow-500/30 text-yellow-300 hover:bg-yellow-500/50 hover:text-yellow-100',
+        base: 'border-current/20 bg-yellow-500/15 text-yellow-300 hover:bg-yellow-500/30 hover:text-yellow-100',
       },
     },
     {
       color: 'info',
       variant: 'faded',
       class: {
-        base: 'border-blue-600/30 bg-blue-500/30 text-blue-300 hover:bg-blue-500/50 hover:text-blue-100',
+        base: 'border-current/20 bg-blue-500/15 text-blue-300 hover:bg-blue-500/30 hover:text-blue-100',
       },
     },
     // Shadow variants
@@ -260,6 +263,7 @@ const {
   dataAstroReload,
   disabled,
   inlineIcon,
+  iconOnly,
   ...htmlProps
 } = Astro.props
 
@@ -268,13 +272,20 @@ const {
   icon: iconSlot,
   label: labelSlot,
   endIcon: endIconSlot,
-} = button({ size, color, variant, shadow, disabled, iconOnly: !label && !(!!icon && !!endIcon) })
+} = button({
+  size,
+  color,
+  variant,
+  shadow,
+  disabled,
+  iconOnly: iconOnly ?? (!label && !(!!icon && !!endIcon)),
+})
 
 const ActualTag = disabled && Tag === 'a' ? 'span' : Tag
 ---
 
 <ActualTag
-  class={base({ class: className })}
+  class={base({ class: cn({ 'opacity-20 hover:opacity-50': disabled }, className) })}
   role={role ??
     (ActualTag === 'button' || ActualTag === 'label' || ActualTag === 'span' ? undefined : 'button')}
   aria-disabled={disabled}
@@ -282,7 +293,7 @@ const ActualTag = disabled && Tag === 'a' ? 'span' : Tag
   {...htmlProps}
 >
   {!!icon && <Icon name={icon} class={iconSlot({ class: classNames?.icon })} is:inline={inlineIcon} />}
-  {!!label && <span class={labelSlot({ class: classNames?.label })}>{label}</span>}
+  <span class={labelSlot({ class: classNames?.label })}>{label}</span>
   {
     !!endIcon && (
       <Icon name={endIcon} class={endIconSlot({ class: classNames?.endIcon })} is:inline={inlineIcon}>

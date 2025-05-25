@@ -322,7 +322,11 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
             icon: true,
             _count: {
               select: {
-                services: true,
+                services: {
+                  where: {
+                    serviceVisibility: 'PUBLIC',
+                  },
+                },
               },
             },
           },
@@ -530,6 +534,7 @@ const showFiltersId = 'show-filters'
             hx-trigger="input delay:500ms, keyup[key=='Enter']"
             hx-target={`#${searchResultsId}`}
             hx-select={`#${searchResultsId}`}
+            hx-swap="outerHTML"
             hx-push-url="true"
             hx-indicator="#search-indicator"
             class="contents"

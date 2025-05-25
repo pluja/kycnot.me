@@ -2,10 +2,14 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
+import Button from '../../../components/Button.astro'
 import Chat from '../../../components/Chat.astro'
 import ServiceCard from '../../../components/ServiceCard.astro'
 import UserBadge from '../../../components/UserBadge.astro'
-import { getServiceSuggestionStatusInfo } from '../../../constants/serviceSuggestionStatus'
+import {
+  getServiceSuggestionStatusInfo,
+  serviceSuggestionStatuses,
+} from '../../../constants/serviceSuggestionStatus'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { cn } from '../../../lib/cn'
 import { parseIntWithFallback } from '../../../lib/numbers'
@@ -96,13 +100,15 @@ const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
   widthClassName="max-w-screen-md"
 >
   <div class="mb-4 flex items-center gap-4">
-    <a
+    <Button
+      as="a"
       href="/admin/service-suggestions"
-      class="font-title inline-flex items-center justify-center rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-400 shadow-xs transition-colors duration-200 hover:bg-green-500/20 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-    >
-      <Icon name="ri:arrow-left-s-line" class="mr-1 size-4" />
-      Back
-    </a>
+      color="success"
+      variant="faded"
+      size="md"
+      icon="ri:arrow-left-s-line"
+      label="Back"
+    />
 
     <h1 class="font-title text-xl text-green-500">Service Suggestion</h1>
   </div>
@@ -170,17 +176,23 @@ const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
           name="status"
           class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-sm text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500 disabled:opacity-50"
         >
-          <option value="PENDING" selected={serviceSuggestion.status === 'PENDING'}> Pending </option>
-          <option value="APPROVED" selected={serviceSuggestion.status === 'APPROVED'}> Approve </option>
-          <option value="REJECTED" selected={serviceSuggestion.status === 'REJECTED'}> Reject </option>
-          <option value="WITHDRAWN" selected={serviceSuggestion.status === 'WITHDRAWN'}> Withdrawn </option>
+          {
+            serviceSuggestionStatuses.map((status) => (
+              <option value={status.value} selected={serviceSuggestion.status === status.value}>
+                {status.label}
+              </option>
+            ))
+          }
         </select>
-        <button
+        <Button
+          as="button"
           type="submit"
-          class="font-title inline-flex items-center justify-center rounded-md border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm text-green-400 shadow-xs transition-colors duration-200 hover:bg-green-500/20 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-        >
-          <Icon name="ri:save-line" class="mr-1 size-4" /> Update
-        </button>
+          color="success"
+          variant="faded"
+          size="md"
+          icon="ri:save-line"
+          label="Update"
+        />
       </form>
     </div>
 

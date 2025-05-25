@@ -4,8 +4,10 @@ import { actions } from 'astro:actions'
 import { z } from 'astro:content'
 import { orderBy } from 'lodash-es'
 
+import Button from '../../../components/Button.astro'
 import SortArrowIcon from '../../../components/SortArrowIcon.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
+import Tooltip from '../../../components/Tooltip.astro'
 import UserBadge from '../../../components/UserBadge.astro'
 import {
   getServiceSuggestionStatusInfo,
@@ -183,12 +185,16 @@ const makeSortUrl = (slug: string) => {
         </select>
       </div>
       <div class="flex items-end">
-        <button
+        <Button
+          as="button"
           type="submit"
-          class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
-        >
-          <Icon name="ri:search-2-line" class="h-4 w-4" />
-        </button>
+          color="info"
+          variant="solid"
+          size="md"
+          iconOnly
+          icon="ri:search-2-line"
+          label="Search"
+        />
       </div>
     </form>
   </div>
@@ -317,13 +323,18 @@ const makeSortUrl = (slug: string) => {
                   </td>
                   <td class="px-4 py-3 text-right">
                     <div class="flex justify-end gap-1">
-                      <a
-                        href={`/admin/service-suggestions/${suggestion.id}`}
-                        class="inline-flex items-center justify-center rounded-full border border-green-500/40 bg-green-500/10 p-1.5 text-green-400 shadow-xs transition-colors duration-200 hover:bg-green-500/20 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-                        title="View"
-                      >
-                        <Icon name="ri:external-link-line" class="size-4" />
-                      </a>
+                      <Tooltip text="Manage">
+                        <Button
+                          as="a"
+                          href={`/admin/service-suggestions/${suggestion.id}`}
+                          color="success"
+                          variant="faded"
+                          size="sm"
+                          iconOnly
+                          icon="ri:arrow-right-line"
+                          label="Manage"
+                        />
+                      </Tooltip>
                     </div>
                   </td>
                 </tr>

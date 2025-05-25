@@ -3,6 +3,7 @@ import { Icon } from 'astro-icon/components'
 import { z } from 'astro:content'
 import { orderBy as lodashOrderBy } from 'lodash-es'
 
+import Button from '../../../components/Button.astro'
 import SortArrowIcon from '../../../components/SortArrowIcon.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
 import Tooltip from '../../../components/Tooltip.astro'
@@ -151,12 +152,17 @@ const makeSortUrl = (sortBy: NonNullable<(typeof filters)['sort-by']>) => {
             <option value="verified" selected={filters.role === 'verified'}>Verified Users</option>
             <option value="spammer" selected={filters.role === 'spammer'}>Spammers</option>
           </select>
-          <button
+          <Button
+            as="button"
             type="submit"
-            class="inline-flex items-center rounded-r-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:outline-none"
-          >
-            <Icon name="ri:search-2-line" class="h-4 w-4" />
-          </button>
+            color="info"
+            variant="solid"
+            size="md"
+            iconOnly
+            icon="ri:search-2-line"
+            label="Search"
+            class="rounded-l-none"
+          />
         </div>
       </div>
     </form>
@@ -320,30 +326,43 @@ const makeSortUrl = (sortBy: NonNullable<(typeof filters)['sort-by']>) => {
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex justify-center gap-2">
-                      <Tooltip
-                        as="a"
-                        href={`/account/impersonate?targetUserId=${user.id}&redirect=/account`}
-                        data-astro-prefetch="tap"
-                        class="inline-flex items-center rounded-md border border-orange-500/50 bg-orange-500/20 px-1 py-1 text-xs text-orange-400 transition-colors hover:bg-orange-500/30"
-                        text="Impersonate"
-                      >
-                        <Icon name="ri:spy-line" class="size-4" />
+                      <Tooltip text="Impersonate">
+                        <Button
+                          as="a"
+                          href={`/account/impersonate?targetUserId=${user.id}&redirect=/account`}
+                          data-astro-prefetch="tap"
+                          color="warning"
+                          variant="faded"
+                          size="sm"
+                          iconOnly
+                          icon="ri:spy-line"
+                          label="Impersonate"
+                          disabled={user.admin}
+                        />
                       </Tooltip>
-                      <Tooltip
-                        as="a"
-                        href={`/admin/users/${user.name}`}
-                        class="inline-flex items-center rounded-md border border-blue-500/50 bg-blue-500/20 px-1 py-1 text-xs text-blue-400 transition-colors hover:bg-blue-500/30"
-                        text="Edit"
-                      >
-                        <Icon name="ri:edit-line" class="size-4" />
+                      <Tooltip text="Edit">
+                        <Button
+                          as="a"
+                          href={`/admin/users/${user.name}`}
+                          color="info"
+                          variant="faded"
+                          size="sm"
+                          iconOnly
+                          icon="ri:edit-line"
+                          label="Edit"
+                        />
                       </Tooltip>
-                      <Tooltip
-                        as="a"
-                        href={`/u/${user.name}`}
-                        class="inline-flex items-center rounded-md border border-green-500/50 bg-green-500/20 px-1 py-1 text-xs text-green-400 transition-colors hover:bg-green-500/30"
-                        text="Public profile"
-                      >
-                        <Icon name="ri:global-line" class="size-4" />
+                      <Tooltip text="Public profile">
+                        <Button
+                          as="a"
+                          href={`/u/${user.name}`}
+                          color="success"
+                          variant="faded"
+                          size="sm"
+                          iconOnly
+                          icon="ri:global-line"
+                          label="Public profile"
+                        />
                       </Tooltip>
                     </div>
                   </td>

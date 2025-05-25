@@ -62,6 +62,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DATABASE:-kycnot}
       DATABASE_URL: "postgresql://${POSTGRES_USER:-kycnot}:${POSTGRES_PASSWORD:-kycnot}@database:5432/${POSTGRES_DATABASE:-kycnot}?schema=public"
       REDIS_URL: "redis://redis:6379"
+    env_file:
+      - .env
     depends_on:
       database:
         condition: service_healthy

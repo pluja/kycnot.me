@@ -1,0 +1,98 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+- The main libraries used are: Astro, TypeScript, Tailwind 4, HTMX, Prisma, npm, zod, lodash-es, date-fns, ts-toolbelt. Full list in: [package.json](mdc:web/package.json)
+- When creating constants or enums, use the `makeHelpersForOptions` function [makeHelpersForOptions.ts](mdc:web/src/lib/makeHelpersForOptions.ts) like in this example. Save the file in the `web/src/constants` folder (like [attributeTypes.ts](mdc:web/src/constants/attributeTypes.ts)). Note that it's not necessary to use all the options or export all the variables that the example has, just the ones you need.
+
+```ts
+import { makeHelpersForOptions } from '../lib/makeHelpersForOptions';
+import { transformCase } from '../lib/strings';
+
+import type { AttributeType } from '@prisma/client';
+
+type AttributeTypeInfo<T extends string | null | undefined = string> = {
+  value: T;
+  slug: string;
+  label: string;
+  icon: string;
+  order: number;
+  classNames: {
+    text: string;
+    icon: string;
+  };
+};
+
+export const {
+  dataArray: attributeTypes,
+  dataObject: attributeTypesById,
+  getFn: getAttributeTypeInfo,
+  getFnSlug: getAttributeTypeInfoBySlug,
+  zodEnumBySlug: attributeTypesZodEnumBySlug,
+  zodEnumById: attributeTypesZodEnumById,
+  keyToSlug: attributeTypeIdToSlug,
+  slugToKey: attributeTypeSlugToId,
+} = makeHelpersForOptions(
+  'value',
+  (value): AttributeTypeInfo<typeof value> => ({
+    value,
+    slug: value ? value.toLowerCase() : '',
+    label: value
+      ? transformCase(value.replace('_', ' '), 'title')
+      : String(value),
+    icon: 'ri:question-line',
+    order: Infinity,
+    classNames: {
+      text: 'text-current/60',
+      icon: 'text-current/60',
+    },
+  }),
+  [
+    {
+      value: 'BAD',
+      slug: 'bad',
+      label: 'Bad',
+      icon: 'ri:close-line',
+      order: 1,
+      classNames: {
+        text: 'text-red-200',
+        icon: 'text-red-400',
+      },
+    },
+    {
+      value: 'WARNING',
+      slug: 'warning',
+      label: 'Warning',
+      icon: 'ri:alert-line',
+      order: 2,
+      classNames: {
+        text: 'text-yellow-200',
+        icon: 'text-yellow-400',
+      },
+    },
+    {
+      value: 'GOOD',
+      slug: 'good',
+      label: 'Good',
+      icon: 'ri:check-line',
+      order: 3,
+      classNames: {
+        text: 'text-green-200',
+        icon: 'text-green-400',
+      },
+    },
+    {
+      value: 'INFO',
+      slug: 'info',
+      label: 'Info',
+      icon: 'ri:information-line',
+      order: 4,
+      classNames: {
+        text: 'text-blue-200',
+        icon: 'text-blue-400',
+      },
+    },
+  ] as const satisfies AttributeTypeInfo<AttributeType>[]
+);
+```

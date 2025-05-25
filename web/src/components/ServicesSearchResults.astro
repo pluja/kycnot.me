@@ -205,6 +205,13 @@ const urlIfIncludingCommunity = urlWithParams(Astro.url, {
               inlineIcon={inlineIcons}
             />
           )}
+          <Button
+            as="a"
+            href="/service-suggestion/new"
+            label="Add service"
+            icon="ri:add-line"
+            inlineIcon={inlineIcons}
+          />
         </div>
       </div>
     ) : (
@@ -241,14 +248,18 @@ const urlIfIncludingCommunity = urlWithParams(Astro.url, {
       </>
     )
   }
-  <div class="mt-4 text-center">
-    <Button
-      as="a"
-      href="/service-suggestion/new"
-      label="Add service"
-      icon="ri:add-line"
-      inlineIcon={inlineIcons}
-      class="mx-auto"
-    />
-  </div>
+  {
+    services && services.length > 0 && (
+      <div class="mt-4 text-center">
+        <Button
+          as="a"
+          href="/service-suggestion/new"
+          label="Add service"
+          icon="ri:add-line"
+          inlineIcon={inlineIcons}
+          class="mx-auto"
+        />
+      </div>
+    )
+  }
 </div>

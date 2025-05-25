@@ -9,7 +9,7 @@ import {
 import type { MaybePromise } from 'astro/actions/runtime/utils.js'
 import type { z } from 'astro/zod'
 
-type SpecialUserPermission = 'admin' | 'verified' | 'moderator'
+type SpecialUserPermission = 'admin' | 'moderator' | 'verified'
 type Permission = SpecialUserPermission | 'guest' | 'not-spammer' | 'user'
 
 type ActionAPIContextWithUser = ActionAPIContext & {
