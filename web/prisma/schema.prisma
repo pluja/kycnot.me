@@ -87,6 +87,7 @@ enum ServiceVisibility {
   PUBLIC
   UNLISTED
   HIDDEN
+  ARCHIVED
 }
 
 enum Currency {

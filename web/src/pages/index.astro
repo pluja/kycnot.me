@@ -222,7 +222,9 @@ const where = {
   verificationStatus: {
     in: includeScams ? uniq([...filters.verification, 'VERIFICATION_FAILED'] as const) : filters.verification,
   },
-  serviceVisibility: ServiceVisibility.PUBLIC,
+  serviceVisibility: {
+    in: [ServiceVisibility.PUBLIC, ServiceVisibility.ARCHIVED],
+  },
   overallScore: { gte: filters['min-score'] },
   acceptedCurrencies: filters.currencies.length
     ? filters['currency-mode'] === 'and'
@@ -372,6 +374,7 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
             imageUrl: true,
             verificationStatus: true,
             acceptedCurrencies: true,
+            serviceVisibility: true,
             attributes: {
               select: {
                 attribute: {

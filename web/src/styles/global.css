@@ -103,6 +103,10 @@
     drop-shadow(0 0 4px color-mix(in oklab, currentColor 60%, transparent));
 }
 
+@utility scrollbar-w-none {
+  scrollbar-width: none;
+}
+
 @utility checkbox-force-checked {
   &:not(:checked) {
     @apply border-transparent! bg-current/50!;

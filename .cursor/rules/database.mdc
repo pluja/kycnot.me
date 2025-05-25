@@ -5,6 +5,7 @@ alwaysApply: false
 ---
 - We use Prisma as ORM.
 - Remember to check the prisma schema [schema.prisma](mdc:web/prisma/schema.prisma) when doing things related to the database.
+- After making changes to the [schema.prisma](mdc:web/prisma/schema.prisma) database or [faker.ts](mdc:web/scripts/faker.ts), you can run `npm run db-reset` (from `/web/` folder) [package.json](mdc:web/package.json).
 - Import the types from prisma instead of hardcoding duplicates. Specially use the Prisma.___GetPayload type and the enums. Like this:
     ```ts
     type Props = {

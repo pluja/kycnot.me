@@ -478,28 +478,43 @@ if (!service) return Astro.rewrite('/404')
                         </div>
                       </div>
                       <div class="flex shrink-0 gap-1.5">
-                        <form method="POST" action={actions.admin.event.toggle} class="contents">
-                          <input type="hidden" name="eventId" value={event.id} />
-                          <Tooltip text={event.visible ? 'Hide Event' : 'Show Event'}>
+                        <Tooltip text={event.visible ? 'Hide' : 'Show'}>
+                          <form method="POST" action={actions.admin.event.toggle} class="contents">
+                            <input type="hidden" name="eventId" value={event.id} />
                             <Button
                               type="submit"
                               variant="faded"
                               size="sm"
                               icon={event.visible ? 'ri:eye-off-line' : 'ri:eye-line'}
+                              iconOnly
+                              label={event.visible ? 'Hide' : 'Show'}
                             />
-                          </Tooltip>
-                        </form>
-                        <Button
-                          type="button"
-                          variant="faded"
-                          size="sm"
-                          icon="ri:pencil-line"
-                          onclick={`document.getElementById('edit-event-${event.id}')?.classList.toggle('hidden')`}
-                        />
-                        <form method="POST" action={actions.admin.event.delete} class="contents">
-                          <input type="hidden" name="eventId" value={event.id} />
-                          <Button type="submit" size="sm" variant="faded" icon="ri:delete-bin-line" />
-                        </form>
+                          </form>
+                        </Tooltip>
+                        <Tooltip text="Edit">
+                          <Button
+                            type="button"
+                            variant="faded"
+                            size="sm"
+                            icon="ri:pencil-line"
+                            onclick={`document.getElementById('edit-event-${event.id}')?.classList.toggle('hidden')`}
+                            iconOnly
+                            label="Edit"
+                          />
+                        </Tooltip>
+                        <Tooltip text="Delete">
+                          <form method="POST" action={actions.admin.event.delete} class="contents">
+                            <input type="hidden" name="eventId" value={event.id} />
+                            <Button
+                              type="submit"
+                              size="sm"
+                              variant="faded"
+                              icon="ri:delete-bin-line"
+                              iconOnly
+                              label="Delete"
+                            />
+                          </form>
+                        </Tooltip>
                       </div>
                     </div>
                     {/* Edit Event Form - Hidden by default */}
@@ -673,17 +688,30 @@ if (!service) return Astro.rewrite('/404')
                         </p>
                       </div>
                       <div class="flex shrink-0 gap-1.5">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="faded"
-                          icon="ri:pencil-line"
-                          onclick={`document.getElementById('edit-verification-step-${step.id}')?.classList.toggle('hidden')`}
-                        />
-                        <form method="POST" action={actions.admin.verificationStep.delete} class="inline">
-                          <input type="hidden" name="id" value={step.id} />
-                          <Button type="submit" size="sm" variant="faded" icon="ri:delete-bin-line" />
-                        </form>
+                        <Tooltip text="Edit">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="faded"
+                            icon="ri:pencil-line"
+                            onclick={`document.getElementById('edit-verification-step-${step.id}')?.classList.toggle('hidden')`}
+                            iconOnly
+                            label="Edit"
+                          />
+                        </Tooltip>
+                        <Tooltip text="Delete">
+                          <form method="POST" action={actions.admin.verificationStep.delete} class="inline">
+                            <input type="hidden" name="id" value={step.id} />
+                            <Button
+                              type="submit"
+                              size="sm"
+                              variant="faded"
+                              icon="ri:delete-bin-line"
+                              iconOnly
+                              label="Delete"
+                            />
+                          </form>
+                        </Tooltip>
                       </div>
                     </div>
 
@@ -844,21 +872,34 @@ if (!service) return Astro.rewrite('/404')
                         <p class="text-day-400 text-sm text-pretty">{method.value}</p>
                       </div>
                       <div class="flex shrink-0 gap-1.5">
-                        <Button
-                          type="button"
-                          variant="faded"
-                          size="sm"
-                          icon="ri:pencil-line"
-                          onclick={`document.getElementById('edit-contact-method-${method.id}')?.classList.toggle('hidden')`}
-                        />
-                        <form
-                          method="POST"
-                          action={actions.admin.service.deleteContactMethod}
-                          class="contents"
-                        >
-                          <input type="hidden" name="id" value={method.id} />
-                          <Button type="submit" size="sm" variant="faded" icon="ri:delete-bin-line" />
-                        </form>
+                        <Tooltip text="Edit">
+                          <Button
+                            type="button"
+                            variant="faded"
+                            size="sm"
+                            icon="ri:pencil-line"
+                            onclick={`document.getElementById('edit-contact-method-${method.id}')?.classList.toggle('hidden')`}
+                            iconOnly
+                            label="Edit"
+                          />
+                        </Tooltip>
+                        <Tooltip text="Delete">
+                          <form
+                            method="POST"
+                            action={actions.admin.service.deleteContactMethod}
+                            class="contents"
+                          >
+                            <input type="hidden" name="id" value={method.id} />
+                            <Button
+                              type="submit"
+                              size="sm"
+                              variant="faded"
+                              icon="ri:delete-bin-line"
+                              iconOnly
+                              label="Delete"
+                            />
+                          </form>
+                        </Tooltip>
                       </div>
                     </div>
 

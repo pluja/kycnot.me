@@ -2,6 +2,7 @@ import { orderBy } from 'lodash-es'
 
 import { getAttributeCategoryInfo } from '../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../constants/attributeTypes'
+import { serviceVisibilitiesById } from '../constants/serviceVisibility'
 import { READ_MORE_SENTENCE_LINK, verificationStatusesByValue } from '../constants/verificationStatus'
 
 import { formatDateShort } from './timeAgo'
@@ -36,6 +37,7 @@ export function makeNonDbAttributes(
   service: Prisma.ServiceGetPayload<{
     select: {
       verificationStatus: true
+      serviceVisibility: true
       isRecentlyListed: true
       listedAt: true
       createdAt: true
@@ -133,6 +135,16 @@ export function makeNonDbAttributes(
           icon: 'ri:search-line',
         },
       ],
+    },
+    {
+      title: serviceVisibilitiesById.ARCHIVED.label,
+      show: service.serviceVisibility === 'ARCHIVED',
+      type: 'WARNING',
+      category: 'TRUST',
+      description: serviceVisibilitiesById.ARCHIVED.longDescription,
+      privacyPoints: 0,
+      trustPoints: 0,
+      links: [],
     },
     {
       title: 'Recently listed',

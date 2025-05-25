@@ -30,7 +30,7 @@ import { formatContactMethod } from '../../constants/contactMethods'
 import { currencies, getCurrencyInfo } from '../../constants/currencies'
 import { getEventTypeInfo } from '../../constants/eventTypes'
 import { getKycLevelInfo, kycLevels } from '../../constants/kycLevels'
-import { serviceVisibilitiesById } from '../../constants/serviceVisibility'
+import { getServiceVisibilityInfo } from '../../constants/serviceVisibility'
 import { getTosHighlightRatingInfo } from '../../constants/tosHighlightRating'
 import { getUserSentimentInfo } from '../../constants/userSentiment'
 import { getVerificationStatusInfo, verificationStatusesByValue } from '../../constants/verificationStatus'
@@ -240,7 +240,11 @@ const watchingDetails = makeWatchingDetails(dbNotificationPreferences, service?.
 
 if (!service) return Astro.rewrite('/404')
 
-if (service.serviceVisibility !== 'PUBLIC' && service.serviceVisibility !== 'UNLISTED') {
+if (
+  service.serviceVisibility !== 'PUBLIC' &&
+  service.serviceVisibility !== 'UNLISTED' &&
+  service.serviceVisibility !== 'ARCHIVED'
+) {
   return Astro.rewrite('/404')
 }
 
@@ -356,6 +360,8 @@ const ogImageTemplateData = {
   score: service.overallScore,
   imageUrl: service.imageUrl,
 } satisfies OgImageAllTemplatesWithProps
+
+const serviceVisibilityInfo = getServiceVisibilityInfo(service.serviceVisibility)
 ---
 
 <BaseLayout
@@ -457,16 +463,17 @@ const ogImageTemplateData = {
   ]}
 >
   {
-    service.serviceVisibility === 'UNLISTED' && (
-      <div class={cn('mb-4 rounded-md bg-yellow-900/50 p-2 text-sm text-yellow-400')}>
+    (serviceVisibilityInfo.value === 'UNLISTED' || serviceVisibilityInfo.value === 'ARCHIVED') && (
+      <div class={cn('mb-4 rounded-md bg-yellow-900/50 px-3 py-2 text-sm text-yellow-400')}>
         <Icon
-          name={serviceVisibilitiesById.UNLISTED.icon}
-          class={cn('me-1.5 inline-block size-4 align-[-0.15em]', serviceVisibilitiesById.UNLISTED.iconClass)}
+          name={serviceVisibilityInfo.icon}
+          class="me-1.5 inline-block size-4 align-[-0.15em] text-yellow-500"
         />
-        Unlisted service, only accessible via direct link and won't appear in searches.
+        {serviceVisibilityInfo.longDescription}
       </div>
     )
   }
+
   <VerificationWarningBanner service={service} />
 
   <div class="flex items-center gap-4">
@@ -1245,7 +1252,8 @@ const ogImageTemplateData = {
       <div class="flex flex-col gap-2">
         {
           service.verificationStatus !== 'VERIFICATION_SUCCESS' &&
-            service.verificationStatus !== 'VERIFICATION_FAILED' && (
+            service.verificationStatus !== 'VERIFICATION_FAILED' &&
+            service.serviceVisibility !== 'ARCHIVED' && (
               <form
                 method="POST"
                 action={actions.service.requestVerification}

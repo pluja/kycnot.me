@@ -12,7 +12,7 @@
     "db-push": "prisma migrate dev",
     "db-triggers": "just import-triggers",
     "db-update": "prisma migrate dev && just import-triggers",
-    "db-reset": "prisma migrate reset && prisma migrate dev && just import-triggers && tsx scripts/faker.ts",
+    "db-reset": "prisma migrate reset -f && prisma migrate dev && just import-triggers && tsx scripts/faker.ts",
     "db-fill": "tsx scripts/faker.ts",
     "db-fill-clean": "tsx scripts/faker.ts --cleanup",
     "format": "prettier --write .",

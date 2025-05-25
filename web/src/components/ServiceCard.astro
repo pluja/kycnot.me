@@ -2,6 +2,7 @@
 import { Icon } from 'astro-icon/components'
 
 import { currencies } from '../constants/currencies'
+import { serviceVisibilitiesById } from '../constants/serviceVisibility'
 import { verificationStatusesByValue } from '../constants/verificationStatus'
 import { cn } from '../lib/cn'
 import { makeOverallScoreInfo } from '../lib/overallScore'
@@ -25,6 +26,7 @@ type Props = HTMLAttributes<'a'> & {
       kycLevel: true
       imageUrl: true
       verificationStatus: true
+      serviceVisibility: true
       acceptedCurrencies: true
       categories: {
         select: {
@@ -43,11 +45,11 @@ const {
     slug,
     description,
     overallScore,
-
     kycLevel,
     imageUrl,
     categories,
     verificationStatus,
+    serviceVisibility,
     acceptedCurrencies,
   },
   class: className,
@@ -69,7 +71,9 @@ const overallScoreInfo = makeOverallScoreInfo(overallScore)
   href={Element === 'a' ? `/service/${slug}` : undefined}
   {...aProps}
   class={cn(
-    'border-night-600 bg-night-800 flex flex-col gap-(--gap) rounded-xl border p-(--gap) [--gap:calc(var(--spacing)*3)]',
+    'border-night-600 group/card bg-night-800 flex flex-col gap-(--gap) rounded-xl border p-(--gap) [--gap:calc(var(--spacing)*3)]',
+    (serviceVisibility === 'ARCHIVED' || verificationStatus === 'VERIFICATION_FAILED') &&
+      'opacity-75 transition-opacity hover:opacity-100 focus-visible:opacity-100',
     className
   )}
 >
@@ -79,7 +83,11 @@ const overallScoreInfo = makeOverallScoreInfo(overallScore)
       src={imageUrl}
       fallback="service"
       alt={name || 'Service logo'}
-      class="size-12 shrink-0 rounded-sm object-contain text-white"
+      class={cn(
+        'size-12 shrink-0 rounded-sm object-contain text-white',
+        (serviceVisibility === 'ARCHIVED' || verificationStatus === 'VERIFICATION_FAILED') &&
+          'grayscale-67 transition-all group-hover/card:grayscale-0 group-focus-visible/card:grayscale-0'
+      )}
       width={48}
       height={48}
     />
@@ -108,6 +116,23 @@ const overallScoreInfo = makeOverallScoreInfo(overallScore)
                   <span class="text-sm font-bold text-red-500">SCAM</span>
                 ),
               ]}
+            </Tooltip>
+          )
+        }{
+          serviceVisibility === 'ARCHIVED' && (
+            <Tooltip
+              text={serviceVisibilitiesById.ARCHIVED.label}
+              position="right"
+              class="-my-2 shrink-0 whitespace-nowrap"
+            >
+              <Icon
+                is:inline={inlineIcons}
+                name={serviceVisibilitiesById.ARCHIVED.icon}
+                class={cn(
+                  'inline-block size-6 shrink-0 rounded-lg p-1 align-[-0.37em]',
+                  serviceVisibilitiesById.ARCHIVED.iconClass
+                )}
+              />
             </Tooltip>
           )
         }

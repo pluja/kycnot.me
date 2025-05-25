@@ -8,7 +8,8 @@ import MyPicture from '../../../components/MyPicture.astro'
 import SortArrowIcon from '../../../components/SortArrowIcon.astro'
 import Tooltip from '../../../components/Tooltip.astro'
 import { getKycLevelInfo } from '../../../constants/kycLevels'
-import { getVerificationStatusInfo } from '../../../constants/verificationStatus'
+import { serviceVisibilities } from '../../../constants/serviceVisibility'
+import { getVerificationStatusInfo, verificationStatuses } from '../../../constants/verificationStatus'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { cn } from '../../../lib/cn'
 import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
@@ -209,11 +210,11 @@ const truncate = (text: string, length: number) => {
           id="visibility"
           class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
         >
-          <option value="">All Visibilities</option>
+          <option value="">All</option>
           {
-            Object.values(ServiceVisibility).map((status) => (
-              <option value={status} selected={filters.visibility === status}>
-                {status}
+            serviceVisibilities.map((visibility) => (
+              <option value={visibility.value} selected={filters.visibility === visibility.value}>
+                {visibility.label}
               </option>
             ))
           }
@@ -227,11 +228,11 @@ const truncate = (text: string, length: number) => {
           id="verificationStatus"
           class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
         >
-          <option value="">All Statuses</option>
+          <option value="">All</option>
           {
-            Object.values(VerificationStatus).map((status) => (
-              <option value={status} selected={filters.verificationStatus === status}>
-                {status}
+            verificationStatuses.map((status) => (
+              <option value={status.value} selected={filters.verificationStatus === status.value}>
+                {status.label}
               </option>
             ))
           }

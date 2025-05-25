@@ -2,19 +2,20 @@ import crypto from 'crypto'
 
 import { faker } from '@faker-js/faker'
 import {
+  AnnouncementType,
   AttributeCategory,
   AttributeType,
   CommentStatus,
   Currency,
+  EventType,
   PrismaClient,
   ServiceSuggestionStatus,
   ServiceSuggestionType,
+  ServiceUserRole,
   VerificationStatus,
   type Prisma,
-  EventType,
   type User,
-  ServiceUserRole,
-  AnnouncementType,
+  type ServiceVisibility,
 } from '@prisma/client'
 import { uniqBy } from 'lodash-es'
 import { generateUsername } from 'unique-username-generator'
@@ -611,7 +612,12 @@ const generateFakeEvent = (serviceId: number) => {
 }
 
 const generateFakeService = (users: User[]) => {
-  const status = faker.helpers.arrayElement(Object.values(VerificationStatus))
+  const status = faker.helpers.weightedArrayElement<VerificationStatus>([
+    { weight: 20, value: 'VERIFICATION_SUCCESS' },
+    { weight: 30, value: 'APPROVED' },
+    { weight: 40, value: 'COMMUNITY_CONTRIBUTED' },
+    { weight: 10, value: 'VERIFICATION_FAILED' },
+  ])
   const name = faker.helpers.arrayElement(serviceNames)
   const slug = `${faker.helpers.slugify(name).toLowerCase()}-${faker.string.alphanumeric({ length: 6, casing: 'lower' })}`
 
@@ -623,6 +629,12 @@ const generateFakeService = (users: User[]) => {
     overallScore: 0,
     privacyScore: 0,
     trustScore: 0,
+    serviceVisibility: faker.helpers.weightedArrayElement<ServiceVisibility>([
+      { weight: 80, value: 'PUBLIC' },
+      { weight: 10, value: 'UNLISTED' },
+      { weight: 5, value: 'HIDDEN' },
+      { weight: 5, value: 'ARCHIVED' },
+    ]),
     verificationStatus: status,
     verificationSummary:
       status === 'VERIFICATION_SUCCESS' || status === 'VERIFICATION_FAILED' ? faker.lorem.paragraph() : null,

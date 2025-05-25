@@ -150,7 +150,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
     checked={comment.suspicious}
   />
 
-  <div class="comment-header flex items-center gap-2 text-sm">
+  <div class="comment-header scrollbar-w-none flex items-center gap-2 overflow-auto text-sm">
     <label for={`collapse-${comment.id.toString()}`} class="cursor-pointer text-zinc-500 hover:text-zinc-300">
       <span class="collapse-symbol text-xs"></span>
       <span class="sr-only">Toggle comment visibility</span>
