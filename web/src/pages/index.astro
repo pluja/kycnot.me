@@ -1,5 +1,4 @@
 ---
-import { ServiceVisibility } from '@prisma/client'
 import { z } from 'astro:schema'
 import { groupBy, omit, orderBy, uniq } from 'lodash-es'
 import seedrandom from 'seedrandom'
@@ -223,7 +222,7 @@ const where = {
     in: includeScams ? uniq([...filters.verification, 'VERIFICATION_FAILED'] as const) : filters.verification,
   },
   serviceVisibility: {
-    in: [ServiceVisibility.PUBLIC, ServiceVisibility.ARCHIVED],
+    in: ['PUBLIC', 'ARCHIVED'],
   },
   overallScore: { gte: filters['min-score'] },
   acceptedCurrencies: filters.currencies.length
@@ -326,7 +325,9 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
               select: {
                 services: {
                   where: {
-                    serviceVisibility: 'PUBLIC',
+                    serviceVisibility: {
+                      in: ['PUBLIC', 'ARCHIVED'],
+                    },
                   },
                 },
               },

@@ -650,22 +650,22 @@ const generateFakeService = (users: User[]) => {
       status === 'VERIFICATION_SUCCESS' || status === 'VERIFICATION_FAILED' ? faker.lorem.paragraphs() : null,
     referral: `?ref=${faker.string.alphanumeric(6)}`,
     acceptedCurrencies: faker.helpers.arrayElements(Object.values(Currency), { min: 1, max: 5 }),
-    serviceUrls: Array.from({ length: faker.number.int({ min: 1, max: 3 }) }, () => faker.internet.url()),
-    tosUrls: Array.from({ length: faker.number.int({ min: 0, max: 2 }) }, () => faker.internet.url()),
-    onionUrls: Array.from(
-      { length: faker.number.int({ min: 0, max: 2 }) },
-      () => `http://${faker.string.alphanumeric({ length: 56, casing: 'lower' })}.onion`
+    serviceUrls: faker.helpers.multiple(() => faker.internet.url(), { count: { min: 1, max: 3 } }),
+    tosUrls: faker.helpers.multiple(() => faker.internet.url(), { count: { min: 1, max: 2 } }),
+    onionUrls: faker.helpers.multiple(
+      () => `http://${faker.string.alphanumeric({ length: 56, casing: 'lower' })}.onion`,
+      { count: { min: 0, max: 2 } }
     ),
-    i2pUrls: Array.from(
-      { length: faker.number.int({ min: 0, max: 2 }) },
-      () => `http://${faker.string.alphanumeric({ length: 52, casing: 'lower' })}.b32.i2p`
+    i2pUrls: faker.helpers.multiple(
+      () => `http://${faker.string.alphanumeric({ length: 52, casing: 'lower' })}.b32.i2p`,
+      { count: { min: 0, max: 2 } }
     ),
     imageUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&format=svg`,
     listedAt: faker.date.past(),
     verifiedAt: status === VerificationStatus.VERIFICATION_SUCCESS ? faker.date.past() : null,
     tosReview: faker.helpers.arrayElement(tosReviewExamples),
     tosReviewAt: faker.date.past(),
-    userSentiment: Math.random() > 0.2 ? generateFakeUserSentiment() : undefined,
+    userSentiment: faker.helpers.maybe(() => generateFakeUserSentiment(), { probability: 0.8 }),
     userSentimentAt: faker.date.recent(),
   } as const satisfies Prisma.ServiceCreateInput
 }

@@ -19,6 +19,9 @@ type Props = HTMLAttributes<'div'> & {
   icon?: string
   inputId?: string
   hideLabel?: boolean
+  classNames?: {
+    description?: string
+  }
 }
 
 const {
@@ -32,13 +35,14 @@ const {
   class: className,
   inputId,
   hideLabel,
+  classNames,
   ...htmlProps
 } = Astro.props
 
 const hasError = !!error && error.length > 0
 ---
 
-<fieldset class={cn('space-y-1', className)} {...htmlProps}>
+<fieldset class={cn('min-w-0 space-y-1', className)} {...htmlProps}>
   {
     !hideLabel && (
       <div class={cn('contents', !!descriptionLabel && 'flex flex-wrap items-center gap-x-4')}>
@@ -71,7 +75,12 @@ const hasError = !!error && error.length > 0
 
   {
     !!description && (
-      <div class="prose prose-sm prose-invert prose-a:text-current prose-a:font-normal hover:prose-a:text-day-300 prose-a:transition-colors text-day-400 max-w-none text-xs text-pretty">
+      <div
+        class={cn(
+          'prose prose-sm prose-invert prose-a:text-current prose-a:font-normal hover:prose-a:text-day-300 prose-a:transition-colors text-day-400 max-w-none text-xs text-pretty',
+          classNames?.description
+        )}
+      >
         <Markdown content={description} />
       </div>
     )

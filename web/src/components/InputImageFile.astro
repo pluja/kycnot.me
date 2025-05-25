@@ -2,16 +2,24 @@
 import { cn } from '../lib/cn'
 import { ACCEPTED_IMAGE_TYPES } from '../lib/zodUtils'
 
+import Button from './Button.astro'
 import InputFile from './InputFile.astro'
+import Tooltip from './Tooltip.astro'
 
 import type { ComponentProps } from 'astro/types'
 
 type Props = Omit<ComponentProps<typeof InputFile>, 'accept'> & {
   square?: boolean
   value?: string | null
+  downloadButton?: boolean
 }
 
-const { class: className, square, value, ...inputFileProps } = Astro.props
+const { class: className, square, value, downloadButton, ...inputFileProps } = Astro.props
+
+function makeDownloadFilename(value: string) {
+  const url = new URL(value, Astro.url.origin)
+  return url.pathname.split('/').pop() ?? 'service-image'
+}
 ---
 
 <div class={cn('flex flex-wrap items-center justify-center gap-4', className)} data-preview-image>
@@ -30,6 +38,31 @@ const { class: className, square, value, ...inputFileProps } = Astro.props
       '[&:is(:has([data-remove-checkbox]:checked)_~_*)]:hidden'
     )}
   />
+  {
+    downloadButton && value && (
+      <Tooltip
+        text="Download"
+        classNames={{
+          tooltip: 'min-2xs:[&:is(:has([data-remove-checkbox]:checked)_~_*_*)]:hidden',
+        }}
+      >
+        <Button
+          as="a"
+          href={value}
+          download={makeDownloadFilename(value)}
+          icon="ri:download-line"
+          size="sm"
+          label="Download"
+          class={cn(
+            'bg-night-600 border-night-400 text-day-200 2xs:[&:is(:has([data-remove-checkbox]:not(:checked))_~_*_*)]:h-24 2xs:[&:is(:has([data-remove-checkbox]:not(:checked))_~_*_*)]:px-0 2xs:[&:is(:has([data-remove-checkbox]:not(:checked))_~_*_*)]:w-8 shrink-0 rounded-md border'
+          )}
+          classNames={{
+            label: '2xs:[&:is(:has([data-remove-checkbox]:not(:checked))_~_*_*)]:hidden block ',
+          }}
+        />
+      </Tooltip>
+    )
+  }
 </div>
 
 <script>

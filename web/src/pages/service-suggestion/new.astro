@@ -1,6 +1,7 @@
 ---
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
+import { orderBy } from 'lodash-es'
 
 import {
   SUGGESTION_DESCRIPTION_MAX_LENGTH,
@@ -16,6 +17,8 @@ import InputImageFile from '../../components/InputImageFile.astro'
 import InputSubmitButton from '../../components/InputSubmitButton.astro'
 import InputText from '../../components/InputText.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
+import { getAttributeCategoryInfo } from '../../constants/attributeCategories'
+import { getAttributeTypeInfo } from '../../constants/attributeTypes'
 import { currencies } from '../../constants/currencies'
 import { kycLevels } from '../../constants/kycLevels'
 import BaseLayout from '../../layouts/BaseLayout.astro'
@@ -55,6 +58,8 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
         select: {
           id: true,
           title: true,
+          category: true,
+          type: true,
         },
       }),
     [],
@@ -241,27 +246,41 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       error={inputErrors.kycLevel}
     />
 
-    <InputCheckboxGroup
-      name="categories"
-      label="Categories"
-      required
-      options={categories.map((category) => ({
-        label: category.name,
-        value: category.id.toString(),
-        icon: category.icon,
-      }))}
-      error={inputErrors.categories}
-    />
+    <div class="xs:grid-cols-[1fr_2fr] grid grid-cols-1 items-stretch gap-x-4 gap-y-6">
+      <InputCheckboxGroup
+        name="categories"
+        label="Categories"
+        required
+        options={categories.map((category) => ({
+          label: category.name,
+          value: category.id.toString(),
+          icon: category.icon,
+        }))}
+        size="lg"
+        error={inputErrors.categories}
+        class="min-w-auto"
+      />
 
-    <InputCheckboxGroup
-      name="attributes"
-      label="Attributes"
-      options={attributes.map((attribute) => ({
-        label: attribute.title,
-        value: attribute.id.toString(),
-      }))}
-      error={inputErrors.attributes}
-    />
+      <InputCheckboxGroup
+        name="attributes"
+        label="Attributes"
+        options={orderBy(
+          attributes.map((attribute) => ({
+            ...attribute,
+            categoryInfo: getAttributeCategoryInfo(attribute.category),
+            typeInfo: getAttributeTypeInfo(attribute.type),
+          })),
+          ['categoryInfo.order', 'typeInfo.order']
+        ).map((attribute) => ({
+          label: attribute.title,
+          value: attribute.id.toString(),
+          icon: [attribute.categoryInfo.icon, attribute.typeInfo.icon],
+          iconClassName: [attribute.categoryInfo.classNames.icon, attribute.typeInfo.classNames.icon],
+        }))}
+        error={inputErrors.attributes}
+        size="lg"
+      />
+    </div>
 
     <InputCardGroup
       name="acceptedCurrencies"

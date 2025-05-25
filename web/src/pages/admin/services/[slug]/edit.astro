@@ -261,6 +261,7 @@ if (!service) return Astro.rewrite('/404')
             inputProps={{
               rows: 3,
               placeholder: 'https://example1.com/tos\nhttps://example2.com/tos',
+              required: true,
             }}
             value={service.tosUrls.join('\n')}
             error={serviceInputErrors.tosUrls}
@@ -298,16 +299,26 @@ if (!service) return Astro.rewrite('/404')
           error={serviceInputErrors.referral}
         />
 
-        <InputImageFile
-          label="Image"
-          name="imageFile"
-          description="Square image. At least 192x192px. Transparency supported. Leave empty to keep current image."
-          error={serviceInputErrors.imageFile}
-          square
-          value={service.imageUrl}
-        />
+        <div class="flex items-center justify-between gap-2">
+          <InputImageFile
+            label="Image"
+            name="imageFile"
+            description="Square image. At least 192x192px. Transparency supported. Leave empty to keep current image."
+            error={serviceInputErrors.imageFile}
+            square
+            value={service.imageUrl}
+            downloadButton
+            removeCheckbox={service.imageUrl
+              ? {
+                  name: 'removeImage',
+                  label: 'Remove image',
+                }
+              : undefined}
+            class="grow"
+          />
+        </div>
 
-        <div class="grid grid-cols-1 items-stretch gap-x-4 gap-y-6 sm:grid-cols-[1fr_2fr]">
+        <div class="xs:grid-cols-[1fr_2fr] grid grid-cols-1 items-stretch gap-x-4 gap-y-6">
           <InputCheckboxGroup
             name="categories"
             label="Categories"
@@ -320,6 +331,7 @@ if (!service) return Astro.rewrite('/404')
             }))}
             selectedValues={service.categories.map((c) => c.id.toString())}
             error={serviceInputErrors.categories}
+            class="min-w-auto"
           />
 
           <InputCheckboxGroup

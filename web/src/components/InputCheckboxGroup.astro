@@ -54,9 +54,9 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
                 disabled={disabled}
               />
               {icons.map((icon, index) => (
-                <Icon name={icon} class={cn('size-4', iconClassName[index])} />
+                <Icon name={icon} class={cn('size-4 shrink-0', iconClassName[index])} />
               ))}
-              <span class="text-sm leading-none">{option.label}</span>
+              <span class="truncate text-sm leading-none">{option.label}</span>
             </label>
           )
         })

@@ -106,9 +106,13 @@ export const adminServiceActions = {
   update: defineProtectedAction({
     accept: 'form',
     permissions: 'admin',
-    input: serviceSchemaBase.transform(addSlugIfMissing),
+    input: serviceSchemaBase
+      .extend({
+        removeImage: z.boolean().optional(),
+      })
+      .transform(addSlugIfMissing),
     handler: async (input) => {
-      const { id, categories, attributes, imageFile, ...data } = input
+      const { id, categories, attributes, imageFile, removeImage, ...data } = input
 
       const existing = await prisma.service.findUnique({
         where: {
@@ -124,7 +128,11 @@ export const adminServiceActions = {
         })
       }
 
-      const imageUrl = imageFile ? await saveFileLocally(imageFile, imageFile.name) : undefined
+      const imageUrl = removeImage
+        ? null
+        : imageFile
+          ? await saveFileLocally(imageFile, imageFile.name)
+          : undefined
 
       // Get existing attributes and categories to compute differences
       const existingService = await prisma.service.findUnique({
