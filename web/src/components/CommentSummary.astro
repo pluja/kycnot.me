@@ -47,12 +47,9 @@ const averageUserRatingFromQuery =
   totalComments > 0 ? sum(ratings.map((stat) => stat.rating * stat.count)) / totalComments : null
 
 if (averageUserRatingFromProps !== undefined) {
-  if (
-    averageUserRatingFromQuery !== averageUserRatingFromProps ||
-    (averageUserRatingFromQuery !== null &&
-      averageUserRatingFromProps !== null &&
-      round(averageUserRatingFromQuery, 2) !== round(averageUserRatingFromProps, 2))
-  ) {
+  const a = averageUserRatingFromQuery === null ? null : round(averageUserRatingFromQuery, 2)
+  const b = averageUserRatingFromProps === null ? null : round(averageUserRatingFromProps, 2)
+  if (a !== b) {
     console.error(
       `The averageUserRating of the comments shown is different from the averageUserRating from the database. Service ID: ${serviceId} ratingUi: ${averageUserRatingFromQuery} ratingDb: ${averageUserRatingFromProps}`
     )

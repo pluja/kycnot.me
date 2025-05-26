@@ -225,7 +225,6 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       label="Onion URLs"
       name="onionUrls"
       inputProps={{
-        required: true,
         placeholder: 'http://example1.onion\nhttp://example2.onion',
       }}
       error={inputErrors.onionUrls}
@@ -324,7 +323,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
 
 <script>
   document.addEventListener('astro:page-load', () => {
-    const triggerInputs = document.querySelectorAll<HTMLInputElement>('[data-generate-slug] input')
+    const triggerInputs = document.querySelectorAll<HTMLInputElement>('input[data-generate-slug]')
     const slugInputs = document.querySelectorAll<HTMLInputElement>('input[name="slug"]')
 
     triggerInputs.forEach((triggerInput) => {

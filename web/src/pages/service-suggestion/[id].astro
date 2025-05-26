@@ -3,9 +3,12 @@ import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
 import AdminOnly from '../../components/AdminOnly.astro'
+import BadgeSmall from '../../components/BadgeSmall.astro'
+import Button from '../../components/Button.astro'
 import Chat from '../../components/Chat.astro'
 import ServiceCard from '../../components/ServiceCard.astro'
 import { getServiceSuggestionStatusInfo } from '../../constants/serviceSuggestionStatus'
+import { getServiceSuggestionTypeInfo } from '../../constants/serviceSuggestionType'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
 import { parseIntWithFallback } from '../../lib/numbers'
@@ -28,6 +31,7 @@ const serviceSuggestion = await Astro.locals.banners.try('Error fetching service
   prisma.serviceSuggestion.findUnique({
     select: {
       id: true,
+      type: true,
       status: true,
       notes: true,
       createdAt: true,
@@ -42,6 +46,7 @@ const serviceSuggestion = await Astro.locals.banners.try('Error fetching service
           imageUrl: true,
           verificationStatus: true,
           acceptedCurrencies: true,
+          serviceVisibility: true,
           categories: {
             select: {
               name: true,
@@ -59,6 +64,7 @@ const serviceSuggestion = await Astro.locals.banners.try('Error fetching service
             select: {
               id: true,
               name: true,
+              displayName: true,
               picture: true,
             },
           },
@@ -81,6 +87,7 @@ if (!serviceSuggestion) {
 }
 
 const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
+const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
 ---
 
 <BaseLayout
@@ -104,17 +111,22 @@ const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
     },
   ]}
 >
-  <h1 class="font-title mt-12 mb-6 text-center text-3xl font-bold">Edit service</h1>
+  <div class="mt-12 mb-6 flex flex-col items-center justify-center gap-3">
+    <div class="flex items-center gap-2">
+      <BadgeSmall color={typeInfo.color} text={typeInfo.label} icon={typeInfo.icon} />
+      <AdminOnly>
+        <Button
+          as="a"
+          href={`/admin/service-suggestions/${serviceSuggestionIdRaw}`}
+          size="sm"
+          icon="ri:lock-line"
+          label="View in admin"
+        />
+      </AdminOnly>
+    </div>
 
-  <AdminOnly>
-    <a
-      href={`/admin/service-suggestions/${serviceSuggestionIdRaw}`}
-      class="border-day-500/30 bg-day-500/10 text-day-400 hover:bg-day-500/20 focus:ring-day-500 inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm shadow-xs transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-    >
-      <Icon name="ri:lock-line" class="size-4" />
-      View in admin
-    </a>
-  </AdminOnly>
+    <h1 class="font-title text-center text-3xl font-bold">Service suggestion</h1>
+  </div>
 
   <ServiceCard service={serviceSuggestion.service} class="mb-6" />
 

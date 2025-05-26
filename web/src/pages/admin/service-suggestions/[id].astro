@@ -2,6 +2,7 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
+import BadgeSmall from '../../../components/BadgeSmall.astro'
 import Button from '../../../components/Button.astro'
 import Chat from '../../../components/Chat.astro'
 import ServiceCard from '../../../components/ServiceCard.astro'
@@ -10,6 +11,7 @@ import {
   getServiceSuggestionStatusInfo,
   serviceSuggestionStatuses,
 } from '../../../constants/serviceSuggestionStatus'
+import { getServiceSuggestionTypeInfo } from '../../../constants/serviceSuggestionType'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { cn } from '../../../lib/cn'
 import { parseIntWithFallback } from '../../../lib/numbers'
@@ -57,6 +59,7 @@ const serviceSuggestion = await Astro.locals.banners.try('Error fetching service
           imageUrl: true,
           verificationStatus: true,
           acceptedCurrencies: true,
+          serviceVisibility: true,
           categories: {
             select: {
               name: true,
@@ -92,6 +95,7 @@ if (!serviceSuggestion) {
 }
 
 const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
+const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
 ---
 
 <BaseLayout
@@ -110,7 +114,9 @@ const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
       label="Back"
     />
 
-    <h1 class="font-title text-xl text-green-500">Service Suggestion</h1>
+    <h1 class="font-title text-day-200 text-xl">Service suggestion</h1>
+
+    <BadgeSmall color={typeInfo.color} text={typeInfo.label} icon={typeInfo.icon} />
   </div>
 
   <div class="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -118,12 +124,13 @@ const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
       <ServiceCard service={serviceSuggestion.service} class="mx-auto max-w-full" />
     </div>
 
-    <div
-      class="rounded-lg border border-green-500/30 bg-black/40 p-4 shadow-[0_0_15px_rgba(34,197,94,0.2)] backdrop-blur-xs"
-    >
-      <h2 class="font-title mb-3 text-lg text-green-500">Suggestion Details</h2>
+    <div class="rounded-lg bg-black/40 p-4 backdrop-blur-xs">
+      <h2 class="font-title text-day-200 mb-3 text-lg">Suggestion Details</h2>
 
       <div class="mb-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
+        <span class="font-title text-gray-400">Type:</span>
+        <BadgeSmall color={typeInfo.color} text={typeInfo.label} icon={typeInfo.icon} />
+
         <span class="font-title text-gray-400">Status:</span>
         <span
           class={cn(
@@ -142,7 +149,7 @@ const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
         <span class="text-gray-300">{serviceSuggestion.createdAt.toLocaleString()}</span>
 
         <span class="font-title text-gray-400">Service page:</span>
-        <a href={`/service/${serviceSuggestion.service.slug}`} class="text-green-400 hover:text-green-500">
+        <a href={`/service/${serviceSuggestion.service.slug}`} class="hover:text-day-200 text-green-400">
           View Service <Icon
             name="ri:external-link-line"
             class="ml-0.5 inline-block size-3 align-[-0.05em]"
@@ -164,11 +171,9 @@ const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
     </div>
   </div>
 
-  <div
-    class="rounded-lg border border-green-500/30 bg-black/40 p-6 shadow-[0_0_15px_rgba(34,197,94,0.2)] backdrop-blur-xs"
-  >
+  <div class="rounded-lg bg-black/40 p-6 backdrop-blur-xs">
     <div class="flex items-center justify-between">
-      <h2 class="font-title text-lg text-green-500">Messages</h2>
+      <h2 class="font-title text-day-200 text-lg">Messages</h2>
 
       <form method="POST" action={actions.admin.serviceSuggestions.update} class="flex gap-2">
         <input type="hidden" name="suggestionId" value={serviceSuggestion.id} />

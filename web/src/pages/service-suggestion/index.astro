@@ -3,6 +3,8 @@ import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 import { z } from 'astro:content'
 
+import BadgeSmall from '../../components/BadgeSmall.astro'
+import BadgeStandardFilter from '../../components/BadgeStandardFilter.astro'
 import Button from '../../components/Button.astro'
 import MyPicture from '../../components/MyPicture.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
@@ -10,10 +12,16 @@ import Tooltip from '../../components/Tooltip.astro'
 import {
   getServiceSuggestionStatusInfo,
   serviceSuggestionStatuses,
+  serviceSuggestionStatusesZodEnumBySlug,
+  serviceSuggestionStatusSlugToId,
 } from '../../constants/serviceSuggestionStatus'
-import { getServiceSuggestionTypeInfo } from '../../constants/serviceSuggestionType'
+import {
+  getServiceSuggestionTypeInfo,
+  serviceSuggestionTypes,
+  serviceSuggestionTypeSlugToId,
+  serviceSuggestionTypesZodEnumBySlug,
+} from '../../constants/serviceSuggestionType'
 import BaseLayout from '../../layouts/BaseLayout.astro'
-import { zodEnumFromConstant } from '../../lib/arrays'
 import { cn } from '../../lib/cn'
 import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
 import { prisma } from '../../lib/prisma'
@@ -26,8 +34,13 @@ if (!user) {
 
 const { data: filters } = zodParseQueryParamsStoringErrors(
   {
-    serviceId: z.array(z.number().int().positive()).default([]),
-    status: z.array(zodEnumFromConstant(serviceSuggestionStatuses, 'value')).default([]),
+    serviceId: z.array(z.number().int().positive()),
+    status: z.array(
+      serviceSuggestionStatusesZodEnumBySlug.transform((slug) => serviceSuggestionStatusSlugToId(slug))
+    ),
+    type: z.array(
+      serviceSuggestionTypesZodEnumBySlug.transform((slug) => serviceSuggestionTypeSlugToId(slug))
+    ),
   },
   Astro
 )
@@ -52,6 +65,7 @@ const serviceSuggestions = await Astro.locals.banners.try('Error fetching servic
     where: {
       id: filters.serviceId.length > 0 ? { in: filters.serviceId } : undefined,
       status: filters.status.length > 0 ? { in: filters.status } : undefined,
+      type: filters.type.length > 0 ? { in: filters.type } : undefined,
       userId: user.id,
     },
     orderBy: {
@@ -104,6 +118,23 @@ const success = !!createResult && !createResult.error
     )
   }
 
+  <div class="mb-6">
+    <div class="text-day-200 mb-2 font-medium">Filter by:</div>
+    <div class="flex flex-wrap gap-2">
+      {
+        serviceSuggestionTypes.map((type) => (
+          <BadgeStandardFilter name="type" value={type.slug} label={type.label} icon={type.icon} />
+        ))
+      }
+
+      {
+        serviceSuggestionStatuses.map((status) => (
+          <BadgeStandardFilter name="status" value={status.slug} label={status.label} icon={status.icon} />
+        ))
+      }
+    </div>
+  </div>
+
   {
     serviceSuggestions.length === 0 ? (
       <p class="text-day-400">No suggestions yet.</p>
@@ -137,15 +168,7 @@ const success = !!createResult && !createResult.error
                   <span class="shrink truncate">{suggestion.service.name}</span>
                 </a>
 
-                <Tooltip
-                  as="span"
-                  class="inline-flex items-center gap-1"
-                  text={typeInfo.label}
-                  classNames={{ tooltip: 'md:hidden!' }}
-                >
-                  <Icon name={typeInfo.icon} class="size-4" />
-                  <span class="hidden md:inline">{typeInfo.label}</span>
-                </Tooltip>
+                <BadgeSmall color={typeInfo.color} text={typeInfo.label} icon={typeInfo.icon} />
 
                 <Tooltip
                   as="span"

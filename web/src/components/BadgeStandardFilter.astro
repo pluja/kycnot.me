@@ -1,0 +1,41 @@
+---
+import { uniq } from 'lodash-es'
+
+import { cn } from '../lib/cn'
+
+import BadgeStandard from './BadgeStandard.astro'
+
+import type { ComponentProps } from 'astro/types'
+
+type Props = Omit<
+  ComponentProps<typeof BadgeStandard>,
+  'as' | 'endIcon' | 'href' | 'icon' | 'text' | 'variant'
+> & {
+  name: string
+  value: string
+  label: string
+  icon: string
+}
+
+const { name, value, label, icon, ...props } = Astro.props
+
+const selectedValues = Astro.url.searchParams.getAll(name)
+const isSelected = selectedValues.includes(value)
+
+const url = new URL(Astro.url)
+url.searchParams.delete(name)
+const valuesToSet = uniq(isSelected ? selectedValues.filter((v) => v !== value) : [...selectedValues, value])
+for (const value of valuesToSet) {
+  url.searchParams.set(name, value)
+}
+---
+
+<BadgeStandard
+  as="a"
+  href={url.href}
+  class={cn(isSelected && 'bg-green-950 text-green-500')}
+  text={label}
+  icon={icon}
+  endIcon={isSelected ? 'ri:close-fill' : undefined}
+  {...props}
+/>

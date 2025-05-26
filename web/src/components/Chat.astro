@@ -76,7 +76,15 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
           />
 
           <Tooltip text="Send">
-            <Button type="submit" icon="ri:send-plane-fill" size="lg" color="success" class="h-16" />
+            <Button
+              type="submit"
+              icon="ri:send-plane-fill"
+              size="lg"
+              color="success"
+              class="h-16"
+              label="Send"
+              iconOnly
+            />
           </Tooltip>
         </form>
         {!!inputErrors.content && <div class="text-sm text-red-500">{inputErrors.content}</div>}

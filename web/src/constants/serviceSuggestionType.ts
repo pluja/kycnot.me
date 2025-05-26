@@ -1,14 +1,18 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import type BadgeSmall from '../components/BadgeSmall.astro'
 import type { ServiceSuggestionType } from '@prisma/client'
+import type { ComponentProps } from 'astro/types'
 
 type ServiceSuggestionTypeInfo<T extends string | null | undefined = string> = {
   value: T
   slug: string
   label: string
   icon: string
+  order: number
   default: boolean
+  color: ComponentProps<typeof BadgeSmall>['color']
 }
 
 export const {
@@ -25,9 +29,11 @@ export const {
   (value): ServiceSuggestionTypeInfo<typeof value> => ({
     value,
     slug: value ? value.toLowerCase() : '',
-    label: value ? transformCase(value, 'title') : String(value),
+    label: value ? transformCase(value.replace('_', ' '), 'title') : String(value),
     icon: 'ri:question-line',
+    order: Infinity,
     default: false,
+    color: 'zinc',
   }),
   [
     {
@@ -35,14 +41,18 @@ export const {
       slug: 'create',
       label: 'Create',
       icon: 'ri:add-line',
+      order: 1,
       default: true,
+      color: 'green',
     },
     {
       value: 'EDIT_SERVICE',
       slug: 'edit',
       label: 'Edit',
       icon: 'ri:pencil-line',
+      order: 2,
       default: false,
+      color: 'blue',
     },
   ] as const satisfies ServiceSuggestionTypeInfo<ServiceSuggestionType>[]
 )

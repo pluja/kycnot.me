@@ -126,11 +126,13 @@ type Props<Tag extends 'a' | 'div' | 'li' = 'div'> = Polymorphic<
   VariantProps<typeof badge> & {
     as: Tag
     icon?: string
+    endIcon?: string
     text: string
     inlineIcon?: boolean
     classNames?: {
       icon?: string
       text?: string
+      endIcon?: string
     }
   }
 >
@@ -138,6 +140,7 @@ type Props<Tag extends 'a' | 'div' | 'li' = 'div'> = Polymorphic<
 const {
   as: Tag = 'div',
   icon: iconName,
+  endIcon: endIconName,
   text: textContent,
   inlineIcon,
   classNames,
@@ -159,4 +162,9 @@ const { base, icon: iconSlot, text: textSlot } = badge({ color, variant })
     )
   }
   <span class={textSlot({ class: classNames?.text })}>{textContent}</span>
+  {
+    !!endIconName && (
+      <Icon name={endIconName} class={iconSlot({ class: classNames?.endIcon })} is:inline={inlineIcon} />
+    )
+  }
 </Tag>

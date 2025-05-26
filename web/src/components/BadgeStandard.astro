@@ -8,11 +8,12 @@ import type { Polymorphic } from 'astro/types'
 type Props<Tag extends 'a' | 'div' | 'li' = 'div'> = Polymorphic<{
   as: Tag
   icon: string
+  endIcon?: string
   text: string
   inlineIcon?: boolean
 }>
 
-const { icon, text, class: className, inlineIcon, as: Tag = 'div', ...divProps } = Astro.props
+const { icon, text, class: className, inlineIcon, endIcon, as: Tag = 'div', ...divProps } = Astro.props
 ---
 
 <Tag
@@ -24,4 +25,5 @@ const { icon, text, class: className, inlineIcon, as: Tag = 'div', ...divProps }
 >
   <Icon name={icon} class="size-4" is:inline={inlineIcon} />
   <span>{text}</span>
+  {!!endIcon && <Icon name={endIcon} class="size-4" is:inline={inlineIcon} />}
 </Tag>

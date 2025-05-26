@@ -43,7 +43,7 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
               : Array.from({ length: icons.length }, () => option.iconClassName)
             : []
           return (
-            <label class="hover:bg-night-500 flex cursor-pointer items-center gap-2 px-5 py-1">
+            <label class="hover:bg-night-500 flex cursor-pointer items-center gap-2 px-5 py-1 has-checked:bg-green-800/20 has-checked:hover:bg-green-800/30">
               <input
                 transition:persist
                 type="checkbox"

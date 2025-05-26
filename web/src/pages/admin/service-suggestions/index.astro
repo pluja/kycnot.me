@@ -4,6 +4,7 @@ import { actions } from 'astro:actions'
 import { z } from 'astro:content'
 import { orderBy } from 'lodash-es'
 
+import BadgeSmall from '../../../components/BadgeSmall.astro'
 import Button from '../../../components/Button.astro'
 import SortArrowIcon from '../../../components/SortArrowIcon.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
@@ -12,59 +13,67 @@ import UserBadge from '../../../components/UserBadge.astro'
 import {
   getServiceSuggestionStatusInfo,
   serviceSuggestionStatuses,
+  serviceSuggestionStatusesZodEnumBySlug,
+  serviceSuggestionStatusSlugToId,
 } from '../../../constants/serviceSuggestionStatus'
+import {
+  getServiceSuggestionTypeInfo,
+  serviceSuggestionTypes,
+  serviceSuggestionTypeSlugToId,
+  serviceSuggestionTypesZodEnumBySlug,
+} from '../../../constants/serviceSuggestionType'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
 import { prisma } from '../../../lib/prisma'
 import { makeLoginUrl } from '../../../lib/redirectUrls'
 
-import type { Prisma, ServiceSuggestionStatus } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 
 const user = Astro.locals.user
 if (!user?.admin) {
   return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Admin access required' }))
 }
 
-const search = Astro.url.searchParams.get('search') ?? ''
-const statusEnumValues = serviceSuggestionStatuses.map((s) => s.value) as [string, ...string[]]
-const statusParam = Astro.url.searchParams.get('status')
-const statusFilter = z
-  .enum(statusEnumValues)
-  .nullable()
-  .parse(statusParam === '' ? null : statusParam) as ServiceSuggestionStatus | null
-
 const { data: filters } = zodParseQueryParamsStoringErrors(
   {
-    'sort-by': z.enum(['service', 'status', 'user', 'createdAt', 'messageCount']).default('createdAt'),
+    search: z.string().optional(),
+    status: serviceSuggestionStatusesZodEnumBySlug
+      .transform((slug) => serviceSuggestionStatusSlugToId(slug))
+      .optional(),
+    type: serviceSuggestionTypesZodEnumBySlug
+      .transform((slug) => serviceSuggestionTypeSlugToId(slug))
+      .optional(),
+    'sort-by': z
+      .enum(['service', 'status', 'type', 'user', 'createdAt', 'messageCount'])
+      .default('createdAt'),
     'sort-order': z.enum(['asc', 'desc']).default('desc'),
   },
   Astro
 )
 
-const sortBy = filters['sort-by']
-const sortOrder = filters['sort-order']
-
 let prismaOrderBy: Prisma.ServiceSuggestionOrderByWithRelationInput = { createdAt: 'desc' }
-if (sortBy === 'createdAt') {
-  prismaOrderBy = { createdAt: sortOrder }
+if (filters['sort-by'] === 'createdAt') {
+  prismaOrderBy = { createdAt: filters['sort-order'] }
 }
 
 let suggestions = await prisma.serviceSuggestion.findMany({
   where: {
-    ...(search
+    ...(filters.search
       ? {
           OR: [
-            { service: { name: { contains: search, mode: 'insensitive' } } },
-            { user: { name: { contains: search, mode: 'insensitive' } } },
-            { notes: { contains: search, mode: 'insensitive' } },
+            { service: { name: { contains: filters.search, mode: 'insensitive' } } },
+            { user: { name: { contains: filters.search, mode: 'insensitive' } } },
+            { notes: { contains: filters.search, mode: 'insensitive' } },
           ],
         }
       : {}),
-    status: statusFilter ?? undefined,
+    status: filters.status,
+    type: filters.type,
   },
   orderBy: prismaOrderBy,
   select: {
     id: true,
+    type: true,
     status: true,
     notes: true,
     createdAt: true,
@@ -119,18 +128,33 @@ let suggestions = await prisma.serviceSuggestion.findMany({
 let suggestionsWithDetails = suggestions.map((s) => ({
   ...s,
   statusInfo: getServiceSuggestionStatusInfo(s.status),
+  typeInfo: getServiceSuggestionTypeInfo(s.type),
   messageCount: s._count.messages,
   lastMessage: s.messages[0],
 }))
 
-if (sortBy === 'service') {
-  suggestionsWithDetails = orderBy(suggestionsWithDetails, [(s) => s.service.name.toLowerCase()], [sortOrder])
-} else if (sortBy === 'status') {
-  suggestionsWithDetails = orderBy(suggestionsWithDetails, [(s) => s.statusInfo.label], [sortOrder])
-} else if (sortBy === 'user') {
-  suggestionsWithDetails = orderBy(suggestionsWithDetails, [(s) => s.user.name.toLowerCase()], [sortOrder])
-} else if (sortBy === 'messageCount') {
-  suggestionsWithDetails = orderBy(suggestionsWithDetails, ['messageCount'], [sortOrder])
+if (filters['sort-by'] === 'service') {
+  suggestionsWithDetails = orderBy(
+    suggestionsWithDetails,
+    [(s) => s.service.name.toLowerCase()],
+    [filters['sort-order']]
+  )
+} else if (filters['sort-by'] === 'status') {
+  suggestionsWithDetails = orderBy(
+    suggestionsWithDetails,
+    [(s) => s.statusInfo.label],
+    [filters['sort-order']]
+  )
+} else if (filters['sort-by'] === 'type') {
+  suggestionsWithDetails = orderBy(suggestionsWithDetails, [(s) => s.typeInfo.label], [filters['sort-order']])
+} else if (filters['sort-by'] === 'user') {
+  suggestionsWithDetails = orderBy(
+    suggestionsWithDetails,
+    [(s) => s.user.name.toLowerCase()],
+    [filters['sort-order']]
+  )
+} else if (filters['sort-by'] === 'messageCount') {
+  suggestionsWithDetails = orderBy(suggestionsWithDetails, ['messageCount'], [filters['sort-order']])
 }
 
 const suggestionCount = suggestionsWithDetails.length
@@ -162,7 +186,7 @@ const makeSortUrl = (slug: string) => {
           type="text"
           name="search"
           id="search"
-          value={search}
+          value={filters.search}
           placeholder="Search by service, user, notes..."
           class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
         />
@@ -177,8 +201,25 @@ const makeSortUrl = (slug: string) => {
           <option value="">All Statuses</option>
           {
             serviceSuggestionStatuses.map((status) => (
-              <option value={status.value} selected={statusFilter === status.value}>
+              <option value={status.slug} selected={filters.status === status.value}>
                 {status.label}
+              </option>
+            ))
+          }
+        </select>
+      </div>
+      <div>
+        <label for="type-filter" class="block text-xs font-medium text-zinc-400">Type</label>
+        <select
+          name="type"
+          id="type-filter"
+          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+        >
+          <option value="">All Types</option>
+          {
+            serviceSuggestionTypes.map((type) => (
+              <option value={type.slug} selected={filters.type === type.value}>
+                {type.label}
               </option>
             ))
           }
@@ -212,7 +253,7 @@ const makeSortUrl = (slug: string) => {
           <thead class="bg-zinc-900/30">
             <tr>
               <th
-                class="w-[25%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+                class="w-[20%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
               >
                 <a href={makeSortUrl('service')} class="flex items-center hover:text-zinc-200">
                   Service <SortArrowIcon
@@ -222,7 +263,7 @@ const makeSortUrl = (slug: string) => {
                 </a>
               </th>
               <th
-                class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+                class="w-[12%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
               >
                 <a href={makeSortUrl('user')} class="flex items-center hover:text-zinc-200">
                   User <SortArrowIcon
@@ -232,7 +273,17 @@ const makeSortUrl = (slug: string) => {
                 </a>
               </th>
               <th
-                class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+                class="w-[10%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
+              >
+                <a href={makeSortUrl('type')} class="flex items-center hover:text-zinc-200">
+                  Type <SortArrowIcon
+                    active={filters['sort-by'] === 'type'}
+                    sortOrder={filters['sort-order']}
+                  />
+                </a>
+              </th>
+              <th
+                class="w-[13%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase"
               >
                 <a href={makeSortUrl('status')} class="flex items-center hover:text-zinc-200">
                   Status <SortArrowIcon
@@ -294,6 +345,13 @@ const makeSortUrl = (slug: string) => {
                   </td>
                   <td class="px-4 py-3">
                     <UserBadge user={suggestion.user} size="md" />
+                  </td>
+                  <td class="px-4 py-3">
+                    <BadgeSmall
+                      color={suggestion.typeInfo.color}
+                      text={suggestion.typeInfo.label}
+                      icon={suggestion.typeInfo.icon}
+                    />
                   </td>
                   <td class="px-4 py-3">
                     <form method="POST" action={actions.admin.serviceSuggestions.update}>
