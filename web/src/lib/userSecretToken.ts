@@ -50,7 +50,7 @@ const USER_SECRET_TOKEN_DEV_USERS_REGEX = (() => {
   }[]
 
   const env =
-    // This file can also be called from faker.ts, where import.meta.env is not available
+    // This file can also be called from seed.ts, where import.meta.env is not available
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     (import.meta.env
       ? Object.fromEntries(specialUsersData.map(({ envToken }) => [envToken, import.meta.env[envToken]]))

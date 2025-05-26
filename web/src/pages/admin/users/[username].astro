@@ -1,5 +1,6 @@
 ---
 import { Icon } from 'astro-icon/components'
+import { Markdown } from 'astro-remote'
 import { actions, isInputError } from 'astro:actions'
 
 import BadgeSmall from '../../../components/BadgeSmall.astro'
@@ -304,8 +305,8 @@ if (!user) return Astro.rewrite('/404')
                 </div>
               </div>
 
-              <div data-note-content>
-                <p class="text-day-200 wrap-anywhere whitespace-pre-wrap" set:text={note.content} />
+              <div data-note-content class="prose prose-sm text-day-200 prose-invert max-w-none text-pretty">
+                <Markdown content={note.content} />
               </div>
 
               <form

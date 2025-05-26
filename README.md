@@ -23,8 +23,7 @@ cd web
 nvm install
 npm i
 cp -n .env.example .env
-npm run db-push
-npm run db-fill-clean
+npm run db-reset
 ```
 
 Now open the [.env](web/.env) file and fill in the missing values.

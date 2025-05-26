@@ -16,6 +16,8 @@ import DropdownButton from '../../components/DropdownButton.astro'
 import DropdownButtonItemForm from '../../components/DropdownButtonItemForm.astro'
 import DropdownButtonItemLink from '../../components/DropdownButtonItemLink.astro'
 import FormatTimeInterval from '../../components/FormatTimeInterval.astro'
+import InputSubmitButton from '../../components/InputSubmitButton.astro'
+import InputTextArea from '../../components/InputTextArea.astro'
 import MyPicture from '../../components/MyPicture.astro'
 import { makeOgImageUrl, type OgImageAllTemplatesWithProps } from '../../components/OgImage'
 import ScoreGauge from '../../components/ScoreGauge.astro'
@@ -23,6 +25,7 @@ import ScoreSquare from '../../components/ScoreSquare.astro'
 import ServiceLinkButton from '../../components/ServiceLinkButton.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import Tooltip from '../../components/Tooltip.astro'
+import UserBadge from '../../components/UserBadge.astro'
 import VerificationWarningBanner from '../../components/VerificationWarningBanner.astro'
 import { getAttributeCategoryInfo } from '../../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../../constants/attributeTypes'
@@ -158,6 +161,21 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
               createdAt: true,
               updatedAt: true,
             },
+          },
+          internalNotes: {
+            select: {
+              id: true,
+              content: true,
+              createdAt: true,
+              addedByUser: {
+                select: {
+                  name: true,
+                  displayName: true,
+                  picture: true,
+                },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
           },
           _count: {
             select: {
@@ -748,6 +766,61 @@ const serviceVisibilityInfo = getServiceVisibilityInfo(service.serviceVisibility
       </ul>
     )
   }
+
+  <AdminOnly>
+    <div class="border-day-500 mt-6 mb-3 flex items-center justify-between border-b">
+      <h2 class="font-title text-day-100 text-lg font-bold">Internal Notes</h2>
+      <a
+        href={`/admin/services/${service.slug}/edit#internal-notes`}
+        class="text-day-500 hover:text-day-200 inline-flex items-center gap-1 text-xs leading-none transition-colors hover:underline"
+      >
+        Manage
+        <Icon name="ri:arrow-right-s-line" class="size-4" />
+      </a>
+    </div>
+
+    {
+      service.internalNotes.length === 0 ? (
+        <p class="text-day-400 mt-2 text-center text-xs">No internal notes yet.</p>
+      ) : (
+        <div
+          class={cn(
+            'grid grid-cols-1 items-start gap-2',
+            service.internalNotes.length > 1 && 'sm:grid-cols-2'
+          )}
+        >
+          {service.internalNotes.map((note) => (
+            <div class="border-night-600 bg-night-800 rounded-lg border p-3">
+              <div class="prose text-day-200 prose-sm prose-invert max-w-none text-pretty">
+                <Markdown content={note.content} />
+              </div>
+
+              <div class="text-day-500 mt-2 flex items-center gap-1 text-xs">
+                <TimeFormatted date={note.createdAt} hourPrecision />
+                {note.addedByUser && (
+                  <span class="flex items-center gap-1">
+                    by <UserBadge user={note.addedByUser} size="sm" />
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    <form
+      method="POST"
+      action={actions.admin.service.internalNote.add}
+      data-note-edit-form
+      class="mt-4 space-y-4"
+    >
+      <input type="hidden" name="serviceId" value={service.id} />
+
+      <InputTextArea label="Add a note" name="content" />
+      <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
+    </form>
+  </AdminOnly>
 
   <h2 class="font-title border-day-500 text-day-200 mt-6 mb-3 border-b text-lg font-bold" id="scores">
     Scores

@@ -31,10 +31,16 @@ const serviceSchemaBase = z.object({
   verificationSummary: z.string().optional().nullable().default(null),
   verificationProofMd: z.string().optional().nullable().default(null),
   acceptedCurrencies: z.array(z.nativeEnum(Currency)),
-  referral: z.string().optional().nullable().default(null),
+  referral: z
+    .string()
+    .regex(/^(\?\w+=.|\/.+)/, 'Referral must be a valid URL parameter or path, not a full URL')
+    .optional()
+    .nullable()
+    .default(null),
   imageFile: imageFileSchema,
   overallScore: zodCohercedNumber(z.number().int().min(0).max(10)).optional(),
   serviceVisibility: z.nativeEnum(ServiceVisibility),
+  internalNote: z.string().optional(),
 })
 
 const addSlugIfMissing = <
@@ -61,7 +67,7 @@ export const adminServiceActions = {
     accept: 'form',
     permissions: 'admin',
     input: serviceSchemaBase.omit({ id: true }).transform(addSlugIfMissing),
-    handler: async (input) => {
+    handler: async (input, context) => {
       const existing = await prisma.service.findUnique({
         where: {
           slug: input.slug,
@@ -75,12 +81,26 @@ export const adminServiceActions = {
         })
       }
 
-      const { imageFile, ...serviceData } = input
-      const imageUrl = imageFile ? await saveFileLocally(imageFile, imageFile.name) : undefined
+      const imageUrl = input.imageFile
+        ? await saveFileLocally(input.imageFile, input.imageFile.name)
+        : undefined
 
       const service = await prisma.service.create({
         data: {
-          ...serviceData,
+          name: input.name,
+          description: input.description,
+          serviceUrls: input.serviceUrls,
+          tosUrls: input.tosUrls,
+          onionUrls: input.onionUrls,
+          kycLevel: input.kycLevel,
+          verificationStatus: input.verificationStatus,
+          verificationSummary: input.verificationSummary,
+          verificationProofMd: input.verificationProofMd,
+          acceptedCurrencies: input.acceptedCurrencies,
+          referral: input.referral,
+          serviceVisibility: input.serviceVisibility,
+          slug: input.slug,
+          overallScore: input.overallScore,
           categories: {
             connect: input.categories.map((id) => ({ id })),
           },
@@ -92,6 +112,14 @@ export const adminServiceActions = {
             })),
           },
           imageUrl,
+          internalNotes: input.internalNote
+            ? {
+                create: {
+                  content: input.internalNote,
+                  addedByUserId: context.locals.user.id,
+                },
+              }
+            : undefined,
         },
         select: {
           id: true,
@@ -112,31 +140,28 @@ export const adminServiceActions = {
       })
       .transform(addSlugIfMissing),
     handler: async (input) => {
-      const { id, categories, attributes, imageFile, removeImage, ...data } = input
-
-      const existing = await prisma.service.findUnique({
+      const anotherServiceWithNewSlug = await prisma.service.findUnique({
         where: {
           slug: input.slug,
-          NOT: { id },
+          NOT: { id: input.id },
         },
       })
 
-      if (existing) {
+      if (anotherServiceWithNewSlug) {
         throw new ActionError({
           code: 'CONFLICT',
           message: 'A service with this slug already exists',
         })
       }
 
-      const imageUrl = removeImage
+      const imageUrl = input.removeImage
         ? null
-        : imageFile
-          ? await saveFileLocally(imageFile, imageFile.name)
+        : input.imageFile
+          ? await saveFileLocally(input.imageFile, input.imageFile.name)
           : undefined
 
-      // Get existing attributes and categories to compute differences
       const existingService = await prisma.service.findUnique({
-        where: { id },
+        where: { id: input.id },
         include: {
           categories: true,
           attributes: {
@@ -154,96 +179,191 @@ export const adminServiceActions = {
         })
       }
 
-      // Find categories to connect and disconnect
       const existingCategoryIds = existingService.categories.map((c) => c.id)
-      const categoriesToAdd = categories.filter((cId) => !existingCategoryIds.includes(cId))
-      const categoriesToRemove = existingCategoryIds.filter((cId) => !categories.includes(cId))
+      const categoriesToAdd = input.categories.filter((cId) => !existingCategoryIds.includes(cId))
+      const categoriesToRemove = existingCategoryIds.filter((cId) => !input.categories.includes(cId))
 
-      // Find attributes to connect and disconnect
       const existingAttributeIds = existingService.attributes.map((a) => a.attributeId)
-      const attributesToAdd = attributes.filter((aId) => !existingAttributeIds.includes(aId))
-      const attributesToRemove = existingAttributeIds.filter((aId) => !attributes.includes(aId))
+      const attributesToAdd = input.attributes.filter((aId) => !existingAttributeIds.includes(aId))
+      const attributesToRemove = existingAttributeIds.filter((aId) => !input.attributes.includes(aId))
 
       const service = await prisma.service.update({
-        where: { id },
+        where: { id: input.id },
         data: {
-          ...data,
+          name: input.name,
+          description: input.description,
+          serviceUrls: input.serviceUrls,
+          tosUrls: input.tosUrls,
+          onionUrls: input.onionUrls,
+          kycLevel: input.kycLevel,
+          verificationStatus: input.verificationStatus,
+          verificationSummary: input.verificationSummary,
+          verificationProofMd: input.verificationProofMd,
+          acceptedCurrencies: input.acceptedCurrencies,
+          referral: input.referral,
+          serviceVisibility: input.serviceVisibility,
+          slug: input.slug,
+          overallScore: input.overallScore,
+
           imageUrl,
           categories: {
             connect: categoriesToAdd.map((id) => ({ id })),
             disconnect: categoriesToRemove.map((id) => ({ id })),
           },
           attributes: {
-            // Connect new attributes
             create: attributesToAdd.map((attributeId) => ({
               attribute: {
                 connect: { id: attributeId },
               },
             })),
-            // Delete specific attributes that are no longer needed
+
             deleteMany: attributesToRemove.map((attributeId) => ({
               attributeId,
             })),
           },
         },
       })
+
       return { service }
     },
   }),
 
-  createContactMethod: defineProtectedAction({
-    accept: 'form',
-    permissions: 'admin',
-    input: z.object({
-      label: z.string().min(1).max(50).nullable(),
-      value: z.string().url(),
-      serviceId: z.number().int().positive(),
+  contactMethod: {
+    add: defineProtectedAction({
+      accept: 'form',
+      permissions: 'admin',
+      input: z.object({
+        label: z.string().min(1).max(50).nullable(),
+        value: z.string().url(),
+        serviceId: z.number().int().positive(),
+      }),
+      handler: async (input) => {
+        const contactMethod = await prisma.serviceContactMethod.create({
+          data: {
+            label: input.label,
+            value: input.value,
+            serviceId: input.serviceId,
+          },
+        })
+        return { contactMethod }
+      },
     }),
-    handler: async (input) => {
-      const contactMethod = await prisma.serviceContactMethod.create({
-        data: {
-          label: input.label,
-          value: input.value,
-          serviceId: input.serviceId,
-        },
-      })
-      return { contactMethod }
-    },
-  }),
 
-  updateContactMethod: defineProtectedAction({
-    accept: 'form',
-    permissions: 'admin',
-    input: z.object({
-      id: z.number().int().positive(),
-      label: z.string().min(1).max(50).nullable(),
-      value: z.string().url(),
-      serviceId: z.number().int().positive(),
+    update: defineProtectedAction({
+      accept: 'form',
+      permissions: 'admin',
+      input: z.object({
+        id: z.number().int().positive(),
+        label: z.string().min(1).max(50).nullable(),
+        value: z.string().url(),
+        serviceId: z.number().int().positive(),
+      }),
+      handler: async (input) => {
+        const contactMethod = await prisma.serviceContactMethod.update({
+          where: { id: input.id },
+          data: {
+            label: input.label,
+            value: input.value,
+            serviceId: input.serviceId,
+          },
+        })
+        return { contactMethod }
+      },
     }),
-    handler: async (input) => {
-      const contactMethod = await prisma.serviceContactMethod.update({
-        where: { id: input.id },
-        data: {
-          label: input.label,
-          value: input.value,
-          serviceId: input.serviceId,
-        },
-      })
-      return { contactMethod }
-    },
-  }),
 
-  deleteContactMethod: defineProtectedAction({
-    accept: 'form',
-    permissions: 'admin',
-    input: z.object({
-      id: z.number().int().positive(),
+    delete: defineProtectedAction({
+      accept: 'form',
+      permissions: 'admin',
+      input: z.object({
+        id: z.number().int().positive(),
+      }),
+      handler: async (input) => {
+        await prisma.serviceContactMethod.delete({
+          where: { id: input.id },
+        })
+        return { success: true }
+      },
     }),
-    handler: async (input) => {
-      await prisma.serviceContactMethod.delete({
-        where: { id: input.id },
-      })
-      return { success: true }
-    },
-  }),
+  },
+
+  internalNote: {
+    add: defineProtectedAction({
+      accept: 'form',
+      permissions: 'admin',
+      input: z.object({
+        serviceId: z.number().int().positive(),
+        content: z.string().min(1),
+      }),
+      handler: async (input, { locals }) => {
+        const service = await prisma.service.findUnique({
+          where: { id: input.serviceId },
+        })
+
+        if (!service) {
+          throw new ActionError({
+            code: 'NOT_FOUND',
+            message: 'Service not found',
+          })
+        }
+
+        await prisma.internalServiceNote.create({
+          data: {
+            content: input.content,
+            serviceId: input.serviceId,
+            addedByUserId: locals.user.id,
+          },
+        })
+      },
+    }),
+
+    update: defineProtectedAction({
+      accept: 'form',
+      permissions: 'admin',
+      input: z.object({
+        noteId: z.number().int().positive(),
+        content: z.string().min(1),
+      }),
+      handler: async (input) => {
+        const note = await prisma.internalServiceNote.findUnique({
+          where: { id: input.noteId },
+        })
+
+        if (!note) {
+          throw new ActionError({
+            code: 'NOT_FOUND',
+            message: 'Note not found',
+          })
+        }
+
+        await prisma.internalServiceNote.update({
+          where: { id: input.noteId },
+          data: { content: input.content },
+        })
+      },
+    }),
+
+    delete: defineProtectedAction({
+      accept: 'form',
+      permissions: 'admin',
+      input: z.object({
+        noteId: z.number().int().positive(),
+      }),
+      handler: async (input) => {
+        const note = await prisma.internalServiceNote.findUnique({
+          where: { id: input.noteId },
+        })
+
+        if (!note) {
+          throw new ActionError({
+            code: 'NOT_FOUND',
+            message: 'Note not found',
+          })
+        }
+
+        await prisma.internalServiceNote.delete({
+          where: { id: input.noteId },
+        })
+      },
+    }),
+  },
 }

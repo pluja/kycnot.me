@@ -1,5 +1,6 @@
 ---
 import { Icon } from 'astro-icon/components'
+import { Markdown } from 'astro-remote'
 import { actions } from 'astro:actions'
 import { sortBy } from 'lodash-es'
 
@@ -525,7 +526,9 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                     <TimeFormatted date={note.createdAt} hourPrecision />
                   </span>
                 </div>
-                <div class="text-day-200 wrap-anywhere whitespace-pre-wrap" set:text={note.content} />
+                <div class="prose text-day-200 prose-sm prose-invert max-w-none text-pretty">
+                  <Markdown content={note.content} />
+                </div>
               </div>
             ))}
           </div>

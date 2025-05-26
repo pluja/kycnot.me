@@ -16,8 +16,8 @@ export const zodCohercedNumber = (zodPipe?: ZodTypeAny) =>
 export const zodUrlOptionalProtocol = z.preprocess(
   (input) => {
     if (typeof input !== 'string') return input
-    const trimmedVal = input.trim()
-    return !/^\w+:\/\//i.test(trimmedVal) ? `https://${trimmedVal}` : trimmedVal
+    const cleanInput = input.trim().replace(/\/$/, '')
+    return !/^\w+:\/\//i.test(cleanInput) ? `https://${cleanInput}` : cleanInput
   },
   z.string().refine((value) => /^(https?):\/\/(?=.*\.[a-z]{2,})[^\s$.?#].[^\s]*$/i.test(value), {
     message: 'Invalid URL',

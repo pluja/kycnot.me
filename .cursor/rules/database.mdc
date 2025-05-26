@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 - We use Prisma as ORM.
 - Remember to check the prisma schema [schema.prisma](mdc:web/prisma/schema.prisma) when doing things related to the database.
-- After making changes to the [schema.prisma](mdc:web/prisma/schema.prisma) database or [faker.ts](mdc:web/scripts/faker.ts), you can run `npm run db-reset` (from `/web/` folder) [package.json](mdc:web/package.json).
+- After making changes to the [schema.prisma](mdc:web/prisma/schema.prisma) database or [seed.ts](mdc:web/prisma/seed.ts), you run `npm run db-reset` (from `/web/` folder) [package.json](mdc:web/package.json). And never do the migrations manually.
 - Import the types from prisma instead of hardcoding duplicates. Specially use the Prisma.___GetPayload type and the enums. Like this:
     ```ts
     type Props = {
@@ -52,4 +52,4 @@ const [user, services] = await Astro.locals.banners.tryMany([
   ],
 ])
 ```
-- When editing the database, remember to edit the db seeding file [faker.ts](mdc:web/scripts/faker.ts) to generate data for the new schema.
+- When editing the database, remember to edit the db seeding file [seed.ts](mdc:web/prisma/seed.ts) to generate data for the new schema.

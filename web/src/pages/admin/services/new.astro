@@ -350,18 +350,38 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
       </div>
 
       <div>
-        <label class="font-title mb-2 block text-sm text-green-500" for="referral">referral</label>
+        <label class="font-title mb-2 block text-sm text-green-500" for="referral">referral link path</label>
         <input
           transition:persist
           type="text"
           name="referral"
           id="referral"
-          placeholder="Optional referral code/link"
+          placeholder="e.g. ?ref=123 or /ref/123"
           class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
         />
         {
           inputErrors.referral && (
             <p class="font-title mt-1 text-sm text-red-500">{inputErrors.referral.join(', ')}</p>
+          )
+        }
+      </div>
+
+      <div>
+        <label for="internalNote" class="font-title mb-2 block text-sm text-green-500">internalNote</label>
+        <div class="space-y-2">
+          <textarea
+            transition:persist
+            name="internalNote"
+            id="internalNote"
+            rows={4}
+            placeholder="Markdown supported"
+            class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
+            set:text=""
+          />
+        </div>
+        {
+          inputErrors.internalNote && (
+            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.internalNote.join(', ')}</p>
           )
         }
       </div>

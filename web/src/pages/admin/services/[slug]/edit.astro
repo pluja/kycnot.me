@@ -1,5 +1,6 @@
 ---
 import { Icon } from 'astro-icon/components'
+import { Markdown } from 'astro-remote'
 import { actions, isInputError } from 'astro:actions'
 import { orderBy } from 'lodash-es'
 
@@ -76,6 +77,15 @@ const verificationStepUpdateInputErrors = isInputError(verificationStepUpdateRes
 const verificationStepDeleteResult = Astro.getActionResult(actions.admin.verificationStep.delete)
 Astro.locals.banners.addIfSuccess(verificationStepDeleteResult, 'Verification step deleted successfully')
 
+const internalNoteCreateResult = Astro.getActionResult(actions.admin.service.internalNote.add)
+Astro.locals.banners.addIfSuccess(internalNoteCreateResult, 'Internal note added successfully')
+const internalNoteInputErrors = isInputError(internalNoteCreateResult?.error)
+  ? internalNoteCreateResult.error.fields
+  : {}
+
+const internalNoteDeleteResult = Astro.getActionResult(actions.admin.service.internalNote.delete)
+Astro.locals.banners.addIfSuccess(internalNoteDeleteResult, 'Internal note deleted successfully')
+
 const [service, categories, attributes] = await Astro.locals.banners.tryMany([
   [
     'Error fetching service',
@@ -128,6 +138,20 @@ const [service, categories, attributes] = await Astro.locals.banners.tryMany([
           contactMethods: {
             orderBy: {
               label: 'asc',
+            },
+          },
+          internalNotes: {
+            include: {
+              addedByUser: {
+                select: {
+                  name: true,
+                  displayName: true,
+                  picture: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: 'desc',
             },
           },
           _count: {
@@ -290,13 +314,14 @@ if (!service) return Astro.rewrite('/404')
         </div>
 
         <InputText
-          label="Referral Code/Link"
+          label="Referral link path"
           name="referral"
           inputProps={{
-            value: service.referral ?? undefined,
-            placeholder: 'e.g., REFCODE123 or https://example.com?ref=123',
+            value: service.referral,
+            placeholder: 'e.g. ?ref=123 or /ref/123',
           }}
           error={serviceInputErrors.referral}
+          description="Will be appended to the service URL"
         />
 
         <div class="flex items-center justify-between gap-2">
@@ -446,6 +471,108 @@ if (!service) return Astro.rewrite('/404')
 
         <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
       </form>
+    </FormSection>
+
+    <FormSection title="Internal Notes" id="internal-notes">
+      <FormSubSection title="Existing Notes">
+        {
+          service.internalNotes.length === 0 ? (
+            <p class="border-night-600 bg-night-800 text-day-300 rounded-xl border p-6 text-center">
+              No internal notes yet.
+            </p>
+          ) : (
+            <div class="space-y-4">
+              {service.internalNotes.map((note) => (
+                <div class="border-night-600 bg-night-800 rounded-md border p-4">
+                  <input
+                    type="checkbox"
+                    class="peer/edit-note sr-only"
+                    data-edit-note-checkbox
+                    id={`edit-note-${note.id}`}
+                  />
+
+                  <div class="flex items-start justify-between">
+                    <div class="flex-grow space-y-1">
+                      <div
+                        data-note-content
+                        class="prose text-day-200 prose-sm prose-invert max-w-none text-pretty"
+                      >
+                        <Markdown content={note.content} />
+                      </div>
+                      <div class="text-day-500 flex items-center gap-2 text-xs">
+                        <TimeFormatted date={note.createdAt} hourPrecision />
+                        {note.addedByUser && (
+                          <span class="flex items-center gap-1">
+                            by <UserBadge user={note.addedByUser} size="sm" />
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div class="flex items-center gap-1">
+                      <Button
+                        as="label"
+                        for={`edit-note-${note.id}`}
+                        variant="faded"
+                        size="sm"
+                        icon="ri:edit-line"
+                        iconOnly
+                        label="Edit"
+                      />
+
+                      <form method="POST" action={actions.admin.service.internalNote.delete} class="contents">
+                        <input type="hidden" name="noteId" value={note.id} />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="faded"
+                          icon="ri:delete-bin-line"
+                          iconOnly
+                          label="Delete"
+                        />
+                      </form>
+                    </div>
+                  </div>
+
+                  <form
+                    method="POST"
+                    action={actions.admin.service.internalNote.update}
+                    data-note-edit-form
+                    data-astro-reload
+                    class="mt-4 hidden space-y-4 peer-checked/edit-note:block"
+                  >
+                    <input type="hidden" name="noteId" value={note.id} />
+                    <InputTextArea
+                      label="Note Content"
+                      name="content"
+                      value={note.content}
+                      inputProps={{ class: 'bg-night-700' }}
+                    />
+                    <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
+                  </form>
+                </div>
+              ))}
+            </div>
+          )
+        }
+      </FormSubSection>
+
+      <FormSubSection title="Add New Note">
+        <form method="POST" action={actions.admin.service.internalNote.add} class="space-y-4">
+          <input type="hidden" name="serviceId" value={service.id} />
+          <InputTextArea
+            label="Note Content"
+            name="content"
+            inputProps={{
+              required: true,
+              rows: 4,
+              placeholder: 'Add internal note about this service...',
+            }}
+            error={internalNoteInputErrors.content}
+          />
+          <InputSubmitButton label="Add Note" icon="ri:add-line" hideCancel />
+        </form>
+      </FormSubSection>
     </FormSection>
 
     <FormSection title="Events">
@@ -898,7 +1025,7 @@ if (!service) return Astro.rewrite('/404')
                         <Tooltip text="Delete">
                           <form
                             method="POST"
-                            action={actions.admin.service.deleteContactMethod}
+                            action={actions.admin.service.contactMethod.delete}
                             class="contents"
                           >
                             <input type="hidden" name="id" value={method.id} />
@@ -919,7 +1046,7 @@ if (!service) return Astro.rewrite('/404')
                     <form
                       id={`edit-contact-method-${method.id}`}
                       method="POST"
-                      action={actions.admin.service.updateContactMethod}
+                      action={actions.admin.service.contactMethod.update}
                       class="border-night-500 bg-night-700 mt-3 hidden space-y-3 rounded-md border p-3"
                     >
                       <input type="hidden" name="id" value={method.id} />
@@ -954,7 +1081,7 @@ if (!service) return Astro.rewrite('/404')
       </FormSubSection>
 
       <FormSubSection title="Add New Contact Method">
-        <form method="POST" action={actions.admin.service.createContactMethod} class="space-y-2">
+        <form method="POST" action={actions.admin.service.contactMethod.add} class="space-y-2">
           <input type="hidden" name="serviceId" value={service.id} />
 
           <InputText label="Override Label" name="label" />

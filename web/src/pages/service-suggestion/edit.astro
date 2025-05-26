@@ -53,6 +53,7 @@ const service = await Astro.locals.banners.try(
             icon: true,
           },
         },
+        serviceVisibility: true,
       },
       where: { id: params.serviceId },
     }),
@@ -101,7 +102,7 @@ if (!service) return Astro.rewrite('/404')
       error={inputErrors.notes}
     />
 
-    <Captcha action={actions.serviceSuggestion.createService} />
+    <Captcha action={actions.serviceSuggestion.editService} />
 
     <InputHoneypotTrap name="message" />
 

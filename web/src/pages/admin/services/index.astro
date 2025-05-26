@@ -111,6 +111,7 @@ const services = await Astro.locals.banners.try(
         _count: {
           select: {
             verificationRequests: true,
+            internalNotes: true,
           },
         },
       },
@@ -440,9 +441,18 @@ const truncate = (text: string, length: number) => {
                     </div>
                   </td>
                   <td class="px-4 py-3 text-center">
-                    <span class="inline-flex items-center rounded-full bg-orange-900/30 px-2.5 py-0.5 text-xs text-orange-400">
-                      {service._count.verificationRequests}
-                    </span>
+                    <div class="flex flex-col items-center justify-center gap-1">
+                      <span class="inline-flex items-center rounded-full bg-orange-900/30 px-2.5 py-0.5 text-xs text-orange-400">
+                        {service._count.verificationRequests}
+                      </span>
+
+                      {service._count.internalNotes > 0 && (
+                        <span class="inline-flex items-center text-purple-400">
+                          <Icon name="ri:sticky-note-line" class="mr-0.5 size-4" />
+                          {service._count.internalNotes}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td class="px-4 py-3 text-center text-xs text-zinc-400">{service.formattedDate}</td>
                   <td class="px-4 py-3 text-right">

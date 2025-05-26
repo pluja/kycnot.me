@@ -377,6 +377,7 @@ model Service {
   attributes             ServiceAttribute[]
   verificationSteps      VerificationStep[]
   suggestions            ServiceSuggestion[]
+  internalNotes          InternalServiceNote[]        @relation("ServiceRecievedNotes")
 
   onEventCreatedForServices       NotificationPreferences[] @relation("onEventCreatedForServices")
   onRootCommentCreatedForServices NotificationPreferences[] @relation("onRootCommentCreatedForServices")
@@ -442,6 +443,7 @@ model Attribute {
 
 model InternalUserNote {
   id        Int      @id @default(autoincrement())
+  /// Markdown
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
@@ -452,6 +454,23 @@ model InternalUserNote {
   addedByUserId Int?
 
   @@index([userId])
+  @@index([addedByUserId])
+  @@index([createdAt])
+}
+
+model InternalServiceNote {
+  id        Int      @id @default(autoincrement())
+  /// Markdown
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  service       Service @relation("ServiceRecievedNotes", fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId     Int
+  addedByUser   User?   @relation("UserAddedServiceNotes", fields: [addedByUserId], references: [id], onDelete: SetNull)
+  addedByUserId Int?
+
+  @@index([serviceId])
   @@index([addedByUserId])
   @@index([createdAt])
 }
@@ -482,6 +501,7 @@ model User {
   suggestionMessages       ServiceSuggestionMessage[]
   internalNotes            InternalUserNote[]           @relation("UserRecievedNotes")
   addedInternalNotes       InternalUserNote[]           @relation("UserAddedNotes")
+  addedServiceNotes        InternalServiceNote[]        @relation("UserAddedServiceNotes")
   verificationRequests     ServiceVerificationRequest[]
   notifications            Notification[]               @relation("NotificationOwner")
   notificationPreferences  NotificationPreferences?

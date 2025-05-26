@@ -1,4 +1,6 @@
 import crypto from 'crypto'
+import { execSync } from 'node:child_process'
+import { parseArgs } from 'node:util'
 
 import { faker } from '@faker-js/faker'
 import {
@@ -10,12 +12,12 @@ import {
   EventType,
   PrismaClient,
   ServiceSuggestionStatus,
-  ServiceSuggestionType,
   ServiceUserRole,
   VerificationStatus,
   type Prisma,
   type User,
   type ServiceVisibility,
+  ServiceSuggestionType,
 } from '@prisma/client'
 import { uniqBy } from 'lodash-es'
 import { generateUsername } from 'unique-username-generator'
@@ -94,20 +96,6 @@ async function createAccount(preGeneratedToken?: string) {
   })
 
   return { token, user }
-}
-
-// Parse command line arguments
-const args = process.argv.slice(2)
-const shouldCleanup = args.includes('--cleanup') || args.includes('-c')
-const onlyCleanup = args.includes('--only-cleanup') || args.includes('-oc')
-
-// Parse number of services from --services or -s flag
-const servicesArg = args.find((arg) => arg.startsWith('--services=') || arg.startsWith('-s='))
-const numServices = parseIntWithFallback(servicesArg?.split('=')[1], 100) // Default to 100 if not specified
-
-if (isNaN(numServices) || numServices < 1) {
-  console.error('❌ Invalid number of services specified. Must be a positive number.')
-  process.exit(1)
 }
 
 const prisma = new PrismaClient()
@@ -648,7 +636,10 @@ const generateFakeService = (users: User[]) => {
     },
     verificationProofMd:
       status === 'VERIFICATION_SUCCESS' || status === 'VERIFICATION_FAILED' ? faker.lorem.paragraphs() : null,
-    referral: `?ref=${faker.string.alphanumeric(6)}`,
+    referral: faker.helpers.arrayElement([
+      `?ref=${faker.string.alphanumeric(6)}`,
+      `/ref/${faker.string.alphanumeric(6)}`,
+    ]),
     acceptedCurrencies: faker.helpers.arrayElements(Object.values(Currency), { min: 1, max: 5 }),
     serviceUrls: faker.helpers.multiple(() => faker.internet.url(), { count: { min: 1, max: 3 } }),
     tosUrls: faker.helpers.multiple(() => faker.internet.url(), { count: { min: 1, max: 2 } }),
@@ -667,6 +658,15 @@ const generateFakeService = (users: User[]) => {
     tosReviewAt: faker.date.past(),
     userSentiment: faker.helpers.maybe(() => generateFakeUserSentiment(), { probability: 0.8 }),
     userSentimentAt: faker.date.recent(),
+    internalNotes: faker.helpers.maybe(
+      () => ({
+        create: {
+          content: faker.lorem.paragraph(),
+          addedByUserId: faker.helpers.arrayElement(users.filter((user) => user.admin)).id,
+        },
+      }),
+      { probability: 0.33 }
+    ),
   } as const satisfies Prisma.ServiceCreateInput
 }
 
@@ -1015,359 +1015,378 @@ const generateFakeAnnouncement = () => {
   } as const satisfies Prisma.AnnouncementCreateInput
 }
 
-async function runFaker() {
-  await prisma.$transaction(
-    async (tx) => {
-      // ---- Clean up existing data if requested ----
-      if (shouldCleanup || onlyCleanup) {
-        console.info('🧹 Cleaning up existing data...')
+async function cleanup() {
+  console.info('🧹 Cleaning up existing data...')
 
-        try {
-          await tx.commentVote.deleteMany()
-          await tx.karmaTransaction.deleteMany()
-          await tx.comment.deleteMany()
-          await tx.serviceAttribute.deleteMany()
-          await tx.serviceContactMethod.deleteMany()
-          await tx.event.deleteMany()
-          await tx.verificationStep.deleteMany()
-          await tx.serviceSuggestionMessage.deleteMany()
-          await tx.serviceSuggestion.deleteMany()
-          await tx.serviceVerificationRequest.deleteMany()
-          await tx.service.deleteMany()
-          await tx.attribute.deleteMany()
-          await tx.category.deleteMany()
-          await tx.internalUserNote.deleteMany()
-          await tx.user.deleteMany()
-          await tx.announcement.deleteMany()
-          console.info('✅ Existing data cleaned up')
-        } catch (error) {
-          console.error('❌ Error cleaning up data:', error)
-          throw error
-        }
-        if (onlyCleanup) return
-      }
-
-      // ---- Get or create categories ----
-      const categories = await Promise.all(
-        categoriesToCreate.map(async (cat) => {
-          const existing = await tx.category.findUnique({
-            where: { name: cat.name },
-          })
-          if (existing) return existing
-
-          return await tx.category.create({
-            data: cat,
-          })
-        })
-      )
-
-      // ---- Create users ----
-      const specialUsersUntyped = Object.fromEntries(
-        await Promise.all(
-          Object.entries(specialUsersData).map(async ([key, userData]) => {
-            const secretToken = process.env[userData.envToken] ?? userData.defaultToken
-            const secretTokenHash = hashUserSecretToken(secretToken)
-
-            const { envToken, defaultToken, ...userCreateData } = userData
-            const user = await tx.user.create({
-              data: {
-                notificationPreferences: { create: {} },
-                ...userCreateData,
-                secretTokenHash,
-              },
-            })
-
-            console.info(`✅ Created ${user.name} with secret token "${secretToken}"`)
-
-            return [key, user] as const
-          })
-        )
-      )
-
-      const specialUsers = specialUsersUntyped as {
-        [K in keyof typeof specialUsersData]: (typeof specialUsersUntyped)[K]
-      }
-
-      let users = await Promise.all(
-        Array.from({ length: 10 }, async () => {
-          const { user } = await createAccount()
-          return user
-        })
-      )
-
-      // ---- Create attributes ----
-      const attributes = await Promise.all(
-        Array.from({ length: 16 }, async () => {
-          return await tx.attribute.create({
-            data: generateFakeAttribute(),
-          })
-        })
-      )
-
-      // ---- Create services ----
-      const services = await Promise.all(
-        Array.from({ length: numServices }, async () => {
-          const serviceData = generateFakeService(users)
-          const randomCategories = faker.helpers.arrayElements(categories, { min: 1, max: 3 })
-
-          const service = await tx.service.create({
-            data: {
-              ...serviceData,
-              categories: {
-                connect: randomCategories.map((cat) => ({ id: cat.id })),
-              },
-            },
-          })
-
-          // Create contact methods for each service
-          await Promise.all(
-            Array.from({ length: faker.number.int({ min: 1, max: 3 }) }, () =>
-              tx.serviceContactMethod.create({
-                data: generateFakeServiceContactMethod(service.id),
-              })
-            )
-          )
-
-          // Link random attributes to the service
-          await Promise.all(
-            faker.helpers.arrayElements(attributes, { min: 2, max: 5 }).map((attr) =>
-              tx.serviceAttribute.create({
-                data: {
-                  serviceId: service.id,
-                  attributeId: attr.id,
-                },
-              })
-            )
-          )
-
-          // Create events for the service
-          await Promise.all(
-            Array.from({ length: faker.number.int({ min: 0, max: 5 }) }, () =>
-              tx.event.create({
-                data: generateFakeEvent(service.id),
-              })
-            )
-          )
-
-          return service
-        })
-      )
-
-      // ---- Create service user affiliations for the service ----
-      await Promise.all(
-        users
-          .filter((user) => user.verified)
-          .map(async (user) => {
-            const servicesToAddAffiliations = uniqBy(
-              faker.helpers.arrayElements(services, {
-                min: 1,
-                max: 3,
-              }),
-              'id'
-            )
-
-            return tx.user.update({
-              where: { id: user.id },
-              data: {
-                serviceAffiliations: {
-                  createMany: {
-                    data: servicesToAddAffiliations.map((service) => ({
-                      role: faker.helpers.arrayElement(Object.values(ServiceUserRole)),
-                      serviceId: service.id,
-                    })),
-                  },
-                },
-              },
-            })
-          })
-      )
-
-      users = await tx.user.findMany({
-        include: {
-          serviceAffiliations: true,
-        },
-      })
-
-      // ---- Create comments and replies ----
-      await Promise.all(
-        services.map(async (service) => {
-          // Create parent comments
-          const commentCount = faker.number.int({ min: 1, max: 10 })
-          const commentData = Array.from({ length: commentCount }, () =>
-            generateFakeComment(faker.helpers.arrayElement(users).id, service.id)
-          )
-          const indexesToUpdate = users.map((user) => {
-            return commentData.findIndex((comment) => comment.authorId === user.id && comment.rating !== null)
-          })
-          commentData.forEach((comment, index) => {
-            if (indexesToUpdate.includes(index)) comment.ratingActive = true
-          })
-
-          await tx.comment.createMany({
-            data: commentData,
-          })
-
-          const comments = await tx.comment.findMany({
-            where: {
-              serviceId: service.id,
-              parentId: null,
-            },
-            orderBy: {
-              createdAt: 'desc',
-            },
-            take: commentCount,
-          })
-
-          const affiliatedUsers = undefinedIfEmpty(
-            users.filter((user) =>
-              user.serviceAffiliations.some((affiliation) => affiliation.serviceId === service.id)
-            )
-          )
-
-          // Create replies to comments
-          await Promise.all(
-            comments.map(async (comment) => {
-              const replyCount = faker.number.int({ min: 0, max: 3 })
-              return Promise.all(
-                Array.from({ length: replyCount }, () => {
-                  const user = faker.helpers.arrayElement(
-                    faker.helpers.maybe(() => affiliatedUsers, { probability: 0.3 }) ?? users
-                  )
-
-                  return tx.comment.create({
-                    data: generateFakeComment(user.id, service.id, comment.id),
-                  })
-                })
-              )
-            })
-          )
-        })
-      )
-
-      // ---- Create service suggestions for normal_dev user ----
-      // First create 3 CREATE_SERVICE suggestions with their services
-      for (let i = 0; i < 3; i++) {
-        const serviceData = generateFakeService(users)
-        const randomCategories = faker.helpers.arrayElements(categories, { min: 1, max: 3 })
-
-        const service = await tx.service.create({
-          data: {
-            ...serviceData,
-            verificationStatus: VerificationStatus.COMMUNITY_CONTRIBUTED,
-            categories: {
-              connect: randomCategories.map((cat) => ({ id: cat.id })),
-            },
-          },
-        })
-
-        const serviceSuggestion = await tx.serviceSuggestion.create({
-          data: generateFakeServiceSuggestion({
-            type: ServiceSuggestionType.CREATE_SERVICE,
-            userId: specialUsers.normal.id,
-            serviceId: service.id,
-          }),
-        })
-
-        // Create some messages for each suggestion
-        await Promise.all(
-          Array.from({ length: faker.number.int({ min: 1, max: 3 }) }, () =>
-            tx.serviceSuggestionMessage.create({
-              data: generateFakeServiceSuggestionMessage(serviceSuggestion.id, [
-                specialUsers.normal.id,
-                specialUsers.admin.id,
-              ]),
-            })
-          )
-        )
-      }
-
-      // Then create 5 EDIT_SERVICE suggestions
-      await Promise.all(
-        services.slice(0, 5).map(async (service) => {
-          const status = faker.helpers.arrayElement(Object.values(ServiceSuggestionStatus))
-          const suggestion = await tx.serviceSuggestion.create({
-            data: generateFakeServiceSuggestion({
-              type: ServiceSuggestionType.EDIT_SERVICE,
-              status,
-              userId: specialUsers.normal.id,
-              serviceId: service.id,
-            }),
-          })
-
-          // Create some messages for each suggestion
-          await Promise.all(
-            Array.from({ length: faker.number.int({ min: 0, max: 3 }) }, () =>
-              tx.serviceSuggestionMessage.create({
-                data: generateFakeServiceSuggestionMessage(suggestion.id, [
-                  specialUsers.normal.id,
-                  specialUsers.admin.id,
-                ]),
-              })
-            )
-          )
-        })
-      )
-
-      // ---- Create internal notes for users ----
-      await Promise.all(
-        users.map(async (user) => {
-          // Create 1-3 notes for each user
-          const numNotes = faker.number.int({ min: 1, max: 3 })
-          return Promise.all(
-            Array.from({ length: numNotes }, () =>
-              tx.internalUserNote.create({
-                data: generateFakeInternalNote(
-                  user.id,
-                  faker.helpers.arrayElement([specialUsers.admin.id, specialUsers.moderator.id])
-                ),
-              })
-            )
-          )
-        })
-      )
-
-      // Add some notes to special users as well
-      await Promise.all(
-        Object.values(specialUsers).map(async (user) => {
-          const numNotes = faker.number.int({ min: 1, max: 3 })
-          return Promise.all(
-            Array.from({ length: numNotes }, () =>
-              tx.internalUserNote.create({
-                data: generateFakeInternalNote(
-                  user.id,
-                  faker.helpers.arrayElement([specialUsers.admin.id, specialUsers.moderator.id])
-                ),
-              })
-            )
-          )
-        })
-      )
-
-      // ---- Create announcement ----
-      await tx.announcement.create({
-        data: generateFakeAnnouncement(),
-      })
-    },
-    {
-      timeout: 1000 * 60 * 10, // 10 minutes
-    }
-  )
-}
-
-async function main() {
   try {
-    await runFaker()
-
-    console.info('✅ Fake data generated successfully')
+    await prisma.commentVote.deleteMany()
+    await prisma.karmaTransaction.deleteMany()
+    await prisma.comment.deleteMany()
+    await prisma.serviceAttribute.deleteMany()
+    await prisma.serviceContactMethod.deleteMany()
+    await prisma.event.deleteMany()
+    await prisma.verificationStep.deleteMany()
+    await prisma.serviceSuggestionMessage.deleteMany()
+    await prisma.serviceSuggestion.deleteMany()
+    await prisma.serviceVerificationRequest.deleteMany()
+    await prisma.service.deleteMany()
+    await prisma.attribute.deleteMany()
+    await prisma.category.deleteMany()
+    await prisma.internalUserNote.deleteMany()
+    await prisma.user.deleteMany()
+    await prisma.announcement.deleteMany()
+    console.info('✅ Existing data cleaned up')
   } catch (error) {
-    console.error('❌ Error generating fake data:', error)
-    process.exit(1)
-  } finally {
-    await prisma.$disconnect()
+    console.error('❌ Error cleaning up data:', error)
+    throw error
   }
 }
 
-main().catch((error: unknown) => {
-  console.error('❌ Fatal error:', error)
-  process.exit(1)
-})
+function importTriggers() {
+  console.info('🔄 Importing SQL triggers...')
+  try {
+    execSync('just import-triggers', { stdio: 'inherit' })
+    console.info('✅ Triggers imported')
+  } catch (error) {
+    console.error('❌ Error importing triggers:', error)
+    throw error
+  }
+}
+
+async function main() {
+  const { values: options } = parseArgs({
+    options: {
+      services: { type: 'string', short: 's', default: '100' },
+      cleanup: { type: 'boolean', short: 'c', default: true },
+      'only-cleanup': { type: 'boolean', short: 'o', default: false },
+    },
+  })
+  const numServices = parseIntWithFallback(options.services, 100)
+  if (isNaN(numServices) || numServices < 1) {
+    console.error('❌ Invalid number of services specified. Must be a positive number.')
+    process.exit(1)
+  }
+
+  importTriggers()
+
+  if (options.cleanup || options['only-cleanup']) {
+    await cleanup()
+    if (options['only-cleanup']) return
+  }
+
+  // ---- Get or create categories ----
+  const categories = await Promise.all(
+    categoriesToCreate.map(async (cat) => {
+      const existing = await prisma.category.findUnique({
+        where: { name: cat.name },
+      })
+      if (existing) return existing
+
+      return await prisma.category.create({
+        data: cat,
+      })
+    })
+  )
+
+  // ---- Create users ----
+  const specialUsersUntyped = Object.fromEntries(
+    await Promise.all(
+      Object.entries(specialUsersData).map(async ([key, userData]) => {
+        const secretToken = process.env[userData.envToken] ?? userData.defaultToken
+        const secretTokenHash = hashUserSecretToken(secretToken)
+
+        const { envToken, defaultToken, ...userCreateData } = userData
+        const user = await prisma.user.create({
+          data: {
+            notificationPreferences: { create: {} },
+            ...userCreateData,
+            secretTokenHash,
+          },
+        })
+
+        console.info(`✅ Created ${user.name} with secret token "${secretToken}"`)
+
+        return [key, user] as const
+      })
+    )
+  )
+
+  const specialUsers = specialUsersUntyped as {
+    [K in keyof typeof specialUsersData]: (typeof specialUsersUntyped)[K]
+  }
+
+  let users = await Promise.all(
+    Array.from({ length: 10 }, async () => {
+      const { user } = await createAccount()
+      return user
+    })
+  )
+
+  // ---- Create attributes ----
+  const attributes = await Promise.all(
+    Array.from({ length: 16 }, async () => {
+      return await prisma.attribute.create({
+        data: generateFakeAttribute(),
+      })
+    })
+  )
+
+  // ---- Create services ----
+  const services = await Promise.all(
+    Array.from({ length: numServices }, async () => {
+      const serviceData = generateFakeService(users)
+      const randomCategories = faker.helpers.arrayElements(categories, { min: 1, max: 3 })
+
+      const service = await prisma.service.create({
+        data: {
+          ...serviceData,
+          categories: {
+            connect: randomCategories.map((cat) => ({ id: cat.id })),
+          },
+        },
+      })
+
+      // Create contact methods for each service
+      await Promise.all(
+        Array.from({ length: faker.number.int({ min: 1, max: 3 }) }, () =>
+          prisma.serviceContactMethod.create({
+            data: generateFakeServiceContactMethod(service.id),
+          })
+        )
+      )
+
+      // Link random attributes to the service
+      await Promise.all(
+        faker.helpers.arrayElements(attributes, { min: 2, max: 5 }).map((attr) =>
+          prisma.serviceAttribute.create({
+            data: {
+              serviceId: service.id,
+              attributeId: attr.id,
+            },
+          })
+        )
+      )
+
+      // Create events for the service
+      await Promise.all(
+        Array.from({ length: faker.number.int({ min: 0, max: 5 }) }, () =>
+          prisma.event.create({
+            data: generateFakeEvent(service.id),
+          })
+        )
+      )
+
+      return service
+    })
+  )
+
+  // ---- Create service user affiliations for the service ----
+  await Promise.all(
+    users
+      .filter((user) => user.verified)
+      .map(async (user) => {
+        const servicesToAddAffiliations = uniqBy(
+          faker.helpers.arrayElements(services, {
+            min: 1,
+            max: 3,
+          }),
+          'id'
+        )
+
+        return prisma.user.update({
+          where: { id: user.id },
+          data: {
+            serviceAffiliations: {
+              createMany: {
+                data: servicesToAddAffiliations.map((service) => ({
+                  role: faker.helpers.arrayElement(Object.values(ServiceUserRole)),
+                  serviceId: service.id,
+                })),
+              },
+            },
+          },
+        })
+      })
+  )
+
+  users = await prisma.user.findMany({
+    include: {
+      serviceAffiliations: true,
+    },
+  })
+
+  // ---- Create comments and replies ----
+  await Promise.all(
+    services.map(async (service) => {
+      // Create parent comments
+      const commentCount = faker.number.int({ min: 1, max: 10 })
+      const commentData = Array.from({ length: commentCount }, () =>
+        generateFakeComment(faker.helpers.arrayElement(users).id, service.id)
+      )
+      const indexesToUpdate = users.map((user) => {
+        return commentData.findIndex((comment) => comment.authorId === user.id && comment.rating !== null)
+      })
+      commentData.forEach((comment, index) => {
+        if (indexesToUpdate.includes(index)) comment.ratingActive = true
+      })
+
+      await prisma.comment.createMany({
+        data: commentData,
+      })
+
+      const comments = await prisma.comment.findMany({
+        where: {
+          serviceId: service.id,
+          parentId: null,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: commentCount,
+      })
+
+      const affiliatedUsers = undefinedIfEmpty(
+        users.filter((user) =>
+          user.serviceAffiliations.some((affiliation) => affiliation.serviceId === service.id)
+        )
+      )
+
+      // Create replies to comments
+      await Promise.all(
+        comments.map(async (comment) => {
+          const replyCount = faker.number.int({ min: 0, max: 3 })
+          return Promise.all(
+            Array.from({ length: replyCount }, () => {
+              const user = faker.helpers.arrayElement(
+                faker.helpers.maybe(() => affiliatedUsers, { probability: 0.3 }) ?? users
+              )
+
+              return prisma.comment.create({
+                data: generateFakeComment(user.id, service.id, comment.id),
+              })
+            })
+          )
+        })
+      )
+    })
+  )
+
+  // ---- Create service suggestions for normal_dev user ----
+  // First create 3 CREATE_SERVICE suggestions with their services
+  for (let i = 0; i < 3; i++) {
+    const serviceData = generateFakeService(users)
+    const randomCategories = faker.helpers.arrayElements(categories, { min: 1, max: 3 })
+
+    const service = await prisma.service.create({
+      data: {
+        ...serviceData,
+        verificationStatus: VerificationStatus.COMMUNITY_CONTRIBUTED,
+        categories: {
+          connect: randomCategories.map((cat) => ({ id: cat.id })),
+        },
+      },
+    })
+
+    const serviceSuggestion = await prisma.serviceSuggestion.create({
+      data: generateFakeServiceSuggestion({
+        type: ServiceSuggestionType.CREATE_SERVICE,
+        userId: specialUsers.normal.id,
+        serviceId: service.id,
+      }),
+    })
+
+    // Create some messages for each suggestion
+    await Promise.all(
+      Array.from({ length: faker.number.int({ min: 1, max: 3 }) }, () =>
+        prisma.serviceSuggestionMessage.create({
+          data: generateFakeServiceSuggestionMessage(serviceSuggestion.id, [
+            specialUsers.normal.id,
+            specialUsers.admin.id,
+          ]),
+        })
+      )
+    )
+  }
+
+  // Then create 5 EDIT_SERVICE suggestions
+  await Promise.all(
+    services.slice(0, 5).map(async (service) => {
+      const status = faker.helpers.arrayElement(Object.values(ServiceSuggestionStatus))
+      const suggestion = await prisma.serviceSuggestion.create({
+        data: generateFakeServiceSuggestion({
+          type: ServiceSuggestionType.EDIT_SERVICE,
+          status,
+          userId: specialUsers.normal.id,
+          serviceId: service.id,
+        }),
+      })
+
+      // Create some messages for each suggestion
+      await Promise.all(
+        Array.from({ length: faker.number.int({ min: 0, max: 3 }) }, () =>
+          prisma.serviceSuggestionMessage.create({
+            data: generateFakeServiceSuggestionMessage(suggestion.id, [
+              specialUsers.normal.id,
+              specialUsers.admin.id,
+            ]),
+          })
+        )
+      )
+    })
+  )
+
+  // ---- Create internal notes for users ----
+  await Promise.all(
+    users.map(async (user) => {
+      // Create 1-3 notes for each user
+      const numNotes = faker.number.int({ min: 1, max: 3 })
+      return Promise.all(
+        Array.from({ length: numNotes }, () =>
+          prisma.internalUserNote.create({
+            data: generateFakeInternalNote(
+              user.id,
+              faker.helpers.arrayElement([specialUsers.admin.id, specialUsers.moderator.id])
+            ),
+          })
+        )
+      )
+    })
+  )
+
+  // Add some notes to special users as well
+  await Promise.all(
+    Object.values(specialUsers).map(async (user) => {
+      const numNotes = faker.number.int({ min: 1, max: 3 })
+      return Promise.all(
+        Array.from({ length: numNotes }, () =>
+          prisma.internalUserNote.create({
+            data: generateFakeInternalNote(
+              user.id,
+              faker.helpers.arrayElement([specialUsers.admin.id, specialUsers.moderator.id])
+            ),
+          })
+        )
+      )
+    })
+  )
+
+  // ---- Create announcement ----
+  await prisma.announcement.create({
+    data: generateFakeAnnouncement(),
+  })
+}
+
+main()
+  .then(async () => {
+    console.info('✅ Fake data generated successfully')
+    await prisma.$disconnect()
+  })
+  .catch(async (error: unknown) => {
+    console.error(
+      '❌ Fatal error:',
+      typeof error === 'object' && error !== null && 'message' in error ? error.message : 'Unknown error'
+    )
+    console.error(error)
+    await prisma.$disconnect()
+    process.exit(1)
+  })

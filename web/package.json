@@ -12,12 +12,14 @@
     "db-push": "prisma migrate dev",
     "db-triggers": "just import-triggers",
     "db-update": "prisma migrate dev && just import-triggers",
-    "db-reset": "prisma migrate reset -f && prisma migrate dev && just import-triggers && tsx scripts/faker.ts",
-    "db-fill": "tsx scripts/faker.ts",
-    "db-fill-clean": "tsx scripts/faker.ts --cleanup",
+    "db-reset": "prisma migrate reset -f && prisma migrate dev",
+    "db-seed": "prisma db seed",
     "format": "prettier --write .",
     "lint": "eslint .",
     "lint-fix": "eslint . --fix && prettier --write ."
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@astrojs/check": "0.9.4",

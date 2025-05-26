@@ -70,7 +70,7 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
           )}
         >
           <input
-            transition:persist={option.noTransitionPersist ? undefined : true}
+            transition:persist={option.noTransitionPersist || !multiple ? undefined : true}
             type={multiple ? 'checkbox' : 'radio'}
             name={wrapperProps.name}
             value={option.value}
