@@ -160,6 +160,7 @@ const splashText = showSplashText ? sample(splashTexts) : null
               <a
                 href={makeUnimpersonateUrl(Astro.url)}
                 data-astro-reload
+                data-astro-prefetch="tap"
                 class="xs:px-3 2xs:px-2 last:xs:-mr-3 last:2xs:-mr-2 flex h-full items-center px-1 text-sm text-stone-100 transition-colors last:-mr-1 hover:text-stone-200"
                 transition:name="header-unimpersonate-link"
                 aria-label="Unimpersonate"

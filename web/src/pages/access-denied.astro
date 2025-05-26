@@ -50,6 +50,7 @@ if (reasonType === 'admin-required' && Astro.locals.user?.admin) {
     <a
       href={makeLoginUrl(Astro.url, { redirect, logout: true, message: reason })}
       data-astro-reload
+      data-astro-prefetch="tap"
       class="focus-visible:outline-primary group flex items-center gap-2 px-3.5 py-2.5 text-white"
     >
       <Icon
@@ -62,6 +63,7 @@ if (reasonType === 'admin-required' && Astro.locals.user?.admin) {
       Astro.locals.actualUser && (
         <a
           href={makeUnimpersonateUrl(Astro.url, { redirect })}
+          data-astro-prefetch="tap"
           class="focus-visible:outline-primary group flex items-center gap-2 px-3.5 py-2.5 text-white"
         >
           <Icon
