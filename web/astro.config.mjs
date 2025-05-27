@@ -177,6 +177,12 @@ export default defineConfig({
         url: true,
         optional: false,
       }),
+      LOGS_UI_URL: envField.string({
+        context: 'server',
+        access: 'secret',
+        url: true,
+        optional: true,
+      }),
 
       RELEASE_NUMBER: envField.number({
         context: 'server',

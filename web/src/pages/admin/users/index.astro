@@ -19,7 +19,7 @@ import type { Prisma } from '@prisma/client'
 
 const { data: filters } = zodParseQueryParamsStoringErrors(
   {
-    'sort-by': z.enum(['name', 'role', 'createdAt', 'karma']).default('createdAt'),
+    'sort-by': z.enum(['name', 'role', 'lastLoginAt', 'karma', 'createdAt']).default('createdAt'),
     'sort-order': z.enum(['asc', 'desc']).default('desc'),
     search: z.string().optional(),
     role: z.enum(['user', 'admin', 'moderator', 'verified', 'spammer']).optional(),
@@ -29,7 +29,10 @@ const { data: filters } = zodParseQueryParamsStoringErrors(
 
 // Set up Prisma orderBy with correct typing
 const prismaOrderBy =
-  filters['sort-by'] === 'name' || filters['sort-by'] === 'createdAt' || filters['sort-by'] === 'karma'
+  filters['sort-by'] === 'name' ||
+  filters['sort-by'] === 'createdAt' ||
+  filters['sort-by'] === 'lastLoginAt' ||
+  filters['sort-by'] === 'karma'
     ? {
         [filters['sort-by'] === 'karma' ? 'totalKarma' : filters['sort-by']]:
           filters['sort-order'] === 'asc' ? 'asc' : 'desc',
@@ -86,6 +89,7 @@ const dbUsers = await prisma.user.findMany({
     totalKarma: true,
     createdAt: true,
     updatedAt: true,
+    lastLoginAt: true,
     internalNotes: {
       select: {
         id: true,
@@ -218,16 +222,29 @@ const makeSortUrl = (sortBy: NonNullable<(typeof filters)['sort-by']>) => {
               <th
                 class="w-[15%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
               >
-                <a
-                  href={makeSortUrl('createdAt')}
-                  class="flex items-center justify-center hover:text-zinc-200"
-                >
-                  Joined <SortArrowIcon
-                    active={filters['sort-by'] === 'createdAt'}
-                    sortOrder={filters['sort-order']}
-                  />
-                </a>
+                <div class="flex flex-wrap items-center justify-center gap-1">
+                  <a
+                    href={makeSortUrl('lastLoginAt')}
+                    class="flex items-center justify-center hover:text-zinc-200"
+                  >
+                    Login <SortArrowIcon
+                      active={filters['sort-by'] === 'lastLoginAt'}
+                      sortOrder={filters['sort-order']}
+                    />
+                  </a>
+                  <span class="text-zinc-600">/</span>
+                  <a
+                    href={makeSortUrl('createdAt')}
+                    class="flex items-center justify-center hover:text-zinc-200"
+                  >
+                    Joined <SortArrowIcon
+                      active={filters['sort-by'] === 'createdAt'}
+                      sortOrder={filters['sort-order']}
+                    />
+                  </a>
+                </div>
               </th>
+
               <th
                 class="w-[15%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
               >
@@ -305,8 +322,24 @@ const makeSortUrl = (sortBy: NonNullable<(typeof filters)['sort-by']>) => {
                       {user.totalKarma}
                     </span>
                   </td>
-                  <td class="px-4 py-3 text-center text-sm text-zinc-400">
-                    <TimeFormatted date={user.createdAt} hourPrecision hoursShort prefix={false} />
+                  <td class="px-4 py-3 text-center text-sm">
+                    <div class="flex flex-wrap items-center justify-center gap-1 text-center">
+                      <TimeFormatted
+                        class="text-zinc-300"
+                        date={user.lastLoginAt}
+                        hourPrecision
+                        hoursShort
+                        prefix={false}
+                      />
+                      <span class="text-zinc-600">/</span>
+                      <TimeFormatted
+                        class="text-zinc-400"
+                        date={user.createdAt}
+                        hourPrecision
+                        hoursShort
+                        prefix={false}
+                      />
+                    </div>
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex justify-center gap-3">

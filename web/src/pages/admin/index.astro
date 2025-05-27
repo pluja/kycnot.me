@@ -1,6 +1,6 @@
 ---
 import { Icon } from 'astro-icon/components'
-import { DATABASE_UI_URL } from 'astro:env/server'
+import { DATABASE_UI_URL, LOGS_UI_URL } from 'astro:env/server'
 
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
@@ -81,6 +81,18 @@ const adminLinks: AdminLink[] = [
       base: 'text-gray-300',
     },
   },
+  ...(LOGS_UI_URL
+    ? [
+        {
+          icon: 'ri:menu-search-line',
+          title: 'Logs',
+          href: LOGS_UI_URL,
+          classNames: {
+            base: 'text-cyan-300',
+          },
+        },
+      ]
+    : []),
 ]
 ---
 
@@ -93,25 +105,27 @@ const adminLinks: AdminLink[] = [
   <nav>
     <ol class="grid grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*40),1fr))] gap-4">
       {
-        adminLinks.map((link) => (
-          <li
-            class={cn(
-              'group ease-out-back transition-transform duration-250 hover:-translate-y-0.5 hover:scale-105',
-              link.classNames.base
-            )}
-          >
-            <a
-              href={link.href}
-              class="flex min-h-24 flex-col items-center justify-around rounded-lg border border-current/4 bg-current/3 py-3 text-center transition-all duration-250 group-hover:border-current/10 group-hover:bg-current/10 group-hover:shadow-xl"
+        adminLinks
+          .filter((link) => link.href)
+          .map((link) => (
+            <li
+              class={cn(
+                'group ease-out-back transition-transform duration-250 hover:-translate-y-0.5 hover:scale-105',
+                link.classNames.base
+              )}
             >
-              <Icon
-                name={link.icon}
-                class="size-8 text-current opacity-50 transition-opacity duration-250 group-hover:opacity-100"
-              />
-              <span class="font-title text-xl leading-none font-semibold text-current">{link.title}</span>
-            </a>
-          </li>
-        ))
+              <a
+                href={link.href}
+                class="flex min-h-24 flex-col items-center justify-around rounded-lg border border-current/4 bg-current/3 py-3 text-center transition-all duration-250 group-hover:border-current/10 group-hover:bg-current/10 group-hover:shadow-xl"
+              >
+                <Icon
+                  name={link.icon}
+                  class="size-8 text-current opacity-50 transition-opacity duration-250 group-hover:opacity-100"
+                />
+                <span class="font-title text-xl leading-none font-semibold text-current">{link.title}</span>
+              </a>
+            </li>
+          ))
       }
     </ol>
   </nav>

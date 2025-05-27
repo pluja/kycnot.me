@@ -48,6 +48,7 @@ const user = await Astro.locals.banners.try('user', async () => {
         verifiedLink: true,
         totalKarma: true,
         createdAt: true,
+        lastLoginAt: true,
         _count: {
           select: {
             comments: true,
@@ -468,6 +469,24 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                 </p>
               </div>
             </li>
+
+            <AdminOnly>
+              <li class="flex items-start">
+                <span class="text-day-500 mt-0.5 mr-2"><Icon name="ri:calendar-line" class="size-4" /></span>
+                <div>
+                  <p class="text-day-500 text-xs">Last login</p>
+                  <p class="text-day-300">
+                    {
+                      formatDateShort(user.lastLoginAt, {
+                        prefix: false,
+                        hourPrecision: true,
+                        caseType: 'sentence',
+                      })
+                    }
+                  </p>
+                </div>
+              </li>
+            </AdminOnly>
 
             {
               user.verifiedLink && (
