@@ -15,6 +15,8 @@ type EventTypeInfo<T extends string | null | undefined = string> = {
   }
   icon: string
   color: ComponentProps<typeof BadgeSmall>['color']
+  isSolved: boolean
+  showBanner: boolean
 }
 
 export const {
@@ -36,6 +38,8 @@ export const {
     },
     icon: 'ri:question-fill',
     color: 'gray',
+    isSolved: false,
+    showBanner: false,
   }),
   [
     {
@@ -46,8 +50,10 @@ export const {
       classNames: {
         dot: 'bg-amber-900 text-amber-300 ring-amber-900/50',
       },
-      icon: 'ri:error-warning-fill',
+      icon: 'ri:alert-fill',
       color: 'yellow',
+      isSolved: false,
+      showBanner: true,
     },
     {
       id: 'WARNING_SOLVED',
@@ -55,10 +61,12 @@ export const {
       label: 'Warning Solved',
       description: 'A previously reported warning has been solved',
       classNames: {
-        dot: 'bg-green-900 text-green-300 ring-green-900/50',
+        dot: 'bg-amber-900 text-amber-300 ring-amber-900/50',
       },
-      icon: 'ri:check-fill',
+      icon: 'ri:alert-fill',
       color: 'green',
+      isSolved: true,
+      showBanner: false,
     },
     {
       id: 'ALERT',
@@ -68,8 +76,10 @@ export const {
       classNames: {
         dot: 'bg-red-900 text-red-300 ring-red-900/50',
       },
-      icon: 'ri:alert-fill',
+      icon: 'ri:spam-fill',
       color: 'red',
+      isSolved: false,
+      showBanner: true,
     },
     {
       id: 'ALERT_SOLVED',
@@ -77,10 +87,12 @@ export const {
       label: 'Alert Solved',
       description: 'A previously reported alert has been solved',
       classNames: {
-        dot: 'bg-green-900 text-green-300 ring-green-900/50',
+        dot: 'bg-red-900 text-red-300 ring-red-900/50',
       },
-      icon: 'ri:check-fill',
+      icon: 'ri:spam-fill',
       color: 'green',
+      isSolved: true,
+      showBanner: false,
     },
     {
       id: 'INFO',
@@ -92,6 +104,8 @@ export const {
       },
       icon: 'ri:information-fill',
       color: 'sky',
+      isSolved: false,
+      showBanner: false,
     },
     {
       id: 'NORMAL',
@@ -103,6 +117,8 @@ export const {
       },
       icon: 'ri:notification-fill',
       color: 'green',
+      isSolved: false,
+      showBanner: false,
     },
     {
       id: 'UPDATE',
@@ -114,6 +130,8 @@ export const {
       },
       icon: 'ri:pencil-fill',
       color: 'sky',
+      isSolved: false,
+      showBanner: false,
     },
   ] as const satisfies EventTypeInfo<EventType>[]
 )

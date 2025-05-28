@@ -685,9 +685,14 @@ if (!service) return Astro.rewrite('/404')
                           label="Started At"
                           name="startedAt"
                           inputProps={{
-                            type: 'date',
+                            type: 'datetime-local',
                             required: true,
-                            value: new Date(event.startedAt).toISOString().split('T')[0],
+                            value: new Date(
+                              new Date(event.startedAt).getTime() -
+                                new Date(event.startedAt).getTimezoneOffset() * 60000
+                            )
+                              .toISOString()
+                              .slice(0, 16),
                           }}
                           error={eventUpdateInputErrors.startedAt}
                         />
@@ -696,7 +701,15 @@ if (!service) return Astro.rewrite('/404')
                           label="Ended At"
                           name="endedAt"
                           inputProps={{
-                            value: event.endedAt ? new Date(event.endedAt).toISOString().split('T')[0] : '',
+                            type: 'datetime-local',
+                            value: event.endedAt
+                              ? new Date(
+                                  new Date(event.endedAt).getTime() -
+                                    new Date(event.endedAt).getTimezoneOffset() * 60000
+                                )
+                                  .toISOString()
+                                  .slice(0, 16)
+                              : '',
                           }}
                           error={eventUpdateInputErrors.endedAt}
                           description="- Empty: Event is ongoing.\n- Filled: Event with specific end date.\n- Same as start date: One-time event."
@@ -756,9 +769,11 @@ if (!service) return Astro.rewrite('/404')
               label="Started At"
               name="startedAt"
               inputProps={{
-                type: 'date',
+                type: 'datetime-local',
                 required: true,
-                value: new Date().toISOString().split('T')[0],
+                value: new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+                  .toISOString()
+                  .slice(0, 16),
               }}
               error={eventInputErrors.startedAt}
             />
@@ -767,7 +782,10 @@ if (!service) return Astro.rewrite('/404')
               label="Ended At"
               name="endedAt"
               inputProps={{
-                value: new Date().toISOString().split('T')[0],
+                type: 'datetime-local',
+                value: new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+                  .toISOString()
+                  .slice(0, 16),
               }}
               error={eventInputErrors.endedAt}
               description="- Empty: Event is ongoing.\n- Filled: Event with specific end date.\n- Same as start date: One-time event."

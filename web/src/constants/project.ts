@@ -1,1 +1,1 @@
-export const SUPPORT_EMAIL = 'support@kycnot.me'
+export const SUPPORT_EMAIL = 'contact@kycnot.me'
