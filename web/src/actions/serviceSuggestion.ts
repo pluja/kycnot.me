@@ -14,12 +14,8 @@ import { defineProtectedAction } from '../lib/defineProtectedAction'
 import { saveFileLocally } from '../lib/fileStorage'
 import { handleHoneypotTrap } from '../lib/honeypot'
 import { prisma } from '../lib/prisma'
-import {
-  imageFileSchemaRequired,
-  stringListOfUrlsSchema,
-  stringListOfUrlsSchemaRequired,
-  zodCohercedNumber,
-} from '../lib/zodUtils'
+import { separateServiceUrlsByType } from '../lib/urls'
+import { imageFileSchemaRequired, stringListOfUrlsSchemaRequired, zodCohercedNumber } from '../lib/zodUtils'
 
 import type { Prisma } from '@prisma/client'
 
@@ -161,9 +157,8 @@ export const serviceSuggestionActions = {
             { message: 'Slug must be unique, try a different one' }
           ),
         description: z.string().min(1).max(SUGGESTION_DESCRIPTION_MAX_LENGTH),
-        serviceUrls: stringListOfUrlsSchemaRequired,
+        allServiceUrls: stringListOfUrlsSchemaRequired,
         tosUrls: stringListOfUrlsSchemaRequired,
-        onionUrls: stringListOfUrlsSchema,
         kycLevel: zodCohercedNumber(z.coerce.number().int().min(0).max(4)),
         attributes: z.array(z.coerce.number().int().positive()),
         categories: z.array(z.coerce.number().int().positive()).min(1),
@@ -210,6 +205,12 @@ export const serviceSuggestionActions = {
 
       const imageUrl = await saveFileLocally(input.imageFile, input.imageFile.name)
 
+      const {
+        web: serviceUrls,
+        onion: onionUrls,
+        i2p: i2pUrls,
+      } = separateServiceUrlsByType(input.allServiceUrls)
+
       const { serviceSuggestion, service } = await prisma.$transaction(async (tx) => {
         const serviceSelect = {
           id: true,
@@ -221,9 +222,10 @@ export const serviceSuggestionActions = {
             name: input.name,
             slug: input.slug,
             description: input.description,
-            serviceUrls: input.serviceUrls,
+            serviceUrls,
             tosUrls: input.tosUrls,
-            onionUrls: input.onionUrls,
+            onionUrls,
+            i2pUrls,
             kycLevel: input.kycLevel,
             acceptedCurrencies: input.acceptedCurrencies,
             imageUrl,

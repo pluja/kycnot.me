@@ -233,16 +233,30 @@ if (!service) return Astro.rewrite('/404')
         enctype="multipart/form-data"
       >
         <input type="hidden" name="id" value={service.id} />
-        <InputText
-          label="Name"
-          name="name"
-          inputProps={{
-            required: true,
-            value: service.name,
-          }}
-          error={serviceInputErrors.name}
-        />
 
+        <div class="grid grid-cols-1 gap-x-4 gap-y-6 md:grid-cols-2">
+          <InputText
+            label="Name"
+            name="name"
+            inputProps={{
+              required: true,
+              value: service.name,
+            }}
+            error={serviceInputErrors.name}
+          />
+
+          <InputText
+            label="Slug"
+            description="Auto-generated if empty"
+            name="slug"
+            inputProps={{
+              value: service.slug,
+              class: 'font-title',
+            }}
+            error={serviceInputErrors.slug}
+            class="font-title"
+          />
+        </div>
         <InputTextArea
           label="Description"
           name="description"
@@ -254,75 +268,43 @@ if (!service) return Astro.rewrite('/404')
           error={serviceInputErrors.description}
         />
 
-        <InputText
-          label="Slug"
-          description="Auto-generated if empty"
-          name="slug"
-          inputProps={{
-            value: service.slug,
-            class: 'font-title',
-          }}
-          error={serviceInputErrors.slug}
-          class="font-title"
-        />
-
-        <div class="grid grid-cols-1 gap-x-4 gap-y-6 md:grid-cols-2">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <InputTextArea
             label="Service URLs"
-            description="One per line"
-            name="serviceUrls"
+            description="One per line. Accepts **Web**, **Onion**, and **I2P** URLs."
+            name="allServiceUrls"
             inputProps={{
-              rows: 3,
-              placeholder: 'https://example1.com\nhttps://example2.com',
+              placeholder: 'https://example1.com\nhttps://example2.onion\nhttps://example3.b32.i2p',
+              class: 'grow min-h-24',
+              required: true,
             }}
-            value={service.serviceUrls.join('\n')}
-            error={serviceInputErrors.serviceUrls}
+            class="row-span-2 flex flex-col self-stretch"
+            value={[...service.serviceUrls, ...service.onionUrls, ...service.i2pUrls].join('\n\n')}
+            error={serviceInputErrors.allServiceUrls}
           />
           <InputTextArea
             label="ToS URLs"
             description="One per line"
             name="tosUrls"
             inputProps={{
-              rows: 3,
               placeholder: 'https://example1.com/tos\nhttps://example2.com/tos',
               required: true,
             }}
             value={service.tosUrls.join('\n')}
             error={serviceInputErrors.tosUrls}
           />
-          <InputTextArea
-            label="Onion URLs"
-            description="One per line"
-            name="onionUrls"
+          <InputText
+            label="Referral link path"
+            name="referral"
             inputProps={{
-              rows: 3,
-              placeholder: 'http://example1.onion\nhttp://example2.onion',
+              value: service.referral,
+              placeholder: 'e.g. ?ref=123 or /ref/123',
             }}
-            value={service.onionUrls.join('\n')}
-            error={serviceInputErrors.onionUrls}
-          />
-          <InputTextArea
-            label="I2P URLs"
-            description="One per line"
-            name="i2pUrls"
-            inputProps={{
-              rows: 3,
-              placeholder: 'http://example1.b32.i2p\nhttp://example2.b32.i2p',
-            }}
-            value={service.i2pUrls.join('\n')}
+            error={serviceInputErrors.referral}
+            class="self-end"
+            description="Will be appended to the service URL"
           />
         </div>
-
-        <InputText
-          label="Referral link path"
-          name="referral"
-          inputProps={{
-            value: service.referral,
-            placeholder: 'e.g. ?ref=123 or /ref/123',
-          }}
-          error={serviceInputErrors.referral}
-          description="Will be appended to the service URL"
-        />
 
         <div class="flex items-center justify-between gap-2">
           <InputImageFile

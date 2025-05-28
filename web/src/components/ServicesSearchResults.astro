@@ -21,7 +21,6 @@ type Props = HTMLAttributes<'div'> & {
   pageSize: number
   sortSeed?: string
   filters: ServicesFiltersObject
-  includeScams: boolean
   countCommunityOnly: number | null
   inlineIcons?: boolean
 }
@@ -35,15 +34,12 @@ const {
   sortSeed,
   class: className,
   filters,
-  includeScams,
   countCommunityOnly,
   inlineIcons,
   ...divProps
 } = Astro.props
 
-const hasScams =
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  filters.verification.includes('VERIFICATION_FAILED') || includeScams
+const hasScams = filters.verification.includes('VERIFICATION_FAILED')
 const hasSomeScam = !!services?.some((service) => service.verificationStatus.includes('VERIFICATION_FAILED'))
 
 const hasCommunityContributed = filters.verification.includes('COMMUNITY_CONTRIBUTED')

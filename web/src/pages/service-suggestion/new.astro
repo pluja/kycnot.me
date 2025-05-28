@@ -201,34 +201,31 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       error={inputErrors.description}
     />
 
-    <InputTextArea
-      label="Service URLs"
-      name="serviceUrls"
-      inputProps={{
-        required: true,
-        placeholder: 'https://example1.com\nhttps://example2.org',
-      }}
-      error={inputErrors.serviceUrls}
-    />
-
-    <InputTextArea
-      label="Terms of Service URLs"
-      name="tosUrls"
-      inputProps={{
-        required: true,
-        placeholder: 'https://example1.com/tos\nhttps://example2.org/terms',
-      }}
-      error={inputErrors.tosUrls}
-    />
-
-    <InputTextArea
-      label="Onion URLs"
-      name="onionUrls"
-      inputProps={{
-        placeholder: 'http://example1.onion\nhttp://example2.onion',
-      }}
-      error={inputErrors.onionUrls}
-    />
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <InputTextArea
+        label="Service URLs"
+        description="One per line. Accepts **Web**, **Onion**, and **I2P** URLs."
+        name="allServiceUrls"
+        inputProps={{
+          placeholder: 'https://example1.com\nhttps://example2.onion\nhttps://example3.b32.i2p',
+          class: 'min-h-24',
+          required: true,
+        }}
+        class="row-span-2 flex flex-col self-stretch"
+        error={inputErrors.allServiceUrls}
+      />
+      <InputTextArea
+        label="ToS URLs"
+        description="One per line"
+        name="tosUrls"
+        inputProps={{
+          placeholder: 'https://example1.com/tos\nhttps://example2.com/tos',
+          class: 'md:min-h-24',
+          required: true,
+        }}
+        error={inputErrors.tosUrls}
+      />
+    </div>
 
     <InputCardGroup
       name="kycLevel"

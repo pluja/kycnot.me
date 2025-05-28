@@ -6,12 +6,8 @@ import slugify from 'slugify'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { saveFileLocally } from '../../lib/fileStorage'
 import { prisma } from '../../lib/prisma'
-import {
-  imageFileSchema,
-  stringListOfUrlsSchema,
-  stringListOfUrlsSchemaRequired,
-  zodCohercedNumber,
-} from '../../lib/zodUtils'
+import { separateServiceUrlsByType } from '../../lib/urls'
+import { imageFileSchema, stringListOfUrlsSchemaRequired, zodCohercedNumber } from '../../lib/zodUtils'
 
 const serviceSchemaBase = z.object({
   id: z.number().int().positive(),
@@ -19,11 +15,10 @@ const serviceSchemaBase = z.object({
     .string()
     .regex(/^[a-z0-9-]+$/, 'Allowed characters: lowercase letters, numbers, and hyphens')
     .optional(),
-  name: z.string().min(1).max(20),
+  name: z.string().min(1).max(40),
   description: z.string().min(1),
-  serviceUrls: stringListOfUrlsSchemaRequired,
+  allServiceUrls: stringListOfUrlsSchemaRequired,
   tosUrls: stringListOfUrlsSchemaRequired,
-  onionUrls: stringListOfUrlsSchema,
   kycLevel: z.coerce.number().int().min(0).max(4),
   attributes: z.array(z.coerce.number().int().positive()),
   categories: z.array(z.coerce.number().int().positive()).min(1),
@@ -85,13 +80,20 @@ export const adminServiceActions = {
         ? await saveFileLocally(input.imageFile, input.imageFile.name)
         : undefined
 
+      const {
+        web: serviceUrls,
+        onion: onionUrls,
+        i2p: i2pUrls,
+      } = separateServiceUrlsByType(input.allServiceUrls)
+
       const service = await prisma.service.create({
         data: {
           name: input.name,
           description: input.description,
-          serviceUrls: input.serviceUrls,
+          serviceUrls,
           tosUrls: input.tosUrls,
-          onionUrls: input.onionUrls,
+          onionUrls,
+          i2pUrls,
           kycLevel: input.kycLevel,
           verificationStatus: input.verificationStatus,
           verificationSummary: input.verificationSummary,
@@ -187,14 +189,21 @@ export const adminServiceActions = {
       const attributesToAdd = input.attributes.filter((aId) => !existingAttributeIds.includes(aId))
       const attributesToRemove = existingAttributeIds.filter((aId) => !input.attributes.includes(aId))
 
+      const {
+        web: serviceUrls,
+        onion: onionUrls,
+        i2p: i2pUrls,
+      } = separateServiceUrlsByType(input.allServiceUrls)
+
       const service = await prisma.service.update({
         where: { id: input.id },
         data: {
           name: input.name,
           description: input.description,
-          serviceUrls: input.serviceUrls,
+          serviceUrls,
           tosUrls: input.tosUrls,
-          onionUrls: input.onionUrls,
+          onionUrls,
+          i2pUrls,
           kycLevel: input.kycLevel,
           verificationStatus: input.verificationStatus,
           verificationSummary: input.verificationSummary,

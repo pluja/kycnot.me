@@ -113,3 +113,28 @@ export function urlDomain(url: URL | string) {
   }
   return url.origin
 }
+
+export function separateServiceUrlsByType(allServiceUrls: string[]) {
+  const result: {
+    web: string[]
+    onion: string[]
+    i2p: string[]
+  } = {
+    web: [],
+    onion: [],
+    i2p: [],
+  }
+
+  for (const url of allServiceUrls) {
+    const parsedUrl = new URL(url)
+    if (parsedUrl.origin.endsWith('.onion')) {
+      result.onion.push(url)
+    } else if (parsedUrl.origin.endsWith('.b32.i2p')) {
+      result.i2p.push(url)
+    } else {
+      result.web.push(url)
+    }
+  }
+
+  return result
+}

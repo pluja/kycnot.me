@@ -916,7 +916,7 @@ const specialUsersData = {
     verifiedLink: 'https://kycnot.me',
     totalKarma: 1001,
     link: 'https://kycnot.me',
-    picture: 'https://comments.kycnot.me/api/users/549f290e-0542-4c18-b437-5b64b35758f0/avatar?size=L',
+    picture: 'https://kycnot.me/files/users/pictures/c277dc0f2f.png',
   },
   moderator: {
     name: 'moderator_dev',
@@ -928,7 +928,7 @@ const specialUsersData = {
     verifiedLink: 'https://kycnot.me',
     totalKarma: 1001,
     link: 'https://kycnot.me',
-    picture: 'https://comments.kycnot.me/api/users/549f290e-0542-4c18-b437-5b64b35758f0/avatar?size=L',
+    picture: 'https://kycnot.me/files/users/pictures/c277dc0f2f.png',
   },
   verified: {
     name: 'verified_dev',

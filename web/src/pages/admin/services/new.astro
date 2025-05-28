@@ -74,19 +74,19 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
       </div>
 
       <div>
-        <label for="serviceUrls" class="font-title mb-2 block text-sm text-green-500">serviceUrls</label>
+        <label for="allServiceUrls" class="font-title mb-2 block text-sm text-green-500">Service URLs</label>
         <textarea
           transition:persist
           class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-          name="serviceUrls"
-          id="serviceUrls"
+          name="allServiceUrls"
+          id="allServiceUrls"
           rows={3}
-          placeholder="https://example1.com https://example2.com"
+          placeholder="https://example1.com\nhttps://example2.onion\nhttps://example3.b32.i2p"
           set:text=""
         />
         {
-          inputErrors.serviceUrls && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.serviceUrls.join(', ')}</p>
+          inputErrors.allServiceUrls && (
+            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.allServiceUrls.join(', ')}</p>
           )
         }
       </div>
@@ -105,24 +105,6 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
         {
           inputErrors.tosUrls && (
             <p class="font-title mt-1 text-sm text-red-500">{inputErrors.tosUrls.join(', ')}</p>
-          )
-        }
-      </div>
-
-      <div>
-        <label for="onionUrls" class="font-title mb-2 block text-sm text-green-500">onionUrls</label>
-        <textarea
-          transition:persist
-          class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-          name="onionUrls"
-          id="onionUrls"
-          rows={3}
-          placeholder="http://example.onion"
-          set:text=""
-        />
-        {
-          inputErrors.onionUrls && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.onionUrls.join(', ')}</p>
           )
         }
       </div>

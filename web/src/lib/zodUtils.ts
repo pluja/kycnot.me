@@ -19,7 +19,7 @@ export const zodUrlOptionalProtocol = z.preprocess(
     const cleanInput = input.trim().replace(/\/$/, '')
     return !/^\w+:\/\//i.test(cleanInput) ? `https://${cleanInput}` : cleanInput
   },
-  z.string().refine((value) => /^(https?):\/\/(?=.*\.[a-z]{2,})[^\s$.?#].[^\s]*$/i.test(value), {
+  z.string().refine((value) => /^(https?):\/\/(?=.*\.[a-z0-9]{2,})[^\s$.?#].[^\s]*$/i.test(value), {
     message: 'Invalid URL',
   })
 )
