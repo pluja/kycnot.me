@@ -201,6 +201,41 @@ Some reviews may be spam or fake. Read comments carefully and **always do your o
 
 To **see comments waiting for moderation**, toggle the switch in the comments section. These comments show up with a yellow background and a "pending" label.
 
+## API
+
+Access basic service data via our public API.
+
+**Attribution:** Please credit **KYCnot.me** if you use data from this API.
+
+### `GET /api/v1/service/[id]`
+
+Fetches details for a single service.
+
+-   **`[id]`**: Can be a service ID, slug, name, or any registered URL (including .onion/.i2p).
+
+**Example Requests:**
+
+```
+/api/v1/service/bisq
+/api/v1/service/https://bisq.network
+```
+
+**Example Response (200 OK):**
+
+```json
+{
+  "name": "Bisq",
+  "description": "Decentralized Bitcoin exchange network.",
+  "kycLevel": 0,
+  "categories": ["exchange"],
+  "serviceUrls": ["https://bisq.network/"],
+  "onionUrls": [],
+  "i2pUrls": [],
+  "tosUrls": ["https://bisq.network/terms-of-service/"],
+  "kycnotmeUrl": "https://kycnot.me/service/bisq"
+}
+```
+
 ## Support
 
 If you like this project, you can **support** it through these methods:
