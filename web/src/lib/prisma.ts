@@ -25,24 +25,23 @@ const findManyAndCount = {
   },
 }
 
-type FindManyAndCountType = typeof findManyAndCount.model.$allModels.findManyAndCount
+// NOTE: This used to be necessary to cast the prismaClientSingleton return type, but it seems not anymore. I left it, just in case we need it again
+// type FindManyAndCountType = typeof findManyAndCount.model.$allModels.findManyAndCount
 
-type ModelsWithCustomMethods = {
-  [Model in keyof PrismaClient]: PrismaClient[Model] extends {
-    findMany: (...args: any[]) => Promise<any>
-  }
-    ? PrismaClient[Model] & {
-        findManyAndCount: FindManyAndCountType
-      }
-    : PrismaClient[Model]
-}
+// type ModelsWithCustomMethods = {
+//   [Model in keyof PrismaClient]: PrismaClient[Model] extends {
+//     findMany: (...args: any[]) => Promise<any>
+//   }
+//     ? PrismaClient[Model] & {
+//         findManyAndCount: FindManyAndCountType
+//       }
+//     : PrismaClient[Model]
+// }
 
-type ExtendedPrismaClient = ModelsWithCustomMethods & PrismaClient
+// type ExtendedPrismaClient = ModelsWithCustomMethods & PrismaClient
 
-function prismaClientSingleton(): ExtendedPrismaClient {
-  const prisma = new PrismaClient().$extends(findManyAndCount)
-
-  return prisma as unknown as ExtendedPrismaClient
+function prismaClientSingleton() {
+  return new PrismaClient().$extends(findManyAndCount)
 }
 
 declare global {

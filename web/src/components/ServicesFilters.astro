@@ -49,6 +49,7 @@ const {
   class={cn(
     // Check the scam filter when there is a text quey and the user has checked verified and approved
     'has-[input[name=q]:not(:placeholder-shown)]:has-[&_input[name=verification][value=verified]:checked]:has-[&_input[name=verification][value=approved]:checked]:[&_input[name=verification][value=scam]]:checkbox-force-checked',
+    'has-[input[name=q]:placeholder-shown]:[&_[data-hide-if-q-is-empty]]:hidden has-[input[name=q]:not(:placeholder-shown)]:[&_[data-hide-if-q-is-filled]]:hidden',
     className
   )}
 >
@@ -80,16 +81,20 @@ const {
         ))
       }
     </select>
-    <p class="text-day-500 mt-1.5 text-center text-sm">
+    <p class="text-day-500 mt-1.5 text-center text-sm" data-hide-if-q-is-filled>
       <Icon name="ri:shuffle-line" class="inline-block size-3.5 align-[-0.125em]" />
       Ties randomly sorted
+    </p>
+    <p class="text-day-500 mt-1.5 text-center text-sm" data-hide-if-q-is-empty>
+      <Icon name="ri:seo-line" class="inline-block size-3.5 align-[-0.125em]" />
+      Sorted by match first
     </p>
   </fieldset>
 
   <!-- Text Search -->
   <fieldset class="mb-6">
     <legend class="font-title mb-3 leading-none text-green-500">
-      <label for="q">Text</label>
+      <label for="q">Name</label>
     </legend>
     <input
       type="text"

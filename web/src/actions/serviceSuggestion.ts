@@ -12,6 +12,7 @@ import { formatDistanceStrict } from 'date-fns'
 import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../lib/captchaValidation'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
 import { saveFileLocally } from '../lib/fileStorage'
+import { findServicesBySimilarity } from '../lib/findServicesBySimilarity'
 import { handleHoneypotTrap } from '../lib/honeypot'
 import { prisma } from '../lib/prisma'
 import { separateServiceUrlsByType } from '../lib/urls'
@@ -29,11 +30,12 @@ export const SUGGESTION_DESCRIPTION_MAX_LENGTH = 100
 export const SUGGESTION_MESSAGE_CONTENT_MAX_LENGTH = 1000
 
 const findPossibleDuplicates = async (input: { name: string }) => {
-  const possibleDuplicates = await prisma.service.findMany({
+  const matches = await findServicesBySimilarity(input.name, 0.3)
+
+  return await prisma.service.findMany({
     where: {
-      name: {
-        contains: input.name,
-        mode: 'insensitive',
+      id: {
+        in: matches.map(({ id }) => id),
       },
     },
     select: {
@@ -43,8 +45,6 @@ const findPossibleDuplicates = async (input: { name: string }) => {
       description: true,
     },
   })
-
-  return possibleDuplicates
 }
 
 const serializeExtraNotes = <T extends Record<string, unknown>>(

@@ -26,6 +26,7 @@ import {
 } from '../constants/verificationStatus'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { areEqualArraysWithoutOrder, zodEnumFromConstant } from '../lib/arrays'
+import { findServicesBySimilarity } from '../lib/findServicesBySimilarity'
 import { parseIntWithFallback } from '../lib/numbers'
 import { areEqualObjectsWithoutOrder } from '../lib/objects'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
@@ -213,7 +214,10 @@ const groupedAttributes = groupBy(
   'value'
 )
 
+const servicesQMatch = filters.q ? await findServicesBySimilarity(filters.q) : null
+
 const where = {
+  id: servicesQMatch ? { in: servicesQMatch.map(({ id }) => id) } : undefined,
   listedAt: {
     lte: new Date(),
   },
@@ -240,16 +244,6 @@ const where = {
             averageUserRating: {
               gte: filters['user-rating'],
             },
-          } satisfies Prisma.ServiceWhereInput,
-        ]
-      : []),
-    ...(filters.q
-      ? [
-          {
-            OR: [
-              { name: { contains: filters.q, mode: 'insensitive' as const } },
-              { description: { contains: filters.q, mode: 'insensitive' as const } },
-            ],
           } satisfies Prisma.ServiceWhereInput,
         ]
       : []),
@@ -338,33 +332,45 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
     [
       'Unable to load services.',
       async () => {
-        const [unsortedServices, totalServices] = await prisma.service.findManyAndCount({
-          where,
-          select: {
-            id: true,
-            ...(Object.fromEntries(sortOptions.map((option) => [option.orderBy.key, true])) as Record<
-              (typeof sortOptions)[number]['orderBy']['key'],
-              true
-            >),
-          },
-        })
+        const [unsortedServicesMissingSimilarityScore, totalServices] = await prisma.service.findManyAndCount(
+          {
+            where,
+            select: {
+              id: true,
+              ...(Object.fromEntries(sortOptions.map((option) => [option.orderBy.key, true])) as Record<
+                (typeof sortOptions)[number]['orderBy']['key'],
+                true
+              >),
+            },
+          }
+        )
+
+        const unsortedServices = unsortedServicesMissingSimilarityScore.map((service) => ({
+          ...service,
+          similarityScore: servicesQMatch?.find((match) => match.id === service.id)?.similarityScore ?? 0,
+        }))
 
         const rng = seedrandom(filters['sort-seed'])
         const selectedSort = sortOptions.find((sort) => sort.value === filters.sort) ?? defaultSortOption
 
         const sortedServices = orderBy(
           unsortedServices,
-          [selectedSort.orderBy.key, () => rng()],
-          [selectedSort.orderBy.direction, 'asc']
+          [
+            ...(filters.q ? (['similarityScore'] as const) : ([] as const)),
+            selectedSort.orderBy.key,
+            () => rng(),
+          ],
+          [...(filters.q ? (['desc'] as const) : ([] as const)), selectedSort.orderBy.direction, 'asc']
         ).slice((filters.page - 1) * PAGE_SIZE, filters.page * PAGE_SIZE)
 
-        const unsortedServicesWithInfo = await prisma.service.findMany({
+        const unsortedServicesWithInfoMissingSimilarityScore = await prisma.service.findMany({
           where: {
             id: {
               in: sortedServices.map((service) => service.id),
             },
           },
           select: {
+            id: true,
             name: true,
             slug: true,
             description: true,
@@ -398,14 +404,20 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
           },
         })
 
+        const unsortedServicesWithInfo = unsortedServicesWithInfoMissingSimilarityScore.map((service) => ({
+          ...service,
+          similarityScore: servicesQMatch?.find((match) => match.id === service.id)?.similarityScore ?? 0,
+        }))
+
         const sortedServicesWithInfo = orderBy(
           unsortedServicesWithInfo,
           [
+            ...(filters.q ? (['similarityScore'] as const) : ([] as const)),
             selectedSort.orderBy.key,
             // Now we can shuffle indeternimistically, because the pagination was already applied
             () => Math.random(),
           ],
-          [selectedSort.orderBy.direction, 'asc']
+          [...(filters.q ? (['desc'] as const) : ([] as const)), selectedSort.orderBy.direction, 'asc']
         )
 
         return [sortedServicesWithInfo, totalServices] as const
