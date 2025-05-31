@@ -87,6 +87,25 @@ function makeLink(url: string, referral: string | null) {
     }
   }
 
+  const bitcointalkMatch = /^(?:https?:\/\/)?(?:www\.)?bitcointalk\.org$/.exec(hostname)
+  if (bitcointalkMatch) {
+    return {
+      type: 'clearnet' as const,
+      url: urlWithReferral,
+      textBits: [
+        {
+          style: 'normal',
+          text: 'BitcoinTalk ',
+        },
+        {
+          style: 'irrelevant',
+          text: 'thread',
+        },
+      ],
+      icon: networksBySlug.clearnet.icon,
+    }
+  }
+
   return {
     type: 'clearnet' as const,
     url: urlWithReferral,

@@ -34,6 +34,7 @@ import {
   verificationStepStatuses,
 } from '../../../../constants/verificationStepStatus'
 import BaseLayout from '../../../../layouts/BaseLayout.astro'
+import { DEPLOYMENT_MODE } from '../../../../lib/envVariables'
 import { makeAdminApiCallInfo } from '../../../../lib/makeAdminApiCallInfo'
 import { pluralize } from '../../../../lib/pluralize'
 import { prisma } from '../../../../lib/prisma'
@@ -1118,6 +1119,14 @@ const apiCalls = await Astro.locals.banners.try(
     </FormSection>
 
     <FormSection title="API">
+      {
+        DEPLOYMENT_MODE === 'staging' && (
+          <p class="rounded-lg bg-red-900/30 p-4 text-sm text-red-200">
+            <Icon name="ri:alert-line" class="inline-block size-4 align-[-0.2em] text-red-400" />
+            This endpoints section doesn't work in PRE. Use curl commands instead.
+          </p>
+        )
+      }
       {
         apiCalls.map((call) => (
           <FormSubSection title={`${call.method} ${call.path}`}>

@@ -89,7 +89,7 @@ if (!user || !user.admin || !user.moderator) return null
         data-comment-id={comment.id}
         data-user-id={user.id}
       >
-        {comment.requiresAdminReview ? 'No Admin Review' : 'Admin Review'}
+        {comment.requiresAdminReview ? 'No Admin Review' : 'Needs Admin Review'}
       </button>
 
       <button
