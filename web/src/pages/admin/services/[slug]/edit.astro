@@ -183,7 +183,21 @@ const [service, categories, attributes] = await Astro.locals.banners.tryMany([
   ],
 ])
 
-if (!service) return Astro.rewrite('/404')
+if (!service) {
+  try {
+    const serviceWithOldSlug = await prisma.service.findFirst({
+      where: { previousSlugs: { has: slug } },
+      select: { slug: true },
+    })
+    if (serviceWithOldSlug) {
+      return Astro.redirect(`/admin/services/${serviceWithOldSlug.slug}/edit`, 301)
+    }
+  } catch (error) {
+    console.error(error)
+  }
+
+  return Astro.rewrite('/404')
+}
 
 const apiCalls = await Astro.locals.banners.try(
   'Error fetching api calls',
@@ -264,7 +278,9 @@ const apiCalls = await Astro.locals.banners.try(
 
           <InputText
             label="Slug"
-            description="Auto-generated if empty"
+            description={`Auto-generated if empty. ${
+              service.previousSlugs.length > 0 ? `Old slugs: ${service.previousSlugs.join(', ')}` : ''
+            }`}
             name="slug"
             inputProps={{
               value: service.slug,

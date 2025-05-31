@@ -612,6 +612,7 @@ const generateFakeService = (users: User[]) => {
   return {
     name,
     slug,
+    previousSlugs: faker.helpers.maybe(() => [`${slug}-old`], { probability: 0.5 }),
     description: faker.helpers.arrayElement(serviceDescriptions),
     kycLevel: faker.helpers.arrayElement(kycLevels.map((level) => level.value)),
     overallScore: 0,

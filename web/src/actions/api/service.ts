@@ -44,7 +44,30 @@ export const apiServiceActions = {
             .flatMap((url) => [url, url.endsWith('/') ? url.slice(0, -1) : `${url}/`])
         : undefined
 
-      const service = await prisma.service.findFirst({
+      const select = {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        kycLevel: true,
+        verificationStatus: true,
+        categories: {
+          select: {
+            name: true,
+            slug: true,
+          },
+        },
+        serviceUrls: true,
+        onionUrls: true,
+        i2pUrls: true,
+        tosUrls: true,
+        referral: true,
+        listedAt: true,
+        verifiedAt: true,
+        serviceVisibility: true,
+      } as const satisfies Prisma.ServiceSelect
+
+      let service = await prisma.service.findFirst({
         where: {
           listedAt: { lte: new Date() },
           serviceVisibility: { in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'] },
@@ -61,29 +84,20 @@ export const apiServiceActions = {
               : []),
           ],
         },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          description: true,
-          kycLevel: true,
-          verificationStatus: true,
-          categories: {
-            select: {
-              name: true,
-              slug: true,
-            },
-          },
-          serviceUrls: true,
-          onionUrls: true,
-          i2pUrls: true,
-          tosUrls: true,
-          referral: true,
-          listedAt: true,
-          verifiedAt: true,
-          serviceVisibility: true,
-        },
+        select,
       })
+
+      if (!service && input.slug) {
+        service = await prisma.service.findFirst({
+          where: {
+            listedAt: { lte: new Date() },
+            serviceVisibility: { in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'] },
+
+            previousSlugs: { has: input.slug },
+          },
+          select,
+        })
+      }
 
       if (
         !service ||

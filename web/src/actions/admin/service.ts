@@ -1,6 +1,7 @@
 import { Currency, ServiceVisibility, VerificationStatus } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
+import { uniq } from 'lodash-es'
 import slugify from 'slugify'
 
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
@@ -164,11 +165,22 @@ export const adminServiceActions = {
 
       const existingService = await prisma.service.findUnique({
         where: { id: input.id },
-        include: {
-          categories: true,
+        select: {
+          slug: true,
+          previousSlugs: true,
+          categories: {
+            select: {
+              id: true,
+            },
+          },
           attributes: {
-            include: {
-              attribute: true,
+            select: {
+              attributeId: true,
+              attribute: {
+                select: {
+                  id: true,
+                },
+              },
             },
           },
         },
@@ -213,6 +225,14 @@ export const adminServiceActions = {
           serviceVisibility: input.serviceVisibility,
           slug: input.slug,
           overallScore: input.overallScore,
+          previousSlugs:
+            existingService.slug !== input.slug
+              ? {
+                  set: uniq([...existingService.previousSlugs, existingService.slug]).filter(
+                    (slug) => slug !== input.slug
+                  ),
+                }
+              : undefined,
 
           imageUrl,
           categories: {

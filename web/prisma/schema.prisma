@@ -336,6 +336,7 @@ model Service {
   id                     Int                          @id @default(autoincrement())
   name                   String
   slug                   String                       @unique
+  previousSlugs          String[]                     @default([])
   description            String
   categories             Category[]                   @relation("ServiceToCategory")
   kycLevel               Int                          @default(4)
@@ -396,6 +397,7 @@ model Service {
   @@index([createdAt])
   @@index([updatedAt])
   @@index([slug])
+  @@index([previousSlugs])
 }
 
 model ServiceContactMethod {

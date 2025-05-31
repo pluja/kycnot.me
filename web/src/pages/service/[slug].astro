@@ -67,7 +67,11 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
     'Error fetching service',
     async () =>
       prisma.service.findUnique({
-        where: { slug },
+        where: {
+          slug,
+          serviceVisibility: { in: ['PUBLIC', 'UNLISTED', 'ARCHIVED'] },
+          listedAt: { lte: new Date() },
+        },
         select: {
           id: true,
           slug: true,
@@ -219,6 +223,34 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
   ],
 ])
 
+if (!service) {
+  try {
+    const serviceWithOldSlug = await prisma.service.findFirst({
+      where: {
+        previousSlugs: { has: slug },
+        serviceVisibility: { in: ['PUBLIC', 'UNLISTED', 'ARCHIVED'] },
+        listedAt: { lte: new Date() },
+      },
+      select: { slug: true },
+    })
+    if (serviceWithOldSlug) {
+      return Astro.redirect(`/service/${serviceWithOldSlug.slug}`, 301)
+    }
+  } catch (error) {
+    console.error(error)
+  }
+
+  return Astro.rewrite('/404')
+}
+
+if (
+  service.serviceVisibility !== 'PUBLIC' &&
+  service.serviceVisibility !== 'UNLISTED' &&
+  service.serviceVisibility !== 'ARCHIVED'
+) {
+  return Astro.rewrite('/404')
+}
+
 const makeWatchingDetails = (
   dbNotificationPreferences: Prisma.NotificationPreferencesGetPayload<{
     select: {
@@ -254,17 +286,7 @@ const makeWatchingDetails = (
   } as const
 }
 
-const watchingDetails = makeWatchingDetails(dbNotificationPreferences, service?.id)
-
-if (!service) return Astro.rewrite('/404')
-
-if (
-  service.serviceVisibility !== 'PUBLIC' &&
-  service.serviceVisibility !== 'UNLISTED' &&
-  service.serviceVisibility !== 'ARCHIVED'
-) {
-  return Astro.rewrite('/404')
-}
+const watchingDetails = makeWatchingDetails(dbNotificationPreferences, service.id)
 
 const statusIcon = {
   ...verificationStatusesByValue,
