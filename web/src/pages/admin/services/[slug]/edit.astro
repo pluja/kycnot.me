@@ -33,6 +33,7 @@ import {
   verificationStepStatuses,
 } from '../../../../constants/verificationStepStatus'
 import BaseLayout from '../../../../layouts/BaseLayout.astro'
+import { makeAdminApiCallInfo } from '../../../../lib/makeAdminApiCallInfo'
 import { pluralize } from '../../../../lib/pluralize'
 import { prisma } from '../../../../lib/prisma'
 
@@ -181,6 +182,20 @@ const [service, categories, attributes] = await Astro.locals.banners.tryMany([
 ])
 
 if (!service) return Astro.rewrite('/404')
+
+const apiCalls = await Astro.locals.banners.try(
+  'Error fetching api calls',
+  () =>
+    Promise.all([
+      makeAdminApiCallInfo({
+        method: 'QUERY',
+        path: '/service/get',
+        input: { slug: service.slug },
+        baseUrl: Astro.url,
+      }),
+    ]),
+  []
+)
 ---
 
 <BaseLayout pageTitle={`Edit Service: ${service.name}`}>
@@ -1099,6 +1114,26 @@ if (!service) return Astro.rewrite('/404')
           <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />
         </form>
       </FormSubSection>
+    </FormSection>
+
+    <FormSection title="API">
+      {
+        apiCalls.map((call) => (
+          <FormSubSection title={`${call.method} ${call.path}`}>
+            <p class="text-day-400 text-sm">Input:</p>
+            <pre
+              class="bg-night-800 border-night-500 text-day-300 overflow-x-auto rounded-md border p-3"
+              set:text={JSON.stringify(call.input, null, 2)}
+            />
+
+            <p class="text-day-400 text-sm">Output:</p>
+            <pre
+              class="bg-night-800 border-night-500 text-day-300 overflow-x-auto rounded-md border p-3"
+              set:text={JSON.stringify(call.output, null, 2)}
+            />
+          </FormSubSection>
+        ))
+      }
     </FormSection>
   </div>
 </BaseLayout>

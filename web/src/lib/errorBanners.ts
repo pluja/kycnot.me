@@ -114,7 +114,13 @@ export class ErrorBanners {
       return result
     } catch (error) {
       this.handler(uiMessage)(error)
-      return fallback as F
+      return fallback as F extends never[]
+        ? T extends [infer _First, ...infer _Rest]
+          ? []
+          : T extends unknown[]
+            ? T[number][]
+            : F
+        : F
     }
   }
 
