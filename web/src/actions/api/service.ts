@@ -46,6 +46,9 @@ export const apiServiceActions = {
 
       const service = await prisma.service.findFirst({
         where: {
+          listedAt: { lte: new Date() },
+          serviceVisibility: { in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'] },
+
           OR: [
             ...(input.id ? ([{ id: input.id }] satisfies Prisma.ServiceWhereInput[]) : []),
             ...(input.slug ? ([{ slug: input.slug }] satisfies Prisma.ServiceWhereInput[]) : []),
@@ -76,10 +79,20 @@ export const apiServiceActions = {
           i2pUrls: true,
           tosUrls: true,
           referral: true,
+          listedAt: true,
+          verifiedAt: true,
+          serviceVisibility: true,
         },
       })
 
-      if (!service) {
+      if (
+        !service ||
+        (service.serviceVisibility !== 'PUBLIC' &&
+          service.serviceVisibility !== 'ARCHIVED' &&
+          service.serviceVisibility !== 'UNLISTED') ||
+        !service.listedAt ||
+        service.listedAt > new Date()
+      ) {
         throw new ActionError({
           code: 'NOT_FOUND',
           message: 'Service not found',
@@ -91,6 +104,7 @@ export const apiServiceActions = {
         slug: service.slug,
         name: service.name,
         description: service.description,
+        serviceVisibility: service.serviceVisibility,
         verificationStatus: service.verificationStatus,
         verificationStatusInfo: pick(getVerificationStatusInfo(service.verificationStatus), [
           'value',
@@ -99,9 +113,11 @@ export const apiServiceActions = {
           'labelShort',
           'description',
         ]),
+        verifiedAt: service.verifiedAt,
         kycLevel: service.kycLevel,
         kycLevelInfo: pick(getKycLevelInfo(service.kycLevel.toString()), ['value', 'name', 'description']),
         categories: service.categories,
+        listedAt: service.listedAt,
         serviceUrls: [...service.serviceUrls, ...service.onionUrls, ...service.i2pUrls].map(
           (url) => url + (service.referral ?? '')
         ),

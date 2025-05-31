@@ -10,6 +10,7 @@ icon: 'ri:plug-line'
 import { SOURCE_CODE_URL } from 'astro:env/server'
 import { kycLevels } from '../../constants/kycLevels'
 import { verificationStatuses } from '../../constants/verificationStatus'
+import { serviceVisibilities } from '../../constants/serviceVisibility'
 
 Access basic service data via our public API.
 
@@ -41,6 +42,7 @@ type ServiceResponse = {
   slug: string
   name: string
   description: string
+  serviceVisibility: 'PUBLIC' | 'ARCHIVED' | 'UNLISTED'
   verificationStatus: 'VERIFICATION_SUCCESS' | 'APPROVED' | 'COMMUNITY_CONTRIBUTED' | 'VERIFICATION_FAILED'
   verificationStatusInfo: {
     value: 'VERIFICATION_SUCCESS' | 'APPROVED' | 'COMMUNITY_CONTRIBUTED' | 'VERIFICATION_FAILED'
@@ -49,6 +51,7 @@ type ServiceResponse = {
     labelShort: string
     description: string
   }
+  verifiedAt: Date | null
   kycLevel: 0 | 1 | 2 | 3 | 4
   kycLevelInfo: {
     value: 0 | 1 | 2 | 3 | 4
@@ -59,13 +62,14 @@ type ServiceResponse = {
     name: string
     slug: string
   }[]
+  listedAt: Date
   serviceUrls: string[]
   tosUrls: string[]
   kycnotmeUrl: `https://kycnot.me/service/${service.slug}`
 }
 ```
 
-### KYC Levels
+#### KYC Levels
 
 <ul>
 {kycLevels.map((level) => (
@@ -75,7 +79,7 @@ type ServiceResponse = {
 ))}
 </ul>
 
-### Verification Status
+#### Verification Status
 
 <ul>
 {verificationStatuses.map((status) => (
@@ -85,7 +89,19 @@ type ServiceResponse = {
 ))}
 </ul>
 
-### Example Request
+#### Service Visibility
+
+<ul>
+{serviceVisibilities.filter((visibility) => visibility.value === 'PUBLIC' || visibility.value === 'ARCHIVED' || visibility.value === 'UNLISTED').map((visibility) => (
+  <li key={visibility.value}>
+    <strong>{visibility.value}</strong>: {visibility.longDescription}
+  </li>
+))}
+</ul>
+
+### Examples
+
+#### Request
 
 ```zsh
 curl -X QUERY https://kycnot.me/api/v1/service/get \
@@ -93,12 +109,13 @@ curl -X QUERY https://kycnot.me/api/v1/service/get \
   -d '{"slug": "my-example-service"}'
 ```
 
-### Example Response
+#### Response
 
 ```json
 {
   "name": "My Example Service",
   "description": "This is a description of my example service",
+  "serviceVisibility": "PUBLIC",
   "verificationStatus": "VERIFICATION_SUCCESS",
   "verificationStatusInfo": {
     "value": "VERIFICATION_SUCCESS",
@@ -107,6 +124,7 @@ curl -X QUERY https://kycnot.me/api/v1/service/get \
     "labelShort": "Verified",
     "description": "Thoroughly tested and verified by the team. But things might change, this is not a guarantee."
   },
+  "verifiedAt": "2025-01-20T07:12:29.393Z",
   "kycLevel": 0,
   "kycLevelInfo": {
     "value": 0,
@@ -119,6 +137,7 @@ curl -X QUERY https://kycnot.me/api/v1/service/get \
       "slug": "exchange"
     }
   ],
+  "listedAt": "2025-05-31T19:09:18.043Z",
   "serviceUrls": [
     "https://example.com",
     "http://c9ikae0fdidzh1ufrzp022e5uqfvz6ofxlkycz59cvo6fdxjgx7ekl9e.onion"
@@ -128,7 +147,7 @@ curl -X QUERY https://kycnot.me/api/v1/service/get \
 }
 ```
 
-### Error Responses
+#### Error Responses
 
 **404 Not Found**: Service not found
 

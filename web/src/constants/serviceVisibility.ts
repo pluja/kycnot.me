@@ -65,7 +65,7 @@ export const {
       value: 'ARCHIVED',
       slug: 'archived',
       label: 'Archived',
-      description: 'No longer operational',
+      description: 'No longer operational.',
       longDescription:
         'Archived service, no longer exists or ceased operations. Information may be outdated.',
       icon: 'ri:archive-line',

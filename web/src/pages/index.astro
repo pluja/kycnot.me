@@ -218,16 +218,12 @@ const servicesQMatch = filters.q ? await findServicesBySimilarity(filters.q) : n
 
 const where = {
   id: servicesQMatch ? { in: servicesQMatch.map(({ id }) => id) } : undefined,
-  listedAt: {
-    lte: new Date(),
-  },
+  listedAt: { lte: new Date() },
   categories: filters.categories.length ? { some: { slug: { in: filters.categories } } } : undefined,
   verificationStatus: {
     in: includeScams ? uniq([...filters.verification, 'VERIFICATION_FAILED'] as const) : filters.verification,
   },
-  serviceVisibility: {
-    in: ['PUBLIC', 'ARCHIVED'],
-  },
+  serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
   overallScore: { gte: filters['min-score'] },
   acceptedCurrencies: filters.currencies.length
     ? filters['currency-mode'] === 'and'
@@ -319,9 +315,8 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
               select: {
                 services: {
                   where: {
-                    serviceVisibility: {
-                      in: ['PUBLIC', 'ARCHIVED'],
-                    },
+                    serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
+                    listedAt: { lte: new Date() },
                   },
                 },
               },

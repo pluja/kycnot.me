@@ -1,10 +1,4 @@
-import {
-  Currency,
-  ServiceSuggestionStatus,
-  ServiceSuggestionType,
-  ServiceVisibility,
-  VerificationStatus,
-} from '@prisma/client'
+import { Currency } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 import { formatDistanceStrict } from 'date-fns'
@@ -118,9 +112,9 @@ export const serviceSuggestionActions = {
 
       const serviceSuggestion = await prisma.serviceSuggestion.create({
         data: {
-          type: ServiceSuggestionType.EDIT_SERVICE,
+          type: 'EDIT_SERVICE',
           notes: combinedNotes,
-          status: ServiceSuggestionStatus.PENDING,
+          status: 'PENDING',
           userId: context.locals.user.id,
           serviceId: service.id,
         },
@@ -229,12 +223,12 @@ export const serviceSuggestionActions = {
             kycLevel: input.kycLevel,
             acceptedCurrencies: input.acceptedCurrencies,
             imageUrl,
-            verificationStatus: VerificationStatus.COMMUNITY_CONTRIBUTED,
+            verificationStatus: 'COMMUNITY_CONTRIBUTED',
             overallScore: 0,
             privacyScore: 0,
             trustScore: 0,
             listedAt: new Date(),
-            serviceVisibility: ServiceVisibility.UNLISTED,
+            serviceVisibility: 'UNLISTED',
             categories: {
               connect: input.categories.map((id) => ({ id })),
             },
@@ -250,8 +244,8 @@ export const serviceSuggestionActions = {
         const serviceSuggestion = await tx.serviceSuggestion.create({
           data: {
             notes: input.notes,
-            type: ServiceSuggestionType.CREATE_SERVICE,
-            status: ServiceSuggestionStatus.PENDING,
+            type: 'CREATE_SERVICE',
+            status: 'PENDING',
             userId: context.locals.user.id,
             serviceId: service.id,
           },

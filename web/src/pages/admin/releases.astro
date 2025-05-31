@@ -1,8 +1,8 @@
 ---
 import { RELEASE_DATE, RELEASE_NUMBER } from 'astro:env/server'
 
-import TimeFormatted from '../../components/TimeFormatted.astro'
 import MiniLayout from '../../layouts/MiniLayout.astro'
+import { timeAgo } from '../../lib/timeAgo'
 
 const releaseDate =
   RELEASE_DATE && !isNaN(new Date(RELEASE_DATE).getTime()) ? new Date(RELEASE_DATE) : undefined
@@ -37,7 +37,7 @@ const releaseDate =
   {
     !!releaseDate && (
       <p class="text-day-500 mt-2">
-        (<TimeFormatted date={releaseDate} hourPrecision daysUntilDate={Infinity} />)
+        (<time datetime={releaseDate.toISOString()}>{timeAgo.format(releaseDate, 'round')}</time>)
       </p>
     )
   }

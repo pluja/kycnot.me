@@ -94,7 +94,16 @@ const user = await Astro.locals.banners.try('user', async () => {
               },
             },
           },
-          where: { service: { serviceVisibility: 'PUBLIC' } },
+          where: {
+            service: {
+              listedAt: {
+                lte: new Date(),
+              },
+              serviceVisibility: {
+                in: ['PUBLIC', 'ARCHIVED'],
+              },
+            },
+          },
           orderBy: { createdAt: 'desc' },
           take: 5,
         },
