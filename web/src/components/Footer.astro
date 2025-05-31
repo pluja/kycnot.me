@@ -15,26 +15,18 @@ const links = [
     icon: 'ri:git-repository-line',
     external: true,
   },
-  ...(Astro.url.origin !== new URL(ONION_ADDRESS).origin
-    ? [
-        {
-          href: ONION_ADDRESS,
-          label: 'Tor',
-          icon: 'onion',
-          external: true,
-        },
-      ]
-    : []),
-  ...(Astro.url.origin !== new URL(I2P_ADDRESS).origin
-    ? [
-        {
-          href: I2P_ADDRESS,
-          label: 'I2P',
-          icon: 'i2p',
-          external: true,
-        },
-      ]
-    : []),
+  {
+    href: ONION_ADDRESS,
+    label: 'Tor',
+    icon: 'onion',
+    external: true,
+  },
+  {
+    href: I2P_ADDRESS,
+    label: 'I2P',
+    icon: 'i2p',
+    external: true,
+  },
   {
     href: '/docs/api',
     label: 'API',
