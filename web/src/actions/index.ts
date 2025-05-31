@@ -1,5 +1,6 @@
 import { accountActions } from './account'
 import { adminActions } from './admin'
+import { apiActions } from './api'
 import { commentActions } from './comment'
 import { notificationActions } from './notifications'
 import { serviceActions } from './service'
@@ -19,6 +20,7 @@ import { serviceSuggestionActions } from './serviceSuggestion'
 export const server = {
   account: accountActions,
   admin: adminActions,
+  api: apiActions,
   comment: commentActions,
   notification: notificationActions,
   service: serviceActions,

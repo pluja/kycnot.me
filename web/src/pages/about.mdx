@@ -203,38 +203,9 @@ To **see comments waiting for moderation**, toggle the switch in the comments se
 
 ## API
 
-Access basic service data via our public API.
+You can access basic service data via our public API.
 
-**Attribution:** Please credit **KYCnot.me** if you use data from this API.
-
-### `GET /api/v1/service/[id]`
-
-Fetches details for a single service.
-
--   **`[id]`**: Can be a service ID, slug, name, or any registered URL (including .onion/.i2p).
-
-**Example Requests:**
-
-```
-/api/v1/service/bisq
-/api/v1/service/https://bisq.network
-```
-
-**Example Response (200 OK):**
-
-```json
-{
-  "name": "Bisq",
-  "description": "Decentralized Bitcoin exchange network.",
-  "kycLevel": 0,
-  "categories": ["exchange"],
-  "serviceUrls": ["https://bisq.network/"],
-  "onionUrls": [],
-  "i2pUrls": [],
-  "tosUrls": ["https://bisq.network/terms-of-service/"],
-  "kycnotmeUrl": "https://kycnot.me/service/bisq"
-}
-```
+See the [API page](/docs/api) for more details.
 
 ## Support
 

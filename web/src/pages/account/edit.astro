@@ -53,7 +53,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
         disabled: !user.karmaUnlocks.displayName,
       }}
       description={!user.karmaUnlocks.displayName
-        ? `${makeKarmaUnlockMessage(karmaUnlocksById.displayName)} [Learn more](/karma)`
+        ? `${makeKarmaUnlockMessage(karmaUnlocksById.displayName)} [Learn more](/docs/karma)`
         : undefined}
     />
 
@@ -68,7 +68,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
         disabled: !user.karmaUnlocks.websiteLink,
       }}
       description={!user.karmaUnlocks.websiteLink
-        ? `${makeKarmaUnlockMessage(karmaUnlocksById.websiteLink)} [Learn more](/karma)`
+        ? `${makeKarmaUnlockMessage(karmaUnlocksById.websiteLink)} [Learn more](/docs/karma)`
         : undefined}
     />
 
@@ -80,7 +80,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
       square
       disabled={!user.karmaUnlocks.profilePicture}
       description={!user.karmaUnlocks.profilePicture
-        ? `${makeKarmaUnlockMessage(karmaUnlocksById.profilePicture)} [Learn more](/karma)`
+        ? `${makeKarmaUnlockMessage(karmaUnlocksById.profilePicture)} [Learn more](/docs/karma)`
         : undefined}
       removeCheckbox={user.picture
         ? {

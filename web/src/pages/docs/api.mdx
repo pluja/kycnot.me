@@ -1,0 +1,155 @@
+---
+layout: ../../layouts/MarkdownLayout.astro
+title: API
+author: KYCnot.me
+pubDate: 2025-05-31
+description: 'Access basic service data via our public API.'
+icon: 'ri:plug-line'
+---
+
+import { SOURCE_CODE_URL } from 'astro:env/server'
+import { kycLevels } from '../../constants/kycLevels'
+import { verificationStatuses } from '../../constants/verificationStatus'
+
+Access basic service data via our public API.
+
+All endpoints should be prefixed with `/api/v1/`.
+
+The endpoints <a href={SOURCE_CODE_URL}>source code</a> is available on the `/web/src/actions/api/index.ts` file.
+
+**Attribution:** Please credit **KYCnot.me** if you use data from this API.
+
+## `QUERY` `/service/get`
+
+Fetches details for a single service by various lookup criteria.
+
+### Request Parameters
+
+| Parameter    | Type   | Required | Description |
+| ------------ | ------ | -------- | ----------- |
+| `id`         | number | No*       | Service ID |
+| `slug`       | string | No*       | Service URL slug (lowercase letters, numbers, and hyphens only) |
+| `serviceUrl` | string | No*       | Service URL. May be web, onion, or i2p. May just be a domain or a full URL. |
+
+\* At least one of the marked parameters is required.
+
+### Response Format
+
+```typescript
+type ServiceResponse = {
+  id: number
+  slug: string
+  name: string
+  description: string
+  verificationStatus: 'VERIFICATION_SUCCESS' | 'APPROVED' | 'COMMUNITY_CONTRIBUTED' | 'VERIFICATION_FAILED'
+  verificationStatusInfo: {
+    value: 'VERIFICATION_SUCCESS' | 'APPROVED' | 'COMMUNITY_CONTRIBUTED' | 'VERIFICATION_FAILED'
+    slug: string
+    label: string
+    labelShort: string
+    description: string
+  }
+  kycLevel: 0 | 1 | 2 | 3 | 4
+  kycLevelInfo: {
+    value: 0 | 1 | 2 | 3 | 4
+    name: string
+    description: string
+  }
+  categories: {
+    name: string
+    slug: string
+  }[]
+  serviceUrls: string[]
+  tosUrls: string[]
+  kycnotmeUrl: `https://kycnot.me/service/${service.slug}`
+}
+```
+
+### KYC Levels
+
+<ul>
+{kycLevels.map((level) => (
+  <li key={level.id}>
+    <strong>{level.id}</strong>: {level.name} - {level.description}
+  </li>
+))}
+</ul>
+
+### Verification Status
+
+<ul>
+{verificationStatuses.map((status) => (
+  <li key={status.value}>
+    <strong>{status.value}</strong>: {status.description}
+  </li>
+))}
+</ul>
+
+### Example Request
+
+```zsh
+curl -X QUERY https://kycnot.me/api/v1/service/get \
+  -H "Content-Type: application/json" \
+  -d '{"slug": "my-example-service"}'
+```
+
+### Example Response
+
+```json
+{
+  "name": "My Example Service",
+  "description": "This is a description of my example service",
+  "verificationStatus": "VERIFICATION_SUCCESS",
+  "verificationStatusInfo": {
+    "value": "VERIFICATION_SUCCESS",
+    "slug": "verified",
+    "label": "Verified",
+    "labelShort": "Verified",
+    "description": "Thoroughly tested and verified by the team. But things might change, this is not a guarantee."
+  },
+  "kycLevel": 0,
+  "kycLevelInfo": {
+    "value": 0,
+    "name": "Guaranteed no KYC",
+    "description": "Terms explicitly state KYC will never be requested."
+  },
+  "categories": [
+    {
+      "name": "Exchange",
+      "slug": "exchange"
+    }
+  ],
+  "serviceUrls": [
+    "https://example.com",
+    "http://c9ikae0fdidzh1ufrzp022e5uqfvz6ofxlkycz59cvo6fdxjgx7ekl9e.onion"
+  ],
+  "tosUrls": ["https://example.com/terms-of-service"],
+  "kycnotmeUrl": "https://kycnot.me/service/bisq"
+}
+```
+
+### Error Responses
+
+**404 Not Found**: Service not found
+
+```json
+{
+  "error": "Service not found"
+}
+```
+
+**400 Bad Request**: Invalid input parameters
+
+```json
+{
+  "error": "Validation error message"
+}
+```
+
+**500 Internal Server Error**: Server error
+
+```json
+{
+  "error": "Internal server error"
+}
+```
