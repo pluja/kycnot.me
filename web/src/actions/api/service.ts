@@ -24,7 +24,7 @@ export const apiServiceActions = {
         .optional(),
       url: zodUrlOptionalProtocol.optional(),
     }),
-    handler: async (input) => {
+    handler: async (input, context) => {
       if (!input.id && !input.slug && !input.url) {
         throw new ActionError({
           code: 'BAD_REQUEST',
@@ -122,7 +122,7 @@ export const apiServiceActions = {
           (url) => url + (service.referral ?? '')
         ),
         tosUrls: service.tosUrls,
-        kycnotmeUrl: `https://kycnot.me/service/${service.slug}`,
+        kycnotmeUrl: new URL(`/service/${service.slug}`, context.url).href,
       }
     },
   }),
