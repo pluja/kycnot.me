@@ -271,6 +271,7 @@ if (toggleResult?.error) {
               label: type.label,
               value: type.value,
               icon: type.icon,
+              noTransitionPersist: false,
             }))}
             cardSize="sm"
             required
@@ -305,8 +306,8 @@ if (toggleResult?.error) {
             label="Status"
             error={createInputErrors.isActive}
             options={[
-              { label: 'Active', value: 'true' },
-              { label: 'Inactive', value: 'false' },
+              { label: 'Active', value: 'true', noTransitionPersist: true },
+              { label: 'Inactive', value: 'false', noTransitionPersist: true },
             ]}
             selectedValue={newAnnouncement.isActive ? 'true' : 'false'}
             cardSize="sm"
@@ -627,6 +628,7 @@ if (toggleResult?.error) {
                                 label: type.label,
                                 value: type.value,
                                 icon: type.icon,
+                                noTransitionPersist: true,
                               }))}
                               cardSize="sm"
                               required
@@ -659,8 +661,8 @@ if (toggleResult?.error) {
                               name="isActive"
                               label="Status"
                               options={[
-                                { label: 'Active', value: 'true' },
-                                { label: 'Inactive', value: 'false' },
+                                { label: 'Active', value: 'true', noTransitionPersist: true },
+                                { label: 'Inactive', value: 'false', noTransitionPersist: true },
                               ]}
                               selectedValue={announcement.isActive ? 'true' : 'false'}
                               cardSize="sm"

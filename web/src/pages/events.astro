@@ -13,6 +13,7 @@ import {
   getEventTypeInfo,
   getEventTypeInfoBySlug,
 } from '../constants/eventTypes'
+import { getServiceVisibilityInfo } from '../constants/serviceVisibility'
 import { getVerificationStatusInfo } from '../constants/verificationStatus'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { cn } from '../lib/cn'
@@ -44,6 +45,8 @@ const [services, [dbEvents, totalEvents]] = await Astro.locals.banners.tryMany([
     async () =>
       prisma.service.findMany({
         where: {
+          listedAt: { lte: new Date() },
+          serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
           events: {
             some: {
               visible: true,
@@ -72,8 +75,15 @@ const [services, [dbEvents, totalEvents]] = await Astro.locals.banners.tryMany([
           createdAt: {
             lte: params.now,
           },
-          ...(params.service ? { service: { slug: params.service } } : {}),
-          ...(params.type ? { type: getEventTypeInfoBySlug(params.type).id } : {}),
+          service: {
+            slug: params.service ?? undefined,
+            listedAt: params.service ? undefined : { lte: new Date() },
+            serviceVisibility: {
+              in: params.service ? ['PUBLIC', 'ARCHIVED', 'UNLISTED'] : ['PUBLIC', 'ARCHIVED'],
+            },
+          },
+          type: params.type ? getEventTypeInfoBySlug(params.type).id : undefined,
+
           ...(params.from || params.to
             ? {
                 OR: [
@@ -105,6 +115,7 @@ const [services, [dbEvents, totalEvents]] = await Astro.locals.banners.tryMany([
               name: true,
               imageUrl: true,
               verificationStatus: true,
+              serviceVisibility: true,
             },
           },
         },
@@ -126,6 +137,7 @@ const events = orderBy(
     service: {
       ...event.service,
       verificationStatusInfo: getVerificationStatusInfo(event.service.verificationStatus),
+      serviceVisibilityInfo: getServiceVisibilityInfo(event.service.serviceVisibility),
     },
   })),
   ['actualEndedAt', 'startedAt'],
@@ -413,6 +425,16 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
                         class={cn(
                           'ms-1 inline-block size-3 shrink-0',
                           event.service.verificationStatusInfo.classNames.icon
+                        )}
+                      />
+                    )}
+
+                    {event.service.serviceVisibility === 'ARCHIVED' && (
+                      <Icon
+                        name={event.service.serviceVisibilityInfo.icon}
+                        class={cn(
+                          'ms-1 inline-block size-3 shrink-0',
+                          event.service.serviceVisibilityInfo.iconClass
                         )}
                       />
                     )}

@@ -406,6 +406,7 @@ const apiCalls = await Astro.locals.banners.try(
             value: kycLevel.id.toString(),
             icon: kycLevel.icon,
             description: kycLevel.description,
+            noTransitionPersist: true,
           }))}
           selectedValue={service.kycLevel.toString()}
           iconSize="md"
@@ -423,6 +424,7 @@ const apiCalls = await Astro.locals.banners.try(
             icon: status.icon,
             iconClass: status.classNames.icon,
             description: status.description,
+            noTransitionPersist: true,
           }))}
           selectedValue={service.verificationStatus}
           error={serviceInputErrors.verificationStatus}
@@ -438,6 +440,7 @@ const apiCalls = await Astro.locals.banners.try(
             label: currency.name,
             value: currency.id,
             icon: currency.icon,
+            noTransitionPersist: true,
           }))}
           selectedValue={service.acceptedCurrencies}
           error={serviceInputErrors.acceptedCurrencies}
@@ -478,6 +481,7 @@ const apiCalls = await Astro.locals.banners.try(
             icon: visibility.icon,
             iconClass: visibility.iconClass,
             description: visibility.description,
+            noTransitionPersist: true,
           }))}
           selectedValue={service.serviceVisibility}
           error={serviceInputErrors.serviceVisibility}

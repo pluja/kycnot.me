@@ -157,12 +157,6 @@ export const adminServiceActions = {
         })
       }
 
-      const imageUrl = input.removeImage
-        ? null
-        : input.imageFile
-          ? await saveFileLocally(input.imageFile, input.imageFile.name)
-          : undefined
-
       const existingService = await prisma.service.findUnique({
         where: { id: input.id },
         select: {
@@ -200,6 +194,12 @@ export const adminServiceActions = {
       const existingAttributeIds = existingService.attributes.map((a) => a.attributeId)
       const attributesToAdd = input.attributes.filter((aId) => !existingAttributeIds.includes(aId))
       const attributesToRemove = existingAttributeIds.filter((aId) => !input.attributes.includes(aId))
+
+      const imageUrl = input.removeImage
+        ? null
+        : input.imageFile
+          ? await saveFileLocally(input.imageFile, input.imageFile.name)
+          : undefined
 
       const {
         web: serviceUrls,
