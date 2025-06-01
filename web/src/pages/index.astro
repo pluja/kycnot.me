@@ -1,6 +1,6 @@
 ---
 import { z } from 'astro:schema'
-import { groupBy, omit, orderBy, uniq } from 'lodash-es'
+import { groupBy, omit, orderBy, sortBy, uniq } from 'lodash-es'
 import seedrandom from 'seedrandom'
 
 import Button from '../components/Button.astro'
@@ -350,7 +350,8 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
         const selectedSort = sortOptions.find((sort) => sort.value === filters.sort) ?? defaultSortOption
 
         const sortedServices = orderBy(
-          unsortedServices,
+          // NOTE: We do a first sort by id to make the seeded sort deterministic
+          sortBy(unsortedServices, 'id'),
           [
             ...(filters.q ? (['similarityScore'] as const) : ([] as const)),
             selectedSort.orderBy.key,
