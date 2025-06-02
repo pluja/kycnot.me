@@ -1,4 +1,4 @@
-import { Currency, ServiceVisibility, VerificationStatus } from '@prisma/client'
+import { Currency, ServiceVisibility, VerificationStatus, KycLevelClarification } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 import { uniq } from 'lodash-es'
@@ -9,35 +9,6 @@ import { saveFileLocally } from '../../lib/fileStorage'
 import { prisma } from '../../lib/prisma'
 import { separateServiceUrlsByType } from '../../lib/urls'
 import { imageFileSchema, stringListOfUrlsSchemaRequired, zodCohercedNumber } from '../../lib/zodUtils'
-
-const serviceSchemaBase = z.object({
-  id: z.number().int().positive(),
-  slug: z
-    .string()
-    .regex(/^[a-z0-9-]+$/, 'Allowed characters: lowercase letters, numbers, and hyphens')
-    .optional(),
-  name: z.string().min(1).max(40),
-  description: z.string().min(1),
-  allServiceUrls: stringListOfUrlsSchemaRequired,
-  tosUrls: stringListOfUrlsSchemaRequired,
-  kycLevel: z.coerce.number().int().min(0).max(4),
-  attributes: z.array(z.coerce.number().int().positive()),
-  categories: z.array(z.coerce.number().int().positive()).min(1),
-  verificationStatus: z.nativeEnum(VerificationStatus),
-  verificationSummary: z.string().optional().nullable().default(null),
-  verificationProofMd: z.string().optional().nullable().default(null),
-  acceptedCurrencies: z.array(z.nativeEnum(Currency)),
-  referral: z
-    .string()
-    .regex(/^(\?\w+=.|\/.+)/, 'Referral must be a valid URL parameter or path, not a full URL')
-    .optional()
-    .nullable()
-    .default(null),
-  imageFile: imageFileSchema,
-  overallScore: zodCohercedNumber(z.number().int().min(0).max(10)).optional(),
-  serviceVisibility: z.nativeEnum(ServiceVisibility),
-  internalNote: z.string().optional(),
-})
 
 const addSlugIfMissing = <
   T extends {
@@ -58,12 +29,52 @@ const addSlugIfMissing = <
     }),
 })
 
+const serviceSchemaBase = z.object({
+  id: z.number().int().positive(),
+  slug: z
+    .string()
+    .regex(/^[a-z0-9-]+$/, 'Allowed characters: lowercase letters, numbers, and hyphens')
+    .optional(),
+  name: z.string().min(1).max(40),
+  description: z.string().min(1),
+  allServiceUrls: stringListOfUrlsSchemaRequired,
+  tosUrls: stringListOfUrlsSchemaRequired,
+  kycLevel: z.coerce.number().int().min(0).max(4),
+  kycLevelClarification: z.nativeEnum(KycLevelClarification).optional().nullable().default(null),
+  attributes: z.array(z.coerce.number().int().positive()),
+  categories: z.array(z.coerce.number().int().positive()).min(1),
+  verificationStatus: z.nativeEnum(VerificationStatus),
+  verificationSummary: z.string().optional().nullable().default(null),
+  verificationProofMd: z.string().optional().nullable().default(null),
+  acceptedCurrencies: z.array(z.nativeEnum(Currency)),
+  referral: z
+    .string()
+    .regex(/^(\?\w+=.|\/.+)/, 'Referral must be a valid URL parameter or path, not a full URL')
+    .optional()
+    .nullable()
+    .default(null),
+  imageFile: imageFileSchema,
+  overallScore: zodCohercedNumber(z.number().int().min(0).max(10)).optional(),
+  serviceVisibility: z.nativeEnum(ServiceVisibility),
+  internalNote: z.string().optional(),
+})
+
+// Define schema for the create action input
+const createServiceInputSchema = serviceSchemaBase.omit({ id: true }).transform(addSlugIfMissing)
+
+// Define schema for the update action input
+const updateServiceInputSchema = serviceSchemaBase
+  .extend({
+    removeImage: z.boolean().optional(),
+  })
+  .transform(addSlugIfMissing)
+
 export const adminServiceActions = {
   create: defineProtectedAction({
     accept: 'form',
     permissions: 'admin',
-    input: serviceSchemaBase.omit({ id: true }).transform(addSlugIfMissing),
-    handler: async (input, context) => {
+    input: createServiceInputSchema,
+    handler: async (input: z.infer<typeof createServiceInputSchema>, context) => {
       const existing = await prisma.service.findUnique({
         where: {
           slug: input.slug,
@@ -96,6 +107,7 @@ export const adminServiceActions = {
           onionUrls,
           i2pUrls,
           kycLevel: input.kycLevel,
+          kycLevelClarification: input.kycLevelClarification,
           verificationStatus: input.verificationStatus,
           verificationSummary: input.verificationSummary,
           verificationProofMd: input.verificationProofMd,
@@ -137,12 +149,8 @@ export const adminServiceActions = {
   update: defineProtectedAction({
     accept: 'form',
     permissions: 'admin',
-    input: serviceSchemaBase
-      .extend({
-        removeImage: z.boolean().optional(),
-      })
-      .transform(addSlugIfMissing),
-    handler: async (input) => {
+    input: updateServiceInputSchema,
+    handler: async (input: z.infer<typeof updateServiceInputSchema>) => {
       const anotherServiceWithNewSlug = await prisma.service.findUnique({
         where: {
           slug: input.slug,
@@ -217,6 +225,7 @@ export const adminServiceActions = {
           onionUrls,
           i2pUrls,
           kycLevel: input.kycLevel,
+          kycLevelClarification: input.kycLevelClarification,
           verificationStatus: input.verificationStatus,
           verificationSummary: input.verificationSummary,
           verificationProofMd: input.verificationProofMd,

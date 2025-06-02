@@ -26,6 +26,7 @@ import { getAttributeTypeInfo } from '../../../../constants/attributeTypes'
 import { formatContactMethod } from '../../../../constants/contactMethods'
 import { currencies } from '../../../../constants/currencies'
 import { eventTypes, getEventTypeInfo } from '../../../../constants/eventTypes'
+import { kycLevelClarifications } from '../../../../constants/kycLevelClarifications'
 import { kycLevels } from '../../../../constants/kycLevels'
 import { serviceVisibilities } from '../../../../constants/serviceVisibility'
 import { verificationStatuses } from '../../../../constants/verificationStatus'
@@ -413,6 +414,22 @@ const apiCalls = await Astro.locals.banners.try(
           cardSize="md"
           error={serviceInputErrors.kycLevel}
           class="[&>div]:grid-cols-2 [&>div]:[--card-min-size:16rem]"
+        />
+
+        <InputCardGroup
+          name="kycLevelClarification"
+          label="KYC Level Clarification"
+          options={kycLevelClarifications.map((clarification) => ({
+            label: clarification.label,
+            value: clarification.value,
+            icon: clarification.icon,
+            description: clarification.description,
+            noTransitionPersist: true,
+          }))}
+          selectedValue={service.kycLevelClarification ?? 'NONE'}
+          iconSize="sm"
+          cardSize="sm"
+          error={serviceInputErrors.kycLevelClarification}
         />
 
         <InputCardGroup

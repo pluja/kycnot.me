@@ -4,6 +4,7 @@ import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
 import Button from '../components/Button.astro'
+import PushNotificationBanner from '../components/PushNotificationBanner.astro'
 import TimeFormatted from '../components/TimeFormatted.astro'
 import Tooltip from '../components/Tooltip.astro'
 import { getNotificationTypeInfo } from '../constants/notificationTypes'
@@ -28,131 +29,146 @@ const { data: params } = zodParseQueryParamsStoringErrors(
 )
 const skip = (params.page - 1) * PAGE_SIZE
 
-const [dbNotifications, notificationPreferences, totalNotifications] = await Astro.locals.banners.tryMany([
-  [
-    'Error while fetching notifications',
-    () =>
-      prisma.notification.findMany({
-        where: {
-          userId: user.id,
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-        skip,
-        take: PAGE_SIZE,
-        select: {
+const [dbNotifications, notificationPreferences, totalNotifications, pushSubscriptions] =
+  await Astro.locals.banners.tryMany([
+    [
+      'Error while fetching notifications',
+      () =>
+        prisma.notification.findMany({
+          where: {
+            userId: user.id,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          skip,
+          take: PAGE_SIZE,
+          select: {
+            id: true,
+            type: true,
+            createdAt: true,
+            read: true,
+            aboutAccountStatusChange: true,
+            aboutCommentStatusChange: true,
+            aboutServiceVerificationStatusChange: true,
+            aboutSuggestionStatusChange: true,
+            aboutComment: {
+              select: {
+                id: true,
+                author: {
+                  select: {
+                    id: true,
+                  },
+                },
+                status: true,
+                content: true,
+                communityNote: true,
+                service: {
+                  select: {
+                    slug: true,
+                    name: true,
+                  },
+                },
+                parent: {
+                  select: {
+                    author: {
+                      select: {
+                        id: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            aboutServiceSuggestionId: true,
+            aboutServiceSuggestion: {
+              select: {
+                status: true,
+                service: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+            aboutServiceSuggestionMessage: {
+              select: {
+                id: true,
+                content: true,
+                suggestion: {
+                  select: {
+                    id: true,
+                    service: {
+                      select: {
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            aboutEvent: {
+              select: {
+                title: true,
+                type: true,
+                service: {
+                  select: {
+                    slug: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+            aboutService: {
+              select: {
+                slug: true,
+                name: true,
+                verificationStatus: true,
+              },
+            },
+            aboutKarmaTransaction: {
+              select: {
+                points: true,
+                action: true,
+                description: true,
+              },
+            },
+          },
+        }),
+      [],
+    ],
+    [
+      'Error while fetching notification preferences',
+      () =>
+        getOrCreateNotificationPreferences(user.id, {
           id: true,
-          type: true,
-          createdAt: true,
-          read: true,
-          aboutAccountStatusChange: true,
-          aboutCommentStatusChange: true,
-          aboutServiceVerificationStatusChange: true,
-          aboutSuggestionStatusChange: true,
-          aboutComment: {
-            select: {
-              id: true,
-              author: {
-                select: {
-                  id: true,
-                },
-              },
-              status: true,
-              content: true,
-              communityNote: true,
-              service: {
-                select: {
-                  slug: true,
-                  name: true,
-                },
-              },
-              parent: {
-                select: {
-                  author: {
-                    select: {
-                      id: true,
-                    },
-                  },
-                },
-              },
-            },
+          enableOnMyCommentStatusChange: true,
+          enableAutowatchMyComments: true,
+          enableNotifyPendingRepliesOnWatch: true,
+          karmaNotificationThreshold: true,
+        }),
+      null,
+    ],
+    [
+      'Error while fetching total notifications',
+      () => prisma.notification.count({ where: { userId: user.id } }),
+      0,
+    ],
+    [
+      'Error while fetching push subscriptions',
+      () =>
+        prisma.pushSubscription.findMany({
+          where: { userId: user.id },
+          select: {
+            endpoint: true,
+            userAgent: true,
           },
-          aboutServiceSuggestionId: true,
-          aboutServiceSuggestion: {
-            select: {
-              status: true,
-              service: {
-                select: {
-                  name: true,
-                },
-              },
-            },
-          },
-          aboutServiceSuggestionMessage: {
-            select: {
-              id: true,
-              content: true,
-              suggestion: {
-                select: {
-                  id: true,
-                  service: {
-                    select: {
-                      name: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-          aboutEvent: {
-            select: {
-              title: true,
-              type: true,
-              service: {
-                select: {
-                  slug: true,
-                  name: true,
-                },
-              },
-            },
-          },
-          aboutService: {
-            select: {
-              slug: true,
-              name: true,
-              verificationStatus: true,
-            },
-          },
-          aboutKarmaTransaction: {
-            select: {
-              points: true,
-              action: true,
-              description: true,
-            },
-          },
-        },
-      }),
-    [],
-  ],
-  [
-    'Error while fetching notification preferences',
-    () =>
-      getOrCreateNotificationPreferences(user.id, {
-        id: true,
-        enableOnMyCommentStatusChange: true,
-        enableAutowatchMyComments: true,
-        enableNotifyPendingRepliesOnWatch: true,
-        karmaNotificationThreshold: true,
-      }),
-    null,
-  ],
-  [
-    'Error while fetching total notifications',
-    () => prisma.notification.count({ where: { userId: user.id } }),
-    0,
-  ],
-])
+        }),
+      [],
+    ],
+  ])
+
+if (!notificationPreferences) console.error('No notification preferences found')
 
 const totalPages = Math.ceil(totalNotifications / PAGE_SIZE)
 
@@ -199,6 +215,17 @@ const notifications = dbNotifications.map((notification) => ({
   }}
 >
   <section class="mx-auto w-full">
+    {
+      notifications.length >= 5 && (
+        <PushNotificationBanner
+          class="mb-4"
+          dismissable
+          pushSubscriptions={pushSubscriptions}
+          hideIfEnabled
+        />
+      )
+    }
+
     <div class="mb-4 flex items-center justify-between">
       <h1 class="font-title flex items-center text-2xl leading-tight font-bold tracking-wider">
         <Icon name="ri:notification-line" class="mr-2 size-6 text-zinc-400" />
@@ -306,57 +333,57 @@ const notifications = dbNotifications.map((notification) => ({
       )
     }
 
-    {
-      !!notificationPreferences && (
-        <div class="mt-8">
-          <h2 class="font-title mb-3 flex items-center border-b border-zinc-800 text-lg font-bold">
-            <Icon name="ri:settings-3-line" class="mr-2 size-5 text-zinc-400" />
-            Notification Settings
-          </h2>
+    <h2 class="font-title mt-8 mb-3 flex items-center border-b border-zinc-800 text-lg font-bold">
+      <Icon name="ri:settings-3-line" class="mr-2 size-5 text-zinc-400" />
+      Notification Settings
+    </h2>
 
-          <form
-            method="POST"
-            action={actions.notification.preferences.update}
-            class="rounded-lg border border-zinc-800 bg-zinc-900 p-4 shadow-sm"
-          >
-            {notificationPreferenceFields.map((field) => (
-              <label class="flex items-center justify-between rounded-md p-2 transition-colors duration-200 hover:bg-zinc-800">
-                <span class="flex items-center text-zinc-300">
-                  <Icon name={field.icon} class="mr-2 size-5 text-zinc-400" />
-                  {field.label}
-                </span>
-                <input
-                  type="checkbox"
-                  name={field.id}
-                  checked={notificationPreferences[field.id]}
-                  class="size-4 rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-blue-600"
-                />
-              </label>
-            ))}
+    <PushNotificationBanner class="mb-3" pushSubscriptions={pushSubscriptions} />
 
-            <div class="mt-4 flex items-center justify-between rounded-md p-2 transition-colors duration-200 hover:bg-zinc-800">
-              <span class="flex items-center text-zinc-300">
-                <Icon name="ri:award-line" class="mr-2 size-5 text-zinc-400" />
-                Notify me when my karma changes by at least
-              </span>
-              <div class="flex items-center gap-2">
-                <input
-                  type="number"
-                  name="karmaNotificationThreshold"
-                  value={notificationPreferences.karmaNotificationThreshold}
-                  min="1"
-                  class="w-20 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-200 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 focus:outline-none"
-                />
-                <span class="text-zinc-400">points</span>
-              </div>
-            </div>
+    <form
+      method="POST"
+      action={actions.notification.preferences.update}
+      class="rounded-lg border border-zinc-800 bg-zinc-900 p-4 shadow-sm"
+    >
+      {
+        notificationPreferenceFields.map((field) => (
+          <label class="flex items-center justify-between rounded-md p-2 transition-colors duration-200 hover:bg-zinc-800">
+            <span class="flex items-center text-zinc-300">
+              <Icon name={field.icon} class="mr-2 size-5 text-zinc-400" />
+              {field.label}
+            </span>
+            <input
+              type="checkbox"
+              name={field.id}
+              checked={notificationPreferences?.[field.id]}
+              class="size-4 rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-blue-600"
+            />
+          </label>
+        ))
+      }
 
-            <div class="mt-4 flex justify-end">
-              <Button type="submit" label="Save" icon="ri:save-line" color="success" />
-            </div>
-          </form>
+      <div
+        class="mt-4 flex items-center justify-between rounded-md p-2 transition-colors duration-200 hover:bg-zinc-800"
+      >
+        <span class="flex items-center text-zinc-300">
+          <Icon name="ri:award-line" class="mr-2 size-5 text-zinc-400" />
+          Notify me when my karma changes by at least
+        </span>
+        <div class="flex items-center gap-2">
+          <input
+            type="number"
+            name="karmaNotificationThreshold"
+            value={notificationPreferences?.karmaNotificationThreshold}
+            min="1"
+            class="w-20 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-200 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 focus:outline-none"
+          />
+          <span class="text-zinc-400">points</span>
         </div>
-      )
-    }
+      </div>
+
+      <div class="mt-4 flex justify-end">
+        <Button type="submit" label="Save" icon="ri:save-line" color="success" />
+      </div>
+    </form>
   </section>
 </BaseLayout>

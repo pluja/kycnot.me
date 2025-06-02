@@ -1,0 +1,155 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions, isInputError } from 'astro:actions'
+import { groupBy, round, uniq } from 'lodash-es'
+
+import InputSubmitButton from '../../components/InputSubmitButton.astro'
+import InputText from '../../components/InputText.astro'
+import InputTextArea from '../../components/InputTextArea.astro'
+import MiniLayout from '../../layouts/MiniLayout.astro'
+import { cn } from '../../lib/cn'
+import { prisma } from '../../lib/prisma'
+
+// Check if user is admin
+if (!Astro.locals.user?.admin) {
+  return Astro.redirect('/access-denied')
+}
+
+const testResult = Astro.getActionResult(actions.admin.notification.webPush.test)
+const testInputErrors = isInputError(testResult?.error) ? testResult.error.fields : {}
+
+Astro.locals.banners.addIfSuccess(testResult, (data) => data.message)
+
+const subscriptions = await Astro.locals.banners.try(
+  'Error while fetching subscriptions by user',
+  () =>
+    prisma.pushSubscription.findMany({
+      select: {
+        id: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    }),
+  [] as []
+)
+const totalSubscriptions = subscriptions.length
+const subscriptionsByUser = groupBy(subscriptions, 'user.id')
+
+const totalUsers = Object.keys(subscriptionsByUser).length
+
+const adminUsers = await prisma.user.findMany({
+  where: {
+    admin: true,
+  },
+  select: {
+    name: true,
+  },
+})
+
+const stats = [
+  {
+    icon: 'ri:notification-4-line',
+    iconClass: 'text-blue-400',
+    title: 'Total Subscriptions',
+    value: totalSubscriptions.toLocaleString(),
+  },
+  {
+    icon: 'ri:user-3-line',
+    iconClass: 'text-green-400',
+    title: 'Subscribed Users',
+    value: totalUsers.toLocaleString(),
+  },
+  {
+    icon: 'ri:smartphone-line',
+    iconClass: 'text-purple-400',
+    title: 'Avg Devices/User',
+    value: (totalUsers > 0 ? round(totalSubscriptions / totalUsers, 1) : 0).toLocaleString(),
+  },
+] satisfies {
+  icon: string
+  iconClass: string
+  title: string
+  value: string
+}[]
+---
+
+<MiniLayout
+  pageTitle="Push notifications"
+  description="Send test notifications"
+  layoutHeader={{
+    icon: 'ri:notification-3-line',
+    title: 'Push notifications',
+    subtitle: 'Send test notifications',
+  }}
+>
+  <div class="mb-6 grid gap-4 sm:grid-cols-3">
+    {
+      stats.map((stat) => (
+        <div class="flex flex-col items-center gap-2 text-center">
+          <div class="flex items-end gap-1">
+            <span class="text-5xl leading-[0.8] font-bold text-white">{stat.value}</span>
+            <Icon name={stat.icon} class={cn('size-5 shrink-0', stat.iconClass)} />
+          </div>
+          <span class="text-day-200 flex grow flex-col justify-center text-sm leading-none font-medium text-balance">
+            {stat.title}
+          </span>
+        </div>
+      ))
+    }
+  </div>
+
+  <h2 class="text-center text-lg font-semibold text-white">Send Test Notification</h2>
+
+  <form method="POST" action={actions.admin.notification.webPush.test} class="space-y-4">
+    <InputTextArea
+      label="Users"
+      name="userNames"
+      inputProps={{
+        placeholder: 'john-doe, jane-doe',
+        class: 'leading-tight min-h-24',
+      }}
+      value={uniq([Astro.locals.user, ...adminUsers].map((user) => user.name)).join('\n')}
+      description={[
+        '- Comma-separated list of user names.',
+        '- Minimum 1 user name.',
+        '- By default, all admin users are selected.',
+      ].join('\n')}
+      error={testInputErrors.userNames}
+    />
+
+    <InputText
+      label="Title"
+      name="title"
+      inputProps={{
+        value: 'Test Notification',
+        required: true,
+      }}
+      error={testInputErrors.title}
+    />
+
+    <InputTextArea
+      label="Body"
+      name="body"
+      inputProps={{
+        value: 'This is a test push notification from KYCNot.me',
+      }}
+      error={testInputErrors.body}
+    />
+
+    <InputText
+      label="Action URL"
+      name="url"
+      inputProps={{
+        placeholder: 'https://example.com/path',
+      }}
+      description="URL to open when the notification is clicked"
+      error={testInputErrors.url}
+    />
+
+    <InputSubmitButton label="Send" icon="ri:send-plane-line" hideCancel color="danger" />
+  </form>
+</MiniLayout>

@@ -195,6 +195,27 @@ export default defineConfig({
         access: 'public',
         optional: true,
       }),
+
+      // Generated with `npx web-push generate-vapid-keys`
+      VAPID_PUBLIC_KEY: envField.string({
+        context: 'server',
+        access: 'public',
+        min: 1,
+        optional: false,
+      }),
+      // Generated with `npx web-push generate-vapid-keys`
+      VAPID_PRIVATE_KEY: envField.string({
+        context: 'server',
+        access: 'secret',
+        min: 1,
+        optional: false,
+      }),
+      VAPID_SUBJECT: envField.string({
+        context: 'server',
+        access: 'secret',
+        min: 1,
+        optional: false,
+      }),
     },
   },
 })

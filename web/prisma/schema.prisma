@@ -297,6 +297,11 @@ enum ServiceSuggestionType {
   EDIT_SERVICE
 }
 
+enum KycLevelClarification {
+  NONE
+  DEPENDS_ON_PARTNERS
+}
+
 model ServiceSuggestion {
   id               Int                        @id @default(autoincrement())
   type             ServiceSuggestionType
@@ -340,6 +345,7 @@ model Service {
   description            String
   categories             Category[]                   @relation("ServiceToCategory")
   kycLevel               Int                          @default(4)
+  kycLevelClarification  KycLevelClarification?
   overallScore           Int                          @default(0)
   privacyScore           Int                          @default(0)
   trustScore             Int                          @default(0)
@@ -385,6 +391,7 @@ model Service {
   onVerificationChangeForServices NotificationPreferences[] @relation("onVerificationChangeForServices")
   Notification                    Notification[]
   affiliatedUsers                 ServiceUser[]             @relation("ServiceUsers")
+  kycLevelDetailsId               Int?
 
   @@index([listedAt])
   @@index([overallScore])
@@ -508,6 +515,7 @@ model User {
   notifications            Notification[]               @relation("NotificationOwner")
   notificationPreferences  NotificationPreferences?
   serviceAffiliations      ServiceUser[]                @relation("UserServices")
+  pushSubscriptions        PushSubscription[]
 
   @@index([createdAt])
   @@index([totalKarma])
@@ -655,4 +663,22 @@ model Announcement {
   updatedAt DateTime         @default(now()) @updatedAt
 
   @@index([isActive, startDate, endDate])
+}
+
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  /// Public key for encryption
+  p256dh    String
+  /// Authentication secret
+  auth      String
+  /// To identify different devices
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([endpoint])
 }

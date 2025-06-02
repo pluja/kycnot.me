@@ -18,8 +18,9 @@ import {
   type User,
   type ServiceVisibility,
   ServiceSuggestionType,
+  KycLevelClarification,
 } from '@prisma/client'
-import { uniqBy } from 'lodash-es'
+import { omit, uniqBy } from 'lodash-es'
 import { generateUsername } from 'unique-username-generator'
 
 import { kycLevels } from '../src/constants/kycLevels'
@@ -615,6 +616,11 @@ const generateFakeService = (users: User[]) => {
     previousSlugs: faker.helpers.maybe(() => [`${slug}-old`], { probability: 0.5 }),
     description: faker.helpers.arrayElement(serviceDescriptions),
     kycLevel: faker.helpers.arrayElement(kycLevels.map((level) => level.value)),
+    kycLevelClarification: faker.helpers.maybe(
+      () =>
+        faker.helpers.arrayElement(omit(Object.values(KycLevelClarification), [KycLevelClarification.NONE])),
+      { probability: 0.25 }
+    ),
     overallScore: 0,
     privacyScore: 0,
     trustScore: 0,
@@ -1135,7 +1141,7 @@ async function main() {
   // ---- Create services ----
   const services = await Promise.all(
     Array.from({ length: numServices }, async () => {
-      const serviceData = generateFakeService(users)
+      const serviceData = generateFakeService([...users, ...Object.values(specialUsers)])
       const randomCategories = faker.helpers.arrayElements(categories, { min: 1, max: 3 })
 
       const service = await prisma.service.create({
@@ -1275,7 +1281,7 @@ async function main() {
   // ---- Create service suggestions for normal_dev user ----
   // First create 3 CREATE_SERVICE suggestions with their services
   for (let i = 0; i < 3; i++) {
-    const serviceData = generateFakeService(users)
+    const serviceData = generateFakeService([...users, ...Object.values(specialUsers)])
     const randomCategories = faker.helpers.arrayElements(categories, { min: 1, max: 3 })
 
     const service = await prisma.service.create({

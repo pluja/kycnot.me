@@ -1,5 +1,5 @@
 ---
-import { VerificationStepStatus, EventType } from '@prisma/client'
+import { VerificationStepStatus, EventType, KycLevelClarification } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
 import { Markdown } from 'astro-remote'
 import { Schema } from 'astro-seo-schema'
@@ -32,6 +32,7 @@ import { getAttributeTypeInfo } from '../../constants/attributeTypes'
 import { formatContactMethod } from '../../constants/contactMethods'
 import { currencies, getCurrencyInfo } from '../../constants/currencies'
 import { getEventTypeInfo } from '../../constants/eventTypes'
+import { getKycLevelClarificationInfo } from '../../constants/kycLevelClarifications'
 import { getKycLevelInfo, kycLevels } from '../../constants/kycLevels'
 import { getServiceVisibilityInfo } from '../../constants/serviceVisibility'
 import { getTosHighlightRatingInfo } from '../../constants/tosHighlightRating'
@@ -78,6 +79,7 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
           name: true,
           description: true,
           kycLevel: true,
+          kycLevelClarification: true,
           overallScore: true,
           privacyScore: true,
           trustScore: true,
@@ -308,6 +310,9 @@ const hiddenLinks = [
 ]
 
 const kycLevelInfo = getKycLevelInfo(`${service.kycLevel}`)
+
+const kycLevelClarificationInfo = getKycLevelClarificationInfo(service.kycLevelClarification)
+
 const userSentiment = service.userSentiment
   ? { ...service.userSentiment, info: getUserSentimentInfo(service.userSentiment.sentiment) }
   : null
@@ -896,8 +901,12 @@ const activeAlertOrWarningEvents = service.events.filter(
           '@type': 'Review',
           itemReviewed: { '@id': itemReviewedId },
           reviewAspect: 'KYC Level',
-          name: kycLevelInfo.name,
-          reviewBody: kycLevelInfo.description,
+          name:
+            kycLevelInfo.name +
+            (kycLevelClarificationInfo.value !== 'NONE' ? ` (${kycLevelClarificationInfo.label})` : ''),
+          reviewBody:
+            kycLevelInfo.description +
+            (kycLevelClarificationInfo.value !== 'NONE' ? ` ${kycLevelClarificationInfo.description}` : ''),
           reviewRating: {
             '@type': 'Rating',
             ratingValue: kycLevelInfo.value,
@@ -918,9 +927,22 @@ const activeAlertOrWarningEvents = service.events.filter(
       </div>
 
       <dl class="flex-grow-5 basis-0">
-        <dt class="text-base font-bold text-pretty">{kycLevelInfo.name}</dt>
+        <dt class="text-base font-bold text-pretty">
+          {kycLevelInfo.name}
+          {
+            kycLevelClarificationInfo.value !== 'NONE' && (
+              <>
+                <span class="text-day-400 mx-1">•</span>
+                <span class="text-blue-500">{kycLevelClarificationInfo.label}</span>
+              </>
+            )
+          }
+        </dt>
         <dd class="text-day-700 mt-1 font-sans text-sm text-pretty">
           {kycLevelInfo.description}
+          <span class="font-medium text-blue-600">
+            {kycLevelClarificationInfo.value !== 'NONE' && ` ${kycLevelClarificationInfo.description}`}
+          </span>
         </dd>
       </dl>
     </div>

@@ -58,6 +58,7 @@
     "tailwindcss": "4.1.7",
     "typescript": "5.8.3",
     "unique-username-generator": "1.4.0",
+    "web-push": "3.6.7",
     "zod-form-data": "2.0.7"
   },
   "devDependencies": {
@@ -74,6 +75,7 @@
     "@types/qrcode": "1.5.5",
     "@types/react": "19.1.4",
     "@types/seedrandom": "3.0.8",
+    "@types/web-push": "3.6.4",
     "@typescript-eslint/parser": "8.32.1",
     "astro-icon": "1.1.5",
     "date-fns": "4.1.0",

@@ -162,3 +162,16 @@ export function areEqualObjectsWithoutOrder<T extends Record<string, unknown>>(
     return undefined
   })
 }
+
+/**
+ * Same as {@link Object.entries}, but with proper typing.
+ * @example
+ * typedObjectEntries({ a: 1, b: 2 }) // [['a', 1], ['b', 2]]
+ */
+export function typedObjectEntries<T extends Record<string, unknown>>(obj: T) {
+  return Object.entries(obj) as Prettify<
+    {
+      [K in Extract<keyof T, string>]: [K, T[K]]
+    }[Extract<keyof T, string>]
+  >[]
+}

@@ -1,11 +1,9 @@
-import { type Prisma, type PrismaClient } from '@prisma/client'
+import { type Prisma } from '@prisma/client'
 import { ActionError } from 'astro:actions'
 import { z } from 'zod'
 
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
-import { prisma as prismaInstance } from '../../lib/prisma'
-
-const prisma = prismaInstance as PrismaClient
+import { prisma } from '../../lib/prisma'
 
 const selectAnnouncementReturnFields = {
   id: true,

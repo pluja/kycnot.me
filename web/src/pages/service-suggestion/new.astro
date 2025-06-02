@@ -20,6 +20,7 @@ import InputTextArea from '../../components/InputTextArea.astro'
 import { getAttributeCategoryInfo } from '../../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../../constants/attributeTypes'
 import { currencies } from '../../constants/currencies'
+import { kycLevelClarifications } from '../../constants/kycLevelClarifications'
 import { kycLevels } from '../../constants/kycLevels'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { prisma } from '../../lib/prisma'
@@ -240,6 +241,21 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       cardSize="md"
       required
       error={inputErrors.kycLevel}
+    />
+
+    <InputCardGroup
+      name="kycLevelClarification"
+      label="KYC Level Clarification"
+      options={kycLevelClarifications.map((clarification) => ({
+        label: clarification.label,
+        value: clarification.value,
+        icon: clarification.icon,
+        description: clarification.description,
+      }))}
+      selectedValue="NONE"
+      iconSize="sm"
+      cardSize="sm"
+      error={inputErrors.kycLevelClarification}
     />
 
     <div class="xs:grid-cols-[1fr_2fr] grid grid-cols-1 items-stretch gap-x-4 gap-y-6">

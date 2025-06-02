@@ -23,6 +23,63 @@ export const notificationActions = {
       })
     },
   }),
+
+  webPush: {
+    subscribe: defineProtectedAction({
+      accept: 'json',
+      permissions: 'user',
+      input: z.object({
+        endpoint: z.string(),
+        p256dhKey: z.string(),
+        authKey: z.string(),
+        userAgent: z.string().optional(),
+      }),
+      handler: async (input, context) => {
+        await prisma.pushSubscription.upsert({
+          where: {
+            userId: context.locals.user.id,
+            endpoint: input.endpoint,
+          },
+          update: {
+            p256dh: input.p256dhKey,
+            auth: input.authKey,
+            userAgent: input.userAgent,
+          },
+          create: {
+            userId: context.locals.user.id,
+            endpoint: input.endpoint,
+            p256dh: input.p256dhKey,
+            auth: input.authKey,
+            userAgent: input.userAgent,
+          },
+        })
+      },
+    }),
+
+    unsubscribe: defineProtectedAction({
+      accept: 'json',
+      permissions: 'user',
+      input: z.object({
+        endpoint: z.string().optional(),
+      }),
+      handler: async (input, context) => {
+        if (input.endpoint) {
+          await prisma.pushSubscription.deleteMany({
+            where: {
+              userId: context.locals.user.id,
+              endpoint: input.endpoint,
+            },
+          })
+        } else {
+          await prisma.pushSubscription.deleteMany({
+            where: {
+              userId: context.locals.user.id,
+            },
+          })
+        }
+      },
+    }),
+  },
   preferences: {
     update: defineProtectedAction({
       accept: 'form',
@@ -31,7 +88,7 @@ export const notificationActions = {
         enableOnMyCommentStatusChange: z.coerce.boolean().optional(),
         enableAutowatchMyComments: z.coerce.boolean().optional(),
         enableNotifyPendingRepliesOnWatch: z.coerce.boolean().optional(),
-        karmaNotificationThreshold: z.coerce.number().int().min(1).optional(),
+        karmaNotificationThreshold: z.coerce.number().int().min(1).max(1_000_000).optional(),
       }),
       handler: async (input, context) => {
         await prisma.notificationPreferences.upsert({

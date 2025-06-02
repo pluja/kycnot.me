@@ -34,6 +34,11 @@ const stringToArrayFactory = (delimiter: RegExp | string = ',') => {
           .filter((item) => item !== '')
 }
 
+export const stringListOfSlugsSchemaRequired = z.preprocess(
+  stringToArrayFactory(/[\s,\n]+/),
+  z.array(z.string().regex(/^[a-z0-9-_A-Z]+$/)).min(1)
+)
+
 export const stringListOfUrlsSchema = z.preprocess(
   stringToArrayFactory(/[\s,\n]+/),
   z.array(zodUrlOptionalProtocol).default([])
