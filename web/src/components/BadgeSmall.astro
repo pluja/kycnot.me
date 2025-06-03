@@ -2,13 +2,14 @@
 import { Icon } from 'astro-icon/components'
 import { tv, type VariantProps } from 'tailwind-variants'
 
+import type { AstroChildren } from '../lib/astro'
 import type { Polymorphic } from 'astro/types'
 
 const badge = tv({
   slots: {
     base: 'inline-flex h-4 items-center justify-center gap-0.75 rounded-full px-1.25 text-[10px] font-medium',
     icon: 'size-3 shrink-0',
-    text: 'mx-0.25 overflow-hidden text-ellipsis whitespace-nowrap',
+    text: 'mx-0.25 overflow-hidden text-ellipsis whitespace-nowrap [&>a]:hover:underline [&>a]:focus-visible:underline',
   },
   variants: {
     color: {
@@ -122,18 +123,22 @@ const badge = tv({
   },
 })
 
-type Props<Tag extends 'a' | 'div' | 'li' = 'div'> = Polymorphic<
+type Props<
+  Tag extends 'a' | 'div' | 'li' = 'div',
+  Text extends string | undefined = string | undefined,
+> = Polymorphic<
   VariantProps<typeof badge> & {
     as: Tag
     icon?: string
     endIcon?: string
-    text: string
+    text?: Text
     inlineIcon?: boolean
     classNames?: {
       icon?: string
       text?: string
       endIcon?: string
     }
+    children?: Text extends string ? never : AstroChildren
   }
 >
 
@@ -161,7 +166,7 @@ const { base, icon: iconSlot, text: textSlot } = badge({ color, variant })
       <Icon name={iconName} class={iconSlot({ class: classNames?.icon })} is:inline={inlineIcon} />
     )
   }
-  <span class={textSlot({ class: classNames?.text })}>{textContent}</span>
+  <span class={textSlot({ class: classNames?.text })}>{textContent ?? <slot />}</span>
   {
     !!endIconName && (
       <Icon name={endIconName} class={iconSlot({ class: classNames?.endIcon })} is:inline={inlineIcon} />

@@ -1,5 +1,5 @@
 ---
-import { VerificationStepStatus, EventType, KycLevelClarification } from '@prisma/client'
+import { VerificationStepStatus, EventType } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
 import { Markdown } from 'astro-remote'
 import { Schema } from 'astro-seo-schema'
@@ -1295,9 +1295,17 @@ const activeAlertOrWarningEvents = service.events.filter(
     </a>
   </div>
 
-  <h2 class="font-title border-day-500 text-day-200 mt-6 mb-3 border-b text-lg font-bold" id="verification">
-    Verification
-  </h2>
+  <div class="border-day-500 mt-6 mb-3 flex items-center justify-between border-b" id="verification">
+    <h2 class="font-title text-day-100 text-lg font-bold">Verification</h2>
+    <a
+      href="/about#suggestion-review-process"
+      class="text-day-500 hover:text-day-200 inline-flex items-center gap-1 text-xs leading-none transition-colors hover:underline"
+    >
+      Learn more
+      <Icon name="ri:arrow-right-s-line" class="size-4" />
+    </a>
+  </div>
+
   <div class={cn('mb-6 rounded-lg p-4', statusInfo.classNames.containerBg)}>
     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div class="flex-1">

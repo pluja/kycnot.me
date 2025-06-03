@@ -243,13 +243,10 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
         comment.author.serviceAffiliations.map((affiliation) => {
           const roleInfo = getServiceUserRoleInfo(affiliation.role)
           return (
-            <BadgeSmall
-              icon={roleInfo.icon}
-              color={roleInfo.color}
-              text={`${roleInfo.label} at ${affiliation.service.name}`}
-              variant="faded"
-              inlineIcon
-            />
+            <BadgeSmall icon={roleInfo.icon} color={roleInfo.color} variant="faded" inlineIcon>
+              {roleInfo.label} at
+              <a href={`/service/${affiliation.service.slug}`}>{affiliation.service.name}</a>
+            </BadgeSmall>
           )
         })
       }
