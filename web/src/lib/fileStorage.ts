@@ -69,6 +69,53 @@ export async function saveFileLocally(
   return url
 }
 
+/**
+ * List all files in a specific subdirectory of the upload directory.
+ * Returns an array of web-accessible URLs.
+ */
+export async function listFiles(subDir: string): Promise<string[]> {
+  const { fsPath: uploadDir, webPath: webUploadPath } = getUploadDir(subDir)
+  try {
+    const files = await fs.readdir(uploadDir)
+    return files.map((file) => sanitizePath(`${webUploadPath}/${file}`))
+  } catch (error: unknown) {
+    const err = error as NodeJS.ErrnoException
+    if (err.code === 'ENOENT') {
+      return []
+    }
+    console.error(`Error listing files in ${uploadDir}:`, error)
+    throw error
+  }
+}
+
+/**
+ * Delete a file locally given its web-accessible URL path
+ */
+export async function deleteFileLocally(fileUrl: string): Promise<void> {
+  // Extract the subpath and filename from the webPath
+  // Example: /files/evidence/service-slug/image.jpg -> evidence/service-slug/image.jpg
+  const basePath = '/files'
+  if (!fileUrl.startsWith(basePath)) {
+    throw new Error('Invalid file URL for deletion. Must start with /files')
+  }
+
+  const subPathAndFile = fileUrl.substring(basePath.length).replace(/^\/+/, '') // Remove leading /files/ and any extra leading slashes
+  const { fsPath: uploadDirWithoutSubDir } = getUploadDir() // Get base upload directory
+  const filePath = path.join(uploadDirWithoutSubDir, subPathAndFile)
+
+  try {
+    await fs.unlink(filePath)
+  } catch (error: unknown) {
+    const err = error as NodeJS.ErrnoException
+    if (err.code === 'ENOENT') {
+      console.warn(`File not found for deletion, but treating as success: ${filePath}`)
+      return
+    }
+    console.error(`Error deleting file ${filePath}:`, error)
+    throw error
+  }
+}
+
 function sanitizePath(inputPath: string): string {
   let sanitized = inputPath.replace(/\\+/g, '/')
   // Collapse multiple slashes, but preserve protocol (e.g., http://)

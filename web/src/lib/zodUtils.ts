@@ -13,15 +13,42 @@ const addZodPipe = (schema: ZodTypeAny, zodPipe?: ZodTypeAny) => {
 export const zodCohercedNumber = (zodPipe?: ZodTypeAny) =>
   addZodPipe(z.number().or(z.string().nonempty()), zodPipe)
 
+const cleanUrl = (input: unknown) => {
+  if (typeof input !== 'string') return input
+  const cleanInput = input.trim().replace(/\/$/, '')
+  return !/^\w+:\/\//i.test(cleanInput) ? `https://${cleanInput}` : cleanInput
+}
+
 export const zodUrlOptionalProtocol = z.preprocess(
-  (input) => {
-    if (typeof input !== 'string') return input
-    const cleanInput = input.trim().replace(/\/$/, '')
-    return !/^\w+:\/\//i.test(cleanInput) ? `https://${cleanInput}` : cleanInput
-  },
+  cleanUrl,
   z.string().refine((value) => /^(https?):\/\/(?=.*\.[a-z0-9]{2,})[^\s$.?#].[^\s]*$/i.test(value), {
     message: 'Invalid URL',
   })
+)
+
+export const zodContactMethod = z.preprocess(
+  (input) => {
+    if (typeof input !== 'string') return input
+    const cleanInput = input.trim()
+
+    if (/^([\d\s+\-_/()[\]*#.,]|ext|x){7,}$/i.test(cleanInput)) return `tel:${cleanInput}`
+
+    if (/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanInput)) return `mailto:${cleanInput}`
+
+    return cleanUrl(cleanInput)
+  },
+  z
+    .string()
+    .trim()
+    .refine(
+      (value) =>
+        /^((https?):\/\/(?=.*\.[a-z0-9]{2,})[^\s$.?#].[^\s]|([\d\s+\-_/()[\]*#.,]|ext|x){7,}|[0-9\s+-_\\/()[\]*#.]|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})*$/i.test(
+          value
+        ),
+      {
+        message: 'Invalid contact method',
+      }
+    )
 )
 
 const stringToArrayFactory = (delimiter: RegExp | string = ',') => {
@@ -47,6 +74,11 @@ export const stringListOfUrlsSchema = z.preprocess(
 export const stringListOfUrlsSchemaRequired = z.preprocess(
   stringToArrayFactory(/[\s,\n]+/),
   z.array(zodUrlOptionalProtocol).min(1)
+)
+
+export const stringListOfContactMethodsSchema = z.preprocess(
+  stringToArrayFactory(/[\s,\n]+/),
+  z.array(zodContactMethod).default([])
 )
 
 export const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB

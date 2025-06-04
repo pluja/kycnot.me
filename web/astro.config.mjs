@@ -6,11 +6,11 @@ import sitemap from '@astrojs/sitemap'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, envField } from 'astro/config'
 import icon from 'astro-icon'
-import { loadEnv } from 'vite'
 
-// @ts-expect-error process.env actually exists
-const { SITE_URL } = loadEnv(process.env.NODE_ENV, process.cwd(), '')
-if (!SITE_URL) throw new Error('SITE_URL environment variable is not set')
+import { postgresListener } from './src/lib/postgresListenerIntegration'
+import { getServerEnvVariable } from './src/lib/serverEnvVariables'
+
+const SITE_URL = getServerEnvVariable('SITE_URL')
 
 export default defineConfig({
   site: SITE_URL,
@@ -22,6 +22,7 @@ export default defineConfig({
     plugins: [tailwindcss()],
   },
   integrations: [
+    postgresListener(),
     icon(),
     mdx(),
     sitemap({

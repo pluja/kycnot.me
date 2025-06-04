@@ -1,11 +1,24 @@
 /* eslint-disable import/no-named-as-default-member */
-import { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT } from 'astro:env/server'
 import webpush, { WebPushError } from 'web-push'
+
+import { getServerEnvVariable } from './serverEnvVariables'
+
+const VAPID_PUBLIC_KEY = getServerEnvVariable('VAPID_PUBLIC_KEY')
+const VAPID_PRIVATE_KEY = getServerEnvVariable('VAPID_PRIVATE_KEY')
+const VAPID_SUBJECT = getServerEnvVariable('VAPID_SUBJECT')
 
 // Configure VAPID keys
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
 
 export { webpush }
+
+export type NotificationData = {
+  title: string
+  body?: string
+  icon?: string
+  badge?: string
+  url?: string
+}
 
 export async function sendPushNotification(
   subscription: {
@@ -15,13 +28,7 @@ export async function sendPushNotification(
       auth: string
     }
   },
-  data: {
-    title: string
-    body?: string
-    icon?: string
-    badge?: string
-    url?: string
-  }
+  data: NotificationData
 ) {
   try {
     const result = await webpush.sendNotification(

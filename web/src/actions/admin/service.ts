@@ -5,10 +5,15 @@ import { uniq } from 'lodash-es'
 import slugify from 'slugify'
 
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
-import { saveFileLocally } from '../../lib/fileStorage'
+import { saveFileLocally, deleteFileLocally } from '../../lib/fileStorage'
 import { prisma } from '../../lib/prisma'
 import { separateServiceUrlsByType } from '../../lib/urls'
-import { imageFileSchema, stringListOfUrlsSchemaRequired, zodCohercedNumber } from '../../lib/zodUtils'
+import {
+  imageFileSchema,
+  stringListOfUrlsSchemaRequired,
+  zodCohercedNumber,
+  zodContactMethod,
+} from '../../lib/zodUtils'
 
 const addSlugIfMissing = <
   T extends {
@@ -69,6 +74,15 @@ const updateServiceInputSchema = serviceSchemaBase
   })
   .transform(addSlugIfMissing)
 
+const evidenceImageAddSchema = z.object({
+  serviceId: z.number().int().positive(),
+  imageFile: imageFileSchema,
+})
+
+const evidenceImageDeleteSchema = z.object({
+  fileUrl: z.string().startsWith('/files/evidence/', 'Must be a valid evidence file URL'),
+})
+
 export const adminServiceActions = {
   create: defineProtectedAction({
     accept: 'form',
@@ -107,7 +121,7 @@ export const adminServiceActions = {
           onionUrls,
           i2pUrls,
           kycLevel: input.kycLevel,
-          kycLevelClarification: input.kycLevelClarification,
+          kycLevelClarification: input.kycLevelClarification ?? undefined,
           verificationStatus: input.verificationStatus,
           verificationSummary: input.verificationSummary,
           verificationProofMd: input.verificationProofMd,
@@ -225,7 +239,7 @@ export const adminServiceActions = {
           onionUrls,
           i2pUrls,
           kycLevel: input.kycLevel,
-          kycLevelClarification: input.kycLevelClarification,
+          kycLevelClarification: input.kycLevelClarification ?? undefined,
           verificationStatus: input.verificationStatus,
           verificationSummary: input.verificationSummary,
           verificationProofMd: input.verificationProofMd,
@@ -272,7 +286,7 @@ export const adminServiceActions = {
       permissions: 'admin',
       input: z.object({
         label: z.string().min(1).max(50).nullable(),
-        value: z.string().url(),
+        value: zodContactMethod,
         serviceId: z.number().int().positive(),
       }),
       handler: async (input) => {
@@ -401,6 +415,52 @@ export const adminServiceActions = {
         await prisma.internalServiceNote.delete({
           where: { id: input.noteId },
         })
+      },
+    }),
+  },
+
+  evidenceImage: {
+    add: defineProtectedAction({
+      accept: 'form',
+      permissions: 'admin',
+      input: evidenceImageAddSchema,
+      handler: async (input) => {
+        const service = await prisma.service.findUnique({
+          where: { id: input.serviceId },
+          select: { slug: true },
+        })
+
+        if (!service) {
+          throw new ActionError({
+            code: 'NOT_FOUND',
+            message: 'Service not found to associate image with.',
+          })
+        }
+
+        if (!input.imageFile) {
+          throw new ActionError({
+            code: 'BAD_REQUEST',
+            message: 'Image file is required.',
+          })
+        }
+
+        const imageUrl = await saveFileLocally(
+          input.imageFile,
+          input.imageFile.name,
+          `evidence/${service.slug}`
+        )
+
+        return { imageUrl }
+      },
+    }),
+    delete: defineProtectedAction({
+      accept: 'form',
+      permissions: 'admin',
+      input: evidenceImageDeleteSchema,
+      handler: async (input) => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        await deleteFileLocally(input.fileUrl)
+        return { success: true }
       },
     }),
   },

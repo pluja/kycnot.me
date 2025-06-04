@@ -10,7 +10,12 @@ import { findServicesBySimilarity } from '../lib/findServicesBySimilarity'
 import { handleHoneypotTrap } from '../lib/honeypot'
 import { prisma } from '../lib/prisma'
 import { separateServiceUrlsByType } from '../lib/urls'
-import { imageFileSchemaRequired, stringListOfUrlsSchemaRequired, zodCohercedNumber } from '../lib/zodUtils'
+import {
+  imageFileSchemaRequired,
+  stringListOfContactMethodsSchema,
+  stringListOfUrlsSchemaRequired,
+  zodCohercedNumber,
+} from '../lib/zodUtils'
 
 import type { Prisma } from '@prisma/client'
 
@@ -153,6 +158,7 @@ export const serviceSuggestionActions = {
         description: z.string().min(1).max(SUGGESTION_DESCRIPTION_MAX_LENGTH),
         allServiceUrls: stringListOfUrlsSchemaRequired,
         tosUrls: stringListOfUrlsSchemaRequired,
+        contactMethods: stringListOfContactMethodsSchema,
         kycLevel: zodCohercedNumber(z.coerce.number().int().min(0).max(4)),
         kycLevelClarification: z.nativeEnum(KycLevelClarification),
         attributes: z.array(z.coerce.number().int().positive()),
@@ -237,6 +243,11 @@ export const serviceSuggestionActions = {
             attributes: {
               create: input.attributes.map((id) => ({
                 attributeId: id,
+              })),
+            },
+            contactMethods: {
+              create: input.contactMethods.map((value) => ({
+                value,
               })),
             },
           },

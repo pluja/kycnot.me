@@ -1,17 +1,10 @@
 import { z } from 'astro:schema'
 
+import { zodParseJSON, type ZodJSON } from './json'
 import { typedObjectEntries } from './objects'
 
-// eslint-disable-next-line @typescript-eslint/consistent-type-definitions
-interface JSONObject {
-  [k: string]: JSONValue
-}
-type JSONList = JSONValue[]
-type JSONPrimitive = boolean | number | string | null
-type JSONValue = Date | JSONList | JSONObject | JSONPrimitive
-
 function makeTypedLocalStorage<
-  Schemas extends Record<string, z.ZodType<JSONValue>>,
+  Schemas extends Record<string, ZodJSON>,
   T extends {
     [K in keyof Schemas]: {
       schema: Schemas[K]
@@ -28,24 +21,7 @@ function makeTypedLocalStorage<
         key,
         {
           get: () => {
-            const stringValue = localStorage.getItem(key)
-            if (!stringValue) return option.default
-
-            let jsonValue: z.output<typeof option.schema> | undefined = option.default
-            try {
-              jsonValue = JSON.parse(stringValue)
-            } catch (error) {
-              console.error(error)
-              return option.default
-            }
-
-            const parsedValue = option.schema.safeParse(jsonValue)
-            if (!parsedValue.success) {
-              console.error(parsedValue.error)
-              return option.default
-            }
-
-            return parsedValue.data
+            return zodParseJSON(option.schema, localStorage.getItem(key), option.default)
           },
 
           set: (value: z.input<typeof option.schema>) => {

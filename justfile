@@ -51,42 +51,6 @@ import-db file="":
     fi
   fi
   
-  echo "Restoring database from $BACKUP_FILE..."
-  # First drop all connections to the database
-  docker compose exec -T database psql -U ${POSTGRES_USER:-kycnot} -c "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = '${POSTGRES_DATABASE:-kycnot}' AND pid <> pg_backend_pid();" postgres
-  
-  # Drop and recreate database
-  echo "Dropping and recreating the database..."
-  docker compose exec -T database psql -U ${POSTGRES_USER:-kycnot} -c "DROP DATABASE IF EXISTS ${POSTGRES_DATABASE:-kycnot};" postgres
-  docker compose exec -T database psql -U ${POSTGRES_USER:-kycnot} -c "CREATE DATABASE ${POSTGRES_DATABASE:-kycnot};" postgres
-  
-  # Restore the database
-  cat "$BACKUP_FILE" | docker compose exec -T database pg_restore -U ${POSTGRES_USER:-kycnot} -d ${POSTGRES_DATABASE:-kycnot} --no-owner
-  echo "Database restored successfully!"
-  
-  # Import triggers
-  echo "Importing triggers..."
-  just import-triggers
-  
-  echo "Database import completed!"
-  # Check if migrations need to be run
-  cd web && npx prisma migrate status
-
-  #!/bin/bash
-  if [ -z "{{file}}" ]; then
-    BACKUP_FILE=$(find backups/ -name 'db_backup_*.dump' | sort -r | head -n 1)
-    if [ -z "$BACKUP_FILE" ]; then
-      echo "Error: No backup files found in the backups directory"
-      exit 1
-    fi
-  else
-    BACKUP_FILE="{{file}}"
-    if [ ! -f "$BACKUP_FILE" ]; then
-      echo "Error: Backup file '$BACKUP_FILE' not found"
-      exit 1
-    fi
-  fi
-  
   echo "=== STEP 1: PREPARING DATABASE ==="
   # Drop all connections to the database
   docker compose exec -T database psql -U ${POSTGRES_USER:-kycnot} -c "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = '${POSTGRES_DATABASE:-kycnot}' AND pid <> pg_backend_pid();" postgres

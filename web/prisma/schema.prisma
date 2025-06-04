@@ -345,7 +345,7 @@ model Service {
   description            String
   categories             Category[]                   @relation("ServiceToCategory")
   kycLevel               Int                          @default(4)
-  kycLevelClarification  KycLevelClarification?
+  kycLevelClarification  KycLevelClarification        @default(NONE)
   overallScore           Int                          @default(0)
   privacyScore           Int                          @default(0)
   trustScore             Int                          @default(0)
@@ -391,7 +391,6 @@ model Service {
   onVerificationChangeForServices NotificationPreferences[] @relation("onVerificationChangeForServices")
   Notification                    Notification[]
   affiliatedUsers                 ServiceUser[]             @relation("ServiceUsers")
-  kycLevelDetailsId               Int?
 
   @@index([listedAt])
   @@index([overallScore])

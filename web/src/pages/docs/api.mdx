@@ -11,6 +11,7 @@ import { SOURCE_CODE_URL } from 'astro:env/server'
 import { kycLevels } from '../../constants/kycLevels'
 import { verificationStatuses } from '../../constants/verificationStatus'
 import { serviceVisibilities } from '../../constants/serviceVisibility'
+import { kycLevelClarifications } from '../../constants/kycLevelClarifications'
 
 Access basic service data via our public API.
 
@@ -58,6 +59,12 @@ type ServiceResponse = {
     name: string
     description: string
   }
+  kycLevelClarification: 'NONE' | 'DEPENDS_ON_PARTNERS' | ...
+  kycLevelClarificationInfo: {
+    value: 'NONE' | 'DEPENDS_ON_PARTNERS' | ...
+    name: string
+    description: string
+  }
   categories: {
     name: string
     slug: string
@@ -99,6 +106,16 @@ type ServiceResponse = {
 ))}
 </ul>
 
+#### KYC Level Clarifications
+
+<ul>
+{kycLevelClarifications.map((clarification) => (
+  <li key={clarification.value}>
+    <strong>{clarification.value}</strong>: {clarification.description}
+  </li>
+))}
+</ul>
+
 ### Examples
 
 #### Request
@@ -130,6 +147,11 @@ curl -X QUERY https://kycnot.me/api/v1/service/get \
     "value": 0,
     "name": "Guaranteed no KYC",
     "description": "Terms explicitly state KYC will never be requested."
+  },
+  "kycLevelClarification": "NONE",
+  "kycLevelClarificationInfo": {
+    "value": "NONE",
+    "description": "No clarification needed."
   },
   "categories": [
     {

@@ -23,7 +23,7 @@ import Tooltip from '../../../../components/Tooltip.astro'
 import UserBadge from '../../../../components/UserBadge.astro'
 import { getAttributeCategoryInfo } from '../../../../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../../../../constants/attributeTypes'
-import { formatContactMethod } from '../../../../constants/contactMethods'
+import { contactMethodUrlTypes, formatContactMethod } from '../../../../constants/contactMethods'
 import { currencies } from '../../../../constants/currencies'
 import { eventTypes, getEventTypeInfo } from '../../../../constants/eventTypes'
 import { kycLevelClarifications } from '../../../../constants/kycLevelClarifications'
@@ -36,6 +36,7 @@ import {
 } from '../../../../constants/verificationStepStatus'
 import BaseLayout from '../../../../layouts/BaseLayout.astro'
 import { DEPLOYMENT_MODE } from '../../../../lib/envVariables'
+import { listFiles } from '../../../../lib/fileStorage'
 import { makeAdminApiCallInfo } from '../../../../lib/makeAdminApiCallInfo'
 import { pluralize } from '../../../../lib/pluralize'
 import { prisma } from '../../../../lib/prisma'
@@ -87,8 +88,35 @@ const internalNoteInputErrors = isInputError(internalNoteCreateResult?.error)
   ? internalNoteCreateResult.error.fields
   : {}
 
+const contactMethodUpdateResult = Astro.getActionResult(actions.admin.service.contactMethod.update)
+Astro.locals.banners.addIfSuccess(contactMethodUpdateResult, 'Contact method updated successfully')
+const contactMethodUpdateInputErrors = isInputError(contactMethodUpdateResult?.error)
+  ? contactMethodUpdateResult.error.fields
+  : {}
+
+const contactMethodAddResult = Astro.getActionResult(actions.admin.service.contactMethod.add)
+Astro.locals.banners.addIfSuccess(contactMethodAddResult, 'Contact method added successfully')
+const contactMethodAddInputErrors = isInputError(contactMethodAddResult?.error)
+  ? contactMethodAddResult.error.fields
+  : {}
+
 const internalNoteDeleteResult = Astro.getActionResult(actions.admin.service.internalNote.delete)
 Astro.locals.banners.addIfSuccess(internalNoteDeleteResult, 'Internal note deleted successfully')
+
+const evidenceImageAddResult = Astro.getActionResult(actions.admin.service.evidenceImage.add)
+if (evidenceImageAddResult?.data?.imageUrl) {
+  Astro.locals.banners.add({
+    uiMessage: 'Evidence image added successfully',
+    type: 'success',
+    origin: 'action',
+  })
+}
+const evidenceImageAddInputErrors = isInputError(evidenceImageAddResult?.error)
+  ? evidenceImageAddResult.error.fields
+  : {}
+
+const evidenceImageDeleteResult = Astro.getActionResult(actions.admin.service.evidenceImage.delete)
+Astro.locals.banners.addIfSuccess(evidenceImageDeleteResult, 'Evidence image deleted successfully')
 
 const [service, categories, attributes] = await Astro.locals.banners.tryMany([
   [
@@ -199,6 +227,12 @@ if (!service) {
 
   return Astro.rewrite('/404')
 }
+
+const evidenceImageUrls = await Astro.locals.banners.try(
+  'Error listing evidence files',
+  () => listFiles(`evidence/${service.slug}`),
+  [] as string[]
+)
 
 const apiCalls = await Astro.locals.banners.try(
   'Error fetching api calls',
@@ -426,7 +460,7 @@ const apiCalls = await Astro.locals.banners.try(
             description: clarification.description,
             noTransitionPersist: true,
           }))}
-          selectedValue={service.kycLevelClarification ?? 'NONE'}
+          selectedValue={service.kycLevelClarification}
           iconSize="sm"
           cardSize="sm"
           error={serviceInputErrors.kycLevelClarification}
@@ -1113,6 +1147,7 @@ const apiCalls = await Astro.locals.banners.try(
                           value: method.label,
                           placeholder: contactMethodInfo.formattedValue,
                         }}
+                        error={contactMethodUpdateInputErrors.label}
                       />
 
                       <InputText
@@ -1122,6 +1157,7 @@ const apiCalls = await Astro.locals.banners.try(
                           value: method.value,
                           placeholder: 'e.g., mailto:contact@example.com or https://t.me/example',
                         }}
+                        error={contactMethodUpdateInputErrors.value}
                       />
 
                       <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
@@ -1142,12 +1178,13 @@ const apiCalls = await Astro.locals.banners.try(
 
           <InputText
             label="Value"
-            description="With protocol (e.g., `mailto:contact@example.com` or `https://t.me/example`)"
+            description={`Accepts: ${contactMethodUrlTypes.map((type) => type.labelPlural).join(', ')}`}
             name="value"
             inputProps={{
               required: true,
-              placeholder: 'mailto:contact@example.com',
+              placeholder: 'contact@example.com',
             }}
+            error={contactMethodAddInputErrors.value}
           />
 
           <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />
@@ -1164,6 +1201,16 @@ const apiCalls = await Astro.locals.banners.try(
           </p>
         )
       }
+      <div class="mb-6 flex justify-center">
+        <Button
+          as="a"
+          href="/docs/api"
+          icon="ri:book-open-line"
+          color="gray"
+          size="sm"
+          label=" Documentation"
+        />
+      </div>
       {
         apiCalls.map((call) => (
           <FormSubSection title={`${call.method} ${call.path}`}>
@@ -1175,6 +1222,74 @@ const apiCalls = await Astro.locals.banners.try(
           </FormSubSection>
         ))
       }
+    </FormSection>
+
+    <FormSection title="Evidence Images" id="evidence-images">
+      <FormSubSection title="Existing Evidence Images">
+        {
+          evidenceImageUrls.length === 0 ? (
+            <p class="border-night-600 bg-night-800 text-day-300 rounded-xl border p-6 text-center">
+              No evidence images yet.
+            </p>
+          ) : (
+            <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+              {evidenceImageUrls.map((imageUrl: string) => (
+                <div class="border-night-600 bg-night-800 group relative rounded-md border p-2">
+                  <MyPicture
+                    src={imageUrl}
+                    alt="Evidence image"
+                    class="aspect-square w-full rounded object-cover"
+                    width={200}
+                    height={200}
+                  />
+                  <form
+                    method="POST"
+                    action={actions.admin.service.evidenceImage.delete}
+                    class="absolute top-1 right-1"
+                  >
+                    <input type="hidden" name="fileUrl" value={imageUrl} />
+                    <Button
+                      type="submit"
+                      variant="faded"
+                      color="danger"
+                      size="sm"
+                      icon="ri:delete-bin-line"
+                      iconOnly
+                      label="Delete Image"
+                      class="opacity-0 transition-opacity group-hover:opacity-100"
+                    />
+                  </form>
+
+                  <input
+                    type="text"
+                    readonly
+                    value={`![Evidence](${imageUrl})`}
+                    class="bg-night-700 text-day-200 mt-2 w-full cursor-text rounded border p-2 font-mono text-xs select-all"
+                  />
+                </div>
+              ))}
+            </div>
+          )
+        }
+      </FormSubSection>
+      <FormSubSection title="Add New Evidence Image">
+        <form
+          method="POST"
+          action={actions.admin.service.evidenceImage.add}
+          class="space-y-4"
+          enctype="multipart/form-data"
+        >
+          <input type="hidden" name="serviceId" value={service.id} />
+          <InputImageFile
+            label="Upload Image"
+            name="imageFile"
+            description="Upload an evidence image."
+            error={evidenceImageAddInputErrors.imageFile}
+            required
+          />
+          <InputSubmitButton label="Add Image" icon="ri:add-line" hideCancel />
+        </form>
+      </FormSubSection>
     </FormSection>
   </div>
 </BaseLayout>

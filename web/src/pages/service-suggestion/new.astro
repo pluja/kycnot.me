@@ -19,6 +19,7 @@ import InputText from '../../components/InputText.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
 import { getAttributeCategoryInfo } from '../../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../../constants/attributeTypes'
+import { contactMethodUrlTypes } from '../../constants/contactMethods'
 import { currencies } from '../../constants/currencies'
 import { kycLevelClarifications } from '../../constants/kycLevelClarifications'
 import { kycLevels } from '../../constants/kycLevels'
@@ -208,25 +209,41 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
         description="One per line. Accepts **Web**, **Onion**, and **I2P** URLs."
         name="allServiceUrls"
         inputProps={{
-          placeholder: 'https://example1.com\nhttps://example2.onion\nhttps://example3.b32.i2p',
-          class: 'min-h-24',
+          placeholder: 'example1.com\nexample2.onion\nexample3.b32.i2p',
+          class: 'md:min-h-20 min-h-24 h-full',
           required: true,
         }}
-        class="row-span-2 flex flex-col self-stretch"
+        class="flex flex-col self-stretch"
         error={inputErrors.allServiceUrls}
       />
+
       <InputTextArea
-        label="ToS URLs"
-        description="One per line"
-        name="tosUrls"
+        label="Contact Methods"
+        description={[
+          'One per line.',
+          `Accepts: ${contactMethodUrlTypes.map((type) => type.labelPlural).join(', ')}`,
+        ].join('\n')}
+        name="contactMethods"
         inputProps={{
-          placeholder: 'https://example1.com/tos\nhttps://example2.com/tos',
-          class: 'md:min-h-24',
-          required: true,
+          placeholder: 'contact@example.com\nt.me/example\n+123 456 7890',
+          class: 'h-full',
         }}
-        error={inputErrors.tosUrls}
+        class="flex flex-col self-stretch"
+        error={inputErrors.contactMethods}
       />
     </div>
+
+    <InputTextArea
+      label="ToS URLs"
+      description="One per line"
+      name="tosUrls"
+      inputProps={{
+        placeholder: 'example.com/tos',
+        required: true,
+        class: 'min-h-10',
+      }}
+      error={inputErrors.tosUrls}
+    />
 
     <InputCardGroup
       name="kycLevel"

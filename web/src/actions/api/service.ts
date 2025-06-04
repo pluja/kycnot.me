@@ -2,6 +2,7 @@ import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 import { pick } from 'lodash-es'
 
+import { getKycLevelClarificationInfo } from '../../constants/kycLevelClarifications'
 import { getKycLevelInfo } from '../../constants/kycLevels'
 import { getVerificationStatusInfo } from '../../constants/verificationStatus'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
@@ -50,6 +51,7 @@ export const apiServiceActions = {
         slug: true,
         description: true,
         kycLevel: true,
+        kycLevelClarification: true,
         verificationStatus: true,
         categories: {
           select: {
@@ -130,6 +132,12 @@ export const apiServiceActions = {
         verifiedAt: service.verifiedAt,
         kycLevel: service.kycLevel,
         kycLevelInfo: pick(getKycLevelInfo(service.kycLevel.toString()), ['value', 'name', 'description']),
+        kycLevelClarification: service.kycLevelClarification,
+        kycLevelClarificationInfo: pick(getKycLevelClarificationInfo(service.kycLevelClarification), [
+          'value',
+          'name',
+          'description',
+        ]),
         categories: service.categories,
         listedAt: service.listedAt,
         serviceUrls: [...service.serviceUrls, ...service.onionUrls, ...service.i2pUrls].map(
