@@ -7,10 +7,8 @@ services:
     volumes:
       - database:/var/lib/postgresql/data:z
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-kycnot}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kycnot}
-      POSTGRES_DB: ${POSTGRES_DATABASE:-kycnot}
+    env_file:
+      - .env
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kycnot} -d ${POSTGRES_DATABASE:-kycnot}"]
       interval: 10s
@@ -21,18 +19,15 @@ services:
     build:
       context: ./pyworker
     restart: always
-    environment:
-      DATABASE_URL: "postgresql://${POSTGRES_USER:-kycnot}:${POSTGRES_PASSWORD:-kycnot}@database:5432/${POSTGRES_DATABASE:-kycnot}?schema=public"
-      CRAWL4AI_BASE_URL: "http://crawl4ai:11235"
-      CRAWL4AI_API_TOKEN: ${CRAWL4AI_API_TOKEN:-testing}
+    env_file:
+      - .env
 
   crawl4ai:
     image: unclecode/crawl4ai:basic-amd64
     expose:
       - "11235"
-    environment:
-      CRAWL4AI_API_TOKEN: ${CRAWL4AI_API_TOKEN:-testing} # Optional API security
-      MAX_CONCURRENT_TASKS: 10
+    env_file:
+      - .env
     volumes:
       - /dev/shm:/dev/shm
     deploy:
@@ -53,15 +48,9 @@ services:
 
   astro:
     build:
-      context: ./web
+      dockerfile: web/Dockerfile
     image: kycnotme/astro:${ASTRO_IMAGE_TAG:-latest}
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-kycnot}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kycnot}
-      POSTGRES_DB: ${POSTGRES_DATABASE:-kycnot}
-      DATABASE_URL: "postgresql://${POSTGRES_USER:-kycnot}:${POSTGRES_PASSWORD:-kycnot}@database:5432/${POSTGRES_DATABASE:-kycnot}?schema=public"
-      REDIS_URL: "redis://redis:6379"
     env_file:
       - .env
     depends_on:

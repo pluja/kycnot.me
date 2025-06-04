@@ -3,8 +3,7 @@ import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 import { groupBy, round, uniq } from 'lodash-es'
 
-import InputSubmitButton from '../../components/InputSubmitButton.astro'
-import InputText from '../../components/InputText.astro'
+import Button from '../../components/Button.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
 import MiniLayout from '../../layouts/MiniLayout.astro'
 import { cn } from '../../lib/cn'
@@ -15,7 +14,7 @@ if (!Astro.locals.user?.admin) {
   return Astro.redirect('/access-denied')
 }
 
-const testResult = Astro.getActionResult(actions.admin.notification.webPush.test)
+const testResult = Astro.getActionResult(actions.admin.notification.test)
 const testInputErrors = isInputError(testResult?.error) ? testResult.error.fields : {}
 
 Astro.locals.banners.addIfSuccess(testResult, (data) => data.message)
@@ -104,7 +103,7 @@ const stats = [
 
   <h2 class="text-center text-lg font-semibold text-white">Send Test Notification</h2>
 
-  <form method="POST" action={actions.admin.notification.webPush.test} class="space-y-4">
+  <form method="POST" action={actions.admin.notification.test} class="space-y-4">
     <InputTextArea
       label="Users"
       name="userNames"
@@ -121,35 +120,6 @@ const stats = [
       error={testInputErrors.userNames}
     />
 
-    <InputText
-      label="Title"
-      name="title"
-      inputProps={{
-        value: 'Test Notification',
-        required: true,
-      }}
-      error={testInputErrors.title}
-    />
-
-    <InputTextArea
-      label="Body"
-      name="body"
-      inputProps={{
-        value: 'This is a test push notification from KYCNot.me',
-      }}
-      error={testInputErrors.body}
-    />
-
-    <InputText
-      label="Action URL"
-      name="url"
-      inputProps={{
-        placeholder: 'https://example.com/path',
-      }}
-      description="URL to open when the notification is clicked"
-      error={testInputErrors.url}
-    />
-
-    <InputSubmitButton label="Send" icon="ri:send-plane-line" hideCancel color="danger" />
+    <Button type="submit" label="Send" icon="ri:send-plane-line" color="danger" class="w-full" />
   </form>
 </MiniLayout>

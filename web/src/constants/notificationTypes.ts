@@ -21,6 +21,11 @@ export const {
   }),
   [
     {
+      id: 'TEST',
+      label: 'Test notification',
+      icon: 'ri:flask-line',
+    },
+    {
       id: 'COMMENT_STATUS_CHANGE',
       label: 'Comment status changed',
       icon: 'ri:chat-check-line',

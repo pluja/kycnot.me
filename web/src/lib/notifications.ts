@@ -12,6 +12,7 @@ import type { Prisma } from '@prisma/client'
 export function makeNotificationTitle(
   notification: Prisma.NotificationGetPayload<{
     select: {
+      id: true
       type: true
       aboutAccountStatusChange: true
       aboutCommentStatusChange: true
@@ -87,6 +88,9 @@ export function makeNotificationTitle(
   user: Prisma.UserGetPayload<{ select: { id: true } }> | null
 ): string {
   switch (notification.type) {
+    case 'TEST': {
+      return `Test notification #${notification.id.toString()}`
+    }
     case 'COMMENT_STATUS_CHANGE': {
       if (!notification.aboutComment) return 'A comment you are watching had a status change'
 
@@ -178,6 +182,7 @@ export function makeNotificationTitle(
 export function makeNotificationContent(
   notification: Prisma.NotificationGetPayload<{
     select: {
+      createdAt: true
       type: true
       aboutKarmaTransaction: {
         select: {
@@ -204,6 +209,9 @@ export function makeNotificationContent(
   }>
 ): string | null {
   switch (notification.type) {
+    case 'TEST': {
+      return `Created on ${notification.createdAt.toLocaleString()}`
+    }
     // TODO: [KARMA_UNLOCK] Will be added later, when karma unloks are in the database, not in the code.
     // case 'KARMA_UNLOCK':
     case 'KARMA_CHANGE': {
@@ -280,6 +288,9 @@ export function makeNotificationLink(
   origin: string
 ): string | null {
   switch (notification.type) {
+    case 'TEST': {
+      return `${origin}/notifications`
+    }
     case 'COMMENT_STATUS_CHANGE':
     case 'REPLY_COMMENT_CREATED':
     case 'COMMUNITY_NOTE_ADDED':
