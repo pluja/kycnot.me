@@ -2,7 +2,7 @@ import { z } from 'astro/zod'
 import { Client } from 'pg'
 
 import { zodParseJSON } from './json'
-import { sendNotifications } from './sendNotifications'
+import { sendNotification } from './sendNotifications'
 import { getServerEnvVariable } from './serverEnvVariables'
 
 import type { AstroIntegration, HookParameters } from 'astro'
@@ -21,10 +21,10 @@ async function handleNotificationCreated(
   try {
     logger.info(`Processing notification with ID: ${String(notificationId)}`)
 
-    const results = await sendNotifications([notificationId], logger)
+    const results = await sendNotification(notificationId, logger)
 
     logger.info(
-      `Sent push notifications for notification ${String(notificationId)} to ${String(results.subscriptions.success)} devices, ${String(results.subscriptions.failure)} failed`
+      `Sent push notifications for notification ${String(notificationId)} to ${String(results.success)} devices, ${String(results.failure)} failed`
     )
   } catch (error) {
     logger.error(`Error processing notification ${String(notificationId)}: ${getErrorMessage(error)}`)

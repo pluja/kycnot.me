@@ -1,20 +1,18 @@
-import { sum } from 'lodash-es'
-
-import { makeNotificationContent, makeNotificationLink, makeNotificationTitle } from './notifications'
+import { makeNotificationActions, makeNotificationContent, makeNotificationTitle } from './notifications'
 import { prisma } from './prisma'
 import { getServerEnvVariable } from './serverEnvVariables'
-import { type NotificationData, sendPushNotification } from './webPush'
+import { type NotificationPayload, sendPushNotification } from './webPush'
 
 import type { AstroIntegrationLogger } from 'astro'
 
 const SITE_URL = getServerEnvVariable('SITE_URL')
 
-export async function sendNotifications(
-  notificationIds: number[],
+export async function sendNotification(
+  notificationId: number,
   logger: AstroIntegrationLogger | Console = console
 ) {
-  const notifications = await prisma.notification.findMany({
-    where: { id: { in: notificationIds } },
+  const notification = await prisma.notification.findUnique({
+    where: { id: notificationId },
     select: {
       id: true,
       type: true,
@@ -110,76 +108,58 @@ export async function sendNotifications(
     },
   })
 
-  if (notifications.length < notificationIds.length) {
-    const missingNotificationIds = notificationIds.filter(
-      (id) => !notifications.some((notification) => notification.id === id)
-    )
-    logger.error(`Notifications with IDs ${missingNotificationIds.join(', ')} not found`)
+  if (!notification) {
+    logger.error(`Notification with ID ${notificationId.toString()} not found`)
+    return { success: 0, failure: 0, total: 0 }
   }
 
-  const results = await Promise.allSettled(
-    notifications.map(async (notification) => {
-      const subscriptions = await prisma.pushSubscription.findMany({
-        where: { userId: notification.userId },
-        select: {
-          id: true,
-          endpoint: true,
-          p256dh: true,
-          auth: true,
+  const subscriptions = await prisma.pushSubscription.findMany({
+    where: { userId: notification.userId },
+    select: {
+      id: true,
+      endpoint: true,
+      p256dh: true,
+      auth: true,
+    },
+  })
+
+  if (subscriptions.length === 0) {
+    logger.info(`No push subscriptions found for user ${notification.user.name}`)
+    return { success: 0, failure: 0, total: 0 }
+  }
+
+  const notificationPayload = {
+    title: makeNotificationTitle(notification, notification.user),
+    body: makeNotificationContent(notification),
+    actions: makeNotificationActions(notification, SITE_URL),
+  } satisfies NotificationPayload
+
+  const subscriptionResults = await Promise.allSettled(
+    subscriptions.map(async (subscription) => {
+      const result = await sendPushNotification(
+        {
+          endpoint: subscription.endpoint,
+          keys: {
+            p256dh: subscription.p256dh,
+            auth: subscription.auth,
+          },
         },
-      })
-
-      if (subscriptions.length === 0) {
-        logger.info(`No push subscriptions found for user ${notification.user.name}`)
-        return
-      }
-      const notificationData = {
-        title: makeNotificationTitle(notification, notification.user),
-        body: makeNotificationContent(notification) ?? undefined,
-        url: makeNotificationLink(notification, SITE_URL) ?? undefined,
-      } satisfies NotificationData
-
-      const subscriptionResults = await Promise.allSettled(
-        subscriptions.map(async (subscription) => {
-          const result = await sendPushNotification(
-            {
-              endpoint: subscription.endpoint,
-              keys: {
-                p256dh: subscription.p256dh,
-                auth: subscription.auth,
-              },
-            },
-            notificationData
-          )
-
-          // Remove invalid subscriptions
-          if (result.error && (result.error.statusCode === 410 || result.error.statusCode === 404)) {
-            await prisma.pushSubscription.delete({ where: { id: subscription.id } })
-            logger.info(`Removed invalid subscription for user ${notification.user.name}`)
-          }
-
-          return result.success
-        })
+        notificationPayload
       )
 
-      return {
-        success: subscriptionResults.filter((r) => r.status === 'fulfilled' && r.value).length,
-        failure: subscriptionResults.filter((r) => !(r.status === 'fulfilled' && r.value)).length,
-        total: subscriptionResults.length,
+      // Remove invalid subscriptions
+      if (result.error && (result.error.statusCode === 410 || result.error.statusCode === 404)) {
+        await prisma.pushSubscription.delete({ where: { id: subscription.id } })
+        logger.info(`Removed invalid subscription for user ${notification.user.name}`)
       }
+
+      return result.success
     })
   )
 
   return {
-    subscriptions: {
-      success: sum(results.map((r) => (r.status === 'fulfilled' && r.value?.success) ?? 0)),
-      failure: sum(results.map((r) => (r.status === 'fulfilled' && r.value?.failure) ?? 0)),
-      total: sum(results.map((r) => (r.status === 'fulfilled' && r.value?.total) ?? 0)),
-    },
-    notifications: {
-      success: results.filter((r) => r.status === 'fulfilled').length,
-      failure: results.filter((r) => r.status !== 'fulfilled').length,
-      total: results.length,
-    },
+    success: subscriptionResults.filter((r) => r.status === 'fulfilled' && r.value).length,
+    failure: subscriptionResults.filter((r) => !(r.status === 'fulfilled' && r.value)).length,
+    total: subscriptionResults.length,
   }
 }

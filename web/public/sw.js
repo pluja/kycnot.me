@@ -6,7 +6,11 @@
 // @ts-expect-error
 const typedSelf = self
 
-const CACHE_NAME = 'kycnot-sw-push-notifications-v1'
+const CACHE_NAME = 'kycnot-sw-push-notifications-v2'
+
+/** @typedef {import('../src/lib/webPush').NotificationPayload} NotificationPayload */
+/** @typedef {{defaultActionUrl: string, payload: NotificationPayload | null}} NotificationData */
+/** @typedef {NotificationOptions & { actions: { action: string; title: string; icon?: string }[], timestamp: number, data: NotificationData }  } CustomNotificationOptions */
 
 typedSelf.addEventListener('install', (event) => {
   console.log('Service Worker installing')
@@ -22,36 +26,59 @@ typedSelf.addEventListener('push', (event) => {
   console.log('Push event received:', event)
 
   if (!event.data) {
-    console.log('Push event but no data')
+    console.error('Push event but no data')
     return
   }
 
-  let notificationData
-  try {
-    notificationData = event.data.json()
-  } catch (error) {
-    console.error('Error parsing push data:', error)
-    notificationData = {
-      title: 'New Notification',
-      options: {
-        body: event.data.text() || 'You have a new notification',
-      },
-    }
-  }
-
-  const { title, options } = notificationData
-
-  const notificationOptions = {
-    body: options.body || '',
-    icon: options.icon || '/favicon.svg',
-    badge: options.badge || '/favicon.svg',
-    data: options.data || {},
+  let title = 'New Notification'
+  /** @type {CustomNotificationOptions} */
+  let options = {
+    body: 'You have a new notification',
+    lang: 'en-US',
+    icon: '/favicon.svg',
+    badge: '/favicon.svg',
     requireInteraction: false,
     silent: false,
-    ...options,
+    actions: [
+      {
+        action: 'view',
+        title: 'View',
+        icon: 'https://api.iconify.design/ri/arrow-right-line.svg',
+      },
+    ],
+    timestamp: Date.now(),
+    data: {
+      defaultActionUrl: '/notifications',
+      payload: null,
+    },
   }
 
-  event.waitUntil(typedSelf.registration.showNotification(title, notificationOptions))
+  try {
+    /** @type {NotificationPayload} */
+    const rawData = event.data.json()
+    if (typeof rawData !== 'object' || rawData === null) throw new Error('Invalid push data, not an object')
+    if (!('title' in rawData) || typeof rawData.title !== 'string')
+      throw new Error('Invalid push data, no title')
+    title = rawData.title
+
+    options = {
+      ...options,
+      body: rawData.body || undefined,
+      actions: rawData.actions.map((action) => ({
+        action: action.action,
+        title: action.title,
+        icon: action.icon,
+      })),
+      data: {
+        ...options.data,
+        payload: rawData,
+      },
+    }
+  } catch (error) {
+    console.error('Error parsing push data:', error)
+  }
+
+  event.waitUntil(typedSelf.registration.showNotification(title, options))
 })
 
 typedSelf.addEventListener('notificationclick', (event) => {
@@ -59,7 +86,11 @@ typedSelf.addEventListener('notificationclick', (event) => {
 
   event.notification.close()
 
-  const url = event.notification.data?.url || '/'
+  /** @type {NotificationData} */
+  const data = event.notification.data
+
+  // @ts-expect-error I already use optional chaining
+  const url = data.payload?.[event.action]?.url || data.defaultActionUrl
 
   event.waitUntil(
     typedSelf.clients.matchAll({ type: 'window' }).then((clientList) => {

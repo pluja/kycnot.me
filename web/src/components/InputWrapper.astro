@@ -48,7 +48,9 @@ const hasError = !!error && error.length > 0
       <div class={cn('contents', !!descriptionLabel && 'flex flex-wrap items-center gap-x-4')}>
         <legend class={cn('font-title block text-sm font-medium', hasError && 'text-red-500')}>
           {icon && <Icon name={icon} class="inline-block size-4 align-[-0.2em]" />}
-          <label for={inputId}>{label}</label>
+          <label for={inputId} transition:persist>
+            {label}
+          </label>
           {required && '*'}
         </legend>
         {!!descriptionLabel && (

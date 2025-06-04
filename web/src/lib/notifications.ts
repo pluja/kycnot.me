@@ -7,6 +7,7 @@ import { serviceSuggestionStatusChangesById } from '../constants/suggestionStatu
 
 import { makeCommentUrl } from './commentsWithReplies'
 
+import type { NotificationAction } from './webPush'
 import type { Prisma } from '@prisma/client'
 
 export function makeNotificationTitle(
@@ -244,7 +245,7 @@ export function makeNotificationContent(
   }
 }
 
-export function makeNotificationLink(
+export function makeNotificationActions(
   notification: Prisma.NotificationGetPayload<{
     select: {
       type: true
@@ -286,47 +287,120 @@ export function makeNotificationLink(
     }
   }>,
   origin: string
-): string | null {
+): NotificationAction[] {
   switch (notification.type) {
     case 'TEST': {
-      return `${origin}/notifications`
+      return [
+        {
+          action: 'view',
+          title: 'View',
+          ...iconNameAndUrl('ri:arrow-right-line'),
+          url: `${origin}/notifications`,
+        },
+        {
+          action: 'profile',
+          title: 'Profile',
+          ...iconNameAndUrl('ri:user-line'),
+          url: `${origin}/account`,
+        },
+      ]
     }
     case 'COMMENT_STATUS_CHANGE':
     case 'REPLY_COMMENT_CREATED':
     case 'COMMUNITY_NOTE_ADDED':
     case 'ROOT_COMMENT_CREATED': {
-      if (!notification.aboutComment) return null
-      return makeCommentUrl({
-        serviceSlug: notification.aboutComment.service.slug,
-        commentId: notification.aboutComment.id,
-        origin,
-      })
+      if (!notification.aboutComment) return []
+      return [
+        {
+          action: 'view',
+          title: 'View',
+          ...iconNameAndUrl('ri:arrow-right-line'),
+          url: makeCommentUrl({
+            serviceSlug: notification.aboutComment.service.slug,
+            commentId: notification.aboutComment.id,
+            origin,
+          }),
+        },
+      ]
     }
     case 'SUGGESTION_MESSAGE': {
-      if (!notification.aboutServiceSuggestionMessage) return null
-      return `${origin}/service-suggestion/${String(notification.aboutServiceSuggestionMessage.suggestion.id)}#message-${String(notification.aboutServiceSuggestionMessage.id)}`
+      if (!notification.aboutServiceSuggestionMessage) return []
+      return [
+        {
+          action: 'view',
+          title: 'View',
+          ...iconNameAndUrl('ri:arrow-right-line'),
+          url: `${origin}/service-suggestion/${String(notification.aboutServiceSuggestionMessage.suggestion.id)}#message-${String(notification.aboutServiceSuggestionMessage.id)}`,
+        },
+      ]
     }
     case 'SUGGESTION_STATUS_CHANGE': {
-      if (!notification.aboutServiceSuggestionId) return null
-      return `${origin}/service-suggestion/${String(notification.aboutServiceSuggestionId)}`
+      if (!notification.aboutServiceSuggestionId) return []
+      return [
+        {
+          action: 'view',
+          title: 'View',
+          ...iconNameAndUrl('ri:arrow-right-line'),
+          url: `${origin}/service-suggestion/${String(notification.aboutServiceSuggestionId)}`,
+        },
+      ]
     }
     // TODO: [KARMA_UNLOCK] Will be added later, when karma unloks are in the database, not in the code.
     // case 'KARMA_UNLOCK': {
-    //   return `${origin}/account#karma-unlocks`
+    //   return [{ action: 'view', title: 'View', url: `${origin}/account#karma-unlocks` }]
     // }
     case 'KARMA_CHANGE': {
-      return `${origin}/account#karma-transactions`
+      return [
+        {
+          action: 'view',
+          title: 'View',
+          ...iconNameAndUrl('ri:arrow-right-line'),
+          url: `${origin}/account#karma-transactions`,
+        },
+      ]
     }
     case 'ACCOUNT_STATUS_CHANGE': {
-      return `${origin}/account#account-status`
+      return [
+        {
+          action: 'view',
+          title: 'View',
+          ...iconNameAndUrl('ri:arrow-right-line'),
+          url: `${origin}/account#account-status`,
+        },
+      ]
     }
     case 'EVENT_CREATED': {
-      if (!notification.aboutEvent) return null
-      return `${origin}/service/${notification.aboutEvent.service.slug}#events`
+      if (!notification.aboutEvent) return []
+      return [
+        {
+          action: 'view',
+          title: 'View',
+          ...iconNameAndUrl('ri:arrow-right-line'),
+          url: `${origin}/service/${notification.aboutEvent.service.slug}#events`,
+        },
+      ]
     }
     case 'SERVICE_VERIFICATION_STATUS_CHANGE': {
-      if (!notification.aboutService) return null
-      return `${origin}/service/${notification.aboutService.slug}#verification`
+      if (!notification.aboutService) return []
+      return [
+        {
+          action: 'view',
+          title: 'View',
+          ...iconNameAndUrl('ri:arrow-right-line'),
+          url: `${origin}/service/${notification.aboutService.slug}#verification`,
+        },
+      ]
     }
   }
+}
+
+function iconUrl<T extends `${string}:${string}`>(iconName: T) {
+  return `https://api.iconify.design/${iconName.replace(':', '/') as T extends `${infer Prefix}:${infer Suffix}` ? `${Prefix}/${Suffix}` : never}.svg` as const
+}
+
+function iconNameAndUrl<T extends `${string}:${string}`>(iconName: T) {
+  return {
+    iconName,
+    icon: iconUrl(iconName),
+  } as const
 }

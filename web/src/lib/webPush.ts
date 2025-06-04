@@ -12,12 +12,19 @@ webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
 
 export { webpush }
 
-export type NotificationData = {
+export type NotificationAction = {
+  action: string
   title: string
-  body?: string
   icon?: string
-  badge?: string
-  url?: string
+
+  url: string | null
+  iconName?: string
+}
+
+export type NotificationPayload = {
+  title: string
+  body: string | null
+  actions: NotificationAction[]
 }
 
 export async function sendPushNotification(
@@ -28,26 +35,13 @@ export async function sendPushNotification(
       auth: string
     }
   },
-  data: NotificationData
+  payload: NotificationPayload
 ) {
   try {
-    const result = await webpush.sendNotification(
-      subscription,
-      JSON.stringify({
-        title: data.title,
-        options: {
-          body: data.body,
-          icon: data.icon ?? '/favicon.svg',
-          badge: data.badge ?? '/favicon.svg',
-          data: {
-            url: data.url,
-          },
-        },
-      }),
-      {
-        TTL: 24 * 60 * 60, // 24 hours
-      }
-    )
+    // NOTE: View sw.js to see how the notification is handled
+    const result = await webpush.sendNotification(subscription, JSON.stringify(payload), {
+      TTL: 24 * 60 * 60, // 24 hours
+    })
     return { success: true, result } as const
   } catch (error) {
     console.error('Error sending push notification:', error)

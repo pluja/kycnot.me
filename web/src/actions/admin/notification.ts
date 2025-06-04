@@ -2,7 +2,6 @@ import { z } from 'astro/zod'
 
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { prisma } from '../../lib/prisma'
-import { sendNotifications } from '../../lib/sendNotifications'
 import { stringListOfSlugsSchemaRequired } from '../../lib/zodUtils'
 
 export const adminNotificationActions = {
@@ -26,10 +25,8 @@ export const adminNotificationActions = {
         select: { id: true },
       })
 
-      const results = await sendNotifications(notifications.map((notification) => notification.id))
-
       return {
-        message: `Sent to ${results.subscriptions.success.toLocaleString()} devices, ${results.subscriptions.failure.toLocaleString()} failed.`,
+        message: `Created ${notifications.length.toString()} notifications.`,
       }
     },
   }),

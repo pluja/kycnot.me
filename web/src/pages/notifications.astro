@@ -11,7 +11,7 @@ import { getNotificationTypeInfo } from '../constants/notificationTypes'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { cn } from '../lib/cn'
 import { getOrCreateNotificationPreferences } from '../lib/notificationPreferences'
-import { makeNotificationContent, makeNotificationLink, makeNotificationTitle } from '../lib/notifications'
+import { makeNotificationActions, makeNotificationContent, makeNotificationTitle } from '../lib/notifications'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { makeLoginUrl } from '../lib/redirectUrls'
@@ -199,7 +199,7 @@ const notifications = dbNotifications.map((notification) => ({
   typeInfo: getNotificationTypeInfo(notification.type),
   title: makeNotificationTitle(notification, user),
   content: makeNotificationContent(notification),
-  link: makeNotificationLink(notification, Astro.url.origin),
+  actions: makeNotificationActions(notification, Astro.url.origin),
 }))
 ---
 
@@ -285,18 +285,21 @@ const notifications = dbNotifications.map((notification) => ({
                       type="submit"
                       class="flex size-8 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-zinc-400 transition-colors duration-200 hover:bg-zinc-700 hover:text-zinc-200"
                     >
-                      <Icon name={notification.read ? 'ri:eye-close-line' : 'ri:eye-line'} class="size-4" />
+                      <Icon name={notification.read ? 'ri:close-line' : 'ri:check-line'} class="size-4" />
                     </Tooltip>
                   </form>
-                  {notification.link && (
-                    <a
-                      href={notification.link}
+                  {notification.actions.map((action) => (
+                    <Tooltip
+                      as="a"
+                      href={action.url}
                       class="flex size-8 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-zinc-400 transition-colors duration-200 hover:bg-zinc-700 hover:text-zinc-200"
+                      text={action.title}
+                      position="left"
                     >
-                      <Icon name="ri:arrow-right-line" class="size-4" />
-                      <span class="sr-only">View details</span>
-                    </a>
-                  )}
+                      <Icon name={action.iconName ?? 'ri:arrow-right-line'} class="size-4" />
+                      <span class="sr-only">{action.title}</span>
+                    </Tooltip>
+                  ))}
                 </div>
               </div>
             </div>
