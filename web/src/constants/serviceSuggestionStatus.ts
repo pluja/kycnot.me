@@ -8,7 +8,7 @@ type ServiceSuggestionStatusInfo<T extends string | null | undefined = string> =
   slug: string
   label: string
   icon: string
-  iconClass: string
+  color: string
   default: boolean
 }
 
@@ -28,7 +28,7 @@ export const {
     slug: value ? value.toLowerCase() : '',
     label: value ? transformCase(value, 'title') : String(value),
     icon: 'ri:question-line',
-    iconClass: 'text-current/60',
+    color: 'gray',
     default: false,
   }),
   [
@@ -37,7 +37,7 @@ export const {
       slug: 'pending',
       label: 'Pending',
       icon: 'ri:time-line',
-      iconClass: 'text-yellow-400',
+      color: 'yellow',
       default: true,
     },
     {
@@ -45,7 +45,7 @@ export const {
       slug: 'approved',
       label: 'Approved',
       icon: 'ri:check-line',
-      iconClass: 'text-green-400',
+      color: 'green',
       default: false,
     },
     {
@@ -53,7 +53,7 @@ export const {
       slug: 'rejected',
       label: 'Rejected',
       icon: 'ri:close-line',
-      iconClass: 'text-red-400',
+      color: 'red',
       default: false,
     },
     {
@@ -61,7 +61,7 @@ export const {
       slug: 'withdrawn',
       label: 'Withdrawn',
       icon: 'ri:arrow-left-line',
-      iconClass: 'text-gray-400',
+      color: 'gray',
       default: false,
     },
   ] as const satisfies ServiceSuggestionStatusInfo<ServiceSuggestionStatus>[]

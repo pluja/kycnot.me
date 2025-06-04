@@ -1,10 +1,11 @@
 ---
 import { Icon } from 'astro-icon/components'
-import { actions } from 'astro:actions'
+import { actions, isInputError } from 'astro:actions'
 
 import BadgeSmall from '../../../components/BadgeSmall.astro'
 import Button from '../../../components/Button.astro'
 import Chat from '../../../components/Chat.astro'
+import InputSelect from '../../../components/InputSelect.astro'
 import ServiceCard from '../../../components/ServiceCard.astro'
 import UserBadge from '../../../components/UserBadge.astro'
 import {
@@ -17,11 +18,19 @@ import { cn } from '../../../lib/cn'
 import { parseIntWithFallback } from '../../../lib/numbers'
 import { prisma } from '../../../lib/prisma'
 import { makeLoginUrl } from '../../../lib/redirectUrls'
+import { formatDateShort } from '../../../lib/timeAgo'
+import BadgeStandard from '../../../components/BadgeStandard.astro'
 
 const user = Astro.locals.user
 if (!user?.admin) {
   return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Admin access required' }))
 }
+
+const serviceSuggestionUpdateResult = Astro.getActionResult(actions.admin.serviceSuggestions.update)
+Astro.locals.banners.addIfSuccess(serviceSuggestionUpdateResult, 'Service suggestion updated successfully')
+const serviceSuggestionUpdateInputErrors = isInputError(serviceSuggestionUpdateResult?.error)
+  ? serviceSuggestionUpdateResult.error.fields
+  : {}
 
 const { id: serviceSuggestionIdRaw } = Astro.params
 const serviceSuggestionId = parseIntWithFallback(serviceSuggestionIdRaw)
@@ -100,114 +109,88 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
 
 <BaseLayout
   pageTitle={`${serviceSuggestion.service.name} | Admin Service Suggestion`}
-  htmx
+  description="View and manage service suggestion"
   widthClassName="max-w-screen-md"
+  htmx
 >
-  <div class="mb-4 flex items-center gap-4">
-    <Button
-      as="a"
-      href="/admin/service-suggestions"
-      color="success"
-      variant="faded"
-      size="md"
-      icon="ri:arrow-left-s-line"
-      label="Back"
-    />
+  <h1 class="font-title mt-12 mb-6 text-center text-3xl font-bold">Service suggestion</h1>
 
-    <h1 class="font-title text-day-200 text-xl">Service suggestion</h1>
+  <ServiceCard service={serviceSuggestion.service} class="mb-6" />
 
-    <BadgeSmall color={typeInfo.color} text={typeInfo.label} icon={typeInfo.icon} />
-  </div>
-
-  <div class="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
-    <div>
-      <ServiceCard service={serviceSuggestion.service} class="mx-auto max-w-full" />
-    </div>
-
-    <div class="rounded-lg bg-black/40 p-4 backdrop-blur-xs">
-      <h2 class="font-title text-day-200 mb-3 text-lg">Suggestion Details</h2>
-
-      <div class="mb-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
-        <span class="font-title text-gray-400">Type:</span>
-        <BadgeSmall color={typeInfo.color} text={typeInfo.label} icon={typeInfo.icon} />
-
-        <span class="font-title text-gray-400">Status:</span>
-        <span
-          class={cn(
-            'inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-            statusInfo.iconClass
-          )}
-        >
-          <Icon name={statusInfo.icon} class="mr-1 size-3" />
-          {statusInfo.label}
-        </span>
-
-        <span class="font-title text-gray-400">Submitted by:</span>
-        <UserBadge class="text-gray-300" user={serviceSuggestion.user} size="md" />
-
-        <span class="font-title text-gray-400">Submitted at:</span>
-        <span class="text-gray-300">{serviceSuggestion.createdAt.toLocaleString()}</span>
-
-        <span class="font-title text-gray-400">Service page:</span>
-        <a href={`/service/${serviceSuggestion.service.slug}`} class="hover:text-day-200 text-green-400">
-          View Service <Icon
-            name="ri:external-link-line"
-            class="ml-0.5 inline-block size-3 align-[-0.05em]"
-          />
-        </a>
+  <section class="border-night-400 bg-night-600 rounded-lg border p-6">
+    <div class="text-day-200 xs:grid-cols-2 grid gap-2 text-sm sm:grid-cols-3">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-title font-bold">Status:</span>
+        <BadgeSmall color={statusInfo.color} text={statusInfo.label} icon={statusInfo.icon} />
       </div>
 
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-title font-bold">Type:</span>
+        <BadgeSmall color={typeInfo.color} text={typeInfo.label} icon={typeInfo.icon} />
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-title font-bold">Author:</span>
+        <UserBadge class="text-gray-300" user={serviceSuggestion.user} size="md" />
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-title font-bold">Submitted:</span>
+        <span>
+          {
+            formatDateShort(serviceSuggestion.createdAt, {
+              prefix: false,
+              hourPrecision: true,
+              caseType: 'sentence',
+            })
+          }
+        </span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-title font-bold">Service:</span>
+        <a href={`/service/${serviceSuggestion.service.slug}`} class="hover:text-day-200 text-green-400">
+          Open <Icon name="ri:external-link-line" class="ml-0.5 inline-block size-3 align-[-0.05em]" />
+        </a>
+      </div>
+    </div>
+
+    <div class="bg-night-700 -mx-2 mt-4 rounded-lg p-2 text-sm">
+      <span class="font-title block font-bold">Notes for moderators:</span>
       {
-        serviceSuggestion.notes && (
-          <div class="mb-4">
-            <h3 class="font-title mb-1 text-sm text-gray-400">Notes from user:</h3>
-            <div
-              class="rounded-md border border-gray-700 bg-black/50 p-3 text-sm wrap-anywhere whitespace-pre-wrap text-gray-300"
-              set:text={serviceSuggestion.notes}
-            />
-          </div>
+        serviceSuggestion.notes ? (
+          <div class="mt-1 text-sm wrap-anywhere whitespace-pre-wrap" set:text={serviceSuggestion.notes} />
+        ) : (
+          <div class="text-day-400 my-4 text-center text-sm italic">Empty</div>
         )
       }
     </div>
-  </div>
 
-  <div class="rounded-lg bg-black/40 p-6 backdrop-blur-xs">
-    <div class="flex items-center justify-between">
-      <h2 class="font-title text-day-200 text-lg">Messages</h2>
+    <form method="POST" action={actions.admin.serviceSuggestions.update} class="mt-6 flex items-end gap-2">
+      <input type="hidden" name="suggestionId" value={serviceSuggestion.id} />
+      <InputSelect
+        name="status"
+        label="Update status"
+        options={serviceSuggestionStatuses.map((status) => ({
+          label: status.label,
+          value: status.value,
+        }))}
+        selectProps={{ value: serviceSuggestion.status }}
+        class="flex-1"
+        error={serviceSuggestionUpdateInputErrors.status}
+      />
+      <Button as="button" type="submit" color="success" size="md" icon="ri:save-line" label="Update" />
+    </form>
+  </section>
 
-      <form method="POST" action={actions.admin.serviceSuggestions.update} class="flex gap-2">
-        <input type="hidden" name="suggestionId" value={serviceSuggestion.id} />
-        <select
-          name="status"
-          class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-sm text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500 disabled:opacity-50"
-        >
-          {
-            serviceSuggestionStatuses.map((status) => (
-              <option value={status.value} selected={serviceSuggestion.status === status.value}>
-                {status.label}
-              </option>
-            ))
-          }
-        </select>
-        <Button
-          as="button"
-          type="submit"
-          color="success"
-          variant="faded"
-          size="md"
-          icon="ri:save-line"
-          label="Update"
-        />
-      </form>
-    </div>
-
-    <Chat
-      messages={serviceSuggestion.messages}
-      userId={user.id}
-      action={actions.admin.serviceSuggestions.message}
-      formData={{
-        suggestionId: serviceSuggestion.id,
-      }}
-    />
-  </div>
+  <Chat
+    messages={serviceSuggestion.messages}
+    title="Chat with moderators"
+    userId={user.id}
+    action={actions.admin.serviceSuggestions.message}
+    formData={{
+      suggestionId: serviceSuggestion.id,
+    }}
+    class="mt-12"
+  />
 </BaseLayout>

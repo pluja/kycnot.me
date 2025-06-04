@@ -111,9 +111,9 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
     },
   ]}
 >
-  <div class="mt-12 mb-6 flex flex-col items-center justify-center gap-3">
-    <div class="flex items-center gap-2">
-      <BadgeSmall color={typeInfo.color} text={typeInfo.label} icon={typeInfo.icon} />
+  <div class="mt-12 mb-6 text-center">
+    <h1 class="font-title text-center text-3xl font-bold">Service suggestion</h1>
+    <div class="flex items-center justify-center gap-2">
       <AdminOnly>
         <Button
           as="a"
@@ -124,29 +124,24 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
         />
       </AdminOnly>
     </div>
-
-    <h1 class="font-title text-center text-3xl font-bold">Service suggestion</h1>
   </div>
 
   <ServiceCard service={serviceSuggestion.service} class="mb-6" />
 
   <section class="border-night-400 bg-night-600 rounded-lg border p-6">
-    <div class="text-day-200 grid grid-cols-2 gap-6 text-sm">
+    <div class="text-day-200 xs:grid-cols-2 grid gap-2 text-sm">
       <div class="flex flex-wrap items-center gap-2">
-        <span>Status:</span>
-        <span
-          class={cn(
-            'border-night-500 bg-night-800 box-content inline-flex h-8 items-center justify-center gap-1 rounded-full border px-2',
-            statusInfo.iconClass
-          )}
-        >
-          <Icon name={statusInfo.icon} class="size-4" />
-          {statusInfo.label}
-        </span>
+        <span class="font-title font-bold">Status:</span>
+        <BadgeSmall color={statusInfo.color} text={statusInfo.label} icon={statusInfo.icon} />
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <span>Submitted:</span>
+        <span class="font-title font-bold">Type:</span>
+        <BadgeSmall color={typeInfo.color} text={typeInfo.label} icon={typeInfo.icon} />
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-title font-bold">Submitted:</span>
         <span>
           {
             formatDateShort(serviceSuggestion.createdAt, {
@@ -157,15 +152,22 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
           }
         </span>
       </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-title font-bold">Service:</span>
+        <a href={`/service/${serviceSuggestion.service.slug}`} class="hover:text-day-200 text-green-400">
+          Open <Icon name="ri:external-link-line" class="ml-0.5 inline-block size-3 align-[-0.05em]" />
+        </a>
+      </div>
     </div>
 
-    <div class="mt-6">
-      <div class="text-day-200 mb-2 text-sm">Notes for moderators:</div>
+    <div class="bg-night-700 -mx-2 mt-4 rounded-lg p-2 text-sm">
+      <span class="font-title block font-bold">Notes for moderators:</span>
       {
         serviceSuggestion.notes ? (
-          <div class="text-sm wrap-anywhere whitespace-pre-wrap" set:text={serviceSuggestion.notes} />
+          <div class="mt-1 text-sm wrap-anywhere whitespace-pre-wrap" set:text={serviceSuggestion.notes} />
         ) : (
-          <span class="text-sm italic">Empty</span>
+          <div class="text-day-400 my-4 text-center text-sm italic">Empty</div>
         )
       }
     </div>
