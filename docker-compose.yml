@@ -18,6 +18,7 @@ services:
   pyworker:
     build:
       context: ./pyworker
+    image: kycnotme/pyworker:${PYWORKER_IMAGE_TAG:-latest}
     restart: always
     env_file:
       - .env

@@ -1,12 +1,10 @@
-import { type Prisma, type ServiceUserRole, type PrismaClient } from '@prisma/client'
+import { type Prisma, type ServiceUserRole } from '@prisma/client'
 import { ActionError } from 'astro:actions'
 import { z } from 'zod'
 
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { saveFileLocally } from '../../lib/fileStorage'
-import { prisma as prismaInstance } from '../../lib/prisma'
-
-const prisma = prismaInstance as PrismaClient
+import { prisma } from '../../lib/prisma'
 
 const selectUserReturnFields = {
   id: true,

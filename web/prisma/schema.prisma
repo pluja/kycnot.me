@@ -25,6 +25,7 @@ enum OrderIdStatus {
   PENDING
   APPROVED
   REJECTED
+  WITHDRAWN
 }
 
 model Comment {

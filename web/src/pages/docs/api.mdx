@@ -27,11 +27,11 @@ Fetches details for a single service by various lookup criteria.
 
 ### Request Parameters
 
-| Parameter    | Type   | Required | Description |
-| ------------ | ------ | -------- | ----------- |
-| `id`         | number | No*       | Service ID |
-| `slug`       | string | No*       | Service URL slug (lowercase letters, numbers, and hyphens only) |
-| `serviceUrl` | string | No*       | Service URL. May be web, onion, or i2p. May just be a domain or a full URL. |
+| Parameter    | Type   | Required | Description                                                                 |
+| ------------ | ------ | -------- | --------------------------------------------------------------------------- |
+| `id`         | number | No\*     | Service ID                                                                  |
+| `slug`       | string | No\*     | Service URL slug (lowercase letters, numbers, and hyphens only)             |
+| `serviceUrl` | string | No\*     | Service URL. May be web, onion, or i2p. May just be a domain or a full URL. |
 
 \* At least one of the marked parameters is required.
 
@@ -79,41 +79,46 @@ type ServiceResponse = {
 #### KYC Levels
 
 <ul>
-{kycLevels.map((level) => (
-  <li key={level.id}>
-    <strong>{level.id}</strong>: {level.name} - {level.description}
-  </li>
-))}
+  {kycLevels.map((level) => (
+    <li key={level.id}>
+      <strong>{level.id}</strong>: {level.name} - {level.description}
+    </li>
+  ))}
 </ul>
 
 #### Verification Status
 
 <ul>
-{verificationStatuses.map((status) => (
-  <li key={status.value}>
-    <strong>{status.value}</strong>: {status.description}
-  </li>
-))}
+  {verificationStatuses.map((status) => (
+    <li key={status.value}>
+      <strong>{status.value}</strong>: {status.description}
+    </li>
+  ))}
 </ul>
 
 #### Service Visibility
 
 <ul>
-{serviceVisibilities.filter((visibility) => visibility.value === 'PUBLIC' || visibility.value === 'ARCHIVED' || visibility.value === 'UNLISTED').map((visibility) => (
-  <li key={visibility.value}>
-    <strong>{visibility.value}</strong>: {visibility.longDescription}
-  </li>
-))}
+  {serviceVisibilities
+    .filter(
+      (visibility) =>
+        visibility.value === 'PUBLIC' || visibility.value === 'ARCHIVED' || visibility.value === 'UNLISTED'
+    )
+    .map((visibility) => (
+      <li key={visibility.value}>
+        <strong>{visibility.value}</strong>: {visibility.longDescription}
+      </li>
+    ))}
 </ul>
 
 #### KYC Level Clarifications
 
 <ul>
-{kycLevelClarifications.map((clarification) => (
-  <li key={clarification.value}>
-    <strong>{clarification.value}</strong>: {clarification.description}
-  </li>
-))}
+  {kycLevelClarifications.map((clarification) => (
+    <li key={clarification.value}>
+      <strong>{clarification.value}</strong>: {clarification.description}
+    </li>
+  ))}
 </ul>
 
 ### Examples

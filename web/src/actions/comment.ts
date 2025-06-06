@@ -345,10 +345,11 @@ export const commentActions = {
         'order-id-status',
         'kyc-requested',
         'funds-blocked',
+        'toggle-rating-active',
       ]),
       value: z.union([
         z.enum(['PENDING', 'APPROVED', 'VERIFIED', 'REJECTED']),
-        z.enum(['PENDING', 'APPROVED', 'REJECTED']),
+        z.enum(['PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN']),
         z.boolean(),
         z.string(),
       ]),
@@ -411,13 +412,16 @@ export const commentActions = {
             updateData.privateContext = input.value as string
             break
           case 'order-id-status':
-            updateData.orderIdStatus = input.value as 'APPROVED' | 'PENDING' | 'REJECTED'
+            updateData.orderIdStatus = input.value as 'APPROVED' | 'PENDING' | 'REJECTED' | 'WITHDRAWN'
             break
           case 'kyc-requested':
             updateData.kycRequested = !!input.value
             break
           case 'funds-blocked':
             updateData.fundsBlocked = !!input.value
+            break
+          case 'toggle-rating-active':
+            updateData.ratingActive = !!input.value
             break
         }
 
