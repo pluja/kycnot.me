@@ -3,14 +3,13 @@ import { transformCase } from '../lib/strings'
 
 import { commentStatusById } from './commentStatus'
 
-import type BadgeSmall from '../components/BadgeSmall.astro'
+import type { TailwindColor } from '../lib/colors'
 import type { Prisma } from '@prisma/client'
-import type { ComponentProps } from 'astro/types'
 
 type CommentStatusFilterInfo<T extends string | null | undefined = string> = {
   value: T
   label: string
-  color: ComponentProps<typeof BadgeSmall>['color']
+  color: TailwindColor
   icon: string
   whereClause: Prisma.CommentWhereInput
   classNames: {

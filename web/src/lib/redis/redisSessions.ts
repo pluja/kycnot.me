@@ -1,7 +1,5 @@
 import { randomBytes } from 'crypto'
 
-import { REDIS_USER_SESSION_EXPIRY_SECONDS } from 'astro:env/server'
-
 import { RedisGenericManager } from './redisGenericManager'
 
 class RedisSessions extends RedisGenericManager {
@@ -74,5 +72,5 @@ class RedisSessions extends RedisGenericManager {
 }
 
 export const redisSessions = await RedisSessions.createAndConnect({
-  expirationTime: REDIS_USER_SESSION_EXPIRY_SECONDS,
+  expirationTime: 60 * 60 * 24, // 24 hours in seconds
 })

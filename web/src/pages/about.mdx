@@ -57,62 +57,77 @@ Some users are **verified**, this means that the moderators have confirmed that 
 
 Users can also be **affiliated** with a service if they're related to it, such as being an owner or part of the team. If you own a service and want to get verified, just reach out to us.
 
+
 ## Listings
 
 ### Suggesting a new listing
 
-To suggest a new listing, visit the [service suggestion form](/service-suggestion/new) and provide the most accurate information possible for higher chances to get approved.
+Suggest a new listing by visiting the [service suggestion form](/service-suggestion/new). Provide the most accurate information for higher chances of getting approved.
 
-Once submitted, you get a unique tracking page where you can monitor its status and communicate directly with moderators.
+Once submitted, you will get a **unique tracking page** where you can monitor the suggestion status and communicate directly with moderators.
 
-All new listings begin as **unlisted** — they're only accessible via direct link and won't appear in search results. After a brief admin review to confirm the request isn't spam or inappropriate, the listing will be marked as **Community Contributed**.
-
-#### Requirements
+#### Listing Requirements
 
 To list a new service, it must fulfill these requirements:
 
-- Offer a service.
+- Offer a service
 - Publicly available website explaining what the service is about
 - Terms of service or FAQ document
 
-For examples:
+Examples of non-valid services:
 
-- Just a Telegram link or a criptocurrency itself is not a valid service.
+- Just a Telegram link
+- A cryptocurrency project
+- A cryptocurrency wallet
 
-### Suggestion Review Process
+#### Suggestion Review Process
 
-#### First Review
+When you submit a new service, it gets the `COMMUNITY_CONTRIBUTED` status and the `unlisted` visibility level. The service **will not appear in search results**, but it can be viewed with a direct link.
+
+##### First Review (Unlisted -> Public)
 
 - A member of the **KYCnot.me team** reviews the submission to ensure it isn't spam or inappropriate.
 - If the listing passes this initial check, it becomes **publicly visible** to all users.
 - At this stage, the listing is **Community Contributed** and will show a disclaimer.
 
-#### Second Review (APPROVED)
+> Allow up to a week for the initial review. As a small team of two volunteers, we have to handle a large number of suggestions alongside our other life commitments.
 
-- The service is tested and investigated again.
-- If it proves to be reliable, it is granted the `APPROVED` status, which means:
-  - The information is accurate.
-  - The service works as described (at the time of the testing).
-  - Basic functionality has been tested.
-  - Communication with the service's support was successful.
-  - A brief investigation found no obvious red flags.
+##### Second Review (Community Contributed -> Approved)
 
-#### Final Review (VERIFIED)
+The service will be tested and investigated more in depth. If:
 
-- After a period of no reported issues, the service will undergo a **third, comprehensive review**.
-  - The service is tested across different dates and under various conditions.
-  - The service administrators and support teams will be contacted for additional verification.
-- If the service meets all requirements, it is granted the **`VERIFIED`** status.
+- Service information is accurate.
+- Works as described (at the time of the testing).
+- Basic functionality is tested successfully.
+- Communication with service's support was successful.
+- No obvious red flags.
+- Platform user reviews will be taken into account.
+- Terms of Service and other documents are briefly reviewed.
+- Other platforms are checked for the service reputation (Trustpilot, Reddit, Bitcointalk, etc.)
 
-#### Failed Verifications
+The service will be granted the `APPROVED` status.
+
+##### Final Review (Approved -> Verified)
+
+After a period of no reported issues, we will do a **third review**.
+
+- The service is tested across different dates and under various conditions.
+- The service administrators and support teams will be contacted for additional verification.
+- User reviews will be checked for any issues and taken into account.
+- Terms of Service and other documents will be reviewed again.
+- Other platforms are checked for the service reputation (Trustpilot, Reddit, Bitcointalk, etc.)
+
+If the service meets all requirements, it is granted the **`VERIFIED`** status.
+
+##### Failed Verifications (Scams)
 
 If the data is not accurate, the service is a scam, or any other checks fail, the service will be rejected and will appear with a disclaimer.
 
-### Verification Steps
+#### Verification Steps
 
 Services will usually show the verification steps that the admins took to reach the verified (or not) status. Each step will have a description and some evidence attached.
 
-### Service Attributes
+#### Service Attributes
 
 An attribute is a feature of a service, categorized as:
 
@@ -130,11 +145,11 @@ Attributes are classified into two main types:
 
 These categories **directly influence** a service's Privacy and Trust scores, which contribute to its **overall rating**.
 
-### Service Scores
+#### Service Scores
 
 Scores are calculated **automatically** using clear, fixed rules. We do not change or adjust scores by hand. The scoring system is **open-source** and anyone can review or suggest improvements.
 
-#### Privacy Score
+##### Privacy Score
 
 The privacy score measures how well a service protects user privacy, using a transparent, rules-based approach:
 
@@ -151,7 +166,7 @@ The privacy score measures how well a service protects user privacy, using a tra
 6. **Privacy Attributes:** The sum of all privacy points from attributes categorized as 'PRIVACY' is added to the score. [See all attributes](/attributes).
 7. **Final Score Range:** The final score is always kept between 0 and 100.
 
-#### Trust Score
+##### Trust Score
 
 The trust score represents how reliable and trustworthy a service is, based on objective, transparent criteria.
 
@@ -165,11 +180,11 @@ The trust score represents how reliable and trustworthy a service is, based on o
 4. **Recently Listed Penalty & Flag:** If a service was listed within the last 15 days and its status is `APPROVED`, a penalty of -10 points is applied to the trust score, and the service is flagged as recently listed.
 5. **Final Score Range:** The final score is always kept between 0 and 100.
 
-#### Overall Score
+##### Overall Score
 
 The overall score is calculated as `(privacy * 0.6) + (trust * 0.4)` and provides a combined measure of privacy and trust.
 
-### Terms of Service Reviews
+#### Terms of Service Reviews
 
 KYCnot.me automatically reviews and summarizes the Terms of Service (ToS) for every service monthly using AI. You get simple, clear summaries that highlight the most important points, so you can quickly see what matters.
 
@@ -177,7 +192,7 @@ We hash each ToS document and only review it again if it changes. Some services 
 
 We aim for accuracy, but the AI may sometimes miss details or highlight less relevant information. If you see any error, contact us.
 
-### Events
+#### Events
 
 There are two types of events:
 
@@ -186,7 +201,7 @@ There are two types of events:
 
 You can also take a look at the [global timeline](/events) where you will find all the service's events sorted by date.
 
-### Reviews and Comments
+## Reviews and Comments
 
 Reviews are comments with a one to five star rating for the service. Each user can leave only one review per service; new reviews replace the old one.
 
@@ -196,7 +211,7 @@ If you've used the service, you can add an **order ID** or proof—this is only 
 
 Some reviews may be spam or fake. Read comments carefully and **always do your own research before making decisions**.
 
-#### Note on moderation
+### Note on moderation
 
 **All comments are moderated.** First, an AI checks each comment. If nothing is flagged, the comment is published right away. If something seems off, the comment is held for a human to review. We only remove comments that are spam, nonsense, unsupported accusations, doxxing, or clear rule violations.
 

@@ -50,4 +50,8 @@ export const typedLocalStorage = makeTypedLocalStorage({
   pushNotificationsBannerDismissedAt: {
     schema: z.coerce.date(),
   },
+  browserNotificationsEnabled: {
+    schema: z.boolean(),
+    default: false,
+  },
 })

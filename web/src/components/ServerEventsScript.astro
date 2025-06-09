@@ -1,0 +1,108 @@
+---
+if (!Astro.locals.user) return
+---
+
+<script>
+  import type { ServerEventsEvent, SSEEventMap } from '../lib/serverEventsTypes'
+
+  const MAX_RECONNECT_ATTEMPTS = 5
+  const RECONNECT_DELAY = 2_000
+
+  let eventSource: EventSource | null = null
+  let reconnectTimeout: number | null = null
+  let reconnectAttempts = 0
+
+  startServerEventsListener()
+
+  // ------------------------------------------------------------
+
+  export function startServerEventsListener() {
+    stopServerEventsListener()
+
+    try {
+      eventSource = new EventSource('/internal-api/server-events')
+
+      eventSource.onopen = () => {
+        reconnectAttempts = 0
+      }
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data as string)
+
+          if (isServerEventsEvent(data)) {
+            const eventType = `sse-${data.type}` as const
+            document.dispatchEvent(
+              new CustomEvent(eventType, { detail: data.data }) as SSEEventMap[typeof eventType]
+            )
+          } else {
+            console.error('Invalid server events event:', data)
+          }
+        } catch (error) {
+          console.error('Error parsing server events data:', error)
+        }
+      }
+
+      eventSource.onerror = (error) => {
+        console.error('Server events error:', error)
+
+        if (eventSource?.readyState === EventSource.CLOSED) {
+          scheduleReconnect()
+        }
+      }
+    } catch (error) {
+      console.error('Failed to start server events listener:', error)
+      scheduleReconnect()
+    }
+  }
+
+  export function stopServerEventsListener() {
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout)
+      reconnectTimeout = null
+    }
+
+    if (eventSource) {
+      eventSource.close()
+      eventSource = null
+      console.info('Disconnected from server events listener')
+    }
+
+    reconnectAttempts = 0
+  }
+
+  function scheduleReconnect() {
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      console.error('Max reconnection attempts reached, giving up')
+      return
+    }
+
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout)
+    }
+
+    const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttempts)
+    reconnectAttempts++
+
+    const delayStr = String(delay)
+    const attemptsStr = String(reconnectAttempts)
+    const maxAttemptsStr = String(MAX_RECONNECT_ATTEMPTS)
+    console.info(`Attempting to reconnect in ${delayStr}ms (attempt ${attemptsStr}/${maxAttemptsStr})`)
+
+    reconnectTimeout = window.setTimeout(() => {
+      startServerEventsListener()
+    }, delay)
+  }
+
+  function isServerEventsEvent(event: unknown): event is ServerEventsEvent {
+    if (typeof event !== 'object' || event === null) return false
+    const e = event as Record<string, unknown>
+    return (
+      'type' in e &&
+      typeof e.type === 'string' &&
+      'data' in e &&
+      typeof e.data === 'object' &&
+      e.data !== null
+    )
+  }
+</script>

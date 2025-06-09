@@ -1,0 +1,60 @@
+---
+import { DEPLOYMENT_MODE } from '../lib/envVariables'
+import { prisma } from '../lib/prisma'
+
+const user = Astro.locals.user
+
+const hasUnreadNotifications = await Astro.locals.banners.try(
+  'Error getting unread notification count',
+  async () =>
+    user
+      ? !!(await prisma.notification.findFirst({
+          where: { userId: user.id, read: false },
+          select: { id: true },
+        }))
+      : false,
+  false
+)
+
+function addBadgeIfUnread(href: string) {
+  if (hasUnreadNotifications) return href.replace('.svg', '-badge.svg')
+  return href
+}
+---
+
+{
+  DEPLOYMENT_MODE === 'production' && (
+    <>
+      <link rel="icon" type="image/svg+xml" href={addBadgeIfUnread('/favicon.svg')} />
+      <link
+        rel="icon"
+        type="image/svg+xml"
+        href={addBadgeIfUnread('/favicon-lightmode.svg')}
+        media="(prefers-color-scheme: light)"
+      />
+    </>
+  )
+}
+{
+  DEPLOYMENT_MODE === 'development' && (
+    <link rel="icon" type="image/svg+xml" href={addBadgeIfUnread('/favicon-dev.svg')} />
+  )
+}
+{
+  DEPLOYMENT_MODE === 'staging' && (
+    <link rel="icon" type="image/svg+xml" href={addBadgeIfUnread('/favicon-stage.svg')} />
+  )
+}
+
+<script>
+  document.addEventListener('sse-new-notification', () => {
+    const links = document.querySelectorAll('link[rel="icon"]')
+    links.forEach((link) => {
+      const href = link.getAttribute('href')
+      if (href && href.includes('favicon') && !href.endsWith('-badge.svg')) {
+        const newHref = href.replace('.svg', '-badge.svg')
+        link.setAttribute('href', newHref)
+      }
+    })
+  })
+</script>

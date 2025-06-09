@@ -1,15 +1,14 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
-import type BadgeSmall from '../components/BadgeSmall.astro'
+import type { TailwindColor } from '../lib/colors'
 import type { CommentStatus } from '@prisma/client'
-import type { ComponentProps } from 'astro/types'
 
 type CommentStatusInfo<T extends string | null | undefined = string> = {
   id: T
   icon: string
   label: string
-  color: ComponentProps<typeof BadgeSmall>['color']
+  color: TailwindColor
   creativeWorkStatus: string | undefined
 }
 

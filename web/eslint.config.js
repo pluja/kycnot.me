@@ -121,7 +121,7 @@ export default tseslint.config(
       'import/first': 'error',
       'import/newline-after-import': 'error',
       'import/no-duplicates': 'error',
-      'import/no-unresolved': ['error', { ignore: ['^astro:'] }],
+      'import/no-unresolved': ['error', { ignore: ['^astro:', '^virtual:'] }],
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-console': ['warn', { allow: without(Object.keys(console), 'log') }],
       'import/namespace': 'off',

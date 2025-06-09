@@ -3,29 +3,16 @@ import webpush, { WebPushError } from 'web-push'
 
 import { getServerEnvVariable } from './serverEnvVariables'
 
+import type { NotificationPayload } from './serverEventsTypes'
+
+const VAPID_SUBJECT = getServerEnvVariable('VAPID_SUBJECT')
 const VAPID_PUBLIC_KEY = getServerEnvVariable('VAPID_PUBLIC_KEY')
 const VAPID_PRIVATE_KEY = getServerEnvVariable('VAPID_PRIVATE_KEY')
-const VAPID_SUBJECT = getServerEnvVariable('VAPID_SUBJECT')
 
 // Configure VAPID keys
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
 
 export { webpush }
-
-export type NotificationAction = {
-  action: string
-  title: string
-  icon?: string
-
-  url: string | null
-  iconName?: string
-}
-
-export type NotificationPayload = {
-  title: string
-  body: string | null
-  actions: NotificationAction[]
-}
 
 export async function sendPushNotification(
   subscription: {

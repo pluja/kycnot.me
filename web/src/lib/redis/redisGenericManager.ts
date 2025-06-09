@@ -1,5 +1,8 @@
-import { REDIS_URL } from 'astro:env/server'
 import { createClient } from 'redis'
+
+import { getServerEnvVariable } from '../serverEnvVariables'
+
+const REDIS_URL = getServerEnvVariable('REDIS_URL')
 
 type RedisGenericManagerOptions = {
   expirationTime: number

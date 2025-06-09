@@ -458,7 +458,6 @@ export const adminServiceActions = {
       permissions: 'admin',
       input: evidenceImageDeleteSchema,
       handler: async (input) => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         await deleteFileLocally(input.fileUrl)
         return { success: true }
       },

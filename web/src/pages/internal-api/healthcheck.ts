@@ -9,6 +9,7 @@ export const GET: APIRoute = () => {
     {
       status: 200,
       headers: {
+        'Access-Control-Allow-Origin': '*',
         'Content-Type': 'application/json',
       },
     }

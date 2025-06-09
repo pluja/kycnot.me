@@ -1,4 +1,4 @@
-import type { z } from 'astro:content'
+import type { z } from 'astro/zod'
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
 interface JSONObject {

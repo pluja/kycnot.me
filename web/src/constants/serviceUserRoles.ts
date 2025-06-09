@@ -1,9 +1,8 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
-import type BadgeSmall from '../components/BadgeSmall.astro'
+import type { TailwindColor } from '../lib/colors'
 import type { ServiceUserRole } from '@prisma/client'
-import type { ComponentProps } from 'astro/types'
 
 type ServiceUserRoleInfo<T extends string | null | undefined = string> = {
   value: T
@@ -11,7 +10,7 @@ type ServiceUserRoleInfo<T extends string | null | undefined = string> = {
   label: string
   icon: string
   order: number
-  color: NonNullable<ComponentProps<typeof BadgeSmall>['color']>
+  color: NonNullable<TailwindColor>
 }
 
 export const {

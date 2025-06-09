@@ -4,8 +4,11 @@ import mdx from '@astrojs/mdx'
 import node from '@astrojs/node'
 import sitemap from '@astrojs/sitemap'
 import tailwindcss from '@tailwindcss/vite'
+import { minimal2023Preset } from '@vite-pwa/assets-generator/config'
+import AstroPWA from '@vite-pwa/astro'
 import { defineConfig, envField } from 'astro/config'
 import icon from 'astro-icon'
+import devtoolsJson from 'vite-plugin-devtools-json'
 
 import { postgresListener } from './src/lib/postgresListenerIntegration'
 import { getServerEnvVariable } from './src/lib/serverEnvVariables'
@@ -16,15 +19,63 @@ export default defineConfig({
   site: SITE_URL,
   vite: {
     build: {
-      sourcemap: true,
+      sourcemap: true, // Enable sourcemaps on production, so users can inspect the code
     },
 
-    plugins: [tailwindcss()],
+    plugins: [devtoolsJson(), tailwindcss()],
   },
   integrations: [
     postgresListener(),
     icon(),
     mdx(),
+    AstroPWA({
+      mode: 'development',
+      base: '/',
+      scope: '/',
+      registerType: 'autoUpdate',
+      manifest: {
+        name: 'KYCnot.me',
+        description: 'Find services that respect your privacy',
+        theme_color: '#040505',
+        background_color: '#171c1b',
+      },
+      pwaAssets: {
+        image: './public/favicon.svg',
+        preset: {
+          ...minimal2023Preset,
+          maskable: {
+            ...minimal2023Preset.maskable,
+            padding: 0.1,
+            resizeOptions: {
+              ...minimal2023Preset.maskable.resizeOptions,
+              background: '#3bdb78',
+            },
+          },
+          apple: {
+            ...minimal2023Preset.apple,
+            padding: 0.1,
+            resizeOptions: {
+              ...minimal2023Preset.apple.resizeOptions,
+              background: '#3bdb78',
+            },
+          },
+        },
+      },
+      workbox: {
+        navigateFallback: '/404',
+        globPatterns: ['**/*.{js,css,html,ico,jpg,jpeg,png,svg,webp,avif}'],
+      },
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      devOptions: {
+        enabled: true,
+        type: 'module',
+      },
+      experimental: {
+        directoryAndTrailingSlashHandler: true,
+      },
+    }),
     sitemap({
       filter: (page) => {
         const url = new URL(page)
@@ -94,35 +145,6 @@ export default defineConfig({
         url: true,
         startsWith: 'redis://',
         default: 'redis://redis:6379',
-      }),
-      REDIS_USER_SESSION_EXPIRY_SECONDS: envField.number({
-        context: 'server',
-        access: 'secret',
-        int: true,
-        gt: 0,
-        default: 60 * 60 * 24, // 24 hours in seconds
-      }),
-      REDIS_IMPERSONATION_SESSION_EXPIRY_SECONDS: envField.number({
-        context: 'server',
-        access: 'secret',
-        int: true,
-        gt: 0,
-        default: 60 * 60 * 24, // 24 hours in seconds
-      }),
-      REDIS_PREGENERATED_TOKEN_EXPIRY_SECONDS: envField.number({
-        context: 'server',
-        access: 'secret',
-        int: true,
-        gt: 0,
-        default: 60 * 5, // 5 minutes in seconds
-      }),
-
-      REDIS_ACTIONS_SESSION_EXPIRY_SECONDS: envField.number({
-        context: 'server',
-        access: 'secret',
-        int: true,
-        gt: 0,
-        default: 60 * 5, // 5 minutes in seconds
       }),
 
       // Development tokens

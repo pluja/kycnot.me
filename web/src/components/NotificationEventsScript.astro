@@ -1,0 +1,29 @@
+---
+
+---
+
+<script>
+  import { isBrowserNotificationsEnabled, showBrowserNotification } from '../lib/client/browserNotifications'
+  import { makeNotificationOptions } from '../lib/notificationOptions'
+
+  document.addEventListener('sse-new-notification', (event) => {
+    if (isBrowserNotificationsEnabled()) {
+      const payload = event.detail
+      const notification = showBrowserNotification(
+        payload.title,
+        makeNotificationOptions(payload, { removeActions: true })
+      )
+
+      // Handle notification click
+      if (notification) {
+        notification.onclick = () => {
+          const defaultAction = payload.actions.find((a) => a.url) ?? payload.actions[0]
+          if (defaultAction?.url) {
+            window.open(defaultAction.url, '_blank')
+          }
+          notification.close()
+        }
+      }
+    }
+  })
+</script>

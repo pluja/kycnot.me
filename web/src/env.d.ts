@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/consistent-type-definitions */
+
 import type { ErrorBanners } from './lib/errorBanners'
 import type { KarmaUnlocks } from './lib/karmaUnlocks'
-/* eslint-disable @typescript-eslint/consistent-type-definitions */
 import type { Prisma } from '@prisma/client'
 import type * as htmx from 'htmx.org'
 

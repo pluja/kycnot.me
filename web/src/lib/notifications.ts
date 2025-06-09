@@ -7,7 +7,7 @@ import { serviceSuggestionStatusChangesById } from '../constants/suggestionStatu
 
 import { makeCommentUrl } from './commentsWithReplies'
 
-import type { NotificationAction } from './webPush'
+import type { NotificationAction } from './serverEventsTypes'
 import type { Prisma } from '@prisma/client'
 
 export function makeNotificationTitle(

@@ -37,12 +37,8 @@ if (!user?.admin) {
 const { data: filters } = zodParseQueryParamsStoringErrors(
   {
     search: z.string().optional(),
-    status: serviceSuggestionStatusesZodEnumBySlug
-      .transform((slug) => serviceSuggestionStatusSlugToId(slug))
-      .optional(),
-    type: serviceSuggestionTypesZodEnumBySlug
-      .transform((slug) => serviceSuggestionTypeSlugToId(slug))
-      .optional(),
+    status: serviceSuggestionStatusesZodEnumBySlug.or(z.literal('all')).default('pending'),
+    type: serviceSuggestionTypesZodEnumBySlug.or(z.literal('all')).optional(),
     'sort-by': z
       .enum(['service', 'status', 'type', 'user', 'createdAt', 'messageCount'])
       .default('createdAt'),
@@ -50,6 +46,11 @@ const { data: filters } = zodParseQueryParamsStoringErrors(
   },
   Astro
 )
+
+const statusFilter = filters.status === 'all' ? undefined : serviceSuggestionStatusSlugToId(filters.status)
+
+const typeFilter =
+  !filters.type || filters.type === 'all' ? undefined : serviceSuggestionTypeSlugToId(filters.type)
 
 let prismaOrderBy: Prisma.ServiceSuggestionOrderByWithRelationInput = { createdAt: 'desc' }
 if (filters['sort-by'] === 'createdAt') {
@@ -67,8 +68,8 @@ let suggestions = await prisma.serviceSuggestion.findMany({
           ],
         }
       : {}),
-    status: filters.status,
-    type: filters.type,
+    status: statusFilter,
+    type: typeFilter,
   },
   orderBy: prismaOrderBy,
   select: {
@@ -198,10 +199,10 @@ const makeSortUrl = (slug: string) => {
           id="status-filter"
           class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
         >
-          <option value="">All Statuses</option>
+          <option value="all" selected={filters.status === 'all'}>All Statuses</option>
           {
             serviceSuggestionStatuses.map((status) => (
-              <option value={status.slug} selected={filters.status === status.value}>
+              <option value={status.slug} selected={filters.status === status.slug}>
                 {status.label}
               </option>
             ))
@@ -215,10 +216,10 @@ const makeSortUrl = (slug: string) => {
           id="type-filter"
           class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
         >
-          <option value="">All Types</option>
+          <option value="all" selected={!filters.type || filters.type === 'all'}>All Types</option>
           {
             serviceSuggestionTypes.map((type) => (
-              <option value={type.slug} selected={filters.type === type.value}>
+              <option value={type.slug} selected={filters.type === type.slug}>
                 {type.label}
               </option>
             ))

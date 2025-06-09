@@ -1,15 +1,18 @@
 import { makeNotificationActions, makeNotificationContent, makeNotificationTitle } from './notifications'
 import { prisma } from './prisma'
 import { getServerEnvVariable } from './serverEnvVariables'
-import { type NotificationPayload, sendPushNotification } from './webPush'
+import { sendPushNotification } from './webPush'
 
+import type { RedisServerEvents } from './redis/redisServerEvents'
+import type { NotificationPayload } from './serverEventsTypes'
 import type { AstroIntegrationLogger } from 'astro'
 
 const SITE_URL = getServerEnvVariable('SITE_URL')
 
 export async function sendNotification(
   notificationId: number,
-  logger: AstroIntegrationLogger | Console = console
+  logger: Pick<AstroIntegrationLogger, 'debug' | 'error' | 'info' | 'warn'>,
+  redisServerEvents: RedisServerEvents
 ) {
   const notification = await prisma.notification.findUnique({
     where: { id: notificationId },
@@ -123,16 +126,13 @@ export async function sendNotification(
     },
   })
 
-  if (subscriptions.length === 0) {
-    logger.info(`No push subscriptions found for user ${notification.user.name}`)
-    return { success: 0, failure: 0, total: 0 }
-  }
-
   const notificationPayload = {
     title: makeNotificationTitle(notification, notification.user),
     body: makeNotificationContent(notification),
     actions: makeNotificationActions(notification, SITE_URL),
   } satisfies NotificationPayload
+
+  await redisServerEvents.send(notification.userId, 'new-notification', notificationPayload)
 
   const subscriptionResults = await Promise.allSettled(
     subscriptions.map(async (subscription) => {

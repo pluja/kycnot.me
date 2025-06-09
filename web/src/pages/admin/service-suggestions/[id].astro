@@ -14,12 +14,10 @@ import {
 } from '../../../constants/serviceSuggestionStatus'
 import { getServiceSuggestionTypeInfo } from '../../../constants/serviceSuggestionType'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
-import { cn } from '../../../lib/cn'
 import { parseIntWithFallback } from '../../../lib/numbers'
 import { prisma } from '../../../lib/prisma'
 import { makeLoginUrl } from '../../../lib/redirectUrls'
 import { formatDateShort } from '../../../lib/timeAgo'
-import BadgeStandard from '../../../components/BadgeStandard.astro'
 
 const user = Astro.locals.user
 if (!user?.admin) {

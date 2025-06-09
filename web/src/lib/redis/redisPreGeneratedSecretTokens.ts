@@ -1,14 +1,14 @@
-import { REDIS_PREGENERATED_TOKEN_EXPIRY_SECONDS } from 'astro:env/server'
-
 import { RedisGenericManager } from './redisGenericManager'
 
 class RedisPreGeneratedSecretTokens extends RedisGenericManager {
+  private readonly prefix = 'pregenerated_user_secret_token:'
+
   /**
    * Stores a pre-generated token with expiration
    * @param token The pre-generated token
    */
   async storePreGeneratedToken(token: string): Promise<void> {
-    await this.redisClient.set(`pregenerated-user-secret-token:${token}`, '1', {
+    await this.redisClient.set(`${this.prefix}${token}`, '1', {
       EX: this.expirationTime,
     })
   }
@@ -19,7 +19,7 @@ class RedisPreGeneratedSecretTokens extends RedisGenericManager {
    * @returns true if token was valid and consumed, false otherwise
    */
   async validateAndConsumePreGeneratedToken(token: string): Promise<boolean> {
-    const key = `pregenerated-user-secret-token:${token}`
+    const key = `${this.prefix}${token}`
     const exists = await this.redisClient.exists(key)
     if (exists) {
       await this.redisClient.del(key)
@@ -30,5 +30,5 @@ class RedisPreGeneratedSecretTokens extends RedisGenericManager {
 }
 
 export const redisPreGeneratedSecretTokens = await RedisPreGeneratedSecretTokens.createAndConnect({
-  expirationTime: REDIS_PREGENERATED_TOKEN_EXPIRY_SECONDS,
+  expirationTime: 60 * 5, // 5 minutes in seconds
 })

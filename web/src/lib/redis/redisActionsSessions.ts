@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 
 import { deserializeActionResult } from 'astro:actions'
 import { z } from 'astro:content'
-import { REDIS_ACTIONS_SESSION_EXPIRY_SECONDS } from 'astro:env/server'
 
 import { RedisGenericManager } from './redisGenericManager'
 
@@ -29,11 +28,13 @@ const dataSchema = z.object({
 })
 
 class RedisActionsSessions extends RedisGenericManager {
+  private readonly prefix = 'actions_session:'
+
   async store(data: z.input<typeof dataSchema>) {
     const sessionId = randomUUID()
 
     const parsedData = dataSchema.parse(data)
-    await this.redisClient.set(`actions-session:${sessionId}`, JSON.stringify(parsedData), {
+    await this.redisClient.set(`${this.prefix}${sessionId}`, JSON.stringify(parsedData), {
       EX: this.expirationTime,
     })
 
@@ -43,7 +44,7 @@ class RedisActionsSessions extends RedisGenericManager {
   async get(sessionId: string | null | undefined) {
     if (!sessionId) return null
 
-    const key = `actions-session:${sessionId}`
+    const key = `${this.prefix}${sessionId}`
 
     const rawData = await this.redisClient.get(key)
     if (!rawData) return null
@@ -60,10 +61,10 @@ class RedisActionsSessions extends RedisGenericManager {
   async delete(sessionId: string | null | undefined) {
     if (!sessionId) return
 
-    await this.redisClient.del(`actions-session:${sessionId}`)
+    await this.redisClient.del(`${this.prefix}${sessionId}`)
   }
 }
 
 export const redisActionsSessions = await RedisActionsSessions.createAndConnect({
-  expirationTime: REDIS_ACTIONS_SESSION_EXPIRY_SECONDS,
+  expirationTime: 60 * 5, // 5 minutes in seconds
 })

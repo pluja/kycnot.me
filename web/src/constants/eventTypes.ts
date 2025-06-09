@@ -1,9 +1,8 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
-import type BadgeSmall from '../components/BadgeSmall.astro'
+import type { TailwindColor } from '../lib/colors'
 import type { EventType } from '@prisma/client'
-import type { ComponentProps } from 'astro/types'
 
 type EventTypeInfo<T extends string | null | undefined = string> = {
   id: T
@@ -14,7 +13,7 @@ type EventTypeInfo<T extends string | null | undefined = string> = {
     dot: string
   }
   icon: string
-  color: ComponentProps<typeof BadgeSmall>['color']
+  color: TailwindColor
   isSolved: boolean
   showBanner: boolean
 }

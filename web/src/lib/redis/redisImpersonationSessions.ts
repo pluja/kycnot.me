@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
 import { z } from 'astro:content'
-import { REDIS_IMPERSONATION_SESSION_EXPIRY_SECONDS } from 'astro:env/server'
 
 import { RedisGenericManager } from './redisGenericManager'
 
@@ -11,11 +10,13 @@ const dataSchema = z.object({
 })
 
 class RedisImpersonationSessions extends RedisGenericManager {
+  private readonly prefix = 'impersonation_session:'
+
   async store(data: z.input<typeof dataSchema>) {
     const sessionId = randomUUID()
 
     const parsedData = dataSchema.parse(data)
-    await this.redisClient.set(`impersonation-session:${sessionId}`, JSON.stringify(parsedData), {
+    await this.redisClient.set(`${this.prefix}${sessionId}`, JSON.stringify(parsedData), {
       EX: this.expirationTime,
     })
 
@@ -25,7 +26,7 @@ class RedisImpersonationSessions extends RedisGenericManager {
   async get(sessionId: string | null | undefined) {
     if (!sessionId) return null
 
-    const key = `impersonation-session:${sessionId}`
+    const key = `${this.prefix}${sessionId}`
 
     const rawData = await this.redisClient.get(key)
     if (!rawData) return null
@@ -36,10 +37,10 @@ class RedisImpersonationSessions extends RedisGenericManager {
   async delete(sessionId: string | null | undefined) {
     if (!sessionId) return
 
-    await this.redisClient.del(`impersonation-session:${sessionId}`)
+    await this.redisClient.del(`${this.prefix}${sessionId}`)
   }
 }
 
 export const redisImpersonationSessions = await RedisImpersonationSessions.createAndConnect({
-  expirationTime: REDIS_IMPERSONATION_SESSION_EXPIRY_SECONDS,
+  expirationTime: 60 * 60 * 24, // 24 hours in seconds
 })

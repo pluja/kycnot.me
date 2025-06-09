@@ -46,8 +46,6 @@ const createInputErrors = isInputError(createResult?.error) ? createResult.error
 const updateResult = Astro.getActionResult(actions.admin.attribute.update)
 Astro.locals.banners.addIfSuccess(updateResult, 'Attribute updated successfully')
 
-const updatedAttributeId = updateResult?.data?.attribute.id ?? null
-
 const sortBy = filters['sort-by']
 const sortOrder = filters['sort-order']
 
@@ -723,8 +721,6 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
     </div>
   </div>
 </BaseLayout>
-
-<script define:vars={{ updatedAttributeId }}></script>
 
 <style>
   @keyframes highlight {

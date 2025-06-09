@@ -16,7 +16,7 @@ ARG ASTRO_BUILD_MODE=production
 RUN npx prisma generate
 
 # Build the application
-RUN npm run build -- --mode ${ASTRO_BUILD_MODE}
+RUN npm run build:astro -- --mode ${ASTRO_BUILD_MODE} && npm run build:server-init
 
 ENV HOST=0.0.0.0
 ENV PORT=4321
@@ -26,4 +26,4 @@ EXPOSE 4321
 COPY web/migrate.sh /usr/local/bin/knm-migrate
 RUN chmod +x /usr/local/bin/knm-migrate
 
-CMD ["node", "./dist/server/entry.mjs"]
+CMD ["sh", "-c", "node ./dist/server/server-init.js & node ./dist/server/entry.mjs"]

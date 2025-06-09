@@ -165,6 +165,11 @@ export const serviceSuggestionActions = {
         categories: z.array(z.coerce.number().int().positive()).min(1),
         acceptedCurrencies: z.array(z.nativeEnum(Currency)).min(1),
         imageFile: imageFileSchemaRequired,
+        rulesConfirm: z.literal('on', {
+          errorMap: () => ({
+            message: 'You must accept the suggestion rules and process to continue',
+          }),
+        }),
         /** @deprecated Honey pot field, do not use */
         message: z.unknown().optional(),
         skipDuplicateCheck: z
@@ -197,6 +202,7 @@ export const serviceSuggestionActions = {
               'imageFile',
               'captcha-value',
               'captcha-solution-hash',
+              'rulesConfirm',
             ]),
             serviceSuggestion: undefined,
             service: undefined,

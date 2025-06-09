@@ -1,6 +1,6 @@
 ---
 import { Icon } from 'astro-icon/components'
-import { actions, isInputError } from 'astro:actions'
+import { actions } from 'astro:actions'
 import { orderBy } from 'lodash-es'
 
 import {
@@ -36,7 +36,7 @@ const result = Astro.getActionResult(actions.serviceSuggestion.createService)
 if (result && !result.error && !result.data.hasDuplicates) {
   return Astro.redirect(`/service-suggestion/${result.data.serviceSuggestion.id}`)
 }
-const inputErrors = isInputError(result?.error) ? result.error.fields : {}
+const inputErrors = result?.error?.code === 'VALIDATION_ERROR' ? result.error.fields : {}
 
 const [categories, attributes] = await Astro.locals.banners.tryMany([
   [
@@ -89,7 +89,11 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
     },
   ]}
 >
-  <h1 class="font-title mt-12 mb-6 text-center text-3xl font-bold">Service suggestion</h1>
+  <h1 class="font-title mt-12 text-center text-3xl font-bold">Service suggestion</h1>
+
+  <p class="text-day-400 mb-6 text-center text-sm">
+    Suggestions are reviewed by moderators before being public.
+  </p>
 
   <form
     method="POST"
@@ -344,6 +348,17 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
     />
 
     <Captcha action={actions.serviceSuggestion.createService} />
+
+    <div>
+      <div class="flex items-center gap-2 text-lg">
+        <input type="checkbox" name="rulesConfirm" id="rules-confirm" required />
+        <label for="rules-confirm">
+          I understand the
+          <a class="underline" target="_blank" href="/about#listings">suggestion rules and process</a>
+        </label>
+      </div>
+      {inputErrors.rulesConfirm && <p class="mt-1 text-sm text-red-500">{inputErrors.rulesConfirm?.[0]}</p>}
+    </div>
 
     <InputHoneypotTrap name="message" />
 

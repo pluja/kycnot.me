@@ -2,6 +2,7 @@
 import { Icon } from 'astro-icon/components'
 import { VAPID_PUBLIC_KEY } from 'astro:env/server'
 
+import { SUPPORT_EMAIL } from '../constants/project'
 import { cn } from '../lib/cn'
 
 import Button from './Button.astro'
@@ -21,24 +22,24 @@ type Props = HTMLAttributes<'div'> & {
 }
 
 const { class: className, dismissable = false, pushSubscriptions, hideIfEnabled, ...props } = Astro.props
-
-// TODO: Feature flag, enabled only for admins
-if (!Astro.locals.user?.admin) {
-  return null
-}
 ---
 
 <div
   data-push-notification-banner
-  data-dismissed={undefined /* Updated by client script */}
-  data-supports-push-notifications={undefined /* Updated by client script */}
+  data-dismissed={undefined as true | undefined /* Updated by client script */}
+  data-notification-supported={undefined as true | undefined /* Updated by client script */}
   data-push-subscriptions={JSON.stringify(pushSubscriptions)}
-  data-is-enabled={undefined /* Updated by client script */}
+  data-is-enabled={undefined as true | undefined /* Updated by client script */}
+  data-loaded={undefined as true | undefined /* Updated by client script */}
+  data-notification-permissions={undefined as
+    | NotificationPermission
+    | undefined /* Updated by client script */}
+  data-vapid-public-key={VAPID_PUBLIC_KEY}
   class={cn(
-    'no-js:hidden relative isolate flex items-center justify-between gap-x-4 overflow-hidden rounded-xl bg-gradient-to-r from-blue-950/80 to-blue-900/60 p-4',
+    'no-js:hidden xs:grid-cols-[auto_auto] xs:justify-between relative isolate grid items-center justify-stretch gap-4 overflow-hidden rounded-xl bg-gradient-to-r from-blue-950/80 to-blue-900/60 p-4 not-data-loaded:hidden',
     'data-dismissed:hidden',
     hideIfEnabled && 'data-is-enabled:hidden',
-    'not-data-supports-push-notifications:hidden',
+    'not-data-notification-supported:hidden',
     'data-is-enabled:**:data-show-if-disabled:hidden not-data-is-enabled:**:data-show-if-enabled:hidden',
     className
   )}
@@ -60,25 +61,18 @@ if (!Astro.locals.user?.admin) {
       <Icon name="ri:notification-4-line" class="size-5 text-blue-300" />
     </div>
     <div>
-      <h3 class="font-medium text-blue-100">
-        <span data-show-if-enabled>Push notifications enabled</span>
-        <span data-show-if-disabled>Turn on push notifications?</span>
-      </h3>
-      <p class="text-sm text-blue-200/80">
-        <span data-show-if-enabled>Turn notifications off for this device?</span>
-        <span data-show-if-disabled>Get notifications on this device.</span>
-      </p>
+      <h3 class="font-medium text-blue-100" data-banner-title>Turn on push notifications?</h3>
+      <p class="text-sm text-blue-200/80" data-banner-description>Get notifications on this device.</p>
     </div>
   </div>
 
-  <div class="flex items-center gap-2">
+  <div class="xs:justify-end flex shrink flex-wrap items-center justify-center gap-2">
     {dismissable && <Button as="span" label="Skip" variant="faded" data-dismiss-button />}
     <Button
       as="span"
       label="Yes, notify me"
       color="white"
       data-push-action="subscribe"
-      data-vapid-public-key={VAPID_PUBLIC_KEY}
       data-show-if-disabled
     />
     <Button
@@ -87,9 +81,20 @@ if (!Astro.locals.user?.admin) {
       color="white"
       variant="faded"
       data-push-action="unsubscribe"
-      data-vapid-public-key={VAPID_PUBLIC_KEY}
       data-show-if-enabled
     />
+  </div>
+
+  <div
+    class="col-span-full flex items-center justify-center gap-2 leading-tight text-red-500 has-[[data-error-message]:empty]:hidden"
+  >
+    <Icon name="ri:error-warning-line" class="size-5 shrink-0" />
+    <span>
+      <span data-error-message></span>
+      <a href={`mailto:${SUPPORT_EMAIL}`} class="text-red-300 underline hover:text-red-200">
+        Contact support
+      </a>
+    </span>
   </div>
 </div>
 
@@ -134,240 +139,128 @@ if (!Astro.locals.user?.admin) {
 </script>
 
 <script>
-  /////////////////////////////////////////////////////////
-  // Script to style when notifications enabled.        //
-  ////////////////////////////////////////////////////////
+  ///////////////////////////////////////////
+  // Script to handle push notifications.  //
+  ///////////////////////////////////////////
 
-  type ServerSubscription = {
-    endpoint: string
-    userAgent: string | null
-  }
+  import {
+    subscribeToPushNotifications,
+    unsubscribeFromPushNotifications,
+    parsePushSubscriptions,
+    isCurrentDeviceSubscribed,
+    supportsPushNotifications,
+    type SafeResult,
+  } from '../lib/client/clientPushNotifications'
 
-  /** Parse push subscriptions from string */
-  function parsePushSubscriptions(subscriptionsAsString: string | undefined) {
-    try {
-      if (typeof subscriptionsAsString !== 'string') throw new Error('Push subscriptions must be a string')
+  import {
+    enableBrowserNotifications,
+    disableBrowserNotifications,
+    isBrowserNotificationsEnabled,
+    supportsBrowserNotifications,
+  } from '../lib/client/browserNotifications'
 
-      const subscriptions = JSON.parse(subscriptionsAsString)
-
-      if (!Array.isArray(subscriptions)) throw new Error('Push subscriptions must be an array')
-      if (!subscriptions.every((s) => typeof s === 'object' && s !== null)) {
-        throw new Error('Push subscriptions must be an array of objects')
-      }
-      if (!subscriptions.every((s) => typeof s.endpoint === 'string')) {
-        throw new Error('Push subscriptions must be an array of objects with endpoint property')
-      }
-      if (!subscriptions.every((s) => typeof s.userAgent === 'string' || s.userAgent === null)) {
-        throw new Error('Push subscriptions must be an array of objects with userAgent property')
-      }
-
-      return subscriptions as ServerSubscription[]
-    } catch (error) {
-      console.error('Failed to parse push subscriptions:', error)
-      return []
+  async function setDataAttributes(banner: HTMLElement) {
+    if (!supportsPushNotifications() && !supportsBrowserNotifications()) {
+      return
     }
-  }
 
-  /** Check if current device has an active push subscription */
-  async function getCurrentPushSubscription() {
-    try {
-      const registration = await navigator.serviceWorker.getRegistration()
-      if (!registration) return null
+    banner.dataset.notificationSupported = ''
+    banner.dataset.notificationPermissions = Notification.permission
 
-      return await registration.pushManager.getSubscription()
-    } catch (error) {
-      console.error('Error getting current push subscription:', error)
-      return null
+    const serverSubscriptions = parsePushSubscriptions(banner.dataset.pushSubscriptions)
+    const titleElement = banner.querySelector<HTMLElement>('[data-banner-title]')
+    const descriptionElement = banner.querySelector<HTMLElement>('[data-banner-description]')
+
+    if (await isCurrentDeviceSubscribed(serverSubscriptions)) {
+      if (titleElement) titleElement.textContent = 'Push notifications enabled'
+      if (descriptionElement) descriptionElement.textContent = 'Turn push notifications off for this device?'
+      banner.dataset.isEnabled = ''
+      banner.dataset.loaded = ''
+      return
     }
-  }
 
-  /** Check if current subscription matches any server subscription */
-  function isCurrentDeviceSubscribed(
-    currentSubscription: PushSubscription | null,
-    serverSubscriptions: ServerSubscription[]
-  ) {
-    if (!currentSubscription || serverSubscriptions.length === 0) return false
+    if (isBrowserNotificationsEnabled()) {
+      if (titleElement) titleElement.textContent = 'Browser notifications enabled'
+      if (descriptionElement)
+        descriptionElement.textContent = 'Turn off notifications? (They only work while the tab is open.)'
+      banner.dataset.isEnabled = ''
+      banner.dataset.loaded = ''
+      return
+    }
 
-    const currentEndpoint = currentSubscription.endpoint
-    const currentUserAgent = navigator.userAgent
-
-    return serverSubscriptions.some(
-      (sub) =>
-        sub.endpoint === currentEndpoint && (sub.userAgent === currentUserAgent || sub.userAgent === null)
-    )
+    // Default state (disabled)
+    if (titleElement) titleElement.textContent = 'Turn on push notifications?'
+    if (descriptionElement) descriptionElement.textContent = 'Get notifications on this device.'
+    banner.dataset.loaded = ''
   }
 
   document.addEventListener('astro:page-load', async () => {
     document.querySelectorAll<HTMLElement>('[data-push-notification-banner]').forEach(async (banner) => {
-      const serverSubscriptions = parsePushSubscriptions(banner.dataset.pushSubscriptions)
-      const currentSubscription = await getCurrentPushSubscription()
-      const isSubscribed = isCurrentDeviceSubscribed(currentSubscription, serverSubscriptions)
+      await setDataAttributes(banner)
 
-      if (isSubscribed) banner.dataset.isEnabled = ''
-    })
-  })
-</script>
+      const vapidPublicKey = banner.dataset.vapidPublicKey
 
-<script>
-  /////////////////////////////////////////////////////////////
-  // Script to handle push notification subscription.        //
-  /////////////////////////////////////////////////////////////
+      banner.querySelectorAll<HTMLElement>('[data-push-action]').forEach((button) => {
+        button.addEventListener('click', async (event) => {
+          event.preventDefault()
+          event.stopPropagation()
 
-  import type { actions } from 'astro:actions'
-  import type { ActionInput } from '../lib/astroActions'
+          const action = button.dataset.pushAction
+          if (action !== 'subscribe' && action !== 'unsubscribe') {
+            console.error('Invalid push action:', action)
+            return
+          }
 
-  /** Utility function to convert VAPID key */
-  function urlB64ToUint8Array(base64String: string) {
-    const cleaned = base64String.trim().replace(/\s+/g, '').replace(/\-/g, '+').replace(/_/g, '/')
-    const padding = '='.repeat((4 - (cleaned.length % 4)) % 4)
-    const base64 = cleaned + padding
+          let result: SafeResult
 
-    const rawData = window.atob(base64)
-    const outputArray = new Uint8Array(rawData.length)
+          if (action === 'subscribe') {
+            const pushResult = vapidPublicKey
+              ? await subscribeToPushNotifications(vapidPublicKey)
+              : { success: false as const, error: 'VAPID public key not found' }
 
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i)
-    }
-    return outputArray
-  }
+            if (pushResult.success) {
+              result = pushResult
+            } else {
+              console.error(
+                "Can't enable push notifications, trying browser notifications.",
+                pushResult.error
+              )
+              const browserResult = await enableBrowserNotifications()
 
-  /** Check for browser support */
-  function checkSupport() {
-    const isSecure =
-      window.isSecureContext ||
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1'
-    return isSecure && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
-  }
+              if (browserResult.success) {
+                result = browserResult
+              } else {
+                console.error("Can't enable browser notifications:", browserResult.error)
+                result = {
+                  success: false,
+                  error: `Can't enable either push or browser notifications. Push: ${pushResult.error}. Browser: ${browserResult.error}`,
+                }
+              }
+            }
+          } else {
+            const pushResult = await unsubscribeFromPushNotifications()
+            const browserResult = disableBrowserNotifications()
 
-  async function registerServiceWorker() {
-    try {
-      const registration = await navigator.serviceWorker.register('/sw.js')
-      console.log('Service Worker registered:', registration)
+            const success = pushResult.success || browserResult.success
 
-      const readyRegistration = await navigator.serviceWorker.ready
-      console.log('Service Worker is active and ready:', readyRegistration)
+            result = success
+              ? { success: true }
+              : { success: false, error: `${pushResult.error} | ${browserResult.error}` }
+          }
 
-      return readyRegistration
-    } catch (error) {
-      console.error('Service Worker registration failed:', error)
-      throw error
-    }
-  }
+          if (!result.success) {
+            console.error(result.error)
 
-  async function subscribeToPush(vapidPublicKey: string) {
-    try {
-      if (!checkSupport()) return
+            const errorMessageElement = banner.querySelector<HTMLElement>('[data-error-message]')
+            if (errorMessageElement) {
+              errorMessageElement.textContent = `Failed to ${action === 'subscribe' ? 'enable' : 'disable'} notifications.`
+            }
 
-      // Request notification permission
-      const permission = await Notification.requestPermission()
-      if (permission !== 'granted') {
-        alert('Push notifications permission denied')
-        return
-      }
+            return
+          }
 
-      const registration = await registerServiceWorker()
-
-      // Subscribe to push manager
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlB64ToUint8Array(vapidPublicKey),
-      })
-
-      const p256dh = subscription.getKey('p256dh')
-      const auth = subscription.getKey('auth')
-
-      // Send subscription to server
-      const response = await fetch('/internal-api/notifications/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          endpoint: subscription.endpoint,
-          userAgent: navigator.userAgent,
-          p256dhKey: p256dh ? btoa(String.fromCharCode(...new Uint8Array(p256dh))) : '',
-          authKey: auth ? btoa(String.fromCharCode(...new Uint8Array(auth))) : '',
-        } satisfies ActionInput<typeof actions.notification.webPush.subscribe>),
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      console.log('Push subscription successful')
-
-      // Reload page to update UI
-      window.location.reload()
-    } catch (error) {
-      console.error('Push subscription failed:', error)
-      alert('Error enabling push notifications. This may be due to browser settings or other restrictions.')
-    }
-  }
-
-  async function unsubscribeFromPush() {
-    try {
-      const registration = await navigator.serviceWorker.getRegistration()
-      if (!registration) {
-        console.log('No service worker registration found')
-        return
-      }
-
-      const subscription = await registration.pushManager.getSubscription()
-      if (!subscription) {
-        console.log('No push subscription found')
-        return
-      }
-
-      // Unsubscribe from browser
-      await subscription.unsubscribe()
-
-      // Remove from server
-      const response = await fetch('/internal-api/notifications/unsubscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          endpoint: subscription.endpoint,
-        } satisfies ActionInput<typeof actions.notification.webPush.unsubscribe>),
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      console.log('Push unsubscription successful')
-
-      // Reload page to update UI
-      window.location.reload()
-    } catch (error) {
-      console.error('Push unsubscription failed:', error)
-      alert('Failed to unsubscribe from push notifications')
-    }
-  }
-
-  document.addEventListener('astro:page-load', () => {
-    const supportsPushNotifications = checkSupport()
-    if (supportsPushNotifications) {
-      document.querySelectorAll<HTMLElement>('[data-push-notification-banner]').forEach((element) => {
-        element.dataset.supportsPushNotifications = ''
-      })
-    }
-
-    document.querySelectorAll<HTMLElement>('[data-push-action]').forEach((button) => {
-      const vapidPublicKey = button.dataset.vapidPublicKey
-      if (!vapidPublicKey) {
-        console.error('Environment variable VAPID_PUBLIC_KEY is not set')
-        return
-      }
-
-      button.addEventListener('click', async (event) => {
-        event.preventDefault()
-        event.stopPropagation()
-
-        const action = button.dataset.pushAction
-        if (action === 'subscribe') {
-          await subscribeToPush(vapidPublicKey)
-        } else if (action === 'unsubscribe') {
-          await unsubscribeFromPush()
-        }
+          window.location.reload()
+        })
       })
     })
   })
