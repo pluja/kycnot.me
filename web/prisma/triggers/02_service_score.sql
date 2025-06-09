@@ -135,6 +135,17 @@ BEGIN
         SET "isRecentlyListed" = FALSE
         WHERE id = service_id;
     END IF;
+
+    -- Apply penalty if ToS cannot be analyzed
+    IF EXISTS (
+        SELECT 1
+        FROM "Service"
+        WHERE id = service_id 
+        AND "tosReviewAt" IS NOT NULL 
+        AND "tosReview" IS NULL
+    ) THEN
+        trust_score := trust_score - 3;
+    END IF;
     
     -- Calculate final trust score (base 100)
     trust_score := trust_score + verification_factor + attributes_score;

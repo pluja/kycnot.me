@@ -41,6 +41,8 @@ export function makeNonDbAttributes(
       isRecentlyListed: true
       listedAt: true
       createdAt: true
+      tosReviewAt: true
+      tosReview: true
     }
   }>,
   { filter = false }: { filter?: boolean } = {}
@@ -154,6 +156,17 @@ export function makeNonDbAttributes(
       description: `Listed on KYCnot.me ${formatDateShort(service.listedAt ?? service.createdAt)}. Proceed with caution.`,
       privacyPoints: 0,
       trustPoints: -5,
+      links: [],
+    },
+    {
+      title: "Can't analyse ToS",
+      show: service.tosReviewAt !== null && service.tosReview === null,
+      type: 'WARNING',
+      category: 'TRUST',
+      description:
+        'The Terms of Service page is not analyable by our AI. Possible reasons may be: captchas, client side rendering, DDoS protections, or non-text format.',
+      privacyPoints: 0,
+      trustPoints: -3,
       links: [],
     },
   ]

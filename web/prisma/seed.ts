@@ -19,6 +19,7 @@ import {
   type ServiceVisibility,
   ServiceSuggestionType,
   KycLevelClarification,
+  VerificationStepStatus,
 } from '@prisma/client'
 import { omit, uniqBy } from 'lodash-es'
 import { generateUsername } from 'unique-username-generator'
@@ -610,6 +611,10 @@ const generateFakeService = (users: User[]) => {
   const name = faker.helpers.arrayElement(serviceNames)
   const slug = `${faker.helpers.slugify(name).toLowerCase()}-${faker.string.alphanumeric({ length: 6, casing: 'lower' })}`
 
+  const tosReview = faker.helpers.maybe(() => faker.helpers.arrayElement(tosReviewExamples), {
+    probability: 0.8,
+  })
+
   return {
     name,
     slug,
@@ -643,6 +648,19 @@ const generateFakeService = (users: User[]) => {
     },
     verificationProofMd:
       status === 'VERIFICATION_SUCCESS' || status === 'VERIFICATION_FAILED' ? faker.lorem.paragraphs() : null,
+    verificationSteps:
+      (status === 'VERIFICATION_SUCCESS' || status === 'VERIFICATION_FAILED') && faker.datatype.boolean(0.75)
+        ? {
+            create: Array.from({ length: faker.number.int({ min: 1, max: 5 }) }, () => ({
+              title: faker.lorem.sentence(),
+              description: faker.lorem.paragraph(),
+              status: faker.helpers.arrayElement(Object.values(VerificationStepStatus)),
+              evidenceMd: faker.lorem.paragraph(),
+              createdAt: faker.date.recent(),
+              updatedAt: faker.date.recent(),
+            })),
+          }
+        : undefined,
     referral: faker.helpers.arrayElement([
       `?ref=${faker.string.alphanumeric(6)}`,
       `/ref/${faker.string.alphanumeric(6)}`,
@@ -661,8 +679,10 @@ const generateFakeService = (users: User[]) => {
     imageUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&format=svg`,
     listedAt: faker.date.past(),
     verifiedAt: status === VerificationStatus.VERIFICATION_SUCCESS ? faker.date.past() : null,
-    tosReview: faker.helpers.arrayElement(tosReviewExamples),
-    tosReviewAt: faker.date.past(),
+    tosReview,
+    tosReviewAt: tosReview
+      ? faker.date.recent()
+      : faker.helpers.maybe(() => faker.date.recent(), { probability: 0.5 }),
     userSentiment: faker.helpers.maybe(() => generateFakeUserSentiment(), { probability: 0.8 }),
     userSentimentAt: faker.date.recent(),
     internalNotes: faker.helpers.maybe(
