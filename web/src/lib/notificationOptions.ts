@@ -14,7 +14,7 @@ export function makeNotificationOptions(
     body: 'You have a new notification',
     lang: 'en-US',
     icon: '/favicon.svg',
-    badge: '/favicon.svg',
+    badge: '/notification-icon.svg',
     requireInteraction: false,
     silent: false,
     actions: options.removeActions
