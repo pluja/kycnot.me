@@ -25,10 +25,11 @@ function addBadgeIfUnread(href: string) {
 {
   DEPLOYMENT_MODE === 'production' && (
     <>
-      <link rel="icon" type="image/svg+xml" href={addBadgeIfUnread('/favicon.svg')} />
+      <link rel="icon" type="image/svg+xml" sizes="any" href={addBadgeIfUnread('/favicon.svg')} />
       <link
         rel="icon"
         type="image/svg+xml"
+        sizes="any"
         href={addBadgeIfUnread('/favicon-lightmode.svg')}
         media="(prefers-color-scheme: light)"
       />
@@ -37,12 +38,30 @@ function addBadgeIfUnread(href: string) {
 }
 {
   DEPLOYMENT_MODE === 'development' && (
-    <link rel="icon" type="image/svg+xml" href={addBadgeIfUnread('/favicon-dev.svg')} />
+    <>
+      <link rel="icon" type="image/svg+xml" sizes="any" href={addBadgeIfUnread('/favicon-dev.svg')} />
+      <link
+        rel="icon"
+        type="image/svg+xml"
+        sizes="any"
+        href={addBadgeIfUnread('/favicon-dev-lightmode.svg')}
+        media="(prefers-color-scheme: light)"
+      />
+    </>
   )
 }
 {
   DEPLOYMENT_MODE === 'staging' && (
-    <link rel="icon" type="image/svg+xml" href={addBadgeIfUnread('/favicon-stage.svg')} />
+    <>
+      <link rel="icon" type="image/svg+xml" sizes="any" href={addBadgeIfUnread('/favicon-stage.svg')} />
+      <link
+        rel="icon"
+        type="image/svg+xml"
+        sizes="any"
+        href={addBadgeIfUnread('/favicon-stage-lightmode.svg')}
+        media="(prefers-color-scheme: light)"
+      />
+    </>
   )
 }
 

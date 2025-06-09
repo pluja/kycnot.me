@@ -307,7 +307,7 @@ export const adminServiceActions = {
       input: z.object({
         id: z.number().int().positive(),
         label: z.string().min(1).max(50).nullable(),
-        value: z.string().url(),
+        value: zodContactMethod,
         serviceId: z.number().int().positive(),
       }),
       handler: async (input) => {

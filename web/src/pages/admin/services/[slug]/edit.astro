@@ -1141,23 +1141,26 @@ const apiCalls = await Astro.locals.banners.try(
                       <input type="hidden" name="serviceId" value={service.id} />
 
                       <InputText
-                        label="Override Label (Optional)"
+                        label="Value"
+                        description={`Accepts: ${contactMethodUrlTypes.map((type) => type.labelPlural).join(', ')}`}
+                        name="value"
+                        inputProps={{
+                          required: true,
+                          value: method.value,
+                          placeholder: 'contact@example.com',
+                        }}
+                        error={contactMethodUpdateInputErrors.value}
+                      />
+
+                      <InputText
+                        label="Label"
                         name="label"
+                        description="Leave empty to auto-generate"
                         inputProps={{
                           value: method.label,
                           placeholder: contactMethodInfo.formattedValue,
                         }}
                         error={contactMethodUpdateInputErrors.label}
-                      />
-
-                      <InputText
-                        label="Value (with protocol)"
-                        name="value"
-                        inputProps={{
-                          value: method.value,
-                          placeholder: 'e.g., mailto:contact@example.com or https://t.me/example',
-                        }}
-                        error={contactMethodUpdateInputErrors.value}
                       />
 
                       <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
@@ -1174,8 +1177,6 @@ const apiCalls = await Astro.locals.banners.try(
         <form method="POST" action={actions.admin.service.contactMethod.add} class="space-y-2">
           <input type="hidden" name="serviceId" value={service.id} />
 
-          <InputText label="Override Label" name="label" />
-
           <InputText
             label="Value"
             description={`Accepts: ${contactMethodUrlTypes.map((type) => type.labelPlural).join(', ')}`}
@@ -1185,6 +1186,13 @@ const apiCalls = await Astro.locals.banners.try(
               placeholder: 'contact@example.com',
             }}
             error={contactMethodAddInputErrors.value}
+          />
+
+          <InputText
+            label="Label"
+            description="Leave empty to auto-generate"
+            name="label"
+            inputProps={{ placeholder: 'Auto-generated' }}
           />
 
           <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />
