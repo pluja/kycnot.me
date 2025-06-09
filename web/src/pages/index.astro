@@ -333,6 +333,8 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
             where,
             select: {
               id: true,
+              serviceVisibility: true,
+              verificationStatus: true,
               ...(Object.fromEntries(sortOptions.map((option) => [option.orderBy.key, true])) as Record<
                 (typeof sortOptions)[number]['orderBy']['key'],
                 true
@@ -354,10 +356,18 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
           sortBy(unsortedServices, 'id'),
           [
             ...(filters.q ? (['similarityScore'] as const) : ([] as const)),
+            (service) => (service.verificationStatus === 'VERIFICATION_FAILED' ? 1 : 0),
+            (service) => (service.serviceVisibility === 'ARCHIVED' ? 1 : 0),
             selectedSort.orderBy.key,
             () => rng(),
           ],
-          [...(filters.q ? (['desc'] as const) : ([] as const)), selectedSort.orderBy.direction, 'asc']
+          [
+            ...(filters.q ? (['desc'] as const) : ([] as const)),
+            'asc',
+            'asc',
+            selectedSort.orderBy.direction,
+            'asc',
+          ]
         ).slice((filters.page - 1) * PAGE_SIZE, filters.page * PAGE_SIZE)
 
         const unsortedServicesWithInfoMissingSimilarityScore = await prisma.service.findMany({
@@ -410,11 +420,19 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
           unsortedServicesWithInfo,
           [
             ...(filters.q ? (['similarityScore'] as const) : ([] as const)),
+            (service) => (service.verificationStatus === 'VERIFICATION_FAILED' ? 1 : 0),
+            (service) => (service.serviceVisibility === 'ARCHIVED' ? 1 : 0),
             selectedSort.orderBy.key,
             // Now we can shuffle indeternimistically, because the pagination was already applied
             () => Math.random(),
           ],
-          [...(filters.q ? (['desc'] as const) : ([] as const)), selectedSort.orderBy.direction, 'asc']
+          [
+            ...(filters.q ? (['desc'] as const) : ([] as const)),
+            'asc',
+            'asc',
+            selectedSort.orderBy.direction,
+            'asc',
+          ]
         )
 
         return [sortedServicesWithInfo, totalServices] as const
