@@ -3,7 +3,9 @@ Task for retrieving Terms of Service (TOS) text.
 """
 
 import hashlib
-from typing import Any, Dict, Optional, Literal
+from typing import Any, Dict, Optional
+
+import requests
 
 from pyworker.database import TosReviewType, save_tos_review, update_kyc_level
 from pyworker.tasks.base import Task
@@ -53,13 +55,37 @@ class TosReviewTask(Task):
         self.logger.info(f"TOS URLs: {tos_urls}")
 
         review = self.get_tos_review(tos_urls, service.get("tosReview"))
+
+        # Always update the processed timestamp, even if review is None
         save_tos_review(service_id, review)
 
-        # Update the KYC level based on the review
+        if review is None:
+            self.logger.warning(
+                f"TOS review could not be generated for service {service_name} (ID: {service_id})"
+            )
+            return None
+
+        # Update the KYC level based on the review, when present
         if "kycLevel" in review:
-            kyc_level = review["kycLevel"]
-            self.logger.info(f"Updating KYC level to {kyc_level} for service {service_name}")
-            update_kyc_level(service_id, kyc_level)
+            new_level = review["kycLevel"]
+            old_level = service.get("kycLevel")
+
+            # Update DB
+            if update_kyc_level(service_id, new_level):
+                msg = f"{service.get('slug', service_name)}: kycLevel {old_level} -> {new_level}"
+
+                # Log to console
+                self.logger.info(msg)
+
+                # Send notification via ntfy
+                try:
+                    requests.post(
+                        "https://ntfy.sh/knm-kyc-lvl-changes-knm", data=msg.encode()
+                    )
+                except requests.RequestException as e:
+                    self.logger.error(
+                        f"Failed to send ntfy notification for KYC level change: {e}"
+                    )
 
         return review
 
@@ -87,7 +113,9 @@ class TosReviewTask(Task):
             content = fetch_markdown(api_url)
 
             if not content:
-                self.logger.warning(f"Failed to retrieve TOS content for URL: {tos_url}")
+                self.logger.warning(
+                    f"Failed to retrieve TOS content for URL: {tos_url}"
+                )
                 all_skipped = False
                 continue
 
