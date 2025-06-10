@@ -498,7 +498,7 @@ model User {
   moderator       Boolean @default(false)
   verifiedLink    String?
   secretTokenHash String  @unique
-  feedId          String? @unique @default(cuid(2))
+  feedId          String  @unique @default(cuid(2))
   /// Computed via trigger. Do not update through prisma.
   totalKarma      Int     @default(0)
 
