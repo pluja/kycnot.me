@@ -31,7 +31,7 @@ if (!Astro.locals.user) return
           const data = JSON.parse(event.data as string)
 
           if (isServerEventsEvent(data)) {
-            const eventType = `sse-${data.type}` as const
+            const eventType = `sse:${data.type}` as const
             document.dispatchEvent(
               new CustomEvent(eventType, { detail: data.data }) as SSEEventMap[typeof eventType]
             )

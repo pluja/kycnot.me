@@ -21,7 +21,7 @@ const cleanUrl = (input: unknown) => {
 
 export const zodUrlOptionalProtocol = z.preprocess(
   cleanUrl,
-  z.string().refine((value) => /^(https?:\/\/)?[a-z0-9]+(\.[a-z0-9])*(\.[a-z0-9]{2,}).*$/i.test(value), {
+  z.string().refine((value) => /^(https?:\/\/)?[^\s$.?#]+(\.[^\s$.?#])*(\.[a-z0-9]{2,}).*$/i.test(value), {
     message: 'Invalid URL',
   })
 )
@@ -42,7 +42,7 @@ export const zodContactMethod = z.preprocess(
     .trim()
     .refine(
       (value) =>
-        /^((https?:\/\/)?[a-z0-9]+(\.[a-z0-9])*(\.[a-z0-9]{2,}).*|([\d\s+\-_/()[\]*#.,]|ext|x){7,}|[0-9\s+-_\\/()[\]*#.]|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})*$/i.test(
+        /^((https?:\/\/)?[^\s$.?#]+(\.[^\s$.?#])*(\.[a-z0-9]{2,}).*|([\d\s+\-_/()[\]*#.,]|ext|x){7,}|[0-9\s+-_\\/()[\]*#.]|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})*$/i.test(
           value
         ),
       {

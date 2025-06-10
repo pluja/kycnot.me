@@ -48,7 +48,7 @@ const count =
 }
 
 <script>
-  document.addEventListener('sse-new-notification', () => {
+  document.addEventListener('sse:new-notification', () => {
     document.querySelectorAll<HTMLElement>('[data-notification-count-link]').forEach((link) => {
       const currentCount = Number(link.getAttribute('data-current-count') || 0)
       const newCount = currentCount + 1

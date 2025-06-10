@@ -22,7 +22,7 @@ DROP FUNCTION IF EXISTS recalculate_scores_for_attribute();
 CREATE OR REPLACE FUNCTION calculate_privacy_score(service_id INT) 
 RETURNS INT AS $$
 DECLARE
-    privacy_score INT := 50; -- Start from middle value (50)
+    privacy_score INT := 0;
     kyc_factor INT;
     onion_factor INT := 0;
     i2p_factor INT := 0;
@@ -78,7 +78,7 @@ BEGIN
     WHERE sa."serviceId" = service_id AND a."category" = 'PRIVACY';
     
     -- Calculate final privacy score (base 100)
-    privacy_score := privacy_score + kyc_factor + onion_factor + i2p_factor + monero_factor + open_source_factor + p2p_factor + decentralized_factor + attributes_score;
+    privacy_score := 50 + kyc_factor + onion_factor + i2p_factor + monero_factor + open_source_factor + p2p_factor + decentralized_factor + attributes_score;
     
     -- Ensure the score is in reasonable bounds (0-100)
     privacy_score := GREATEST(0, LEAST(100, privacy_score));
@@ -91,9 +91,11 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION calculate_trust_score(service_id INT) 
 RETURNS INT AS $$
 DECLARE
-    trust_score INT := 50; -- Start from middle value (50)
+    trust_score INT := 0;
     verification_factor INT;
     attributes_score INT := 0;
+    recently_listed_factor INT := 0;
+    tos_penalty_factor INT := 0;
 BEGIN
     -- Get verification status factor
     SELECT 
@@ -124,7 +126,7 @@ BEGIN
         AND "verificationStatus" = 'APPROVED'
         AND (NOW() - "listedAt") <= INTERVAL '15 days'
     ) THEN
-        trust_score := trust_score - 10;
+        recently_listed_factor := -10;
         -- Update the isRecentlyListed flag to true
         UPDATE "Service"
         SET "isRecentlyListed" = TRUE
@@ -144,12 +146,12 @@ BEGIN
         AND "tosReviewAt" IS NOT NULL 
         AND "tosReview" IS NULL
     ) THEN
-        trust_score := trust_score - 3;
+        tos_penalty_factor := -3;
     END IF;
     
     -- Calculate final trust score (base 100)
-    trust_score := trust_score + verification_factor + attributes_score;
-    
+    trust_score := 50 + verification_factor + attributes_score + recently_listed_factor + tos_penalty_factor;
+
     -- Ensure the score is in reasonable bounds (0-100)
     trust_score := GREATEST(0, LEAST(100, trust_score));
     

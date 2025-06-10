@@ -1,0 +1,87 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import MiniLayout from '../../layouts/MiniLayout.astro'
+import { takeCounts } from '../../lib/feeds'
+
+const user = Astro.locals.user
+
+const feeds = [
+  {
+    title: user ? 'Your notifications' : 'User notifications',
+    description: `Last ${takeCounts.userNotifications.toLocaleString()} of your notifications`,
+    rss: user ? `/feeds/user/${user.feedId}/notifications.xml` : '/feeds/user/[feedId]/notifications.xml',
+    icon: 'ri:notification-line',
+    replacementDescription: user
+      ? null
+      : "Replace [feedId] with the user feed ID, found in the user's notifications page",
+  },
+  {
+    title: 'Service comments',
+    description: `Last ${takeCounts.serviceComments.toLocaleString()} comments (and reviews) from a specific service`,
+    rss: '/feeds/service/[slug]/comments.xml',
+    icon: 'ri:chat-3-line',
+    replacementDescription: 'Replace [slug] with the actual service slug',
+  },
+  {
+    title: 'Service events',
+    description: `Last ${takeCounts.serviceEvents.toLocaleString()} events from a specific service`,
+    rss: '/feeds/service/[slug]/events.xml',
+    icon: 'ri:calendar-event-line',
+    replacementDescription: 'Replace [slug] with the actual service slug',
+  },
+  {
+    title: 'All events',
+    description: `Last ${takeCounts.allEvents.toLocaleString()} events from all listed services`,
+    rss: '/feeds/events.xml',
+    icon: 'ri:calendar-2-line',
+    replacementDescription: null,
+  },
+] as const satisfies {
+  title: string
+  description: string
+  rss: `/feeds/${string}`
+  icon: string
+  replacementDescription: string | null
+}[]
+---
+
+<MiniLayout
+  pageTitle="RSS Feeds"
+  description="Subscribe to RSS feeds to stay updated with the latest comments and events on KYCnot.me"
+  ogImage={{
+    template: 'generic',
+    title: 'RSS Feeds',
+    description: 'Subscribe to stay updated',
+    icon: 'ri:rss-line',
+  }}
+  layoutHeader={{
+    icon: 'ri:rss-line',
+    title: 'RSS Feeds',
+    subtitle: 'Copy the feed URL to your RSS reader',
+  }}
+  size="md"
+>
+  <div class="space-y-8">
+    {
+      feeds.map((feed) => (
+        <div>
+          <div class="flex flex-row items-center justify-center gap-2">
+            <Icon name={feed.icon} class="inline-block size-6 shrink-0 text-white" />
+            <h2 class="text-left text-lg leading-tight font-bold text-white">{feed.title}</h2>
+          </div>
+
+          <p class="text-day-300 mt-1 text-center text-sm text-balance">{feed.description}</p>
+
+          <div
+            class="border-night-500 bg-night-600 relative mt-2 rounded-lg border px-4 py-2 font-mono break-all text-white"
+            set:text={`${Astro.url.origin}${feed.rss}`}
+          />
+          {!!feed.replacementDescription && (
+            <p class="text-day-500 mt-1 text-center text-xs italic">{feed.replacementDescription}</p>
+          )}
+        </div>
+      ))
+    }
+  </div>
+</MiniLayout>

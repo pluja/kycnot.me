@@ -11,7 +11,7 @@ import { getAttributeCategoryInfo } from '../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../constants/attributeTypes'
 import { getVerificationStatusInfo } from '../constants/verificationStatus'
 import BaseLayout from '../layouts/BaseLayout.astro'
-import { sortAttributes } from '../lib/attributes'
+import { nonDbAttributes, sortAttributes } from '../lib/attributes'
 import { cn } from '../lib/cn'
 import { formatNumber } from '../lib/numbers'
 import { makeOverallScoreInfo } from '../lib/overallScore'
@@ -59,9 +59,14 @@ const attributes = await Astro.locals.banners.try(
 )
 
 const sortBy = filters['sort-by']
+const mergedAttributes = [
+  ...nonDbAttributes.map((attribute) => ({ ...attribute, services: [], id: attribute.slug })),
+  ...attributes,
+]
+
 const sortedAttributes = sortBy
   ? orderBy(
-      sortAttributes(attributes),
+      sortAttributes(mergedAttributes),
       sortBy === 'type'
         ? (attribute) => getAttributeTypeInfo(attribute.type).order
         : sortBy === 'category'
@@ -73,7 +78,7 @@ const sortedAttributes = sortBy
               : 'trustPoints',
       filters['sort-order']
     )
-  : sortAttributes(attributes)
+  : sortAttributes(mergedAttributes)
 
 const attributesWithInfo = sortedAttributes.map((attribute) => ({
   ...attribute,
@@ -292,7 +297,10 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
 
           <label
             for={`show-services-${attribute.id}`}
-            class="col-span-full grid cursor-pointer list-none grid-cols-subgrid items-center rounded-sm p-2 peer-checked/show-services:[&_[data-expand-icon]]:rotate-180"
+            class={cn(
+              'col-span-full grid cursor-pointer list-none grid-cols-subgrid items-center rounded-sm p-2 peer-checked/show-services:[&_[data-expand-icon]]:rotate-180',
+              attribute.services.length === 0 && 'cursor-default'
+            )}
             aria-label={`Show services for ${attribute.title}`}
           >
             <h3 class={cn('text-lg font-bold', attribute.typeInfo.classNames.text)}>{attribute.title}</h3>
@@ -339,7 +347,9 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
             </div>
 
             <div class="flex items-center justify-center">
-              <Icon name="ri:arrow-down-s-line" class="size-6" data-expand-icon />
+              {attribute.services.length > 0 && (
+                <Icon name="ri:arrow-down-s-line" class="size-6" data-expand-icon />
+              )}
             </div>
           </label>
 

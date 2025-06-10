@@ -41,6 +41,11 @@ export const {
       icon: 'ri:chat-4-line',
     },
     {
+      id: 'SUGGESTION_CREATED',
+      label: 'New suggestion',
+      icon: 'ri:lightbulb-line',
+    },
+    {
       id: 'SUGGESTION_MESSAGE',
       label: 'New message in suggestion',
       icon: 'ri:mail-line',

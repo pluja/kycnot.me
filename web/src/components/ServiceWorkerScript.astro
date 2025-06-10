@@ -1,0 +1,54 @@
+---
+
+---
+
+<script>
+  import { registerSW } from 'virtual:pwa-register'
+
+  declare global {
+    // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+    interface Window {
+      __SW_REGISTRATION__?: ServiceWorkerRegistration
+    }
+  }
+
+  const NO_AUTO_RELOAD_ROUTES = ['/account/welcome', '/500', '/404'] as const satisfies `/${string}`[]
+
+  let hasPendingUpdate = false
+
+  const updateSW = registerSW({
+    immediate: true,
+    onRegisteredSW: (_swScriptUrl, registration) => {
+      if (registration) window.__SW_REGISTRATION__ = registration
+
+      document.addEventListener('astro:after-swap', checkAndApplyPendingUpdate, { passive: true })
+      window.addEventListener('popstate', checkAndApplyPendingUpdate, { passive: true })
+    },
+    onNeedRefresh: () => {
+      if (shouldSkipAutoReload()) {
+        void updateSW(false)
+        hasPendingUpdate = true
+        return
+      }
+
+      void updateSW(true)
+    },
+    onRegisterError: (error) => {
+      console.error('Service Worker registration error', error)
+    },
+  })
+
+  function shouldSkipAutoReload() {
+    const currentPath = window.location.pathname
+    const isErrorPage = document.querySelector('[data-is-error-page]') !== null
+
+    return isErrorPage || NO_AUTO_RELOAD_ROUTES.some((route) => currentPath === route)
+  }
+
+  function checkAndApplyPendingUpdate() {
+    if (hasPendingUpdate && !shouldSkipAutoReload()) {
+      hasPendingUpdate = false
+      void updateSW(true)
+    }
+  }
+</script>

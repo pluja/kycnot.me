@@ -45,7 +45,7 @@ export type ServerEventsEvent = {
 }[keyof ServerEventsData]
 
 export type SSEEventMap = {
-  [K in keyof ServerEventsData as `sse-${K}`]: CustomEvent<ServerEventsData[K]>
+  [K in keyof ServerEventsData as `sse:${K}`]: CustomEvent<ServerEventsData[K]>
 }
 
 declare global {

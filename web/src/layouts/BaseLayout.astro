@@ -16,7 +16,7 @@ type Props = ComponentProps<typeof BaseHead> & {
   children: AstroChildren
   errors?: string[]
   success?: string[]
-  className?: {
+  classNames?: {
     body?: string
     main?: string
     footer?: string
@@ -31,14 +31,16 @@ type Props = ComponentProps<typeof BaseHead> & {
     | 'max-w-screen-sm'
     | 'max-w-screen-xl'
     | 'max-w-screen-xs'
+  isErrorPage?: boolean
 }
 
 const {
   errors = [],
   success = [],
-  className,
+  classNames,
   widthClassName = 'max-w-screen-2xl',
   showSplashText,
+  isErrorPage,
   ...baseHeadProps
 } = Astro.props
 
@@ -77,7 +79,10 @@ const announcement = await Astro.locals.banners.try(
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <BaseHead {...baseHeadProps} />
   </head>
-  <body class={cn('bg-night-700 text-day-300 flex min-h-dvh flex-col *:shrink-0', className?.body)}>
+  <body
+    class={cn('bg-night-700 text-day-300 flex min-h-dvh flex-col *:shrink-0', classNames?.body)}
+    data-is-error-page={isErrorPage}
+  >
     {announcement && <AnnouncementBanner announcement={announcement} transition:name="header-announcement" />}
     <Header
       classNames={{
@@ -116,7 +121,7 @@ const announcement = await Astro.locals.banners.try(
     <main
       class={cn(
         'container mx-auto mt-4 mb-12 grow px-4',
-        className?.main,
+        classNames?.main,
         (widthClassName === 'max-w-none' || widthClassName === 'max-w-screen-2xl') && 'lg:px-8 2xl:px-12',
         widthClassName
       )}
@@ -124,6 +129,6 @@ const announcement = await Astro.locals.banners.try(
       <slot />
     </main>
 
-    <Footer class={className?.footer} />
+    <Footer class={classNames?.footer} />
   </body>
 </html>

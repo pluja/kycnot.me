@@ -53,6 +53,7 @@ export async function sendNotification(
       aboutServiceSuggestion: {
         select: {
           status: true,
+          type: true,
           service: {
             select: {
               name: true,

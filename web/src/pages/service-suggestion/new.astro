@@ -1,6 +1,6 @@
 ---
 import { Icon } from 'astro-icon/components'
-import { actions } from 'astro:actions'
+import { actions, isInputError } from 'astro:actions'
 import { orderBy } from 'lodash-es'
 
 import {
@@ -11,6 +11,7 @@ import {
 } from '../../actions/serviceSuggestion'
 import Captcha from '../../components/Captcha.astro'
 import InputCardGroup from '../../components/InputCardGroup.astro'
+import InputCheckbox from '../../components/InputCheckbox.astro'
 import InputCheckboxGroup from '../../components/InputCheckboxGroup.astro'
 import InputHoneypotTrap from '../../components/InputHoneypotTrap.astro'
 import InputImageFile from '../../components/InputImageFile.astro'
@@ -36,7 +37,7 @@ const result = Astro.getActionResult(actions.serviceSuggestion.createService)
 if (result && !result.error && !result.data.hasDuplicates) {
   return Astro.redirect(`/service-suggestion/${result.data.serviceSuggestion.id}`)
 }
-const inputErrors = result?.error?.code === 'VALIDATION_ERROR' ? result.error.fields : {}
+const inputErrors = isInputError(result?.error) ? result.error.fields : {}
 
 const [categories, attributes] = await Astro.locals.banners.tryMany([
   [
@@ -239,7 +240,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
 
     <InputTextArea
       label="ToS URLs"
-      description="One per line"
+      description="One per line. AI review uses the first working URL only."
       name="tosUrls"
       inputProps={{
         placeholder: 'example.com/tos',
@@ -349,16 +350,10 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
 
     <Captcha action={actions.serviceSuggestion.createService} />
 
-    <div>
-      <div class="flex items-center gap-2 text-lg">
-        <input type="checkbox" name="rulesConfirm" id="rules-confirm" required />
-        <label for="rules-confirm">
-          I understand the
-          <a class="underline" target="_blank" href="/about#listings">suggestion rules and process</a>
-        </label>
-      </div>
-      {inputErrors.rulesConfirm && <p class="mt-1 text-sm text-red-500">{inputErrors.rulesConfirm?.[0]}</p>}
-    </div>
+    <InputCheckbox name="rulesConfirm" required error={inputErrors.rulesConfirm}>
+      I understand the
+      <a class="underline" target="_blank" href="/about#listings">suggestion rules and process</a>
+    </InputCheckbox>
 
     <InputHoneypotTrap name="message" />
 

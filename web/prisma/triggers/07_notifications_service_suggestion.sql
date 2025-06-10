@@ -3,7 +3,20 @@ RETURNS TRIGGER AS $$
 DECLARE
   suggestion_status_change "ServiceSuggestionStatusChange";
 BEGIN
-  IF TG_OP = 'INSERT' THEN -- Corresponds to ServiceSuggestionMessage insert
+  IF TG_OP = 'INSERT' AND TG_TABLE_NAME = 'ServiceSuggestion' THEN -- Corresponds to ServiceSuggestion insert
+    -- Notify all admins when a new suggestion is created
+    INSERT INTO "Notification" ("userId", "type", "aboutServiceSuggestionId")
+    SELECT u."id", 'SUGGESTION_CREATED', NEW."id"
+    FROM "User" u
+    WHERE u."admin" = true
+      AND NOT EXISTS (
+        SELECT 1 FROM "Notification" n
+        WHERE n."userId" = u."id"
+          AND n."type" = 'SUGGESTION_CREATED'
+          AND n."aboutServiceSuggestionId" = NEW."id"
+      );
+
+  ELSIF TG_OP = 'INSERT' AND TG_TABLE_NAME = 'ServiceSuggestionMessage' THEN -- Corresponds to ServiceSuggestionMessage insert
     -- Notify suggestion author (if not the sender)
     INSERT INTO "Notification" ("userId", "type", "aboutServiceSuggestionId", "aboutServiceSuggestionMessageId")
     SELECT s."userId", 'SUGGESTION_MESSAGE', NEW."suggestionId", NEW."id"
@@ -54,6 +67,13 @@ BEGIN
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Trigger for new suggestions
+DROP TRIGGER IF EXISTS service_suggestion_created_notifications_trigger ON "ServiceSuggestion";
+CREATE TRIGGER service_suggestion_created_notifications_trigger
+  AFTER INSERT ON "ServiceSuggestion"
+  FOR EACH ROW
+  EXECUTE FUNCTION trigger_service_suggestion_notifications();
 
 -- Trigger for new messages
 DROP TRIGGER IF EXISTS service_suggestion_message_notifications_trigger ON "ServiceSuggestionMessage";

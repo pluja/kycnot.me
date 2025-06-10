@@ -13,6 +13,7 @@ import HtmxScript from './HtmxScript.astro'
 import NotificationEventsScript from './NotificationEventsScript.astro'
 import { makeOgImageUrl } from './OgImage'
 import ServerEventsScript from './ServerEventsScript.astro'
+import ServiceWorkerScript from './ServiceWorkerScript.astro'
 import TailwindJsPluggin from './TailwindJsPluggin.astro'
 
 import type { ComponentProps } from 'astro/types'
@@ -137,10 +138,12 @@ const ogImageUrl = makeOgImageUrl(ogImage, Astro.url)
   ))
 }
 
-<!-- Server events -->
-<ServerEventsScript />
-
-<!-- Push Notifications -->
-
-<script src="/src/pwa.ts"></script>
-<NotificationEventsScript />
+{
+  Astro.locals.user && (
+    <>
+      <ServerEventsScript />
+      <ServiceWorkerScript />
+      <NotificationEventsScript />
+    </>
+  )
+}

@@ -7,11 +7,12 @@ import BaseLayout from '../layouts/BaseLayout.astro'
 <BaseLayout
   pageTitle="404: Page Not Found"
   description="The page doesn't exist, double check the URL."
-  className={{
+  classNames={{
     main: 'm-0 -mt-16 flex max-w-none flex-col items-center justify-center bg-[#737373] pt-16 text-[#fafafa] [--speed:2s] perspective-distant [&_*]:[transform-style:preserve-3d]',
     footer: 'bg-black',
   }}
   widthClassName="max-w-none"
+  isErrorPage
 >
   <h1
     data-text="404"

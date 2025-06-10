@@ -1,6 +1,7 @@
 ---
 import { z } from 'astro/zod'
 import { Icon } from 'astro-icon/components'
+import { LOGS_UI_URL } from 'astro:env/server'
 
 import { SUPPORT_EMAIL } from '../constants/project'
 import BaseLayout from '../layouts/BaseLayout.astro'
@@ -21,9 +22,10 @@ const {
 <BaseLayout
   pageTitle="500: Server Error"
   description="Sorry, something crashed on the server."
-  className={{
+  classNames={{
     main: 'relative my-0 flex flex-col items-center justify-center px-6 py-24 text-center sm:py-32 lg:px-8',
   }}
+  isErrorPage
 >
   <Icon
     name="ri:bug-line"
@@ -93,6 +95,20 @@ const {
       />
       Contact support
     </a>
+    {
+      Astro.locals.user?.admin && !!LOGS_UI_URL && (
+        <a
+          href={LOGS_UI_URL}
+          class="focus-visible:outline-primary group flex items-center gap-2 px-3.5 py-2.5 text-white"
+        >
+          <Icon
+            name="ri:menu-search-line"
+            class="size-5 transition-transform group-hover:-translate-y-1 group-active:translate-y-0"
+          />
+          View logs <span class="text-xs text-gray-400">(admin only)</span>
+        </a>
+      )
+    }
   </div>
 </BaseLayout>
 

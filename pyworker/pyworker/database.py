@@ -332,7 +332,7 @@ def remove_service_attribute_by_slug(service_id: int, attribute_slug: str) -> bo
     return remove_service_attribute(service_id, attribute_id)
 
 
-def save_tos_review(service_id: int, review: TosReviewType):
+def save_tos_review(service_id: int, review: Optional[TosReviewType]):
     """
     Save a TOS review for a specific service.
 
@@ -341,8 +341,8 @@ def save_tos_review(service_id: int, review: TosReviewType):
         review: A TypedDict containing the review data.
     """
     try:
-        # Serialize the dictionary to a JSON string for the database
-        review_json = json.dumps(review)
+        # Only serialize to JSON if review is not None
+        review_json = json.dumps(review) if review is not None else None
         with get_db_connection() as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 cursor.execute(

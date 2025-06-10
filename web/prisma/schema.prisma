@@ -135,6 +135,7 @@ enum NotificationType {
   COMMUNITY_NOTE_ADDED
   /// Comment that is not a reply. May include a rating.
   ROOT_COMMENT_CREATED
+  SUGGESTION_CREATED
   SUGGESTION_MESSAGE
   SUGGESTION_STATUS_CHANGE
   // KARMA_UNLOCK // TODO: [KARMA_UNLOCK] Will be added later, when karma unloks are in the database, not in the code.
@@ -497,6 +498,7 @@ model User {
   moderator       Boolean @default(false)
   verifiedLink    String?
   secretTokenHash String  @unique
+  feedId          String  @unique @default(cuid(2))
   /// Computed via trigger. Do not update through prisma.
   totalKarma      Int     @default(0)
 

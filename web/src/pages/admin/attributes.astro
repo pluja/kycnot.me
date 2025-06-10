@@ -372,7 +372,7 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
       </div>
     </div>
 
-    <div class="scrollbar-thin max-w-full overflow-x-auto">
+    <div class="max-w-full overflow-x-auto">
       <div class="min-w-[750px]">
         <table class="w-full divide-y divide-zinc-700">
           <thead class="bg-zinc-900/30">
@@ -721,51 +721,3 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
     </div>
   </div>
 </BaseLayout>
-
-<style>
-  @keyframes highlight {
-    0% {
-      background-color: rgba(59, 130, 246, 0.1);
-    }
-    50% {
-      background-color: rgba(59, 130, 246, 0.3);
-    }
-    100% {
-      background-color: transparent;
-    }
-  }
-
-  /* Base CSS text size utility */
-  .text-2xs {
-    font-size: 0.6875rem; /* 11px */
-    line-height: 1rem; /* 16px */
-  }
-
-  /* Scrollbar styling for better mobile experience */
-  .scrollbar-thin::-webkit-scrollbar {
-    height: 6px;
-    width: 6px;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: rgba(30, 41, 59, 0.2);
-    border-radius: 3px;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: rgba(75, 85, 99, 0.5);
-    border-radius: 3px;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: rgba(100, 116, 139, 0.6);
-  }
-
-  @media (max-width: 768px) {
-    .scrollbar-thin {
-      scrollbar-width: thin;
-      scrollbar-color: rgba(75, 85, 99, 0.5) rgba(30, 41, 59, 0.2); /* thumb track for firefox*/
-      -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-    }
-  }
-</style>

@@ -47,11 +47,6 @@ const [services, [dbEvents, totalEvents]] = await Astro.locals.banners.tryMany([
         where: {
           listedAt: { lte: new Date() },
           serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
-          events: {
-            some: {
-              visible: true,
-            },
-          },
         },
         select: {
           id: true,
@@ -162,7 +157,7 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
   pageTitle="Events"
   description="Discover important events, updates, and news about KYC-free services in chronological order."
   widthClassName="max-w-screen-lg"
-  className={{ main: 'sm:flex sm:items-start sm:gap-6' }}
+  classNames={{ main: 'sm:flex sm:items-start sm:gap-6' }}
   ogImage={{
     template: 'generic',
     title: 'Events',

@@ -16,9 +16,6 @@ const releaseDate =
     title: 'Releases',
     subtitle: 'Current release',
   }}
-  className={{
-    main: 'flex flex-col items-center justify-center text-center',
-  }}
 >
   <p class="text-day-200 font-title text-center text-6xl font-medium tracking-wider">
     {RELEASE_NUMBER ? `#${RELEASE_NUMBER}` : '???'}
@@ -36,7 +33,7 @@ const releaseDate =
   </time>
   {
     !!releaseDate && (
-      <p class="text-day-500 mt-2">
+      <p class="text-day-500 mt-2 text-center">
         (<time datetime={releaseDate.toISOString()}>{timeAgo.format(releaseDate, 'round')}</time>)
       </p>
     )

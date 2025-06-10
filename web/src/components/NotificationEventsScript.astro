@@ -6,7 +6,7 @@
   import { isBrowserNotificationsEnabled, showBrowserNotification } from '../lib/client/browserNotifications'
   import { makeNotificationOptions } from '../lib/notificationOptions'
 
-  document.addEventListener('sse-new-notification', (event) => {
+  document.addEventListener('sse:new-notification', (event) => {
     if (isBrowserNotificationsEnabled()) {
       const payload = event.detail
       const notification = showBrowserNotification(

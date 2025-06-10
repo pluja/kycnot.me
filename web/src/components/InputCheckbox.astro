@@ -1,0 +1,61 @@
+---
+import { cn } from '../lib/cn'
+
+import type InputWrapper from './InputWrapper.astro'
+import type { AstroChildren } from '../lib/astro'
+import type { ComponentProps } from 'astro/types'
+
+type Props = Pick<ComponentProps<typeof InputWrapper>, 'error' | 'name' | 'required'> & {
+  disabled?: boolean
+  id?: string
+} & (
+    | {
+        label: string
+        children?: undefined
+      }
+    | {
+        label?: undefined
+        children: AstroChildren
+      }
+  )
+
+const { disabled, name, required, error, id, label } = Astro.props
+
+const hasError = !!error && error.length > 0
+---
+
+{}
+
+<div>
+  <label
+    class={cn(
+      'inline-flex cursor-pointer items-center gap-2',
+      hasError && 'text-red-300',
+      disabled && 'cursor-not-allowed opacity-50'
+    )}
+  >
+    <input
+      transition:persist
+      type="checkbox"
+      id={id}
+      name={name}
+      required={required}
+      disabled={disabled}
+      class={cn(disabled && 'opacity-50')}
+    />
+    <span class="text-sm leading-none text-pretty">{label ?? <slot />}</span>
+  </label>
+
+  {
+    hasError &&
+      (typeof error === 'string' ? (
+        <p class="text-sm text-red-500">{error}</p>
+      ) : (
+        <ul class="text-sm text-red-500">
+          {error.map((e) => (
+            <li>{e}</li>
+          ))}
+        </ul>
+      ))
+  }
+</div>

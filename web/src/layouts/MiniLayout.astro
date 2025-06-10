@@ -9,20 +9,30 @@ import type { ComponentProps } from 'astro/types'
 
 type Props = Omit<ComponentProps<typeof BaseLayout>, 'widthClassName'> & {
   layoutHeader: { icon: string; title: string; subtitle?: string }
+  size?: 'md' | 'xs'
 }
 
-const { layoutHeader, ...baseLayoutProps } = Astro.props
+const { layoutHeader, size = 'xs', ...baseLayoutProps } = Astro.props
 ---
 
 <BaseLayout
-  className={{
-    ...baseLayoutProps.className,
-    main: cn('xs:items-center-safe flex grow flex-col justify-center-safe', baseLayoutProps.className?.main),
+  classNames={{
+    main: cn(
+      'flex grow flex-col justify-center-safe',
+      {
+        'xs:items-center-safe': size === 'xs',
+        'md:items-center-safe': size === 'md',
+      },
+      baseLayoutProps.classNames?.main
+    ),
   }}
   {...baseLayoutProps}
 >
   <div
-    class="bg-night-800 border-night-500 xs:block xs:max-w-screen-xs contents w-full rounded-xl border p-8"
+    class={cn('bg-night-800 border-night-500 contents w-full rounded-xl border p-8', {
+      'xs:block xs:max-w-screen-xs': size === 'xs',
+      'md:block md:max-w-screen-md': size === 'md',
+    })}
   >
     <div class="bg-day-200 mx-auto flex size-12 items-center justify-center rounded-lg">
       <Icon name={layoutHeader.icon} class="text-night-800 size-8" />
@@ -31,14 +41,24 @@ const { layoutHeader, ...baseLayoutProps } = Astro.props
     <h1
       class={cn(
         'font-title text-day-200 mt-1 text-center text-3xl font-semibold',
-        !layoutHeader.subtitle && 'xs:mb-8 mb-6'
+        !layoutHeader.subtitle && {
+          'xs:mb-8 mb-6': size === 'xs',
+          'mb-6 md:mb-8': size === 'md',
+        }
       )}
     >
       {layoutHeader.title}
     </h1>
     {
       !!layoutHeader.subtitle && (
-        <p class="text-day-500 xs:mb-8 mt-1 mb-6 text-center">{layoutHeader.subtitle}</p>
+        <p
+          class={cn('text-day-500 mt-1 mb-6 text-center', {
+            'xs:mb-8': size === 'xs',
+            'md:mb-8': size === 'md',
+          })}
+        >
+          {layoutHeader.subtitle}
+        </p>
       )
     }
 

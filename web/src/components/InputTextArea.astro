@@ -27,6 +27,7 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
     class={cn(
       baseInputClassNames.input,
       baseInputClassNames.textarea,
+      !!inputProps?.rows && 'h-auto',
       inputProps?.class,
       hasError && baseInputClassNames.error,
       !!inputProps?.disabled && baseInputClassNames.disabled

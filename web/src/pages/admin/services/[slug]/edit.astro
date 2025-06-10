@@ -352,7 +352,7 @@ const apiCalls = await Astro.locals.banners.try(
           />
           <InputTextArea
             label="ToS URLs"
-            description="One per line"
+            description="One per line. AI review uses the first working URL only."
             name="tosUrls"
             inputProps={{
               placeholder: 'https://example1.com/tos\nhttps://example2.com/tos',

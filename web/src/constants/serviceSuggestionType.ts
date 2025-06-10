@@ -8,6 +8,7 @@ type ServiceSuggestionTypeInfo<T extends string | null | undefined = string> = {
   value: T
   slug: string
   label: string
+  labelAlt: string
   icon: string
   order: number
   default: boolean
@@ -33,12 +34,14 @@ export const {
     order: Infinity,
     default: false,
     color: 'zinc',
+    labelAlt: value ? transformCase(value.replace('_', ' '), 'title') : String(value),
   }),
   [
     {
       value: 'CREATE_SERVICE',
       slug: 'create',
       label: 'Create',
+      labelAlt: 'service',
       icon: 'ri:add-line',
       order: 1,
       default: true,
@@ -48,6 +51,7 @@ export const {
       value: 'EDIT_SERVICE',
       slug: 'edit',
       label: 'Edit',
+      labelAlt: 'edit',
       icon: 'ri:pencil-line',
       order: 2,
       default: false,

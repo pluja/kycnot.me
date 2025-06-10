@@ -3,6 +3,7 @@ import { commentStatusChangesById } from '../constants/commentStatusChange'
 import { eventTypesById } from '../constants/eventTypes'
 import { getKarmaTransactionActionInfo } from '../constants/karmaTransactionActions'
 import { serviceVerificationStatusChangesById } from '../constants/serviceStatusChange'
+import { getServiceSuggestionTypeInfo } from '../constants/serviceSuggestionType'
 import { serviceSuggestionStatusChangesById } from '../constants/suggestionStatusChange'
 
 import { makeCommentUrl } from './commentsWithReplies'
@@ -48,6 +49,7 @@ export function makeNotificationTitle(
       aboutServiceSuggestion: {
         select: {
           status: true
+          type: true
           service: {
             select: {
               name: true
@@ -130,6 +132,12 @@ export function makeNotificationTitle(
       return notification.aboutComment.status == 'PENDING'
         ? `New unmoderated comment on ${service}`
         : `New comment on ${service}`
+    }
+    case 'SUGGESTION_CREATED': {
+      if (!notification.aboutServiceSuggestion) return 'New service suggestion'
+      const typeInfo = getServiceSuggestionTypeInfo(notification.aboutServiceSuggestion.type)
+      const service = notification.aboutServiceSuggestion.service.name
+      return `New ${typeInfo.labelAlt} suggestion for ${service}`
     }
     case 'SUGGESTION_MESSAGE': {
       if (!notification.aboutServiceSuggestionMessage) return 'New message on your suggestion'
@@ -219,6 +227,7 @@ export function makeNotificationContent(
       if (!notification.aboutKarmaTransaction) return null
       return notification.aboutKarmaTransaction.description
     }
+    case 'SUGGESTION_CREATED':
     case 'SUGGESTION_STATUS_CHANGE':
     case 'ACCOUNT_STATUS_CHANGE':
     case 'SERVICE_VERIFICATION_STATUS_CHANGE': {
@@ -320,6 +329,17 @@ export function makeNotificationActions(
             commentId: notification.aboutComment.id,
             origin,
           }),
+        },
+      ]
+    }
+    case 'SUGGESTION_CREATED': {
+      if (!notification.aboutServiceSuggestionId) return []
+      return [
+        {
+          action: 'view',
+          title: 'View',
+          ...iconNameAndUrl('ri:arrow-right-line'),
+          url: `${origin}/service-suggestion/${String(notification.aboutServiceSuggestionId)}`,
         },
       ]
     }

@@ -36,6 +36,10 @@ const findPossibleDuplicates = async (input: { name: string }) => {
       id: {
         in: matches.map(({ id }) => id),
       },
+      listedAt: { lte: new Date() },
+      serviceVisibility: {
+        in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'],
+      },
     },
     select: {
       id: true,
@@ -58,6 +62,8 @@ const serializeExtraNotes = <T extends Record<string, unknown>>(
         serializedValue = value
       } else if (value === undefined || value === null) {
         serializedValue = ''
+      } else if (Array.isArray(value)) {
+        serializedValue = value.map((item) => String(item)).join(', ')
       } else if (typeof value === 'object' && 'toString' in value && typeof value.toString === 'function') {
         // eslint-disable-next-line @typescript-eslint/no-base-to-string
         serializedValue = value.toString()
@@ -144,17 +150,7 @@ export const serviceSuggestionActions = {
           .max(SUGGESTION_SLUG_MAX_LENGTH)
           .regex(/^[a-z0-9-]+$/, {
             message: 'Slug must contain only lowercase letters, numbers, and hyphens',
-          })
-          .refine(
-            async (slug) => {
-              const exists = await prisma.service.findUnique({
-                select: { id: true },
-                where: { slug },
-              })
-              return !exists
-            },
-            { message: 'Slug must be unique, try a different one' }
-          ),
+          }),
         description: z.string().min(1).max(SUGGESTION_DESCRIPTION_MAX_LENGTH),
         allServiceUrls: stringListOfUrlsSchemaRequired,
         tosUrls: stringListOfUrlsSchemaRequired,
@@ -189,8 +185,16 @@ export const serviceSuggestionActions = {
         location: 'serviceSuggestion.createService',
       })
 
+      const serviceWithSameSlug = await prisma.service.findUnique({
+        select: { id: true, name: true, slug: true, description: true },
+        where: { slug: input.slug },
+      })
+
       if (!input.skipDuplicateCheck) {
-        const possibleDuplicates = await findPossibleDuplicates(input)
+        const possibleDuplicates = [
+          ...(serviceWithSameSlug ? [serviceWithSameSlug] : []),
+          ...(await findPossibleDuplicates(input)),
+        ]
 
         if (possibleDuplicates.length > 0) {
           return {
@@ -207,6 +211,13 @@ export const serviceSuggestionActions = {
             serviceSuggestion: undefined,
             service: undefined,
           } as const
+        }
+      } else {
+        if (serviceWithSameSlug) {
+          throw new ActionError({
+            message: 'Slug already in use, try a different one',
+            code: 'BAD_REQUEST',
+          })
         }
       }
 
