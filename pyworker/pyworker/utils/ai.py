@@ -173,12 +173,12 @@ type TosReview = {
         /** In regards to KYC, Privacy, Anonymity, Self-Sovereignity, etc. */
         /** anything that could harm the user's privacy, identity, self-sovereignity or anonymity is negative, anything that otherwise helps is positive. else it is neutral. */
         rating: 'negative' | 'neutral' | 'positive'
-    }[]
+    }[] // max 8 highlights, try to provide at least 3.
 }
 
 The rating is a number between 0 and 2, where 0 is informative, 1 is warning, and 2 is critical.
 
-Do not provide more than 8 highlights. Focus on the most important information for the user. Be concise but thorough, and make sure your output is properly formatted JSON.
+Focus on the most important information for the user. Be concise and thorough, and make sure your output is properly formatted JSON.
 """
 
 PROMPT_COMMENT_SENTIMENT_SUMMARY = """
