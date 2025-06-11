@@ -14,10 +14,11 @@ type Props = Omit<ComponentProps<typeof InputWrapper>, 'children' | 'inputId' | 
     value: string
     disabled?: boolean
   }[]
-  selectProps?: Omit<HTMLAttributes<'select'>, 'name'>
+  selectProps?: Omit<HTMLAttributes<'select'>, 'name' | 'value'>
+  selectedValue?: string[] | string
 }
 
-const { options, selectProps, ...wrapperProps } = Astro.props
+const { options, selectProps, selectedValue, ...wrapperProps } = Astro.props
 
 const inputId = selectProps?.id ?? Astro.locals.makeId(`input-${wrapperProps.name}`)
 const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
@@ -39,7 +40,15 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
   >
     {
       options.map((option) => (
-        <option value={option.value} disabled={option.disabled}>
+        <option
+          value={option.value}
+          disabled={option.disabled}
+          selected={
+            Array.isArray(selectedValue)
+              ? selectedValue.includes(option.value)
+              : selectedValue === option.value
+          }
+        >
           {option.label}
         </option>
       ))

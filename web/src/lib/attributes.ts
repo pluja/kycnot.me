@@ -2,6 +2,8 @@ import { orderBy } from 'lodash-es'
 
 import { getAttributeCategoryInfo } from '../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../constants/attributeTypes'
+import { getKycLevelClarificationInfo } from '../constants/kycLevelClarifications'
+import { kycLevels } from '../constants/kycLevels'
 import { serviceVisibilitiesById } from '../constants/serviceVisibility'
 import { READ_MORE_SENTENCE_LINK, verificationStatusesByValue } from '../constants/verificationStatus'
 
@@ -27,7 +29,7 @@ type NonDbAttribute = Prisma.AttributeGetPayload<{
   }[]
 }
 
-export const nonDbAttributes: (NonDbAttribute & {
+type NonDbAttributeFull = NonDbAttribute & {
   customize: (
     service: Prisma.ServiceGetPayload<{
       select: {
@@ -41,12 +43,16 @@ export const nonDbAttributes: (NonDbAttribute & {
         onionUrls: true
         i2pUrls: true
         acceptedCurrencies: true
+        kycLevel: true
+        kycLevelClarification: true
       }
     }>
   ) => Partial<Pick<NonDbAttribute, 'description' | 'title'>> & {
     show: boolean
   }
-})[] = [
+}
+
+export const nonDbAttributes: NonDbAttributeFull[] = [
   {
     slug: 'verification-verified',
     title: 'Verified',
@@ -135,6 +141,31 @@ export const nonDbAttributes: (NonDbAttribute & {
       description: `${verificationStatusesByValue.VERIFICATION_FAILED.description} ${READ_MORE_SENTENCE_LINK}\n\nCheck out the [proof](#verification).`,
     }),
   },
+  ...kycLevels.map<NonDbAttributeFull>((kycLevel) => ({
+    slug: `kyc-level-${kycLevel.id}`,
+    title: kycLevel.name,
+    type: kycLevel.attributeType,
+    category: 'PRIVACY',
+    description: kycLevel.description,
+    privacyPoints: kycLevel.privacyPoints,
+    trustPoints: 0,
+    links: [
+      {
+        url: `/?max-kyc=${kycLevel.id}`,
+        label: 'With this or better',
+        icon: 'ri:search-line',
+      },
+    ],
+    customize: (service) => {
+      const clarification = getKycLevelClarificationInfo(service.kycLevelClarification)
+      return {
+        show: service.kycLevel === kycLevel.value,
+        title: kycLevel.name + (clarification.value !== 'NONE' ? ` (${clarification.label})` : ''),
+        description:
+          kycLevel.description + (clarification.value !== 'NONE' ? ` ${clarification.description}` : ''),
+      }
+    },
+  })),
   {
     slug: 'archived',
     title: serviceVisibilitiesById.ARCHIVED.label,
@@ -261,20 +292,7 @@ export function sortAttributes<
 }
 
 export function makeNonDbAttributes(
-  service: Prisma.ServiceGetPayload<{
-    select: {
-      verificationStatus: true
-      serviceVisibility: true
-      isRecentlyListed: true
-      listedAt: true
-      createdAt: true
-      tosReviewAt: true
-      tosReview: true
-      onionUrls: true
-      i2pUrls: true
-      acceptedCurrencies: true
-    }
-  }>,
+  service: Parameters<NonDbAttributeFull['customize']>[0],
   { filter = false }: { filter?: boolean } = {}
 ) {
   const attributes = nonDbAttributes.map(({ customize, ...attribute }) => ({

@@ -153,15 +153,6 @@ Scores are calculated **automatically** using clear, fixed rules. We do not chan
 The privacy score measures how well a service protects user privacy, using a transparent, rules-based approach:
 
 1. **Base Score:** Every service starts with a neutral score of 50 points.
-1. **KYC Level:** Adjusts the score based on the level of identity verification required:
-   - KYC Level 0 (No KYC): **+25 points**
-   - KYC Level 1 (Minimal KYC): **+10 points**
-   - KYC Level 2 (Moderate KYC): **-5 points**
-   - KYC Level 3 (More KYC): **-15 points**
-   - KYC Level 4 (Full mandatory KYC): **-25 points**
-1. **Onion URL:** **+5 points** if the service offers at least one Onion (Tor) URL.
-1. **I2P URL:** **+5 points** if the service offers at least one I2P URL.
-1. **Monero Acceptance:** **+5 points** if the service accepts Monero as a payment method.
 1. **Privacy Attributes:** The sum of all privacy points from attributes categorized as 'PRIVACY' is added to the score. [See all attributes](/attributes).
 1. **Final Score Range:** The final score is always kept between 0 and 100.
 
@@ -170,13 +161,6 @@ The privacy score measures how well a service protects user privacy, using a tra
 The trust score represents how reliable and trustworthy a service is, based on objective, transparent criteria.
 
 1. **Base Score:** Every service begins with a neutral score of 50 points.
-1. **Verification Status:**
-   - **Verification Success:** +10 points
-   - **Approved:** +5 points
-   - **Community Contributed:** 0 points
-   - **Verification Failed (SCAM):** -50 points
-1. **Recently Listed:** If a service was listed within the last 15 days and its status is `APPROVED`, a penalty of -10 points is applied to the trust score, and the service is flagged as recently listed.
-1. **Can't Analyze ToS:** If a service's Terms of Service cannot be analyzed by our AI (usually due to captchas, client-side rendering, DDoS protections, or non-text format), a penalty of -3 points is applied to the trust score.
 1. **Trust Attributes:** The total trust points from all attributes categorized as 'TRUST' are added to the score. [See all attributes](/attributes).
 1. **Final Score Range:** The final score is always kept between 0 and 100.
 

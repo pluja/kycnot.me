@@ -106,7 +106,7 @@ export const {
       type: 'matrix',
       label: 'Matrix',
       matcher: /^https?:\/\/(?:www\.)?matrix\.to\/#\/(.+)/,
-      formatter: ([, value]) => (value ? `#${value}` : 'Matrix'),
+      formatter: ([, value]) => value ?? 'Matrix',
       icon: 'ri:hashtag',
       urlType: 'url',
     },
@@ -121,7 +121,7 @@ export const {
     {
       type: 'simplex',
       label: 'SimpleX Chat',
-      matcher: /^https?:\/\/(?:www\.)?(simplex\.chat)\//,
+      matcher: /^https?:\/\/(?:www\.)?((?:simplex\.chat|smp\d+\.simplex\.im))\//,
       formatter: () => 'SimpleX Chat',
       icon: 'simplex',
       urlType: 'url',

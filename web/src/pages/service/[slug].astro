@@ -27,7 +27,7 @@ import Tooltip from '../../components/Tooltip.astro'
 import UserBadge from '../../components/UserBadge.astro'
 import VerificationWarningBanner from '../../components/VerificationWarningBanner.astro'
 import { getAttributeCategoryInfo } from '../../constants/attributeCategories'
-import { getAttributeTypeInfo } from '../../constants/attributeTypes'
+import { baseScoreType, getAttributeTypeInfo } from '../../constants/attributeTypes'
 import { formatContactMethod } from '../../constants/contactMethods'
 import { currencies, getCurrencyInfo } from '../../constants/currencies'
 import { getEventTypeInfo } from '../../constants/eventTypes'
@@ -1052,6 +1052,20 @@ const activeEventToShow =
             </li>
           )
         })}
+        <li
+          class={cn(
+            'bg-night-400 flex items-center self-start rounded-md p-2 text-sm text-pretty select-none',
+            baseScoreType.classNames.container,
+            baseScoreType.classNames.text
+          )}
+        >
+          <Icon
+            name={baseScoreType.icon}
+            class={cn('mr-2 size-4 flex-shrink-0', baseScoreType.classNames.icon)}
+          />
+          <span class="font-title">{baseScoreType.label}</span>
+          <span class={cn('mr-1 ml-auto', baseScoreType.classNames.icon)}>+50</span>
+        </li>
       </ul>
     )
   }
@@ -1459,6 +1473,7 @@ const activeEventToShow =
     Comments
   </h2>
   <div
+    id="discuss"
     class='grid grid-cols-1 gap-8 [grid-template-areas:"about""rating""ai"] sm:grid-cols-[1fr_1fr] sm:gap-4 sm:[grid-template-areas:"about_ai""rating_ai"]'
   >
     <div class="relative rounded-md bg-orange-400/10 p-2 px-2.5 text-xs text-orange-100/70 [grid-area:about]">

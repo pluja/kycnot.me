@@ -173,7 +173,7 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
           label: status.label,
           value: status.value,
         }))}
-        selectProps={{ value: serviceSuggestion.status }}
+        selectedValue={serviceSuggestion.status}
         class="flex-1"
         error={serviceSuggestionUpdateInputErrors.status}
       />

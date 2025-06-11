@@ -1143,7 +1143,7 @@ async function main() {
   }
 
   let users = await Promise.all(
-    Array.from({ length: 10 }, async () => {
+    Array.from({ length: 570 }, async () => {
       const { user } = await createAccount()
       return user
     })

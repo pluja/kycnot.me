@@ -801,7 +801,8 @@ const apiCalls = await Astro.locals.banners.try(
                             label: type.label,
                             value: type.id,
                           }))}
-                          selectProps={{ required: true, value: event.type }}
+                          selectedValue={event.type}
+                          selectProps={{ required: true }}
                           error={eventUpdateInputErrors.type}
                         />
                       </div>
@@ -982,7 +983,7 @@ const apiCalls = await Astro.locals.banners.try(
                           label: status.label,
                           value: status.value,
                         }))}
-                        selectProps={{ value: step.status }}
+                        selectedValue={step.status}
                         error={verificationStepUpdateInputErrors.status}
                       />
 

@@ -108,3 +108,19 @@ export const {
     },
   ] as const satisfies AttributeTypeInfo<AttributeType>[]
 )
+
+export const baseScoreType = {
+  value: 'BASE_SCORE',
+  slug: 'base-score',
+  label: 'Base score',
+  icon: 'ri:information-line',
+  order: 5,
+  classNames: {
+    container: 'bg-night-500',
+    subcontainer: '',
+    text: 'text-day-200',
+    textLight: '',
+    icon: '',
+    button: '',
+  },
+} as const satisfies AttributeTypeInfo
