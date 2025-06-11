@@ -24,6 +24,7 @@ RETURNS INT AS $$
 DECLARE
     privacy_score INT := 0;
     kyc_factor INT;
+    clarification_factor INT := 0;
     onion_factor INT := 0;
     i2p_factor INT := 0;
     monero_factor INT := 0;
@@ -44,6 +45,16 @@ BEGIN
         END
     INTO kyc_factor
     FROM "Service" 
+    WHERE "id" = service_id;
+    
+    -- Adjust score based on KYC level clarification modifiers
+    SELECT 
+        CASE 
+            WHEN "kycLevelClarification" = 'DEPENDS_ON_PARTNERS' THEN -5
+            ELSE 0 -- Default modifier when no clarification or unrecognized value
+        END
+    INTO clarification_factor
+    FROM "Service"
     WHERE "id" = service_id;
     
     -- Check for onion URLs
@@ -78,7 +89,7 @@ BEGIN
     WHERE sa."serviceId" = service_id AND a."category" = 'PRIVACY';
     
     -- Calculate final privacy score (base 100)
-    privacy_score := 50 + kyc_factor + onion_factor + i2p_factor + monero_factor + open_source_factor + p2p_factor + decentralized_factor + attributes_score;
+    privacy_score := 50 + kyc_factor + clarification_factor + onion_factor + i2p_factor + monero_factor + open_source_factor + p2p_factor + decentralized_factor + attributes_score;
     
     -- Ensure the score is in reasonable bounds (0-100)
     privacy_score := GREATEST(0, LEAST(100, privacy_score));

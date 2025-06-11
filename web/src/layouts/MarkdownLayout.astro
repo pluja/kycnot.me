@@ -1,5 +1,6 @@
 ---
 import { makeOgImageUrl, type OgImageAllTemplatesWithProps } from '../components/OgImage'
+import TimeFormatted from '../components/TimeFormatted.astro'
 import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
 
 import BaseLayout from './BaseLayout.astro'
@@ -13,21 +14,19 @@ type Props = ComponentProps<typeof BaseLayout> &
   MarkdownLayoutProps<{
     children: AstroChildren
     title: string
-    author: string
-    pubDate: string
+    updatedAt?: string
     description: string
     icon?: string
   }>
 
 const { frontmatter, schemas, ...baseLayoutProps } = Astro.props
-const publishDate = frontmatter.pubDate ? new Date(frontmatter.pubDate) : null
+const publishDate = frontmatter.updatedAt ? new Date(frontmatter.updatedAt) : null
 const ogImageTemplateData = {
   template: 'generic',
   title: frontmatter.title,
   description: frontmatter.description,
   icon: frontmatter.icon,
 } satisfies OgImageAllTemplatesWithProps
-const weAreAuthor = frontmatter.author.toLowerCase().trim() === 'kycnot.me'
 ---
 
 <BaseLayout
@@ -44,14 +43,7 @@ const weAreAuthor = frontmatter.author.toLowerCase().trim() === 'kycnot.me'
       datePublished: publishDate?.toISOString(),
       dateModified: publishDate?.toISOString(),
       image: makeOgImageUrl(ogImageTemplateData, Astro.url),
-      author: frontmatter.author
-        ? weAreAuthor
-          ? KYCNOTME_SCHEMA_MINI
-          : {
-              '@type': 'Person',
-              name: frontmatter.author,
-            }
-        : undefined,
+      author: KYCNOTME_SCHEMA_MINI,
       publisher: KYCNOTME_SCHEMA_MINI,
       mainEntityOfPage: {
         '@type': 'WebPage',
@@ -61,15 +53,26 @@ const weAreAuthor = frontmatter.author.toLowerCase().trim() === 'kycnot.me'
     ...(schemas ?? []),
   ]}
 >
+  <div class="bg-dots-fade absolute inset-x-0 top-0 -z-1 h-128 opacity-15"></div>
   <div
     class="prose prose-invert prose-headings:text-green-400 prose-h1:text-[2.5rem] prose-h1:font-bold prose-h1:my-8 prose-h1:drop-shadow-[0_0_10px_rgba(0,255,0,0.3)] prose-h2:text-green-500 prose-h2:text-[1.8rem] prose-h2:font-semibold prose-h2:my-6 prose-h2:border-b prose-h2:border-green-900 prose-h2:pb-1 prose-h3:text-green-600 prose-h3:text-[1.4rem] prose-h3:font-semibold prose-h3:my-4 prose-h4:text-green-700 prose-h4:text-[1.2rem] prose-h4:font-semibold prose-h4:my-3 prose-strong:font-semibold prose-strong:drop-shadow-[0_0_5px_rgba(0,255,0,0.2)] prose-p:text-gray-300 prose-p:my-4 prose-p:leading-relaxed prose-a:text-green-400 prose-a:no-underline prose-a:transition-all prose-a:border-b prose-a:border-green-900 prose-a:hover:text-green-400 prose-a:hover:drop-shadow-[0_0_8px_rgba(0,255,0,0.4)] prose-a:hover:border-green-400 prose-ul:text-gray-300 prose-ol:text-gray-300 prose-li:my-2 prose-li:leading-relaxed mx-auto"
   >
-    <h1>{frontmatter.title}</h1>
-    <p class="text-gray-500">
-      {frontmatter.author && `by ${frontmatter.author}`}
-      {frontmatter.pubDate && ` | ${new Date(frontmatter.pubDate).toLocaleDateString()}`}
+    <h1 class="mb-0!">{frontmatter.title}</h1>
+    <p class="mt-2! opacity-70">
+      Updated {frontmatter.updatedAt && <TimeFormatted date={new Date(frontmatter.updatedAt)} />}
     </p>
 
     <slot />
   </div>
 </BaseLayout>
+
+<style>
+  .bg-dots-fade {
+    background:
+      radial-gradient(closest-side, #777, #fff) 0/ 1em 1em space,
+      linear-gradient(to bottom, #888, #fff);
+    background-blend-mode: multiply;
+    mix-blend-mode: multiply;
+    filter: contrast(21);
+  }
+</style>

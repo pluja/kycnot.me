@@ -366,7 +366,7 @@ def run_worker_mode() -> int:
 
     # Register service score recalculation task (every 5 minutes)
     scheduler.register_task(
-        "service-score-recalc",
+        "service_score_recalc",
         "*/5 * * * *",
         run_service_score_recalc_task,
     )

@@ -2,7 +2,7 @@ import { orderBy } from 'lodash-es'
 
 import { getAttributeCategoryInfo } from '../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../constants/attributeTypes'
-import { getKycLevelClarificationInfo } from '../constants/kycLevelClarifications'
+import { getKycLevelClarificationInfo, kycLevelClarifications } from '../constants/kycLevelClarifications'
 import { kycLevels } from '../constants/kycLevels'
 import { serviceVisibilitiesById } from '../constants/serviceVisibility'
 import { READ_MORE_SENTENCE_LINK, verificationStatusesByValue } from '../constants/verificationStatus'
@@ -166,6 +166,21 @@ export const nonDbAttributes: NonDbAttributeFull[] = [
       }
     },
   })),
+  ...kycLevelClarifications
+    .filter((clarification) => clarification.value !== 'NONE')
+    .map<NonDbAttributeFull>((clarification) => ({
+      slug: `kyc-clarification-${clarification.slug}`,
+      title: `KYC ${clarification.label}`,
+      type: clarification.attributeType,
+      category: 'PRIVACY',
+      description: clarification.description,
+      privacyPoints: clarification.privacyPoints,
+      trustPoints: 0,
+      links: [],
+      customize: (service) => ({
+        show: service.kycLevelClarification === clarification.value,
+      }),
+    })),
   {
     slug: 'archived',
     title: serviceVisibilitiesById.ARCHIVED.label,

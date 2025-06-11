@@ -1,0 +1,151 @@
+---
+import favicon from '../../public/favicon.svg'
+import logoMiniFull from '../assets/logo/logo-mini-full.svg'
+import logoNormal from '../assets/logo/logo-normal.svg'
+import logoSmall from '../assets/logo/logo-small.svg'
+import reviewBadgeLongBlack from '../assets/review-badge/long-black.svg'
+import reviewBadgeLongWhite from '../assets/review-badge/long-white.svg'
+import reviewBadgeShortBlack from '../assets/review-badge/short-black.svg'
+import reviewBadgeShortWhite from '../assets/review-badge/short-white.svg'
+
+import Button from './Button.astro'
+import MyPicture from './MyPicture.astro'
+
+const categories: {
+  title: string
+  assets: {
+    name: string
+    path: typeof logoNormal
+    alt: string
+  }[]
+}[] = [
+  {
+    title: 'Logos',
+    assets: [
+      {
+        name: 'Logo',
+        path: logoNormal,
+        alt: 'KYCnot.me logo normal version',
+      },
+      {
+        name: 'Logo small',
+        path: logoSmall,
+        alt: 'KYCnot.me logo small version',
+      },
+      {
+        name: 'Logo mini',
+        path: logoMiniFull,
+        alt: 'KYCnot.me logo mini version',
+      },
+      {
+        name: 'Logo icon',
+        path: favicon,
+        alt: 'KYCnot.me logo icon version',
+      },
+    ],
+  },
+  {
+    title: 'Review badges',
+    assets: [
+      {
+        name: 'Review badge (long black)',
+        path: reviewBadgeLongBlack,
+        alt: 'KYCnot.me review badge long black version',
+      },
+      {
+        name: 'Review badge (long white)',
+        path: reviewBadgeLongWhite,
+        alt: 'KYCnot.me review badge long white version',
+      },
+      {
+        name: 'Review badge (short black)',
+        path: reviewBadgeShortBlack,
+        alt: 'KYCnot.me review badge short black version',
+      },
+      {
+        name: 'Review badge (short white)',
+        path: reviewBadgeShortWhite,
+        alt: 'KYCnot.me review badge short white version',
+      },
+    ],
+  },
+]
+---
+
+<div class="not-prose mb-16 space-y-8">
+  {
+    categories.map((category) => {
+      return (
+        <>
+          <h3 class="font-title mb-2 text-center text-xl font-semibold text-white">{category.title}</h3>
+          <ul class="xs:grid-cols-2 grid grid-cols-1 gap-6">
+            {category.assets.map((asset) => (
+              <li>
+                <div
+                  class="bg-transparency-grid mx-auto flex aspect-[3/1] max-w-sm items-center justify-center rounded-lg p-4"
+                  style={{
+                    '--transparency-grid-color-1': 'var(--color-night-600)',
+                    '--transparency-grid-color-2': 'var(--color-night-500)',
+                    '--transparency-grid-size': 'calc(var(--spacing) * 4)',
+                  }}
+                >
+                  <MyPicture
+                    src={asset.path}
+                    alt={asset.alt}
+                    pictureAttributes={{
+                      class: 'contents',
+                    }}
+                    class="max-h-full min-h-8 max-w-full min-w-8 object-contain"
+                  />
+                </div>
+                <div class="mt-2 text-center">
+                  <Button
+                    as="a"
+                    href={asset.path.src}
+                    download={asset.name}
+                    label={asset.name}
+                    size="sm"
+                    color="white"
+                    variant="faded"
+                    icon="ri:download-line"
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )
+    })
+  }
+</div>
+
+<style>
+  .bg-transparency-grid {
+    --transparency-grid-color-1: #fff;
+    --transparency-grid-color-2: #ccc;
+    --transparency-grid-size: calc(var(--spacing) * 8);
+
+    background-color: var(--transparency-grid-color-1);
+    background-image:
+      linear-gradient(
+        45deg,
+        var(--transparency-grid-color-2) 25%,
+        transparent 25%,
+        transparent 75%,
+        var(--transparency-grid-color-2) 75%,
+        var(--transparency-grid-color-2)
+      ),
+      linear-gradient(
+        45deg,
+        var(--transparency-grid-color-2) 25%,
+        transparent 25%,
+        transparent 75%,
+        var(--transparency-grid-color-2) 75%,
+        var(--transparency-grid-color-2)
+      );
+    background-size: var(--transparency-grid-size) var(--transparency-grid-size);
+    background-position:
+      0 0,
+      calc(var(--transparency-grid-size) / 2) calc(var(--transparency-grid-size) / 2);
+  }
+</style>
