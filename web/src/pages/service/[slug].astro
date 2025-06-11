@@ -407,9 +407,12 @@ const ogImageTemplateData = {
 
 const serviceVisibilityInfo = getServiceVisibilityInfo(service.serviceVisibility)
 
-const activeAlertOrWarningEvents = service.events.filter(
-  (event) => getEventTypeInfo(event.type).showBanner && (event.endedAt === null || event.endedAt >= now)
-)
+const activeAlertOrWarningEvents = service.events
+  .map((event) => ({
+    ...event,
+    typeInfo: getEventTypeInfo(event.type),
+  }))
+  .filter((event) => event.typeInfo.showBanner && (event.endedAt === null || event.endedAt >= now))
 const activeEventToShow =
   activeAlertOrWarningEvents.find((event) => event.type === EventType.ALERT) ?? activeAlertOrWarningEvents[0]
 ---
@@ -518,15 +521,10 @@ const activeEventToShow =
         href="#events"
         class={cn(
           'group mb-4 block rounded-md px-3 py-2 text-sm transition-colors duration-200',
-          activeEventToShow.type === EventType.ALERT
-            ? 'bg-red-900/50 text-red-300 hover:bg-red-800/60 focus-visible:bg-red-800/60'
-            : 'bg-yellow-900/50 text-yellow-300 hover:bg-yellow-800/60 focus-visible:bg-yellow-800/60'
+          activeEventToShow.typeInfo.classNames.banner
         )}
       >
-        <Icon
-          name={activeEventToShow.type === EventType.ALERT ? 'ri:alert-fill' : 'ri:alarm-warning-fill'}
-          class="me-1.5 inline-block size-4 align-[-0.15em]"
-        />
+        <Icon name={activeEventToShow.typeInfo.icon} class="me-1.5 inline-block size-4 align-[-0.15em]" />
         <span class="font-bold">{activeEventToShow.title}</span> — {activeEventToShow.content}
         {activeAlertOrWarningEvents.length >= 2 && <>+{activeAlertOrWarningEvents.length - 1} more events.</>}
         <span class="underline">Go to events</span>
@@ -1070,6 +1068,9 @@ const activeEventToShow =
     )
   }
 
+  <p class="text-day-400 mt-3 text-center text-xs">
+    <span class="hover:text-day-200 transition-colors">Overall = 60% Privacy + 40% Trust (Rounded)</span>
+  </p>
   <div class="xs:gap-x-6 mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs">
     <a
       href="/about#service-scores"
@@ -1083,7 +1084,7 @@ const activeEventToShow =
       class="text-day-400 hover:text-day-200 inline-flex items-center gap-1 transition-colors hover:underline"
     >
       <Icon name="ri:information-line" class="size-3" />
-      Attributes list
+      All attributes list
     </a>
   </div>
 
@@ -1194,15 +1195,15 @@ const activeEventToShow =
             <p class="text-day-500 mt-1 text-sm text-balance">
               Maybe due to captchas, client side rendering, DDoS protections, or non-text format.
             </p>
-            {service.tosUrls.length > 0 && (
-              <p class="mt-2 text-xs">
-                {service.tosUrls.map((url) => (
-                  <a href={url} class="hover:underline">
-                    {urlDomain(url)}
-                  </a>
-                ))}
-              </p>
-            )}
+            <p class="mt-2 text-xs">
+              Reviewed <TimeFormatted date={service.tosReviewAt} hourPrecision />
+              {service.tosUrls.length > 0 && 'from'}
+              {service.tosUrls.map((url) => (
+                <a href={url} class="hover:underline">
+                  {urlDomain(url)}
+                </a>
+              ))}
+            </p>
           </div>
         )
       ) : (

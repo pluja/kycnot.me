@@ -11,6 +11,7 @@ type EventTypeInfo<T extends string | null | undefined = string> = {
   description: string
   classNames: {
     dot: string
+    banner?: string
   }
   icon: string
   color: TailwindColor
@@ -34,6 +35,7 @@ export const {
     description: '',
     classNames: {
       dot: 'bg-zinc-700 text-zinc-300 ring-zinc-700/50',
+      banner: 'bg-zinc-900/50 text-zinc-300 hover:bg-zinc-800/60 focus-visible:bg-zinc-800/60',
     },
     icon: 'ri:question-fill',
     color: 'gray',
@@ -48,6 +50,7 @@ export const {
       description: 'Potential issues that users should be aware of',
       classNames: {
         dot: 'bg-amber-900 text-amber-300 ring-amber-900/50',
+        banner: 'bg-yellow-900/50 text-yellow-300 hover:bg-yellow-800/60 focus-visible:bg-yellow-800/60',
       },
       icon: 'ri:alert-fill',
       color: 'yellow',
@@ -61,6 +64,7 @@ export const {
       description: 'A previously reported warning has been solved',
       classNames: {
         dot: 'bg-amber-900 text-amber-300 ring-amber-900/50',
+        banner: 'bg-yellow-900/50 text-yellow-300 hover:bg-yellow-800/60 focus-visible:bg-yellow-800/60',
       },
       icon: 'ri:alert-fill',
       color: 'green',
@@ -74,6 +78,7 @@ export const {
       description: 'Critical issues affecting service functionality',
       classNames: {
         dot: 'bg-red-900 text-red-300 ring-red-900/50',
+        banner: 'bg-red-900/50 text-red-300 hover:bg-red-800/60 focus-visible:bg-red-800/60',
       },
       icon: 'ri:spam-fill',
       color: 'red',
@@ -87,6 +92,7 @@ export const {
       description: 'A previously reported alert has been solved',
       classNames: {
         dot: 'bg-red-900 text-red-300 ring-red-900/50',
+        banner: 'bg-red-900/50 text-red-300 hover:bg-red-800/60 focus-visible:bg-red-800/60',
       },
       icon: 'ri:spam-fill',
       color: 'green',
@@ -100,6 +106,7 @@ export const {
       description: 'General information about the service',
       classNames: {
         dot: 'bg-blue-900 text-blue-300 ring-blue-900/50',
+        banner: 'bg-blue-900/50 text-blue-300 hover:bg-blue-800/60 focus-visible:bg-blue-800/60',
       },
       icon: 'ri:information-fill',
       color: 'sky',
@@ -113,6 +120,7 @@ export const {
       description: 'Regular service update or announcement',
       classNames: {
         dot: 'bg-zinc-700 text-zinc-300 ring-zinc-700/50',
+        banner: 'bg-zinc-900/50 text-zinc-300 hover:bg-zinc-800/60 focus-visible:bg-zinc-800/60',
       },
       icon: 'ri:notification-fill',
       color: 'green',
@@ -126,6 +134,7 @@ export const {
       description: 'Service details were updated on kycnot.me',
       classNames: {
         dot: 'bg-sky-900 text-sky-300 ring-sky-900/50',
+        banner: 'bg-sky-900/50 text-sky-300 hover:bg-sky-800/60 focus-visible:bg-sky-800/60',
       },
       icon: 'ri:pencil-fill',
       color: 'sky',

@@ -333,28 +333,32 @@ def remove_service_attribute_by_slug(service_id: int, attribute_slug: str) -> bo
 
 
 def save_tos_review(service_id: int, review: Optional[TosReviewType]):
-    """
-    Save a TOS review for a specific service.
+    """Persist a TOS review and/or update the timestamp for a service.
 
-    Args:
-        service_id: The ID of the service.
-        review: A TypedDict containing the review data.
+    If *review* is ``None`` the existing review (if any) is preserved while
+    only the ``tosReviewAt`` column is updated. This ensures we still track
+    when the review task last ran even if the review generation failed or
+    produced no changes.
     """
     try:
-        # Only serialize to JSON if review is not None
-        review_json = json.dumps(review) if review is not None else None
         with get_db_connection() as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
-                cursor.execute(
-                    """
-                    UPDATE "Service" 
-                    SET "tosReview" = %s, "tosReviewAt" = NOW()
-                    WHERE id = %s
-                """,
-                    (review_json, service_id),
-                )
+                if review is None:
+                    cursor.execute(
+                        'UPDATE "Service" SET "tosReviewAt" = NOW() WHERE id = %s AND "tosReview" IS NULL',
+                        (service_id,),
+                    )
+                else:
+                    review_json = json.dumps(review)
+                    cursor.execute(
+                        'UPDATE "Service" SET "tosReview" = %s, "tosReviewAt" = NOW() WHERE id = %s',
+                        (review_json, service_id),
+                    )
+
                 conn.commit()
-                logger.info(f"Successfully saved TOS review for service {service_id}")
+                logger.info(
+                    f"Successfully saved TOS review (updated={review is not None}) for service {service_id}"
+                )
     except Exception as e:
         logger.error(f"Error saving TOS review for service {service_id}: {e}")
 
