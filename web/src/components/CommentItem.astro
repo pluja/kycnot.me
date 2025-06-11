@@ -150,13 +150,13 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
     checked={comment.suspicious}
   />
 
-  <div class="comment-header scrollbar-w-none -mt-10 flex items-center gap-2 overflow-auto pt-10 text-sm">
+  <div class="comment-header flex items-center gap-2 text-sm">
     <label for={`collapse-${comment.id.toString()}`} class="cursor-pointer text-zinc-500 hover:text-zinc-300">
       <span class="collapse-symbol text-xs"></span>
       <span class="sr-only">Toggle comment visibility</span>
     </label>
 
-    <span class="flex items-center gap-1">
+    <span class="flex min-w-16 items-center gap-1">
       <UserBadge
         user={comment.author}
         size="md"
@@ -179,7 +179,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
     </span>
 
     {/* User badges - more compact but still with text */}
-    <div class="flex flex-wrap items-center gap-1">
+    <div class="flex w-min grow flex-wrap items-center gap-1">
       {
         comment.author.admin && (
           <BadgeSmall icon="ri:shield-star-fill" color="green" text="Admin" variant="faded" inlineIcon />

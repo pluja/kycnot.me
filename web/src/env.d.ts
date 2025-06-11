@@ -17,6 +17,7 @@ declare global {
 
   interface Window {
     htmx?: typeof htmx
+    __SW_REGISTRATION__?: ServiceWorkerRegistration
   }
 
   namespace PrismaJson {
