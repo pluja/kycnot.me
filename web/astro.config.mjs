@@ -107,8 +107,9 @@ export default defineConfig({
     '/service/[...slug]/proof': '/service/[...slug]/#verification',
     '/attribute/[...slug]': '/attributes',
     '/attr/[...slug]': '/attributes',
-    '/service/[...slug]/review': '/service/[...slug]#comments',
     // #endregion
+
+    '/service/[...slug]/review': '/service/[...slug]#comments',
   },
   env: {
     schema: {

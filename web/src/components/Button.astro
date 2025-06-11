@@ -288,6 +288,7 @@ const ActualTag = disabled && Tag === 'a' ? 'span' : Tag
   class={base({ class: cn({ 'opacity-20 hover:opacity-50': disabled }, className) })}
   role={role ?? (Tag === 'button' || Tag === 'label' || (disabled && Tag === 'a') ? undefined : 'button')}
   aria-disabled={disabled}
+  aria-label={label}
   {...dataAstroReload && { 'data-astro-reload': dataAstroReload }}
   {...htmlProps}
 >
