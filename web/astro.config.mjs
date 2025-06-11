@@ -122,7 +122,7 @@ export default defineConfig({
       }),
       // Public URLs (can be accessed from both server and client)
       SOURCE_CODE_URL: envField.string({
-        context: 'server',
+        context: 'client',
         access: 'public',
         url: true,
         optional: false,

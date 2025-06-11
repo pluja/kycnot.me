@@ -1,0 +1,43 @@
+---
+
+---
+
+<script>
+  import { SOURCE_CODE_URL } from 'astro:env/client'
+
+  const logoStyle = `
+  padding: 0 119.5px;
+  display: block;
+  line-height: 64px;
+  background-size: auto 64px;
+  background-repeat: no-repeat;
+  background-position: 50% 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 240 64'%3E%3Crect width='239' height='63' x='.5' y='.5' fill='%23101413' stroke='%23292B2A' rx='7.5'/%3E%3Cpath fill='%233BDB78' d='M19 18a1 1 0 0 0-1 1v26a1 1 0 0 0 1 1h74a1 1 0 0 0 1-1V19a1 1 0 0 0-1-1H19Zm4 4h2a1 1 0 0 1 1 1v6a1 1 0 0 0 1 1h6a1 1 0 0 1 1 1v3h3a1 1 0 0 1 1 1v3h3a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3h-3a1 1 0 0 1-1-1v-3h-7a1 1 0 0 0-1 1v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V23a1 1 0 0 1 1-1Zm12 0h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1Zm12.8 0h2.4a1 1 0 0 1 .8.5l5 7.8 5-7.8a1 1 0 0 1 .8-.5h2.4a1 1 0 0 1 .8 1.5l-6.9 10.8a1 1 0 0 0-.1.6V41a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-6.1c0-.2 0-.4-.2-.6L47 23.5a1 1 0 0 1 .8-1.5ZM75 22h14a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H74v12h15a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H75a1 1 0 0 1-1-1v-3h-3a1 1 0 0 1-1-1V27a1 1 0 0 1 1-1h3v-3a1 1 0 0 1 1-1Zm24 0a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V25.6l9.2 15.9c.2.3.5.5.8.5h5a1 1 0 0 0 1-1V23a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v15.4l-9.2-15.9a1 1 0 0 0-.8-.5h-5Zm29 0a1 1 0 0 0-1 1v3h12v-3a1 1 0 0 0-1-1h-10Zm11 4v12h3a1 1 0 0 0 1-1V27a1 1 0 0 0-1-1h-3Zm0 12h-12v3a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-3Zm-12 0V26h-3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3Zm21-16a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3h4v15a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V26h4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1h-18Zm27 0a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V29.4l5.5 12a1 1 0 0 0 1 .6h3a1 1 0 0 0 1-.6l5.5-12V41a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V23a1 1 0 0 0-1-1h-3.4a1 1 0 0 0-.9.6L186 37.2l-6.7-14.6a1 1 0 0 0-1-.6H175Zm32 0a1 1 0 0 0-1 1v3h15a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-14Zm-1 4h-3a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-14a1 1 0 0 1-1-1v-3h7a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-7v-4Zm-38 12a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-2Z'/%3E%3C/svg%3E");
+  `
+
+  setTimeout(
+    console.log.bind(
+      console,
+      `\n%c \n%c\n    👋%c  Hi there! %c\n\n‣ We included source maps, so you can easily inspect the code. 🕵🏻‍♂️\n‣ Everything works with JavaScript disabled.\n‣ Source code: ${SOURCE_CODE_URL}`,
+      logoStyle,
+      `
+        font-family: cursive;
+        font-size: 2rem;
+        font-weight: bold;
+      `,
+      `
+        font-family: cursive;
+        font-size: 2rem;
+        font-weight: bold;	
+        background: repeating-linear-gradient(90deg, #14ffe9 0%, #ffc800 16.66666%, #ff00e0 33.33333%, #14ffe9 50.0%) -100%/ 200%;
+      	-webkit-background-clip: text;
+      	background-clip: text;
+      	color: transparent;
+      `,
+      `
+        font-size: 1rem;
+        font-family: system-ui, -apple-system, sans-serif;
+      `
+    )
+  )
+</script>

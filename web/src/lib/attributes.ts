@@ -2,7 +2,7 @@ import { orderBy } from 'lodash-es'
 
 import { getAttributeCategoryInfo } from '../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../constants/attributeTypes'
-import { getKycLevelClarificationInfo, kycLevelClarifications } from '../constants/kycLevelClarifications'
+import { kycLevelClarifications } from '../constants/kycLevelClarifications'
 import { kycLevels } from '../constants/kycLevels'
 import { serviceVisibilitiesById } from '../constants/serviceVisibility'
 import { READ_MORE_SENTENCE_LINK, verificationStatusesByValue } from '../constants/verificationStatus'
@@ -156,15 +156,9 @@ export const nonDbAttributes: NonDbAttributeFull[] = [
         icon: 'ri:search-line',
       },
     ],
-    customize: (service) => {
-      const clarification = getKycLevelClarificationInfo(service.kycLevelClarification)
-      return {
-        show: service.kycLevel === kycLevel.value,
-        title: kycLevel.name + (clarification.value !== 'NONE' ? ` (${clarification.label})` : ''),
-        description:
-          kycLevel.description + (clarification.value !== 'NONE' ? ` ${clarification.description}` : ''),
-      }
-    },
+    customize: (service) => ({
+      show: service.kycLevel === kycLevel.value,
+    }),
   })),
   ...kycLevelClarifications
     .filter((clarification) => clarification.value !== 'NONE')

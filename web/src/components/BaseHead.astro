@@ -8,6 +8,7 @@ import { pwaInfo } from 'virtual:pwa-info'
 import { isNotArray } from '../lib/arrays'
 import { DEPLOYMENT_MODE } from '../lib/envVariables'
 
+import DevToolsMessageScript from './DevToolsMessageScript.astro'
 import DynamicFavicon from './DynamicFavicon.astro'
 import HtmxScript from './HtmxScript.astro'
 import NotificationEventsScript from './NotificationEventsScript.astro'
@@ -147,3 +148,5 @@ const ogImageUrl = makeOgImageUrl(ogImage, Astro.url)
     </>
   )
 }
+
+<DevToolsMessageScript />
