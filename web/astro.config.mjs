@@ -35,9 +35,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       manifest: {
         name: 'KYCnot.me',
+        short_name: 'KYCnot.me',
         description: 'Find services that respect your privacy',
         theme_color: '#040505',
         background_color: '#171c1b',
+        display: 'minimal-ui',
       },
       pwaAssets: {
         image: './public/favicon.svg',

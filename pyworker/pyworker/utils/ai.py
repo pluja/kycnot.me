@@ -92,7 +92,9 @@ def prompt_check_tos_review(content: str) -> TosReviewCheck:
         {"role": "user", "content": content},
     ]
 
-    result_dict = query_openai_json(messages, model="openai/gpt-4.1-mini")
+    result_dict = query_openai_json(
+        messages, model="openai/gemini-2.5-flash-preview-05-20"
+    )
 
     return cast(TosReviewCheck, result_dict)
 

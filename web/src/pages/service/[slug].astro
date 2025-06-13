@@ -294,6 +294,8 @@ const statusIcon = {
   APPROVED: undefined,
 }[service.verificationStatus]
 
+const isScam = service.verificationStatus === 'VERIFICATION_FAILED'
+
 const shuffledLinks = {
   clearnet: shuffle(service.serviceUrls),
   onion: shuffle(service.onionUrls),
@@ -756,11 +758,18 @@ const activeEventToShow =
       <ul aria-label="Service links" class="xs:justify-start mt-4 flex flex-wrap justify-center gap-2">
         {shownLinks.map((url) => (
           <li>
-            <ServiceLinkButton
-              url={url}
-              referral={service.referral}
-              enableMinWidth={shuffledLinks.onion.length + shuffledLinks.i2p.length > 0}
-            />
+            {isScam ? (
+              <span class="2xs:text-sm 2xs:h-8 2xs:gap-2 2xs:px-4 bg-day-800 inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs whitespace-nowrap text-red-400">
+                <Icon name="ri:alert-line" class="size-4 text-red-400" />
+                {urlDomain(url)}
+              </span>
+            ) : (
+              <ServiceLinkButton
+                url={url}
+                referral={service.referral}
+                enableMinWidth={shuffledLinks.onion.length + shuffledLinks.i2p.length > 0}
+              />
+            )}
           </li>
         ))}
 
@@ -784,11 +793,18 @@ const activeEventToShow =
 
         {hiddenLinks.map((url) => (
           <li class="hidden peer-checked:block">
-            <ServiceLinkButton
-              url={url}
-              referral={service.referral}
-              enableMinWidth={shuffledLinks.onion.length + shuffledLinks.i2p.length > 0}
-            />
+            {isScam ? (
+              <span class="2xs:text-sm 2xs:h-8 2xs:gap-2 2xs:px-4 bg-day-800 inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs whitespace-nowrap text-red-400">
+                <Icon name="ri:alert-line" class="size-4 text-red-400" />
+                {urlDomain(url)}
+              </span>
+            ) : (
+              <ServiceLinkButton
+                url={url}
+                referral={service.referral}
+                enableMinWidth={shuffledLinks.onion.length + shuffledLinks.i2p.length > 0}
+              />
+            )}
           </li>
         ))}
       </ul>
