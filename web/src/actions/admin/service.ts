@@ -126,7 +126,8 @@ export const adminServiceActions = {
           verificationSummary: input.verificationSummary,
           verificationProofMd: input.verificationProofMd,
           acceptedCurrencies: input.acceptedCurrencies,
-          referral: input.referral,
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+          referral: input.referral || null,
           serviceVisibility: input.serviceVisibility,
           slug: input.slug,
           overallScore: input.overallScore,
@@ -244,7 +245,8 @@ export const adminServiceActions = {
           verificationSummary: input.verificationSummary,
           verificationProofMd: input.verificationProofMd,
           acceptedCurrencies: input.acceptedCurrencies,
-          referral: input.referral,
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+          referral: input.referral || null,
           serviceVisibility: input.serviceVisibility,
           slug: input.slug,
           overallScore: input.overallScore,
