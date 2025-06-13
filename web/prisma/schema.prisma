@@ -578,6 +578,7 @@ enum VerificationStepStatus {
   IN_PROGRESS
   PASSED
   FAILED
+  WARNING
 }
 
 model VerificationStep {

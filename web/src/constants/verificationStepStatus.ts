@@ -43,6 +43,12 @@ export const {
       color: 'red',
     },
     {
+      value: 'WARNING',
+      label: 'Warning',
+      icon: 'ri:alert-line',
+      color: 'yellow',
+    },
+    {
       value: 'PENDING',
       label: 'Pending',
       icon: 'ri:time-line',

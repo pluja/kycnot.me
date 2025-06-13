@@ -387,6 +387,13 @@ const getVerificationStepStatusInfo = (status: VerificationStepStatus) => {
         color: 'red',
         timelineIconClass: 'text-red-400',
       } as const
+    case VerificationStepStatus.WARNING:
+      return {
+        text: 'Warning',
+        icon: 'ri:alert-line',
+        color: 'yellow',
+        timelineIconClass: 'text-yellow-400',
+      } as const
     default:
       return {
         text: 'Unknown',

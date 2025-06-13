@@ -3,6 +3,7 @@ import { Icon } from 'astro-icon/components'
 import { differenceInDays, isPast } from 'date-fns'
 
 import { verificationStatusesByValue } from '../constants/verificationStatus'
+import { verificationStepStatusesByValue } from '../constants/verificationStepStatus'
 import { cn } from '../lib/cn'
 
 import TimeFormatted from './TimeFormatted.astro'
@@ -67,7 +68,7 @@ const wasRecentlyAdded = isPast(listedDate) && differenceInDays(new Date(), list
       </span>
     </div>
   ) : wasRecentlyAdded ? (
-    <div class="mb-3 rounded-md bg-red-900/50 p-2 text-sm text-red-400">
+    <div class="mb-3 rounded-md bg-yellow-900/50 p-2 text-sm text-yellow-400">
       This service was {service.listedAt === null ? 'added ' : 'listed '}{' '}
       <TimeFormatted date={listedDate} daysUntilDate={RECENTLY_ADDED_DAYS} />
       {service.verificationStatus !== 'VERIFICATION_SUCCESS' && ' and it is not verified'}. Proceed with
@@ -98,14 +99,29 @@ const wasRecentlyAdded = isPast(listedDate) && differenceInDays(new Date(), list
 {
   service.verificationStatus !== 'VERIFICATION_FAILED' &&
     service.verificationSteps.some((step) => step.status === 'FAILED') && (
-      <div class="mb-3 flex items-center gap-2 rounded-md bg-red-900/50 p-2 text-sm text-red-400">
+      <a
+        href="#verification"
+        class="mb-3 flex items-center gap-2 rounded-md bg-red-900/50 p-2 text-sm text-red-400 transition-colors hover:bg-red-900/60"
+      >
         <Icon
           name={verificationStatusesByValue.VERIFICATION_FAILED.icon}
           class={cn('size-5', verificationStatusesByValue.VERIFICATION_FAILED.classNames.icon)}
         />
-        <span>
-          This service has failed one or more verification steps. Review the verification details carefully.
-        </span>
-      </div>
+        <span>Some verification steps failed. Please review the details below.</span>
+      </a>
+    )
+}
+
+{
+  service.verificationStatus !== 'VERIFICATION_FAILED' &&
+    !service.verificationSteps.some((step) => step.status === 'FAILED') &&
+    service.verificationSteps.some((step) => step.status === 'WARNING') && (
+      <a
+        href="#verification"
+        class="mb-3 flex items-center gap-2 rounded-md bg-yellow-600/30 p-2 text-sm text-yellow-200 transition-colors hover:bg-yellow-600/40"
+      >
+        <Icon name={verificationStepStatusesByValue.WARNING.icon} class={cn('size-5 text-yellow-400')} />
+        <span>Some verification steps are marked as warnings.</span>
+      </a>
     )
 }
