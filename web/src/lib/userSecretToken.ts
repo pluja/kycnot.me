@@ -10,7 +10,7 @@ import {
 } from '../constants/characters'
 
 import { getRandom, typedJoin } from './arrays'
-import { DEPLOYMENT_MODE } from './envVariables'
+import { DEPLOYMENT_MODE } from './client/envVariables'
 import { transformCase } from './strings'
 
 const DIGEST = 'sha512'

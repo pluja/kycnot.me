@@ -35,8 +35,8 @@ type NonDbAttributeFull = NonDbAttribute & {
       select: {
         verificationStatus: true
         serviceVisibility: true
-        isRecentlyListed: true
-        listedAt: true
+        isRecentlyApproved: true
+        approvedAt: true
         createdAt: true
         tosReviewAt: true
         tosReview: true
@@ -189,17 +189,17 @@ export const nonDbAttributes: NonDbAttributeFull[] = [
     }),
   },
   {
-    slug: 'recently-listed',
-    title: 'Recently listed',
+    slug: 'recently-approved',
+    title: 'Recently approved',
     type: 'WARNING',
     category: 'TRUST',
-    description: 'Listed on KYCnot.me less than 15 days ago. Proceed with caution.',
+    description: 'Approved on KYCnot.me less than 15 days ago. Proceed with caution.',
     privacyPoints: 0,
     trustPoints: -5,
     links: [],
     customize: (service) => ({
-      show: service.isRecentlyListed,
-      description: `Listed on KYCnot.me ${formatDateShort(service.listedAt ?? service.createdAt)}. Proceed with caution.`,
+      show: service.isRecentlyApproved,
+      description: `Approved on KYCnot.me ${formatDateShort(service.approvedAt ?? service.createdAt)}. Proceed with caution.`,
     }),
   },
   {
@@ -217,41 +217,22 @@ export const nonDbAttributes: NonDbAttributeFull[] = [
     }),
   },
   {
-    slug: 'has-onion-urls',
-    title: 'Has Onion URLs',
+    slug: 'has-onion-or-i2p-urls',
+    title: 'Has Onion or I2P URLs',
     type: 'GOOD',
     category: 'PRIVACY',
-    description: 'Onion (Tor) URLs enhance privacy and anonymity.',
+    description: 'Onion (Tor) and I2P URLs enhance privacy and anonymity.',
     privacyPoints: 5,
     trustPoints: 0,
     links: [
       {
-        url: '/?onion=true',
+        url: '/?networks=onion&networks=i2p',
         label: 'Search with this',
         icon: 'ri:search-line',
       },
     ],
     customize: (service) => ({
-      show: service.onionUrls.length > 0,
-    }),
-  },
-  {
-    slug: 'has-i2p-urls',
-    title: 'Has I2P URLs',
-    type: 'GOOD',
-    category: 'PRIVACY',
-    description: 'I2P URLs enhance privacy and anonymity.',
-    privacyPoints: 5,
-    trustPoints: 0,
-    links: [
-      {
-        url: '/?i2p=true',
-        label: 'Search with this',
-        icon: 'ri:search-line',
-      },
-    ],
-    customize: (service) => ({
-      show: service.i2pUrls.length > 0,
+      show: service.onionUrls.length > 0 || service.i2pUrls.length > 0,
     }),
   },
   {

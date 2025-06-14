@@ -4,14 +4,17 @@
 
 <script>
   import { isBrowserNotificationsEnabled, showBrowserNotification } from '../lib/client/browserNotifications'
-  import { makeNotificationOptions } from '../lib/notificationOptions'
+  import {
+    makeBrowserNotificationOptions,
+    makeBrowserNotificationTitle,
+  } from '../lib/client/notificationOptions'
 
   document.addEventListener('sse:new-notification', (event) => {
     if (isBrowserNotificationsEnabled()) {
       const payload = event.detail
       const notification = showBrowserNotification(
-        payload.title,
-        makeNotificationOptions(payload, { removeActions: true })
+        makeBrowserNotificationTitle(payload.title),
+        makeBrowserNotificationOptions(payload, { removeActions: true })
       )
 
       // Handle notification click

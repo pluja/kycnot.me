@@ -353,8 +353,6 @@ model Service {
   privacyScore           Int                          @default(0)
   trustScore             Int                          @default(0)
   /// Computed via trigger. Do not update through prisma.
-  isRecentlyListed       Boolean                      @default(false)
-  /// Computed via trigger. Do not update through prisma.
   averageUserRating      Float?
   serviceVisibility      ServiceVisibility            @default(PUBLIC)
   serviceInfoBanner      ServiceInfoBanner            @default(NONE)
@@ -363,8 +361,6 @@ model Service {
   verificationSummary    String?
   verificationRequests   ServiceVerificationRequest[]
   verificationProofMd    String?
-  /// Computed via trigger when the service status is VERIFICATION_SUCCESS. Do not update through prisma.
-  verifiedAt             DateTime?
   /// [UserSentiment]
   userSentiment          Json?
   userSentimentAt        DateTime?
@@ -380,7 +376,16 @@ model Service {
   tosReviewAt            DateTime?
   createdAt              DateTime                     @default(now())
   updatedAt              DateTime                     @default(now()) @updatedAt
+  /// Computed via trigger when the visibility is PUBLIC or (ARCHIVED and listedAt was null). Do not update through prisma.
   listedAt               DateTime?
+  /// Computed via trigger when the verification status is APPROVED. Do not update through prisma.
+  approvedAt             DateTime?
+  /// Computed via trigger when the verification status is VERIFICATION_SUCCESS. Do not update through prisma.
+  verifiedAt             DateTime?
+  /// Computed via trigger when the verification status is VERIFICATION_FAILED. Do not update through prisma.
+  spamAt                 DateTime?
+  /// Computed via trigger. Do not update through prisma.
+  isRecentlyApproved     Boolean                      @default(false)
   comments               Comment[]
   events                 Event[]
   contactMethods         ServiceContactMethod[]       @relation("ServiceToContactMethod")
@@ -396,6 +401,9 @@ model Service {
   affiliatedUsers                 ServiceUser[]             @relation("ServiceUsers")
 
   @@index([listedAt])
+  @@index([approvedAt])
+  @@index([verifiedAt])
+  @@index([spamAt])
   @@index([overallScore])
   @@index([privacyScore])
   @@index([trustScore])
@@ -407,6 +415,7 @@ model Service {
   @@index([updatedAt])
   @@index([slug])
   @@index([previousSlugs])
+  @@index([serviceVisibility])
 }
 
 model ServiceContactMethod {

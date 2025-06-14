@@ -96,7 +96,7 @@ Tasks will run according to their configured cron schedules.
 ### Force Triggers Task
 
 - Maintains database triggers by forcing them to run under certain conditions
-- Currently handles updating the "isRecentlyListed" flag for services after 15 days
+- Currently handles updating the "isRecentlyApproved" flag for services after 15 days
 - Scheduled via `CRON_FORCE-TRIGGERS_TASK`
 
 ### Service Score Recalculation Task

@@ -52,6 +52,7 @@ type ServiceResponse = {
     description: string
   }
   verifiedAt: Date | null
+  approvedAt: Date | null
   kycLevel: 0 | 1 | 2 | 3 | 4
   kycLevelInfo: {
     value: 0 | 1 | 2 | 3 | 4
@@ -145,7 +146,8 @@ curl -X QUERY https://kycnot.me/api/v1/service/get \
     "labelShort": "Verified",
     "description": "Thoroughly tested and verified by the team. But things might change, this is not a guarantee."
   },
-  "verifiedAt": "2025-01-20T07:12:29.393Z",
+  "verifiedAt": "2025-06-14T11:02:39.294Z",
+  "approvedAt": "2025-05-31T19:09:18.043Z",
   "kycLevel": 0,
   "kycLevelInfo": {
     "value": 0,
@@ -163,7 +165,7 @@ curl -X QUERY https://kycnot.me/api/v1/service/get \
       "slug": "exchange"
     }
   ],
-  "listedAt": "2025-05-31T19:09:18.043Z",
+  "listedAt": "2025-04-20T07:12:29.393Z",
   "serviceUrls": [
     "https://example.com",
     "http://c9ikae0fdidzh1ufrzp022e5uqfvz6ofxlkycz59cvo6fdxjgx7ekl9e.onion"

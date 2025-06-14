@@ -230,26 +230,22 @@ if (!user) return Astro.rewrite('/404')
             label: 'Admin',
             value: 'admin',
             icon: 'ri:shield-star-fill',
-            noTransitionPersist: true,
           },
           {
             label: 'Moderator',
             value: 'moderator',
             icon: 'ri:graduation-cap-fill',
-            noTransitionPersist: true,
           },
           {
             label: 'Spammer',
             value: 'spammer',
             icon: 'ri:alert-fill',
-            noTransitionPersist: true,
           },
           {
             label: 'Verified',
             value: 'verified',
             icon: 'ri:verified-badge-fill',
             disabled: true,
-            noTransitionPersist: true,
           },
         ]}
         selectedValue={[
@@ -434,7 +430,6 @@ if (!user) return Astro.rewrite('/404')
           label: role.label,
           value: role.value,
           icon: role.icon,
-          noTransitionPersist: true,
         }))}
         required
         cardSize="sm"

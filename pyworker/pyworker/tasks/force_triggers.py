@@ -9,7 +9,7 @@ class ForceTriggersTask(Task):
     Force triggers to run under certain conditions.
     """
 
-    RECENT_LISTED_INTERVAL_DAYS = 15
+    RECENT_APPROVED_INTERVAL_DAYS = 15
 
     def __init__(self):
         super().__init__("force_triggers")
@@ -24,10 +24,10 @@ class ForceTriggersTask(Task):
 
         update_query = f"""
         UPDATE "Service"
-        SET "isRecentlyListed" = FALSE, "updatedAt" = NOW()
-        WHERE "isRecentlyListed" = TRUE
-        AND "listedAt" IS NOT NULL
-        AND "listedAt" < NOW() - INTERVAL '{self.RECENT_LISTED_INTERVAL_DAYS} days'
+        SET "isRecentlyApproved" = FALSE, "updatedAt" = NOW()
+        WHERE "isRecentlyApproved" = TRUE
+        AND "approvedAt" IS NOT NULL
+        AND "approvedAt" < NOW() - INTERVAL '{self.RECENT_APPROVED_INTERVAL_DAYS} days'
         """
         try:
             with self.conn.cursor() as cursor:

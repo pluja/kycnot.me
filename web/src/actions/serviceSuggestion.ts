@@ -36,7 +36,6 @@ const findPossibleDuplicates = async (input: { name: string }) => {
       id: {
         in: matches.map(({ id }) => id),
       },
-      listedAt: { lte: new Date() },
       serviceVisibility: {
         in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'],
       },
@@ -252,7 +251,6 @@ export const serviceSuggestionActions = {
             overallScore: 0,
             privacyScore: 0,
             trustScore: 0,
-            listedAt: new Date(),
             serviceVisibility: 'UNLISTED',
             categories: {
               connect: input.categories.map((id) => ({ id })),

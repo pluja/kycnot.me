@@ -1,16 +1,12 @@
 ---
 import { Icon } from 'astro-icon/components'
-import { differenceInDays, isPast } from 'date-fns'
+import { differenceInDays } from 'date-fns'
 
 import { verificationStatusesByValue } from '../constants/verificationStatus'
 import { verificationStepStatusesByValue } from '../constants/verificationStepStatus'
 import { cn } from '../lib/cn'
 
-import TimeFormatted from './TimeFormatted.astro'
-
 import type { Prisma } from '@prisma/client'
-
-const RECENTLY_ADDED_DAYS = 7
 
 type Props = {
   service: Prisma.ServiceGetPayload<{
@@ -18,7 +14,8 @@ type Props = {
       verificationStatus: true
       verificationProofMd: true
       verificationSummary: true
-      listedAt: true
+      approvedAt: true
+      isRecentlyApproved: true
       createdAt: true
       verificationSteps: {
         select: {
@@ -31,8 +28,14 @@ type Props = {
 
 const { service } = Astro.props
 
-const listedDate = service.listedAt ?? service.createdAt
-const wasRecentlyAdded = isPast(listedDate) && differenceInDays(new Date(), listedDate) < RECENTLY_ADDED_DAYS
+function formatApprovedAt(approvedAt: Date | null) {
+  if (!approvedAt) return 'less than 15 days ago'
+
+  const days = differenceInDays(new Date(), approvedAt)
+  if (days === 0) return 'today'
+  if (days === 1) return 'yesterday'
+  return `${days.toLocaleString()} days ago`
+}
 ---
 
 {
@@ -67,10 +70,10 @@ const wasRecentlyAdded = isPast(listedDate) && differenceInDays(new Date(), list
         </a>
       </span>
     </div>
-  ) : wasRecentlyAdded ? (
+  ) : service.isRecentlyApproved ? (
     <div class="mb-3 rounded-md bg-yellow-900/50 p-2 text-sm text-yellow-400">
-      This service was {service.listedAt === null ? 'added ' : 'listed '}{' '}
-      <TimeFormatted date={listedDate} daysUntilDate={RECENTLY_ADDED_DAYS} />
+      This service was approved
+      {formatApprovedAt(service.approvedAt)}
       {service.verificationStatus !== 'VERIFICATION_SUCCESS' && ' and it is not verified'}. Proceed with
       caution.
       <a
@@ -87,7 +90,7 @@ const wasRecentlyAdded = isPast(listedDate) && differenceInDays(new Date(), list
         Basic checks passed, but not fully verified.
         <a
           href="/about#suggestion-review-process"
-          class="text-yellow-100 underline opacity-50 transition-opacity hover:opacity-100 focus-visible:opacity-100"
+          class="text-blue-100 underline opacity-50 transition-opacity hover:opacity-100 focus-visible:opacity-100"
         >
           Learn more
         </a>

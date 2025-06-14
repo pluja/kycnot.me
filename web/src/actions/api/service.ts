@@ -65,13 +65,13 @@ export const apiServiceActions = {
         tosUrls: true,
         referral: true,
         listedAt: true,
+        approvedAt: true,
         verifiedAt: true,
         serviceVisibility: true,
       } as const satisfies Prisma.ServiceSelect
 
       let service = await prisma.service.findFirst({
         where: {
-          listedAt: { lte: new Date() },
           serviceVisibility: { in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'] },
 
           OR: [
@@ -92,7 +92,6 @@ export const apiServiceActions = {
       if (!service && input.slug) {
         service = await prisma.service.findFirst({
           where: {
-            listedAt: { lte: new Date() },
             serviceVisibility: { in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'] },
 
             previousSlugs: { has: input.slug },
@@ -105,9 +104,7 @@ export const apiServiceActions = {
         !service ||
         (service.serviceVisibility !== 'PUBLIC' &&
           service.serviceVisibility !== 'ARCHIVED' &&
-          service.serviceVisibility !== 'UNLISTED') ||
-        !service.listedAt ||
-        service.listedAt > new Date()
+          service.serviceVisibility !== 'UNLISTED')
       ) {
         throw new ActionError({
           code: 'NOT_FOUND',
@@ -130,6 +127,7 @@ export const apiServiceActions = {
           'description',
         ]),
         verifiedAt: service.verifiedAt,
+        approvedAt: service.approvedAt,
         kycLevel: service.kycLevel,
         kycLevelInfo: pick(getKycLevelInfo(service.kycLevel.toString()), ['value', 'name', 'description']),
         kycLevelClarification: service.kycLevelClarification,

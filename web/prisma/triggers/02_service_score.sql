@@ -1,7 +1,7 @@
 -- This script defines PostgreSQL functions and triggers for managing service scores:
 -- 1. Automatically calculates and updates privacy, trust, and overall scores 
 --    for services when services or their attributes change.
--- 2. Updates the isRecentlyListed flag for services listed within the last 15 days.
+-- 2. Updates the isRecentlyApproved flag for services approved within the last 15 days.
 -- 3. Queues asynchronous score recalculation in "ServiceScoreRecalculationJob" 
 --    when an "Attribute" definition (e.g., points) is updated, ensuring 
 --    efficient handling of widespread score updates.
@@ -25,12 +25,8 @@ DECLARE
     privacy_score INT := 0;
     kyc_factor INT;
     clarification_factor INT := 0;
-    onion_factor INT := 0;
-    i2p_factor INT := 0;
+    onion_or_i2p_factor INT := 0;
     monero_factor INT := 0;
-    open_source_factor INT := 0;
-    p2p_factor INT := 0;
-    decentralized_factor INT := 0;
     attributes_score INT := 0;
 BEGIN
     -- Get service data
@@ -57,20 +53,12 @@ BEGIN
     FROM "Service"
     WHERE "id" = service_id;
     
-    -- Check for onion URLs
+    -- Check for onion or i2p URLs
     IF EXISTS (
         SELECT 1 FROM "Service" 
-        WHERE "id" = service_id AND array_length("onionUrls", 1) > 0
+        WHERE "id" = service_id AND (array_length("onionUrls", 1) > 0 OR array_length("i2pUrls", 1) > 0)
     ) THEN
-        onion_factor := 5;
-    END IF;
-    
-    -- Check for i2p URLs
-    IF EXISTS (
-        SELECT 1 FROM "Service" 
-        WHERE "id" = service_id AND array_length("i2pUrls", 1) > 0
-    ) THEN
-        i2p_factor := 5;
+        onion_or_i2p_factor := 5;
     END IF;
     
     -- Check for Monero acceptance
@@ -86,10 +74,10 @@ BEGIN
     INTO attributes_score
     FROM "ServiceAttribute" sa
     JOIN "Attribute" a ON sa."attributeId" = a."id"
-    WHERE sa."serviceId" = service_id AND a."category" = 'PRIVACY';
+    WHERE sa."serviceId" = service_id;
     
     -- Calculate final privacy score (base 100)
-    privacy_score := 50 + kyc_factor + clarification_factor + onion_factor + i2p_factor + monero_factor + open_source_factor + p2p_factor + decentralized_factor + attributes_score;
+    privacy_score := 50 + kyc_factor + clarification_factor + onion_or_i2p_factor + monero_factor + attributes_score;
     
     -- Ensure the score is in reasonable bounds (0-100)
     privacy_score := GREATEST(0, LEAST(100, privacy_score));
@@ -105,7 +93,7 @@ DECLARE
     trust_score INT := 0;
     verification_factor INT;
     attributes_score INT := 0;
-    recently_listed_factor INT := 0;
+    recently_approved_factor INT := 0;
     tos_penalty_factor INT := 0;
 BEGIN
     -- Get verification status factor
@@ -126,26 +114,26 @@ BEGIN
     INTO attributes_score
     FROM "ServiceAttribute" sa
     JOIN "Attribute" a ON sa."attributeId" = a.id
-    WHERE sa."serviceId" = service_id AND a.category = 'TRUST';
+    WHERE sa."serviceId" = service_id;
 
-    -- Apply penalty if service was listed within the last 15 days
+    -- Apply penalty if service was approved within the last 15 days
     IF EXISTS (
         SELECT 1
         FROM "Service"
         WHERE id = service_id 
-        AND "listedAt" IS NOT NULL 
+        AND "approvedAt" IS NOT NULL 
         AND "verificationStatus" = 'APPROVED'
-        AND (NOW() - "listedAt") <= INTERVAL '15 days'
+        AND (NOW() - "approvedAt") <= INTERVAL '15 days'
     ) THEN
-        recently_listed_factor := -10;
-        -- Update the isRecentlyListed flag to true
+        recently_approved_factor := -10;
+        -- Update the isRecentlyApproved flag to true
         UPDATE "Service"
-        SET "isRecentlyListed" = TRUE
+        SET "isRecentlyApproved" = TRUE
         WHERE id = service_id;
     ELSE
-        -- Update the isRecentlyListed flag to false
+        -- Update the isRecentlyApproved flag to false
         UPDATE "Service"
-        SET "isRecentlyListed" = FALSE
+        SET "isRecentlyApproved" = FALSE
         WHERE id = service_id;
     END IF;
 
@@ -161,7 +149,7 @@ BEGIN
     END IF;
     
     -- Calculate final trust score (base 100)
-    trust_score := 50 + verification_factor + attributes_score + recently_listed_factor + tos_penalty_factor;
+    trust_score := 50 + verification_factor + attributes_score + recently_approved_factor + tos_penalty_factor;
 
     -- Ensure the score is in reasonable bounds (0-100)
     trust_score := GREATEST(0, LEAST(100, trust_score));
@@ -176,7 +164,7 @@ RETURNS INT AS $$
 DECLARE
     overall_score INT;
 BEGIN
-    overall_score := CAST(ROUND(((privacy_score * 0.6) + (trust_score * 0.4)) / 10.0) AS INT);
+    overall_score := CAST(((privacy_score * 0.6) + (trust_score * 0.4)) / 10.0 AS INT);
     RETURN GREATEST(0, LEAST(10, overall_score));
 END;
 $$ LANGUAGE plpgsql;

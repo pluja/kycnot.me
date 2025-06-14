@@ -5,7 +5,10 @@
 import { clientsClaim } from 'workbox-core'
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
 
-import { makeNotificationOptions } from './lib/notificationOptions'
+import {
+  makeBrowserNotificationOptions,
+  makeBrowserNotificationTitle,
+} from './lib/client/notificationOptions'
 
 import type { NotificationData, NotificationPayload } from './lib/serverEventsTypes'
 
@@ -59,8 +62,8 @@ async function handleNotificationClick(url: string) {
 
 async function showPushNotification(payload: NotificationPayload | null) {
   await self.registration.showNotification(
-    payload?.title ?? 'New Notification',
-    makeNotificationOptions(payload)
+    makeBrowserNotificationTitle(payload?.title),
+    makeBrowserNotificationOptions(payload)
   )
 }
 

@@ -1,4 +1,6 @@
-import type { NotificationData, NotificationPayload } from './serverEventsTypes'
+import { DEPLOYMENT_MODE } from './envVariables'
+
+import type { NotificationData, NotificationPayload } from '../serverEventsTypes'
 
 export type CustomNotificationOptions = NotificationOptions & {
   actions?: { action: string; title: string; icon?: string }[]
@@ -6,14 +8,24 @@ export type CustomNotificationOptions = NotificationOptions & {
   data: NotificationData
 }
 
-export function makeNotificationOptions(
+export function makeBrowserNotificationTitle(title?: string | null) {
+  const prefix = DEPLOYMENT_MODE === 'development' ? '[DEV] ' : DEPLOYMENT_MODE === 'staging' ? '[PRE] ' : ''
+  return `${prefix}${title ?? 'New Notification'}`
+}
+
+export function makeBrowserNotificationOptions(
   payload: NotificationPayload | null,
   options: { removeActions?: boolean } = {}
 ) {
   const defaultOptions: CustomNotificationOptions = {
     body: 'You have a new notification',
     lang: 'en-US',
-    icon: '/favicon.svg',
+    icon:
+      DEPLOYMENT_MODE === 'development'
+        ? '/favicon-dev.svg'
+        : DEPLOYMENT_MODE === 'staging'
+          ? '/favicon-stage.svg'
+          : '/favicon.svg',
     badge: '/notification-icon.svg',
     requireInteraction: false,
     silent: false,

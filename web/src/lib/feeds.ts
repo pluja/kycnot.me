@@ -39,7 +39,6 @@ export async function getService(slug: string | undefined): Promise<
   const service =
     (await prisma.service.findFirst({
       where: {
-        listedAt: { lte: new Date() },
         serviceVisibility: { in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'] },
         slug,
       },
@@ -47,7 +46,6 @@ export async function getService(slug: string | undefined): Promise<
     })) ??
     (await prisma.service.findFirst({
       where: {
-        listedAt: { lte: new Date() },
         serviceVisibility: { in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'] },
         previousSlugs: { has: slug },
       },
@@ -175,7 +173,6 @@ export async function getEvents(): Promise<
     where: {
       visible: true,
       service: {
-        listedAt: { lte: new Date() },
         serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
       },
     },

@@ -45,7 +45,6 @@ const [services, [dbEvents, totalEvents]] = await Astro.locals.banners.tryMany([
     async () =>
       prisma.service.findMany({
         where: {
-          listedAt: { lte: new Date() },
           serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
         },
         select: {
@@ -72,7 +71,6 @@ const [services, [dbEvents, totalEvents]] = await Astro.locals.banners.tryMany([
           },
           service: {
             slug: params.service ?? undefined,
-            listedAt: params.service ? undefined : { lte: new Date() },
             serviceVisibility: {
               in: params.service ? ['PUBLIC', 'ARCHIVED', 'UNLISTED'] : ['PUBLIC', 'ARCHIVED'],
             },

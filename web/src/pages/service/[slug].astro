@@ -70,7 +70,6 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
         where: {
           slug,
           serviceVisibility: { in: ['PUBLIC', 'UNLISTED', 'ARCHIVED'] },
-          listedAt: { lte: new Date() },
         },
         select: {
           id: true,
@@ -93,6 +92,7 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
           referral: true,
           imageUrl: true,
           listedAt: true,
+          approvedAt: true,
           createdAt: true,
           acceptedCurrencies: true,
           tosReview: true,
@@ -100,7 +100,7 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
           userSentiment: true,
           userSentimentAt: true,
           averageUserRating: true,
-          isRecentlyListed: true,
+          isRecentlyApproved: true,
           contactMethods: {
             select: {
               value: true,
@@ -230,7 +230,6 @@ if (!service) {
       where: {
         previousSlugs: { has: slug },
         serviceVisibility: { in: ['PUBLIC', 'UNLISTED', 'ARCHIVED'] },
-        listedAt: { lte: new Date() },
       },
       select: { slug: true },
     })
@@ -1005,15 +1004,23 @@ const activeEventToShow =
                     attribute.typeInfo.classNames.text
                   )}
                 >
-                  <Icon
-                    name={attribute.categoryInfo.icon}
-                    class={cn('mr-2 size-4 flex-shrink-0', attribute.typeInfo.classNames.icon)}
-                  />
-                  <span>{attribute.title}</span>
+                  <span class="mr-auto ml-1">{attribute.title}</span>
+                  <>
+                    {weights.map((w) => (
+                      <span
+                        class={cn(
+                          'ml-2 text-center text-sm',
+                          w.value === 0 ? 'text-current/30' : 'text-current/60'
+                        )}
+                      >
+                        {formatNumber(w.value, w.formatOptions)}
+                      </span>
+                    ))}
+                  </>
                   <Icon
                     name="ri:arrow-down-s-line"
                     class={cn(
-                      'ml-auto size-5 group-open/attribute:rotate-180',
+                      'ml-1 size-5 group-open/attribute:rotate-180',
                       attribute.typeInfo.classNames.icon
                     )}
                   />
@@ -1080,19 +1087,16 @@ const activeEventToShow =
             baseScoreType.classNames.text
           )}
         >
-          <Icon
-            name={baseScoreType.icon}
-            class={cn('mr-2 size-4 flex-shrink-0', baseScoreType.classNames.icon)}
-          />
-          <span class="font-title">{baseScoreType.label}</span>
-          <span class={cn('mr-1 ml-auto', baseScoreType.classNames.icon)}>+50</span>
+          <span class="font-title mr-auto ml-1">{baseScoreType.label}</span>
+          <span class="mr-2 text-current/60">+50</span>
+          <span class="mr-1 text-current/60">+50</span>
         </li>
       </ul>
     )
   }
 
   <p class="text-day-400 mt-3 text-center text-xs">
-    <span class="hover:text-day-200 transition-colors">Overall = 60% Privacy + 40% Trust (Rounded)</span>
+    <span class="hover:text-day-200 transition-colors">Overall = 60% Privacy + 40% Trust (Truncated)</span>
   </p>
   <div class="xs:gap-x-6 mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs">
     <a

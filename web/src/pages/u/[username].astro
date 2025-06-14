@@ -25,6 +25,7 @@ import { makeUserWithKarmaUnlocks } from '../../lib/karmaUnlocks'
 import { prisma } from '../../lib/prisma'
 import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
 import { formatDateShort } from '../../lib/timeAgo'
+import { urlDomain } from '../../lib/urls'
 
 import type { ProfilePage, WithContext } from 'schema-dts'
 
@@ -96,9 +97,6 @@ const user = await Astro.locals.banners.try('user', async () => {
           },
           where: {
             service: {
-              listedAt: {
-                lte: new Date(),
-              },
               serviceVisibility: {
                 in: ['PUBLIC', 'ARCHIVED'],
               },
@@ -511,7 +509,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                       rel="noopener noreferrer"
                       class="text-blue-400 hover:underline"
                     >
-                      {user.verifiedLink}
+                      {urlDomain(user.verifiedLink)}
                     </a>
                   </div>
                 </li>
@@ -975,12 +973,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                         </span>
                       </td>
                       <td class="px-4 py-3 text-center">
-                        <span
-                          class={cn(
-                            'border-night-500/20 bg-night-800/10 inline-flex items-center rounded-full border px-2 py-0.5 text-xs',
-                            statusInfo.iconClass
-                          )}
-                        >
+                        <span class="border-night-500/20 bg-night-800/10 inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
                           <Icon name={statusInfo.icon} class="mr-1 size-3" />
                           {statusInfo.label}
                         </span>

@@ -13,14 +13,15 @@ import {
   PrismaClient,
   ServiceSuggestionStatus,
   ServiceUserRole,
-  VerificationStatus,
   type Prisma,
   type User,
   type ServiceVisibility,
   ServiceSuggestionType,
   KycLevelClarification,
   VerificationStepStatus,
+  type VerificationStatus,
 } from '@prisma/client'
+import { differenceInDays, isPast } from 'date-fns'
 import { omit, uniqBy } from 'lodash-es'
 import { generateUsername } from 'unique-username-generator'
 
@@ -614,6 +615,14 @@ const generateFakeService = (users: User[]) => {
   const tosReview = faker.helpers.maybe(() => faker.helpers.arrayElement(tosReviewExamples), {
     probability: 0.8,
   })
+  const serviceVisibility = faker.helpers.weightedArrayElement<ServiceVisibility>([
+    { weight: 80, value: 'PUBLIC' },
+    { weight: 10, value: 'UNLISTED' },
+    { weight: 5, value: 'HIDDEN' },
+    { weight: 5, value: 'ARCHIVED' },
+  ])
+  const approvedAt =
+    status === 'APPROVED' || status === 'VERIFICATION_SUCCESS' ? faker.date.recent({ days: 30 }) : null
 
   return {
     name,
@@ -629,12 +638,7 @@ const generateFakeService = (users: User[]) => {
     overallScore: 0,
     privacyScore: 0,
     trustScore: 0,
-    serviceVisibility: faker.helpers.weightedArrayElement<ServiceVisibility>([
-      { weight: 80, value: 'PUBLIC' },
-      { weight: 10, value: 'UNLISTED' },
-      { weight: 5, value: 'HIDDEN' },
-      { weight: 5, value: 'ARCHIVED' },
-    ]),
+    serviceVisibility,
     verificationStatus: status,
     verificationSummary:
       status === 'VERIFICATION_SUCCESS' || status === 'VERIFICATION_FAILED' ? faker.lorem.paragraph() : null,
@@ -677,8 +681,14 @@ const generateFakeService = (users: User[]) => {
       { count: { min: 0, max: 2 } }
     ),
     imageUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&format=svg`,
-    listedAt: faker.date.past(),
-    verifiedAt: status === VerificationStatus.VERIFICATION_SUCCESS ? faker.date.past() : null,
+    listedAt:
+      serviceVisibility === 'PUBLIC' || serviceVisibility === 'ARCHIVED'
+        ? faker.date.recent({ days: 30 })
+        : null,
+    verifiedAt: status === 'VERIFICATION_SUCCESS' ? faker.date.recent({ days: 30 }) : null,
+    spamAt: status === 'VERIFICATION_FAILED' ? faker.date.recent({ days: 30 }) : null,
+    approvedAt,
+    isRecentlyApproved: !!approvedAt && isPast(approvedAt) && differenceInDays(new Date(), approvedAt) < 15,
     tosReview,
     tosReviewAt: tosReview
       ? faker.date.recent()
@@ -908,7 +918,7 @@ const generateFakeServiceContactMethod = (serviceId: number) => {
       value: `https://linkedin.com/in/${faker.helpers.slugify(faker.person.fullName())}`,
     },
     {
-      label: faker.lorem.word({ length: 2 }),
+      label: 'Custom label',
       value: `https://bitcointalk.org/index.php?topic=${faker.number.int({ min: 1, max: 1000000 }).toString()}.0`,
     },
     {
@@ -918,7 +928,7 @@ const generateFakeServiceContactMethod = (serviceId: number) => {
       value: faker.internet.url(),
     },
     {
-      label: faker.lorem.word({ length: 2 }),
+      label: 'Custom label',
       value: faker.internet.url(),
     },
     {
@@ -1307,7 +1317,7 @@ async function main() {
     const service = await prisma.service.create({
       data: {
         ...serviceData,
-        verificationStatus: VerificationStatus.COMMUNITY_CONTRIBUTED,
+        verificationStatus: 'COMMUNITY_CONTRIBUTED',
         categories: {
           connect: randomCategories.map((cat) => ({ id: cat.id })),
         },

@@ -89,6 +89,11 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     score_recalc_parser.add_argument(
         "--service-id", type=int, help="Specific service ID to process (optional)"
     )
+    score_recalc_parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Recalculate scores for all services (ignores --service-id)",
+    )
 
     return parser.parse_args(args)
 
@@ -295,12 +300,15 @@ def run_force_triggers_task() -> int:
         close_db_pool()
 
 
-def run_service_score_recalc_task(service_id: Optional[int] = None) -> int:
+def run_service_score_recalc_task(
+    service_id: Optional[int] = None, all_services: bool = False
+) -> int:
     """
     Run the service score recalculation task.
 
     Args:
         service_id: Optional specific service ID to process.
+        all_services: Whether to recalculate scores for all services.
 
     Returns:
         Exit code.
@@ -310,7 +318,34 @@ def run_service_score_recalc_task(service_id: Optional[int] = None) -> int:
     try:
         # Initialize task and use as context manager
         with ServiceScoreRecalculationTask() as task:  # type: ignore
-            result = task.run(service_id)  # type: ignore
+            if all_services:
+                queued = task.recalculate_all_services()  # type: ignore
+                if not queued:
+                    logger.warning(
+                        "Failed to queue recalculation jobs for all services"
+                    )
+
+                # Continuously process queued jobs in batches until none remain
+                while True:
+                    _ = task.run()  # type: ignore
+
+                    # Check if there are still unprocessed jobs
+                    remaining = 0
+                    if task.conn:
+                        with task.conn.cursor() as cursor:
+                            cursor.execute(
+                                'SELECT COUNT(*) FROM "ServiceScoreRecalculationJob" WHERE "processedAt" IS NULL'
+                            )
+                            remaining = cursor.fetchone()[0]
+
+                    if remaining == 0:
+                        break
+
+                result = True  # All jobs processed successfully
+
+            else:
+                result = task.run(service_id)  # type: ignore
+
             if result:
                 logger.info("Successfully recalculated service scores")
             else:
@@ -419,7 +454,9 @@ def main() -> int:
         elif args.task == "force-triggers":
             return run_force_triggers_task()
         elif args.task == "service-score-recalc":
-            return run_service_score_recalc_task(args.service_id)
+            return run_service_score_recalc_task(
+                args.service_id, getattr(args, "all", False)
+            )
         elif args.task:
             logger.error(f"Unknown task: {args.task}")
             return 1

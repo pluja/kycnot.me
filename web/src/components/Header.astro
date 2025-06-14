@@ -3,8 +3,8 @@ import { Icon } from 'astro-icon/components'
 import { sample } from 'lodash-es'
 
 import { splashTexts } from '../constants/splashTexts'
+import { DEPLOYMENT_MODE } from '../lib/client/envVariables'
 import { cn } from '../lib/cn'
-import { DEPLOYMENT_MODE } from '../lib/envVariables'
 import { makeLoginUrl, makeUnimpersonateUrl } from '../lib/redirectUrls'
 
 import AdminOnly from './AdminOnly.astro'

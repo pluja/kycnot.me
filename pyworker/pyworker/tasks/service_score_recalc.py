@@ -205,8 +205,7 @@ class ServiceScoreRecalculationTask(Task):
                 cursor.execute(
                     """
                     SELECT id 
-                    FROM "Service" 
-                    WHERE "isActive" = TRUE
+                    FROM "Service"
                     """
                 )
                 services = cursor.fetchall()

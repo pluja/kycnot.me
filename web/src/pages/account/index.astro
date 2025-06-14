@@ -22,6 +22,7 @@ import { makeUserWithKarmaUnlocks } from '../../lib/karmaUnlocks'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
 import { formatDateShort } from '../../lib/timeAgo'
+import { urlDomain } from '../../lib/urls'
 
 const userId = Astro.locals.user?.id
 if (!userId) {
@@ -423,7 +424,7 @@ if (!user) return Astro.rewrite('/404')
                       rel="noopener noreferrer"
                       class="text-blue-400 hover:underline"
                     >
-                      {user.verifiedLink}
+                      {urlDomain(user.verifiedLink)}
                     </a>
                   </div>
                 </li>
@@ -857,12 +858,7 @@ if (!user) return Astro.rewrite('/404')
                         </span>
                       </td>
                       <td class="px-4 py-3 text-center">
-                        <span
-                          class={cn(
-                            'border-night-500/20 bg-night-800/10 inline-flex items-center rounded-full border px-2 py-0.5 text-xs',
-                            statusInfo.iconClass
-                          )}
-                        >
+                        <span class="border-night-500/20 bg-night-800/10 inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
                           <Icon name={statusInfo.icon} class="mr-1 size-3" />
                           {statusInfo.label}
                         </span>

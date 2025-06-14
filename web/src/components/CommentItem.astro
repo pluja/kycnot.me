@@ -15,6 +15,7 @@ import {
 } from '../lib/commentsWithReplies'
 import { computeKarmaUnlocks } from '../lib/karmaUnlocks'
 import { formatDateShort } from '../lib/timeAgo'
+import { urlDomain } from '../lib/urls'
 
 import BadgeSmall from './BadgeSmall.astro'
 import CommentModeration from './CommentModeration.astro'
@@ -170,7 +171,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
               comment.author.admin || comment.author.moderator
                 ? `KYCnot.me ${comment.author.admin ? 'Admin' : 'Moderator'}${comment.author.verifiedLink ? '. ' : ''}`
                 : ''
-            }${comment.author.verifiedLink ? `Related to ${comment.author.verifiedLink}` : ''}`}
+            }${comment.author.verifiedLink ? `Related to ${urlDomain(comment.author.verifiedLink)}` : ''}`}
           >
             <Icon name="ri:verified-badge-fill" class="size-4 text-cyan-300" />
           </Tooltip>

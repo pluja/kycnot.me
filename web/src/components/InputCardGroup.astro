@@ -20,7 +20,6 @@ type Props<Multiple extends boolean = false> = Omit<
     iconClass?: string
     description?: MarkdownString
     disabled?: boolean
-    noTransitionPersist?: boolean
   }[]
   disabled?: boolean
   selectedValue?: Multiple extends true ? string[] : string
@@ -70,7 +69,7 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
           )}
         >
           <input
-            transition:persist={option.noTransitionPersist || !multiple ? undefined : true}
+            transition:persist
             type={multiple ? 'checkbox' : 'radio'}
             name={wrapperProps.name}
             value={option.value}
