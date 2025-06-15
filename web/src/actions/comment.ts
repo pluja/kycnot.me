@@ -270,6 +270,18 @@ export const commentActions = {
             }
           }
 
+          const isRelatedToService = !!(await tx.serviceUser.findUnique({
+            where: {
+              userId_serviceId: {
+                userId: context.locals.user.id,
+                serviceId: input.serviceId,
+              },
+            },
+            select: {
+              id: true,
+            },
+          }))
+
           // Prepare data object with proper type safety
           const commentData: Prisma.CommentCreateInput = {
             content: input.content,
@@ -277,7 +289,12 @@ export const commentActions = {
             author: { connect: { id: context.locals.user.id } },
 
             // Change status to HUMAN_PENDING if there's an issue report, this is so that the AI worker does not pick it up for review
-            status: context.locals.user.admin ? 'APPROVED' : isIssueReport ? 'HUMAN_PENDING' : 'PENDING',
+            status:
+              context.locals.user.admin || context.locals.user.moderator || isRelatedToService
+                ? 'APPROVED'
+                : isIssueReport
+                  ? 'HUMAN_PENDING'
+                  : 'PENDING',
             requiresAdminReview,
             orderId: input.orderId?.trim() ?? null,
             kycRequested: input.issueKycRequested === true,
