@@ -1,4 +1,3 @@
-import { ActionError } from 'astro:actions'
 import { z } from 'astro:content'
 
 import { defineProtectedAction } from '../lib/defineProtectedAction'
@@ -58,28 +57,15 @@ export const notificationActions = {
       accept: 'json',
       permissions: 'guest',
       input: z.object({
-        endpoint: z.string().optional(),
+        endpoint: z.string(),
       }),
       handler: async (input, context) => {
-        if (input.endpoint) {
-          await prisma.pushSubscription.deleteMany({
-            where: {
-              userId: context.locals.user?.id ?? undefined,
-              endpoint: input.endpoint,
-            },
-          })
-        } else if (context.locals.user) {
-          await prisma.pushSubscription.deleteMany({
-            where: {
-              userId: context.locals.user.id,
-            },
-          })
-        } else {
-          throw new ActionError({
-            code: 'BAD_REQUEST',
-            message: 'Endpoint is required when user is not logged in.',
-          })
-        }
+        await prisma.pushSubscription.delete({
+          where: {
+            userId: context.locals.user?.id ?? undefined,
+            endpoint: input.endpoint,
+          },
+        })
       },
     }),
   },
