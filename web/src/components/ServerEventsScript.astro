@@ -27,6 +27,12 @@ if (!Astro.locals.user) return
       }
 
       eventSource.onmessage = (event) => {
+        // NOTE: Disable sse: events when user is not logged in
+        if (!document.body.hasAttribute('data-is-logged-in')) {
+          stopServerEventsListener()
+          return
+        }
+
         try {
           const data = JSON.parse(event.data as string)
 

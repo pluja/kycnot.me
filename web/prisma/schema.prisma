@@ -687,8 +687,6 @@ model PushSubscription {
   p256dh    String
   /// Authentication secret
   auth      String
-  /// To identify different devices
-  userAgent String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

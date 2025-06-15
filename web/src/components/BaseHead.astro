@@ -107,12 +107,8 @@ const ogImageUrl = makeOgImageUrl(ogImage, Astro.url)
 
 <DynamicFavicon />
 
-<!-- Components -->
-{
-  !Astro.url.pathname.startsWith('/admin') && (
-    <ClientRouter />
-  ) /* Disable to prevent bugs in important admin forms */
-}
+<ClientRouter />
+
 <LoadingIndicator color="green" />
 <TailwindJsPluggin />
 {htmx && <HtmxScript />}

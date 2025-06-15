@@ -163,7 +163,6 @@ const [dbNotifications, notificationPreferences, totalNotifications, pushSubscri
           where: { userId: user.id },
           select: {
             endpoint: true,
-            userAgent: true,
           },
         }),
       [],

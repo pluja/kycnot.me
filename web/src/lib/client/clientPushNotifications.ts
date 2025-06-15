@@ -5,7 +5,6 @@ import type { actions } from 'astro:actions'
 
 type ServerSubscription = {
   endpoint: string
-  userAgent: string | null
 }
 
 export type SafeResult =
@@ -45,7 +44,6 @@ export async function subscribeToPushNotifications(vapidPublicKey: string): Prom
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         endpoint: subscription.endpoint,
-        userAgent: navigator.userAgent,
         p256dhKey: p256dh ? btoa(String.fromCharCode(...new Uint8Array(p256dh))) : '',
         authKey: auth ? btoa(String.fromCharCode(...new Uint8Array(auth))) : '',
       } satisfies ActionInput<typeof actions.notification.webPush.subscribe>),
@@ -131,13 +129,7 @@ export async function isCurrentDeviceSubscribed(serverSubscriptions: ServerSubsc
   const currentSubscription = await getCurrentSubscription()
   if (!currentSubscription || serverSubscriptions.length === 0) return false
 
-  const currentEndpoint = currentSubscription.endpoint
-  const currentUserAgent = navigator.userAgent
-
-  return serverSubscriptions.some(
-    (sub) =>
-      sub.endpoint === currentEndpoint && (sub.userAgent === currentUserAgent || sub.userAgent === null)
-  )
+  return serverSubscriptions.some((sub) => sub.endpoint === currentSubscription.endpoint)
 }
 
 function urlB64ToUint8Array(base64String: string) {
@@ -183,5 +175,5 @@ export function parsePushSubscriptions(subscriptionsAsString: string | undefined
 function isServerSubscription(subscription: unknown): subscription is ServerSubscription {
   if (typeof subscription !== 'object' || subscription === null) return false
   const s = subscription as Record<string, unknown>
-  return typeof s.endpoint === 'string' && (typeof s.userAgent === 'string' || s.userAgent === null)
+  return typeof s.endpoint === 'string'
 }

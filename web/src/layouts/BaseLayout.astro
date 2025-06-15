@@ -81,7 +81,8 @@ const announcement = await Astro.locals.banners.try(
   </head>
   <body
     class={cn('bg-night-700 text-day-300 flex min-h-dvh flex-col *:shrink-0', classNames?.body)}
-    data-is-error-page={isErrorPage}
+    data-is-error-page={isErrorPage ? '' : undefined}
+    data-is-logged-in={Astro.locals.user !== null ? '' : undefined}
   >
     {announcement && <AnnouncementBanner announcement={announcement} transition:name="header-announcement" />}
     <Header

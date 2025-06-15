@@ -71,12 +71,13 @@ const [dbComments, pendingCommentsCount, activeRatingComment] = await Astro.loca
     'Failed to fetch comments',
     async () =>
       await prisma.comment.findMany(
-        makeCommentsNestedQuery({
+        await makeCommentsNestedQuery({
           depth: MAX_COMMENT_DEPTH,
           user,
           showPending: params.showPending,
           serviceId: service.id,
           sort: params.sort,
+          highlightedCommentId: params.comment,
         })
       ),
     [],

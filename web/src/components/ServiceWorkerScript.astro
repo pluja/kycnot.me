@@ -4,6 +4,7 @@
 
 <script>
   import { registerSW } from 'virtual:pwa-register'
+  import { unsubscribeFromPushNotifications } from '../lib/client/clientPushNotifications'
 
   const NO_AUTO_RELOAD_ROUTES = ['/account/welcome', '/500', '/404'] as const satisfies `/${string}`[]
 
@@ -33,7 +34,7 @@
 
   function shouldSkipAutoReload() {
     const currentPath = window.location.pathname
-    const isErrorPage = document.querySelector('[data-is-error-page]') !== null
+    const isErrorPage = document.body.hasAttribute('data-is-error-page')
 
     return isErrorPage || NO_AUTO_RELOAD_ROUTES.some((route) => currentPath === route)
   }
@@ -47,5 +48,12 @@
 
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault()
+  })
+
+  document.addEventListener('astro:page-load', async () => {
+    if (!document.body.hasAttribute('data-is-logged-in')) {
+      await unsubscribeFromPushNotifications()
+      window.__SW_REGISTRATION__?.unregister()
+    }
   })
 </script>

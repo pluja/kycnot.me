@@ -1,10 +1,10 @@
 ---
 import { Icon } from 'astro-icon/components'
-import { differenceInDays } from 'date-fns'
 
 import { verificationStatusesByValue } from '../constants/verificationStatus'
 import { verificationStepStatusesByValue } from '../constants/verificationStepStatus'
 import { cn } from '../lib/cn'
+import { formatDaysAgo } from '../lib/timeAgo'
 
 import type { Prisma } from '@prisma/client'
 
@@ -27,15 +27,6 @@ type Props = {
 }
 
 const { service } = Astro.props
-
-function formatApprovedAt(approvedAt: Date | null) {
-  if (!approvedAt) return 'less than 15 days ago'
-
-  const days = differenceInDays(new Date(), approvedAt)
-  if (days === 0) return 'today'
-  if (days === 1) return 'yesterday'
-  return `${days.toLocaleString()} days ago`
-}
 ---
 
 {
@@ -73,7 +64,7 @@ function formatApprovedAt(approvedAt: Date | null) {
   ) : service.isRecentlyApproved ? (
     <div class="mb-3 rounded-md bg-yellow-900/50 p-2 text-sm text-yellow-400">
       This service was approved
-      {formatApprovedAt(service.approvedAt)}
+      {service.approvedAt ? formatDaysAgo(service.approvedAt) : 'less than 15 days ago'}
       {service.verificationStatus !== 'VERIFICATION_SUCCESS' && ' and it is not verified'}. Proceed with
       caution.
       <a

@@ -53,7 +53,7 @@ export async function removeUserSessionIdCookie(cookies: AstroCookies) {
   cookies.delete(COOKIE_NAME, { path: '/' })
 }
 
-export async function logout(context: Pick<APIContext, 'cookies' | 'locals'>) {
+export async function logout(context: Pick<APIContext, 'cookies' | 'locals' | 'request' | 'url'>) {
   await stopImpersonating(context)
 
   await removeUserSessionIdCookie(context.cookies)

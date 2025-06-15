@@ -7,7 +7,7 @@ import { kycLevels } from '../constants/kycLevels'
 import { serviceVisibilitiesById } from '../constants/serviceVisibility'
 import { READ_MORE_SENTENCE_LINK, verificationStatusesByValue } from '../constants/verificationStatus'
 
-import { formatDateShort } from './timeAgo'
+import { formatDaysAgo } from './timeAgo'
 
 import type { Prisma } from '@prisma/client'
 
@@ -199,7 +199,7 @@ export const nonDbAttributes: NonDbAttributeFull[] = [
     links: [],
     customize: (service) => ({
       show: service.isRecentlyApproved,
-      description: `Approved on KYCnot.me ${formatDateShort(service.approvedAt ?? service.createdAt)}. Proceed with caution.`,
+      description: `Approved on KYCnot.me less than 15 days ago${service.approvedAt ? ` (${formatDaysAgo(service.approvedAt)})` : ''}. Proceed with caution.`,
     }),
   },
   {

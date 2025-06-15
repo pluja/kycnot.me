@@ -7,11 +7,15 @@ export function supportsBrowserNotifications() {
 }
 
 export function isBrowserNotificationsEnabled() {
-  return (
-    supportsBrowserNotifications() &&
-    Notification.permission === 'granted' &&
-    typedLocalStorage.browserNotificationsEnabled.get()
-  )
+  const browserNotificationsEnabled = typedLocalStorage.browserNotificationsEnabled.get()
+  if (!browserNotificationsEnabled) return false
+
+  if (!document.body.hasAttribute('data-is-logged-in')) {
+    typedLocalStorage.browserNotificationsEnabled.set(false)
+    return false
+  }
+
+  return supportsBrowserNotifications() && Notification.permission === 'granted'
 }
 
 export async function enableBrowserNotifications(): Promise<SafeResult> {

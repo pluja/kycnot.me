@@ -692,12 +692,12 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
 
                         <div class="flex justify-end space-x-3">
                           <Button
-                            as="button"
                             color="gray"
                             variant="faded"
                             size="sm"
                             label="Cancel"
-                            onclick={`document.getElementById('edit-form-${index}').classList.toggle('hidden')`}
+                            data-cancel-button
+                            data-cancel-form-id={`edit-form-${index}`}
                           />
                           <Button
                             as="button"
@@ -721,3 +721,22 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
     </div>
   </div>
 </BaseLayout>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Optional script for cancel buttons in attribute forms.  //
+  // Hides the edit form when cancel button is clicked.     //
+  ////////////////////////////////////////////////////////////
+  document.addEventListener('astro:page-load', () => {
+    document.querySelectorAll<HTMLButtonElement>('[data-cancel-button]').forEach((button) => {
+      button.addEventListener('click', (e) => {
+        e.preventDefault()
+        const formId = button.getAttribute('data-cancel-form-id')
+        if (!formId) throw new Error('Form ID not found')
+        const form = document.getElementById(formId)
+        if (!form) throw new Error('Form not found')
+        form.classList.add('hidden')
+      })
+    })
+  })
+</script>

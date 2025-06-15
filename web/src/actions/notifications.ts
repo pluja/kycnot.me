@@ -1,3 +1,4 @@
+import { ActionError } from 'astro:actions'
 import { z } from 'astro:content'
 
 import { defineProtectedAction } from '../lib/defineProtectedAction'
@@ -32,7 +33,6 @@ export const notificationActions = {
         endpoint: z.string(),
         p256dhKey: z.string(),
         authKey: z.string(),
-        userAgent: z.string().optional(),
       }),
       handler: async (input, context) => {
         await prisma.pushSubscription.upsert({
@@ -43,14 +43,12 @@ export const notificationActions = {
           update: {
             p256dh: input.p256dhKey,
             auth: input.authKey,
-            userAgent: input.userAgent,
           },
           create: {
             userId: context.locals.user.id,
             endpoint: input.endpoint,
             p256dh: input.p256dhKey,
             auth: input.authKey,
-            userAgent: input.userAgent,
           },
         })
       },
@@ -58,7 +56,7 @@ export const notificationActions = {
 
     unsubscribe: defineProtectedAction({
       accept: 'json',
-      permissions: 'user',
+      permissions: 'guest',
       input: z.object({
         endpoint: z.string().optional(),
       }),
@@ -66,15 +64,20 @@ export const notificationActions = {
         if (input.endpoint) {
           await prisma.pushSubscription.deleteMany({
             where: {
-              userId: context.locals.user.id,
+              userId: context.locals.user?.id ?? undefined,
               endpoint: input.endpoint,
             },
           })
-        } else {
+        } else if (context.locals.user) {
           await prisma.pushSubscription.deleteMany({
             where: {
               userId: context.locals.user.id,
             },
+          })
+        } else {
+          throw new ActionError({
+            code: 'BAD_REQUEST',
+            message: 'Endpoint is required when user is not logged in.',
           })
         }
       },

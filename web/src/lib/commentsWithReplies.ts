@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { prisma } from './prisma'
+
 import type { Prisma } from '@prisma/client'
 
 export const MAX_COMMENT_DEPTH = 12
@@ -75,12 +77,13 @@ export type CommentWithRepliesPopulated = CommentWithReplies<{
 export const commentSortSchema = z.enum(['newest', 'upvotes', 'status']).default('newest')
 export type CommentSortOption = z.infer<typeof commentSortSchema>
 
-export function makeCommentsNestedQuery({
+export async function makeCommentsNestedQuery({
   depth = 0,
   user,
   showPending,
   serviceId,
   sort,
+  highlightedCommentId,
 }: {
   depth?: number
   user: Prisma.UserGetPayload<{
@@ -91,6 +94,7 @@ export function makeCommentsNestedQuery({
   showPending?: boolean
   serviceId: number
   sort: CommentSortOption
+  highlightedCommentId?: number | null
 }) {
   const orderByClause: Prisma.CommentOrderByWithRelationInput[] = []
 
@@ -108,6 +112,8 @@ export function makeCommentsNestedQuery({
   }
   orderByClause.unshift({ suspicious: 'asc' }) // Always put suspicious comments last within a sort group
 
+  const highlightedBranchIds = highlightedCommentId ? await findAllParentIds(highlightedCommentId, depth) : []
+
   const baseQuery = {
     ...commentReplyQuery,
     orderBy: orderByClause,
@@ -121,6 +127,9 @@ export function makeCommentsNestedQuery({
           : ({
               status: { in: ['APPROVED', 'VERIFIED'] },
             } as const satisfies Prisma.CommentWhereInput),
+        ...(highlightedBranchIds.length > 0
+          ? [{ id: { in: highlightedBranchIds } } as const satisfies Prisma.CommentWhereInput]
+          : []),
       ],
       parentId: null,
       serviceId,
@@ -159,6 +168,47 @@ export function makeRepliesQuery<T extends Prisma.CommentFindManyArgs>(
       replies: makeRepliesQuery(query, currentDepth - 1),
     },
   }
+}
+
+async function findAllParentIds(commentId: number, depth: number) {
+  const commentwithManyParents = await prisma.comment.findFirst({
+    where: { id: commentId },
+    select: makeParentQuerySelect(depth),
+  })
+
+  return extractParentIds(commentwithManyParents, [commentId])
+}
+
+type ParentQueryRecursive = {
+  parent: {
+    select: {
+      id: true
+      parent: false | { select: ParentQueryRecursive }
+    }
+  }
+}
+
+function makeParentQuerySelect(depth: number): ParentQueryRecursive {
+  return {
+    parent: {
+      select: {
+        id: true,
+        parent: depth <= 0 ? false : { select: makeParentQuerySelect(depth - 1) },
+      },
+    },
+  } as const satisfies Prisma.CommentSelect
+}
+
+function extractParentIds(
+  comment: Prisma.CommentGetPayload<{ select: ParentQueryRecursive }> | null,
+  acc: number[] = []
+) {
+  if (!comment?.parent?.id) return acc
+
+  return extractParentIds(comment.parent as Prisma.CommentGetPayload<{ select: ParentQueryRecursive }>, [
+    ...acc,
+    comment.parent.id,
+  ])
 }
 
 export function makeCommentUrl({

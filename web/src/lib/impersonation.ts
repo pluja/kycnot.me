@@ -29,7 +29,7 @@ export async function stopImpersonating(context: Pick<APIContext, 'cookies' | 'l
   const sessionId = context.cookies.get(IMPERSONATION_SESSION_COOKIE)?.value
   await redisImpersonationSessions.delete(sessionId)
   context.cookies.delete(IMPERSONATION_SESSION_COOKIE)
-  context.locals.user = context.locals.actualUser
+  context.locals.user = context.locals.actualUser ?? context.locals.user
   context.locals.actualUser = null
 }
 

@@ -1,4 +1,4 @@
-import { addDays, format, isBefore, isToday, isYesterday } from 'date-fns'
+import { addDays, differenceInDays, format, isBefore, isToday, isYesterday } from 'date-fns'
 import TimeAgo from 'javascript-time-ago'
 import en from 'javascript-time-ago/locale/en'
 
@@ -46,4 +46,11 @@ export function formatDateShort(
   if (!caseType) return text
 
   return transformCase(text, caseType)
+}
+
+export function formatDaysAgo(approvedAt: Date) {
+  const days = differenceInDays(new Date(), approvedAt)
+  if (days === 0) return 'today'
+  if (days === 1) return 'yesterday'
+  return `${days.toLocaleString()} days ago`
 }
