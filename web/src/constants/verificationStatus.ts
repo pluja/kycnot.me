@@ -26,7 +26,7 @@ type VerificationStatusInfo<T extends string | null | undefined = string> = {
 }
 
 export const READ_MORE_SENTENCE_LINK =
-  'Read more about the [suggestion review process](/about#suggestion-review-process).' satisfies MarkdownString
+  'Read more about the [listing statuses](/about#listing-statuses).' satisfies MarkdownString
 
 export const {
   dataArray: verificationStatuses,

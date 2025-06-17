@@ -52,9 +52,9 @@ const { service } = Astro.props
     <div class="mb-3 flex items-center gap-2 rounded-md bg-yellow-600/30 p-2 text-sm text-yellow-200">
       <Icon name="ri:alert-line" class="size-5 text-yellow-400" />
       <span>
-        Community-contributed. Information not reviewed.
+        Community contributed. Information not reviewed.
         <a
-          href="/about#suggestion-review-process"
+          href="/about#community-contributed"
           class="text-yellow-100 underline opacity-50 transition-opacity hover:opacity-100 focus-visible:opacity-100"
         >
           Learn more
@@ -68,7 +68,7 @@ const { service } = Astro.props
       {service.verificationStatus !== 'VERIFICATION_SUCCESS' && ' and it is not verified'}. Proceed with
       caution.
       <a
-        href="/about#suggestion-review-process"
+        href="/about#approved"
         class="text-yellow-100 underline opacity-50 transition-opacity hover:opacity-100 focus-visible:opacity-100"
       >
         Learn more
@@ -78,9 +78,9 @@ const { service } = Astro.props
     <div class="mb-3 flex items-center gap-2 rounded-md bg-blue-600/30 p-2 text-sm text-blue-200">
       <Icon name="ri:information-line" class="size-5 text-blue-400" />
       <span>
-        Basic checks passed, but not fully verified.
+        Basic checks passed, but service is not verified.
         <a
-          href="/about#suggestion-review-process"
+          href="/about#approved"
           class="text-blue-100 underline opacity-50 transition-opacity hover:opacity-100 focus-visible:opacity-100"
         >
           Learn more

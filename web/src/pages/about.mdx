@@ -8,6 +8,21 @@ icon: 'ri:information-line'
 
 import DonationAddress from '../components/DonationAddress.astro'
 
+- [What is KYC?](#what-is-kyc)
+- [Why does this site exist?](#why-does-this-site-exist)
+- [Why only Bitcoin and Monero?](#why-only-bitcoin-and-monero)
+- [User Accounts](#user-accounts)
+  - [Verified and Affiliated Users](#verified-and-affiliated-users)
+- [Listings](#listings)
+  - [Suggesting a new listing](#suggesting-a-new-listing)
+  - [Listing statuses](#listing-statuses)
+- [Reviews and Comments](#reviews-and-comments)
+  - [Moderation](#moderation)
+- [API](#api)
+- [Donate](#support)
+- [Contact](#contact)
+- [Downloads and Assets](#downloads-and-assets)
+
 ## What is this page?
 
 KYCnot.me is a directory of trustworthy alternatives for buying, exchanging, trading, and using cryptocurrencies without having to disclose your identity, thus preserving your right to privacy.
@@ -52,9 +67,9 @@ Users earn karma by participating in the community. When your comments get appro
 
 ### Verified and Affiliated Users
 
-Some users are **verified**, this means that the moderators have confirmed that the user is related to a specific link or service. The verification is directly linked to the URL, ensuring that the person behind the username has a legitimate connection to the service they claim to represent. This verification process is reserved for individuals with established reputation.
+**Verified users** have proven their identity by linking their account to a specific website. This verification confirms they are legitimate representatives of that site, whether it's a personal website, blog, social media profile, or service page. You can request verification [in your profile](/account).
 
-Users can also be **affiliated** with a service if they're related to it, such as being an owner or part of the team. If you own a service and want to get verified, just reach out to us.
+**Affiliated users** are users who represent a service listed in the directory, such as owners, support staff, or team members. If you represent a service and want to become affiliated, you can request it [in your profile](/account).
 
 ## Listings
 
@@ -119,7 +134,7 @@ If the service meets all requirements, it is granted the **`VERIFIED`** status.
 
 ##### Failed Verifications (Scams)
 
-If the data is not accurate, the service is a scam, or any other checks fail, the service will be rejected and will appear with a disclaimer.
+If the data is not accurate, the service is a scam, or any other checks fail, the service will be rejected and will appear with a disclaimer. 
 
 #### Verification Steps
 
@@ -184,6 +199,32 @@ There are two types of events:
 
 You can also take a look at the [global timeline](/events) where you will find all the service's events sorted by date.
 
+### Listing Statuses
+
+#### **Unlisted**
+
+Initial state after the service is submitted. The service will **not appear in the list or search results**. Only accessible with a **direct link**. An **initial review** is done by the team to ensure the service is **not spam or inappropriate**.
+
+#### **Community Contributed**
+
+The service is **listed** in the directory, but it has **not been reviewed** by our team. The information **may be inaccurate, incomplete, or fraudulent**. Users should use these services **with caution**.
+
+#### **Approved**
+
+The service is listed in the directory and has been **reviewed by our team**. The information is **accurate and complete**. Initial tests were **successful**, but there is **not enough trust** to be verified.
+
+#### **Verified**
+
+The service has been listed for a while and has **not been reported** as a scam, user reviews are **mostly positive**, and the service is **not under any investigation**. Further tests and checks have been **successfully completed**. Contact with support or admins was also successful.
+
+#### **Scam**
+
+The service is a **scam**. User reports, negative reviews, or **failed internal testing** and other red flags were found. Evidence is provided in the **verification section** of the service page.
+
+#### **Archived**
+
+The service is **no longer available**. It may have been **shut down, acquired, or otherwise discontinued**. Still **visible** in the directory **for reference**.
+
 ## Reviews and Comments
 
 Reviews are comments with a one to five star rating for the service. Each user can leave only one review per service; new reviews replace the old one.
@@ -194,21 +235,38 @@ If you've used the service, you can add an **order ID** or proof—this is only 
 
 Some reviews may be spam or fake. Read comments carefully and **always do your own research before making decisions**.
 
-### Note on moderation
+### Moderation
 
-**All comments are moderated.** First, an AI checks each comment. If nothing is flagged, the comment is published right away. If something seems off, the comment is held for a human to review. We only remove comments that are spam, nonsense, unsupported accusations, doxxing, or clear rule violations.
+**All comments are moderated.** First, an **AI checks** each comment. If nothing is flagged, the comment is published right away. If something seems off, the comment is held for a **human review**. We only remove comments that do not follow the guidelines.
+
+Comments from [**users affiliated with a service**](/about#verified-and-affiliated-users) are automatically approved on their own service page.
 
 To **see comments waiting for moderation**, toggle the switch in the comments section. These comments show up with a yellow background and a "pending" label.
 
+#### Comment Guidelines
+
+We welcome honest, constructive discussion. However, any comment or review that contains the following will be **rejected**:
+
+- **Spam** – promotional content, fake reviews, or coordinated campaigns.
+- **Doxxing** – harassment, threats, or disclosure of private information.
+- **Illegal content** – anything that encourages illegal activity.
+- **AI-generated text** – AI-written content is not allowed.
+- **Unrelated content** – content that is not related to the service.
+- **Personal discussion** – discussions not related to the service.
+
+A review score may be **disabled** if it:
+
+- Is not based on your own first-hand experience.
+- Contains demonstrably false or unverified claims.
+- Is not relevant to the service being reviewed.
+
 ## API
 
-You can access basic service data via our public API.
-
-See the [API page](/docs/api) for more details.
+You can access basic service data through our [public API](/docs/api).
 
 ## Support
 
-If you like this project, you can **support** it through these methods:
+You can **support** our work through these methods:
 
 <DonationAddress
   cryptoName="Monero"
@@ -218,11 +276,11 @@ If you like this project, you can **support** it through these methods:
 
 ## Contact
 
-You can contact via direct chat:
+You can contact us through SimpleX Chat:
 
 - [SimpleX Chat](https://simplex.chat/contact#/?v=2&smp=smp%3A%2F%2F0YuTwO05YJWS8rkjn9eLJDjQhFKvIYd8d4xG8X1blIU%3D%40smp8.simplex.im%2FcgKHYUYnpAIVoGb9lxb0qEMEpvYIvc1O%23%2F%3Fv%3D1-2%26dh%3DMCowBQYDK2VuAyEAIW_JSq8wOsLKG4Xv4O54uT2D_l8MJBYKQIFj1FjZpnU%253D%26srv%3Dbeccx4yfxxbvyhqypaavemqurytl6hozr47wfc7uuecacjqdvwpw2xid.onion)
 
-## Downloads and assets
+## Downloads and Assets
 
 For logos and brand assets, visit our [downloads page](/downloads).
 
