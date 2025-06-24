@@ -461,6 +461,25 @@ if (!user) return Astro.rewrite('/404')
       <InputSubmitButton label="Submit" icon="ri:add-line" hideCancel />
     </form>
   </FormSection>
+
+  <FormSection title="Delete User">
+    {
+      user.admin || user.moderator ? (
+        <p class="text-center text-balance">This user can't be deleted</p>
+      ) : (
+        <p class="text-center text-balance">
+          To delete this user,
+          <a
+            href={`/account/impersonate?targetUserId=${user.id}&redirect=/account/delete`}
+            data-astro-prefetch="tap"
+            class="underline"
+          >
+            impersonate it and go to /account/delete
+          </a>
+        </p>
+      )
+    }
+  </FormSection>
 </BaseLayout>
 
 <script>

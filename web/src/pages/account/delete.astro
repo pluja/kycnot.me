@@ -1,0 +1,141 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import Captcha from '../../components/Captcha.astro'
+import InputSubmitButton from '../../components/InputSubmitButton.astro'
+import UserBadge from '../../components/UserBadge.astro'
+import MiniLayout from '../../layouts/MiniLayout.astro'
+import { prisma } from '../../lib/prisma'
+import { makeLoginUrl } from '../../lib/redirectUrls'
+
+const deleteResult = Astro.getActionResult(actions.account.delete)
+if (deleteResult && !deleteResult.error) {
+  Astro.locals.banners.addIfSuccess(deleteResult, 'Account deleted successfully')
+  return Astro.redirect('/')
+}
+
+const userId = Astro.locals.user?.id
+if (!userId) {
+  return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Login to delete your account' }))
+}
+
+const user = await Astro.locals.banners.try('Failed to load user profile', () =>
+  prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      admin: true,
+      moderator: true,
+      name: true,
+      displayName: true,
+      picture: true,
+      _count: {
+        select: {
+          comments: true,
+          commentVotes: true,
+          suggestions: true,
+          suggestionMessages: true,
+          verificationRequests: true,
+        },
+      },
+    },
+  })
+)
+
+if (!user) return Astro.rewrite('/404')
+---
+
+<MiniLayout
+  pageTitle="Delete account"
+  description="Delete your account"
+  ogImage={{
+    template: 'generic',
+    title: 'Delete account',
+    description: 'Delete your account',
+    icon: 'ri:delete-bin-line',
+  }}
+  layoutHeader={{
+    icon: 'ri:delete-bin-line',
+    title: 'Delete account',
+    subtitle: 'Are you sure? This is irreversible.',
+  }}
+  breadcrumbs={[
+    {
+      name: 'Accounts',
+      url: '/account',
+    },
+    {
+      name: 'Delete account',
+    },
+  ]}
+>
+  <h2 class="font-title text-day-200 mb-2 text-lg font-semibold">What will be deleted:</h2>
+
+  <a
+    href="/account"
+    class="group relative mb-2 flex flex-col items-center rounded-xl border border-red-500/10 bg-red-500/10 p-4"
+  >
+    <UserBadge user={user} size="lg" noLink classNames={{ text: 'group-hover:underline' }} />
+    <Icon
+      name="ri:forbid-line"
+      class="2xs:block absolute top-1/2 left-3 hidden size-8 -translate-y-1/2 text-red-300/10"
+    />
+    <Icon
+      name="ri:forbid-2-line"
+      class="2xs:block absolute top-1/2 right-3 hidden size-8 -translate-y-1/2 text-red-300/10"
+    />
+  </a>
+
+  <ul class="2xs:grid-cols-2 mb-8 grid grid-cols-1 gap-x-1 gap-y-0">
+    <li>
+      <span class="text-day-200 me-1 align-[-0.1em] text-2xl font-bold">1</span>
+      <span class="text-day-400 text-sm">User</span>
+    </li>
+
+    <li>
+      <span class="text-day-200 me-1 align-[-0.1em] text-2xl font-bold"
+        >{user._count.comments.toLocaleString()}</span
+      >
+      <span class="text-day-400 text-sm">Comments <span class="text-xs">(+ their replies)</span></span>
+    </li>
+
+    <li>
+      <span class="text-day-200 me-1 align-[-0.1em] text-2xl font-bold"
+        >{user._count.commentVotes.toLocaleString()}</span
+      >
+      <span class="text-day-400 text-sm">Comment Votes</span>
+    </li>
+
+    <li>
+      <span class="text-day-200 me-1 align-[-0.1em] text-2xl font-bold"
+        >{user._count.suggestions.toLocaleString()}</span
+      >
+      <span class="text-day-400 text-sm">Service Suggestions</span>
+    </li>
+
+    <li>
+      <span class="text-day-200 me-1 align-[-0.1em] text-2xl font-bold"
+        >{user._count.suggestionMessages.toLocaleString()}</span
+      >
+      <span class="text-day-400 text-sm">Suggestion Messages</span>
+    </li>
+
+    <li>
+      <span class="text-day-200 me-1 align-[-0.1em] text-2xl font-bold"
+        >{user._count.verificationRequests.toLocaleString()}</span
+      >
+      <span class="text-day-400 text-sm">Verification Requests</span>
+    </li>
+  </ul>
+
+  {
+    user.admin || user.moderator ? (
+      <p class="text-center text-balance text-red-300">Admins and moderators cannot be deleted.</p>
+    ) : (
+      <form method="POST" action={actions.account.delete}>
+        <Captcha action={actions.account.delete} class="mb-6" />
+        <InputSubmitButton label="Delete account" color="danger" icon="ri:delete-bin-line" />
+      </form>
+    )
+  }
+</MiniLayout>

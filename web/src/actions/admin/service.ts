@@ -58,6 +58,7 @@ const serviceSchemaBase = z.object({
     .optional()
     .nullable()
     .default(null),
+  operatingSince: z.coerce.date().optional().nullable(),
   imageFile: imageFileSchema,
   overallScore: zodCohercedNumber(z.number().int().min(0).max(10)).optional(),
   serviceVisibility: z.nativeEnum(ServiceVisibility),
@@ -150,6 +151,7 @@ export const adminServiceActions = {
                 },
               }
             : undefined,
+          operatingSince: input.operatingSince,
         },
         select: {
           id: true,
@@ -258,7 +260,6 @@ export const adminServiceActions = {
                   ),
                 }
               : undefined,
-
           imageUrl,
           categories: {
             connect: categoriesToAdd.map((id) => ({ id })),
@@ -275,6 +276,7 @@ export const adminServiceActions = {
               attributeId,
             })),
           },
+          operatingSince: input.operatingSince,
         },
       })
 

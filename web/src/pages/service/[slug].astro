@@ -95,6 +95,7 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
           approvedAt: true,
           createdAt: true,
           acceptedCurrencies: true,
+          operatingSince: true,
           tosReview: true,
           tosReviewAt: true,
           userSentiment: true,
@@ -901,13 +902,34 @@ const activeEventToShow =
   </h2>
   <div class="xs:gap-8 flex flex-row flex-wrap items-stretch justify-center gap-4 sm:justify-between">
     <div class="flex max-w-84 flex-grow flex-row items-center justify-evenly gap-4">
-      <ScoreSquare score={service.overallScore} label="Overall" itemReviewedId={itemReviewedId} />
+      <ScoreSquare
+        as="a"
+        href="/about#service-scores"
+        score={service.overallScore}
+        label="Overall"
+        itemReviewedId={itemReviewedId}
+        showInfo
+      />
 
       <div class="bg-day-800 h-12 w-px flex-shrink-0 self-center"></div>
 
-      <ScoreGauge score={service.privacyScore} label="Privacy" itemReviewedId={itemReviewedId} />
+      <ScoreGauge
+        as="a"
+        href="/about#service-scores"
+        score={service.privacyScore}
+        label="Privacy"
+        itemReviewedId={itemReviewedId}
+        showInfo
+      />
 
-      <ScoreGauge score={service.trustScore} label="Trust" itemReviewedId={itemReviewedId} />
+      <ScoreGauge
+        as="a"
+        href="/about#service-scores"
+        score={service.trustScore}
+        label="Trust"
+        itemReviewedId={itemReviewedId}
+        showInfo
+      />
     </div>
     <div
       class="@container flex max-w-112 flex-shrink-0 flex-grow-100 basis-64 flex-row items-start rounded-lg bg-white px-3 py-2 text-black"

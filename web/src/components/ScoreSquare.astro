@@ -6,27 +6,39 @@ import { makeOverallScoreInfo } from '../lib/overallScore'
 import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
 import { transformCase } from '../lib/strings'
 
-import type { HTMLAttributes } from 'astro/types'
+import type { HTMLTag, Polymorphic } from 'astro/types'
 
-export type Props = HTMLAttributes<'div'> & {
+type Props = Polymorphic<{
+  as: HTMLTag
   score: number
   label: string
   total?: number
   itemReviewedId?: string
-}
+  showInfo?: boolean
+  children?: never
+}>
 
-const { score, label, total = 10, class: className, itemReviewedId, ...htmlProps } = Astro.props
+const {
+  as: Tag = 'div',
+  score,
+  label,
+  total = 10,
+  class: className,
+  itemReviewedId,
+  showInfo = false,
+  ...htmlProps
+} = Astro.props
 
 const { text, classNameBg, formattedScore } = makeOverallScoreInfo(score, total)
 ---
 
-<div
+<Tag
   {...htmlProps}
   class={cn(
     '2xs:size-24 relative flex aspect-square size-18 flex-col items-center justify-start text-white',
     className
   )}
-  role="group"
+  role={htmlProps.role ?? 'group'}
 >
   {
     !!itemReviewedId && (
@@ -48,15 +60,17 @@ const { text, classNameBg, formattedScore } = makeOverallScoreInfo(score, total)
       />
     )
   }
-  <!-- <svg
-    class="absolute top-0.5 left-[calc(50%+48px/2+2px)] size-3 text-current/60"
-    viewBox="0 0 12 12"
-    fill="currentColor"
-  >
-    <path
-      d="M6 11C3.23857 11 1 8.7614 1 6C1 3.23857 3.23857 1 6 1C8.7614 1 11 3.23857 11 6C11 8.7614 8.7614 11 6 11ZM6 10C8.20915 10 10 8.20915 10 6C10 3.79086 8.20915 2 6 2C3.79086 2 2 3.79086 2 6C2 8.20915 3.79086 10 6 10ZM5.5 3.5H6.5V4.5H5.5V3.5ZM5.5 5.5H6.5V8.5H5.5V5.5Z"
-    ></path>
-  </svg> -->
+  {
+    showInfo && (
+      <svg
+        class="absolute top-0.5 left-[calc(50%+48px/2+2px)] size-3 text-current/60"
+        viewBox="0 0 12 12"
+        fill="currentColor"
+      >
+        <path d="M6 11C3.23857 11 1 8.7614 1 6C1 3.23857 3.23857 1 6 1C8.7614 1 11 3.23857 11 6C11 8.7614 8.7614 11 6 11ZM6 10C8.20915 10 10 8.20915 10 6C10 3.79086 8.20915 2 6 2C3.79086 2 2 3.79086 2 6C2 8.20915 3.79086 10 6 10ZM5.5 3.5H6.5V4.5H5.5V3.5ZM5.5 5.5H6.5V8.5H5.5V5.5Z" />
+      </svg>
+    )
+  }
 
   <div
     class={cn(
@@ -77,4 +91,4 @@ const { text, classNameBg, formattedScore } = makeOverallScoreInfo(score, total)
   </div>
 
   <span class="text-xs leading-none tracking-wide text-current/80">{text}</span>
-</div>
+</Tag>

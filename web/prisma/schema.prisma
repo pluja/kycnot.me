@@ -349,6 +349,8 @@ model Service {
   categories             Category[]                   @relation("ServiceToCategory")
   kycLevel               Int                          @default(4)
   kycLevelClarification  KycLevelClarification        @default(NONE)
+  /// The first known date when the service started operating. Used for New/Mature service attributes.
+  operatingSince         DateTime?
   overallScore           Int                          @default(0)
   privacyScore           Int                          @default(0)
   trustScore             Int                          @default(0)

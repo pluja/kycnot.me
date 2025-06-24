@@ -393,7 +393,9 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
               <span class="text-day-500 mt-0.5 mr-2"><Icon name="ri:award-line" class="size-4" /></span>
               <div>
                 <p class="text-day-500 text-xs">Karma</p>
-                <p class="text-day-300">{user.totalKarma.toLocaleString()}</p>
+                <p class="text-day-300">
+                  {!user.admin && !user.moderator ? user.totalKarma.toLocaleString() : '∞'}
+                </p>
               </div>
             </li>
           </ul>
@@ -575,187 +577,130 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
     </section>
   </AdminOnly>
 
-  <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
-    <header>
-      <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
-        <Icon name="ri:building-4-line" class="mr-2 inline-block size-5" />
-        Service Affiliations
-      </h2>
-    </header>
+  {
+    !user.admin && !user.moderator && (
+      <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+        <header>
+          <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+            <Icon name="ri:building-4-line" class="mr-2 inline-block size-5" />
+            Service Affiliations
+          </h2>
+        </header>
 
-    {
-      user.serviceAffiliations.length > 0 ? (
-        <ul class="2xs:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] grid gap-4">
-          {user.serviceAffiliations.map((affiliation) => {
-            const roleInfo = getServiceUserRoleInfo(affiliation.role)
-            const statusIcon = {
-              ...verificationStatusesByValue,
-              APPROVED: undefined,
-            }[affiliation.service.verificationStatus]
+        {user.serviceAffiliations.length > 0 ? (
+          <ul class="2xs:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] grid gap-4">
+            {user.serviceAffiliations.map((affiliation) => {
+              const roleInfo = getServiceUserRoleInfo(affiliation.role)
+              const statusIcon = {
+                ...verificationStatusesByValue,
+                APPROVED: undefined,
+              }[affiliation.service.verificationStatus]
 
-            return (
-              <li class="shrink-0">
-                <a
-                  href={`/service/${affiliation.service.slug}`}
-                  class="text-day-300 group flex min-w-32 items-center gap-2 text-sm"
-                >
-                  <MyPicture
-                    src={affiliation.service.imageUrl}
-                    fallback="service"
-                    alt={affiliation.service.name}
-                    width={40}
-                    height={40}
-                    class="size-10 shrink-0 rounded-lg"
-                  />
-                  <div class="flex min-w-0 flex-1 flex-col justify-center">
-                    <div class="flex items-center gap-1.5">
-                      <BadgeSmall color={roleInfo.color} text={roleInfo.label} icon={roleInfo.icon} />
-                      <span class="text-day-500">of</span>
+              return (
+                <li class="shrink-0">
+                  <a
+                    href={`/service/${affiliation.service.slug}`}
+                    class="text-day-300 group flex min-w-32 items-center gap-2 text-sm"
+                  >
+                    <MyPicture
+                      src={affiliation.service.imageUrl}
+                      fallback="service"
+                      alt={affiliation.service.name}
+                      width={40}
+                      height={40}
+                      class="size-10 shrink-0 rounded-lg"
+                    />
+                    <div class="flex min-w-0 flex-1 flex-col justify-center">
+                      <div class="flex items-center gap-1.5">
+                        <BadgeSmall color={roleInfo.color} text={roleInfo.label} icon={roleInfo.icon} />
+                        <span class="text-day-500">of</span>
+                      </div>
+
+                      <div class="text-day-300 flex items-center gap-1 font-semibold">
+                        <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap group-hover:underline">
+                          {affiliation.service.name}
+                        </span>
+                        {statusIcon && (
+                          <Tooltip text={statusIcon.label} position="right" class="-m-1 shrink-0">
+                            <Icon
+                              name={statusIcon.icon}
+                              class={cn(
+                                'inline-block size-6 shrink-0 rounded-lg p-1',
+                                statusIcon.classNames.icon
+                              )}
+                            />
+                          </Tooltip>
+                        )}
+                        <Icon name="ri:external-link-line" class="size-4 shrink-0" />
+                      </div>
                     </div>
+                  </a>
+                </li>
+              )
+            })}
+          </ul>
+        ) : (
+          <p class="text-day-400 mb-6">No service affiliations yet.</p>
+        )}
+      </section>
+    )
+  }
 
-                    <div class="text-day-300 flex items-center gap-1 font-semibold">
-                      <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap group-hover:underline">
-                        {affiliation.service.name}
-                      </span>
-                      {statusIcon && (
-                        <Tooltip text={statusIcon.label} position="right" class="-m-1 shrink-0">
-                          <Icon
-                            name={statusIcon.icon}
-                            class={cn(
-                              'inline-block size-6 shrink-0 rounded-lg p-1',
-                              statusIcon.classNames.icon
-                            )}
-                          />
-                        </Tooltip>
-                      )}
-                      <Icon name="ri:external-link-line" class="size-4 shrink-0" />
-                    </div>
-                  </div>
-                </a>
-              </li>
-            )
-          })}
-        </ul>
-      ) : (
-        <p class="text-day-400 mb-6">No service affiliations yet.</p>
-      )
-    }
-  </section>
+  {
+    !user.admin && !user.moderator && (
+      <section
+        class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs"
+        id="karma-unlocks"
+      >
+        <header>
+          <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+            <Icon name="ri:lock-unlock-line" class="mr-2 inline-block size-5" />
+            Karma Unlocks
+          </h2>
 
-  <section
-    class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs"
-    id="karma-unlocks"
-  >
-    <header>
-      <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
-        <Icon name="ri:lock-unlock-line" class="mr-2 inline-block size-5" />
-        Karma Unlocks
-      </h2>
+          <div class="border-night-500 bg-night-800/70 mb-4 rounded-md border px-4 py-3">
+            <p class="text-day-300">
+              Earn karma to unlock features and privileges.{' '}
+              <a href="/docs/karma" class="text-day-200 hover:underline">
+                Learn about karma
+              </a>
+            </p>
+          </div>
+        </header>
 
-      <div class="border-night-500 bg-night-800/70 mb-4 rounded-md border px-4 py-3">
-        <p class="text-day-300">
-          Earn karma to unlock features and privileges. <a
-            href="/docs/karma"
-            class="text-day-200 hover:underline">Learn about karma</a
-          >
-        </p>
-      </div>
-    </header>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div class="space-y-3">
+            <input type="checkbox" id="positive-unlocks-toggle" class="peer sr-only md:hidden" checked />
+            <label
+              for="positive-unlocks-toggle"
+              class="flex cursor-pointer items-center justify-between border-b border-green-500/20 pb-2 md:cursor-default peer-checked:[&_[data-expand-arrow]]:rotate-180"
+            >
+              <h3 class="font-title text-day-200 text-sm">Positive unlocks</h3>
+              <Icon name="ri:arrow-down-s-line" class="text-day-400 size-5 md:hidden" data-expand-arrow />
+            </label>
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <div class="space-y-3">
-        <input type="checkbox" id="positive-unlocks-toggle" class="peer sr-only md:hidden" checked />
-        <label
-          for="positive-unlocks-toggle"
-          class="flex cursor-pointer items-center justify-between border-b border-green-500/20 pb-2 md:cursor-default peer-checked:[&_[data-expand-arrow]]:rotate-180"
-        >
-          <h3 class="font-title text-day-200 text-sm">Positive unlocks</h3>
-          <Icon name="ri:arrow-down-s-line" class="text-day-400 size-5 md:hidden" data-expand-arrow />
-        </label>
-
-        <div class="mt-3 hidden space-y-3 peer-checked:block md:block">
-          {
-            sortBy(
-              karmaUnlocks.filter((unlock) => unlock.karma >= 0),
-              'karma'
-            ).map((unlock) => (
-              <div
-                class={cn(
-                  'flex items-center justify-between rounded-md border p-3',
-                  user.karmaUnlocks[unlock.id]
-                    ? 'border-green-500/30 bg-green-500/10'
-                    : 'border-night-500 bg-night-800'
-                )}
-              >
-                <div class="flex items-center">
-                  <span class={cn('mr-3', user.karmaUnlocks[unlock.id] ? 'text-day-400' : 'text-day-500')}>
-                    <Icon name={unlock.icon} class="size-5" />
-                  </span>
-                  <div>
-                    <p
-                      class={cn(
-                        'font-medium',
-                        user.karmaUnlocks[unlock.id] ? 'text-day-300' : 'text-day-400'
-                      )}
-                    >
-                      {unlock.name}
-                    </p>
-                    <p class="text-day-500 text-sm">{unlock.karma.toLocaleString()} karma</p>
-                  </div>
-                </div>
-                <div>
-                  {user.karmaUnlocks[unlock.id] ? (
-                    <span class="bg-day-500/20 text-day-300 inline-flex items-center rounded-full px-2 py-1 text-xs">
-                      <Icon name="ri:check-line" class="mr-1 size-3" /> Unlocked
-                    </span>
-                  ) : (
-                    <span class="bg-night-800 text-day-400 inline-flex items-center rounded-full px-2 py-1 text-xs">
-                      <Icon name="ri:lock-line" class="mr-1 size-3" /> Locked
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))
-          }
-        </div>
-      </div>
-
-      <div class="space-y-3">
-        <input type="checkbox" id="negative-unlocks-toggle" class="peer sr-only md:hidden" />
-
-        <label
-          for="negative-unlocks-toggle"
-          class="flex cursor-pointer items-center justify-between border-b border-red-500/20 pb-2 md:cursor-default peer-checked:[&_[data-expand-arrow]]:rotate-180"
-        >
-          <h3 class="font-title text-sm text-red-400">Negative unlocks</h3>
-          <Icon name="ri:arrow-down-s-line" class="text-day-400 size-5 md:hidden" data-expand-arrow />
-        </label>
-
-        <div class="mt-3 hidden space-y-3 peer-checked:block md:block">
-          {
-            sortBy(
-              karmaUnlocks.filter((unlock) => unlock.karma < 0),
-              'karma'
-            )
-              .reverse()
-              .map((unlock) => (
+            <div class="mt-3 hidden space-y-3 peer-checked:block md:block">
+              {sortBy(
+                karmaUnlocks.filter((unlock) => unlock.karma >= 0),
+                'karma'
+              ).map((unlock) => (
                 <div
                   class={cn(
                     'flex items-center justify-between rounded-md border p-3',
                     user.karmaUnlocks[unlock.id]
-                      ? 'border-red-500/30 bg-red-500/10'
+                      ? 'border-green-500/30 bg-green-500/10'
                       : 'border-night-500 bg-night-800'
                   )}
                 >
                   <div class="flex items-center">
-                    <span class={cn('mr-3', user.karmaUnlocks[unlock.id] ? 'text-red-400' : 'text-day-500')}>
+                    <span class={cn('mr-3', user.karmaUnlocks[unlock.id] ? 'text-day-400' : 'text-day-500')}>
                       <Icon name={unlock.icon} class="size-5" />
                     </span>
                     <div>
                       <p
                         class={cn(
                           'font-medium',
-                          user.karmaUnlocks[unlock.id] ? 'text-red-400' : 'text-day-400'
+                          user.karmaUnlocks[unlock.id] ? 'text-day-300' : 'text-day-400'
                         )}
                       >
                         {unlock.name}
@@ -765,28 +710,89 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                   </div>
                   <div>
                     {user.karmaUnlocks[unlock.id] ? (
-                      <span class="inline-flex items-center rounded-full bg-red-500/20 px-2 py-1 text-xs text-red-400">
-                        <Icon name="ri:alert-line" class="mr-1 size-3" /> Active
+                      <span class="bg-day-500/20 text-day-300 inline-flex items-center rounded-full px-2 py-1 text-xs">
+                        <Icon name="ri:check-line" class="mr-1 size-3" /> Unlocked
                       </span>
                     ) : (
                       <span class="bg-night-800 text-day-400 inline-flex items-center rounded-full px-2 py-1 text-xs">
-                        <Icon name="ri:shield-check-line" class="mr-1 size-3" /> Avoided
+                        <Icon name="ri:lock-line" class="mr-1 size-3" /> Locked
                       </span>
                     )}
                   </div>
                 </div>
-              ))
-          }
+              ))}
+            </div>
+          </div>
 
-          <p class="text-day-400 border-night-500/30 bg-night-800/70 mt-4 rounded-md border p-3 text-xs">
-            <Icon name="ri:information-line" class="inline-block size-4" />
-            Negative karma leads to restrictions. <br class="hidden sm:block" />Keep interactions positive to
-            avoid penalties.
-          </p>
+          <div class="space-y-3">
+            <input type="checkbox" id="negative-unlocks-toggle" class="peer sr-only md:hidden" />
+
+            <label
+              for="negative-unlocks-toggle"
+              class="flex cursor-pointer items-center justify-between border-b border-red-500/20 pb-2 md:cursor-default peer-checked:[&_[data-expand-arrow]]:rotate-180"
+            >
+              <h3 class="font-title text-sm text-red-400">Negative unlocks</h3>
+              <Icon name="ri:arrow-down-s-line" class="text-day-400 size-5 md:hidden" data-expand-arrow />
+            </label>
+
+            <div class="mt-3 hidden space-y-3 peer-checked:block md:block">
+              {sortBy(
+                karmaUnlocks.filter((unlock) => unlock.karma < 0),
+                'karma'
+              )
+                .reverse()
+                .map((unlock) => (
+                  <div
+                    class={cn(
+                      'flex items-center justify-between rounded-md border p-3',
+                      user.karmaUnlocks[unlock.id]
+                        ? 'border-red-500/30 bg-red-500/10'
+                        : 'border-night-500 bg-night-800'
+                    )}
+                  >
+                    <div class="flex items-center">
+                      <span
+                        class={cn('mr-3', user.karmaUnlocks[unlock.id] ? 'text-red-400' : 'text-day-500')}
+                      >
+                        <Icon name={unlock.icon} class="size-5" />
+                      </span>
+                      <div>
+                        <p
+                          class={cn(
+                            'font-medium',
+                            user.karmaUnlocks[unlock.id] ? 'text-red-400' : 'text-day-400'
+                          )}
+                        >
+                          {unlock.name}
+                        </p>
+                        <p class="text-day-500 text-sm">{unlock.karma.toLocaleString()} karma</p>
+                      </div>
+                    </div>
+                    <div>
+                      {user.karmaUnlocks[unlock.id] ? (
+                        <span class="inline-flex items-center rounded-full bg-red-500/20 px-2 py-1 text-xs text-red-400">
+                          <Icon name="ri:alert-line" class="mr-1 size-3" /> Active
+                        </span>
+                      ) : (
+                        <span class="bg-night-800 text-day-400 inline-flex items-center rounded-full px-2 py-1 text-xs">
+                          <Icon name="ri:shield-check-line" class="mr-1 size-3" /> Avoided
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+              <p class="text-day-400 border-night-500/30 bg-night-800/70 mt-4 rounded-md border p-3 text-xs">
+                <Icon name="ri:information-line" class="inline-block size-4" />
+                Negative karma leads to restrictions. <br class="hidden sm:block" />
+                Keep interactions positive to avoid penalties.
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  </section>
+      </section>
+    )
+  }
 
   <div class="space-y-6">
     <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
@@ -929,139 +935,143 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
       )
     }
 
-    <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
-      <header class="flex items-center justify-between">
-        <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
-          <Icon name="ri:lightbulb-line" class="mr-2 inline-block size-5" />
-          Recent Suggestions
-        </h2>
-      </header>
+    {
+      !user.admin && !user.moderator && (
+        <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+          <header class="flex items-center justify-between">
+            <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+              <Icon name="ri:lightbulb-line" class="mr-2 inline-block size-5" />
+              Recent Suggestions
+            </h2>
+          </header>
 
-      {
-        user.suggestions.length === 0 ? (
-          <p class="text-day-400">No suggestions yet.</p>
-        ) : (
-          <div class="overflow-x-auto">
-            <table class="divide-night-400/20 w-full min-w-full divide-y">
-              <thead>
-                <tr>
-                  <th class="text-day-400 px-4 py-3 text-left text-xs">Service</th>
-                  <th class="text-day-400 px-4 py-3 text-left text-xs">Type</th>
-                  <th class="text-day-400 px-4 py-3 text-center text-xs">Status</th>
-                  <th class="text-day-400 px-4 py-3 text-right text-xs">Date</th>
-                </tr>
-              </thead>
-              <tbody class="divide-night-400/10 divide-y">
-                {user.suggestions.map((suggestion) => {
-                  const typeInfo = getServiceSuggestionTypeInfo(suggestion.type)
-                  const statusInfo = getServiceSuggestionStatusInfo(suggestion.status)
+          {user.suggestions.length === 0 ? (
+            <p class="text-day-400">No suggestions yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="divide-night-400/20 w-full min-w-full divide-y">
+                <thead>
+                  <tr>
+                    <th class="text-day-400 px-4 py-3 text-left text-xs">Service</th>
+                    <th class="text-day-400 px-4 py-3 text-left text-xs">Type</th>
+                    <th class="text-day-400 px-4 py-3 text-center text-xs">Status</th>
+                    <th class="text-day-400 px-4 py-3 text-right text-xs">Date</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-night-400/10 divide-y">
+                  {user.suggestions.map((suggestion) => {
+                    const typeInfo = getServiceSuggestionTypeInfo(suggestion.type)
+                    const statusInfo = getServiceSuggestionStatusInfo(suggestion.status)
 
-                  return (
-                    <tr class="hover:bg-night-500/5">
-                      <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
-                        <a
-                          href={`/service-suggestion/${suggestion.id}`}
-                          class="text-blue-400 hover:underline"
-                        >
-                          {suggestion.service.name}
-                        </a>
-                      </td>
-                      <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
-                        <span class="inline-flex items-center">
-                          <Icon name={typeInfo.icon} class="mr-1 size-4" />
-                          {typeInfo.label}
-                        </span>
-                      </td>
-                      <td class="px-4 py-3 text-center">
-                        <span class="border-night-500/20 bg-night-800/10 inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
-                          <Icon name={statusInfo.icon} class="mr-1 size-3" />
-                          {statusInfo.label}
-                        </span>
-                      </td>
-                      <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
-                        <TimeFormatted
-                          date={suggestion.createdAt}
-                          prefix={false}
-                          hourPrecision
-                          caseType="sentence"
-                        />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )
-      }
-    </section>
+                    return (
+                      <tr class="hover:bg-night-500/5">
+                        <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
+                          <a
+                            href={`/service-suggestion/${suggestion.id}`}
+                            class="text-blue-400 hover:underline"
+                          >
+                            {suggestion.service.name}
+                          </a>
+                        </td>
+                        <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
+                          <span class="inline-flex items-center">
+                            <Icon name={typeInfo.icon} class="mr-1 size-4" />
+                            {typeInfo.label}
+                          </span>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                          <span class="border-night-500/20 bg-night-800/10 inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
+                            <Icon name={statusInfo.icon} class="mr-1 size-3" />
+                            {statusInfo.label}
+                          </span>
+                        </td>
+                        <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
+                          <TimeFormatted
+                            date={suggestion.createdAt}
+                            prefix={false}
+                            hourPrecision
+                            caseType="sentence"
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )
+    }
 
-    <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
-      <header class="flex items-center justify-between">
-        <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
-          <Icon name="ri:exchange-line" class="mr-2 inline-block size-5" />
-          Recent Karma Transactions
-        </h2>
-        <span class="text-day-500">{user.totalKarma.toLocaleString()} karma</span>
-      </header>
+    {
+      !user.admin && !user.moderator && (
+        <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+          <header class="flex items-center justify-between">
+            <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+              <Icon name="ri:exchange-line" class="mr-2 inline-block size-5" />
+              Recent Karma Transactions
+            </h2>
+            <span class="text-day-500">{user.totalKarma.toLocaleString()} karma</span>
+          </header>
 
-      {
-        user.karmaTransactions.length === 0 ? (
-          <p class="text-day-400">No karma transactions yet.</p>
-        ) : (
-          <div class="overflow-x-auto">
-            <table class="divide-night-400/20 w-full min-w-full divide-y">
-              <thead>
-                <tr>
-                  <th class="text-day-400 px-4 py-3 text-left text-xs">Action</th>
-                  <th class="text-day-400 px-4 py-3 text-left text-xs">Description</th>
-                  <th class="text-day-400 px-4 py-3 text-right text-xs">Points</th>
-                  <th class="text-day-400 px-4 py-3 text-right text-xs">Date</th>
-                </tr>
-              </thead>
-              <tbody class="divide-night-400/10 divide-y">
-                {user.karmaTransactions.map((transaction) => {
-                  const actionInfo = getKarmaTransactionActionInfo(transaction.action)
-                  return (
-                    <tr class="hover:bg-night-500/5">
-                      <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
-                        <span class="inline-flex items-center gap-1">
-                          <Icon name={actionInfo.icon} class="size-4" />
-                          {actionInfo.label}
-                          {transaction.action === 'MANUAL_ADJUSTMENT' && transaction.grantedBy && (
-                            <>
-                              <span class="text-day-500">from</span>
-                              <UserBadge user={transaction.grantedBy} size="sm" class="text-day-500" />
-                            </>
+          {user.karmaTransactions.length === 0 ? (
+            <p class="text-day-400">No karma transactions yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="divide-night-400/20 w-full min-w-full divide-y">
+                <thead>
+                  <tr>
+                    <th class="text-day-400 px-4 py-3 text-left text-xs">Action</th>
+                    <th class="text-day-400 px-4 py-3 text-left text-xs">Description</th>
+                    <th class="text-day-400 px-4 py-3 text-right text-xs">Points</th>
+                    <th class="text-day-400 px-4 py-3 text-right text-xs">Date</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-night-400/10 divide-y">
+                  {user.karmaTransactions.map((transaction) => {
+                    const actionInfo = getKarmaTransactionActionInfo(transaction.action)
+                    return (
+                      <tr class="hover:bg-night-500/5">
+                        <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
+                          <span class="inline-flex items-center gap-1">
+                            <Icon name={actionInfo.icon} class="size-4" />
+                            {actionInfo.label}
+                            {transaction.action === 'MANUAL_ADJUSTMENT' && transaction.grantedBy && (
+                              <>
+                                <span class="text-day-500">from</span>
+                                <UserBadge user={transaction.grantedBy} size="sm" class="text-day-500" />
+                              </>
+                            )}
+                          </span>
+                        </td>
+                        <td class="text-day-300 px-4 py-3">{transaction.description}</td>
+                        <td
+                          class={cn(
+                            'px-4 py-3 text-right text-xs whitespace-nowrap',
+                            transaction.points >= 0 ? 'text-green-400' : 'text-red-400'
                           )}
-                        </span>
-                      </td>
-                      <td class="text-day-300 px-4 py-3">{transaction.description}</td>
-                      <td
-                        class={cn(
-                          'px-4 py-3 text-right text-xs whitespace-nowrap',
-                          transaction.points >= 0 ? 'text-green-400' : 'text-red-400'
-                        )}
-                      >
-                        {transaction.points >= 0 && '+'}
-                        {transaction.points}
-                      </td>
-                      <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
-                        <TimeFormatted
-                          date={transaction.createdAt}
-                          prefix={false}
-                          hourPrecision
-                          caseType="sentence"
-                        />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )
-      }
-    </section>
+                        >
+                          {transaction.points >= 0 && '+'}
+                          {transaction.points}
+                        </td>
+                        <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
+                          <TimeFormatted
+                            date={transaction.createdAt}
+                            prefix={false}
+                            hourPrecision
+                            caseType="sentence"
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )
+    }
   </div>
 </BaseLayout>

@@ -362,6 +362,22 @@ const apiCalls = await Astro.locals.banners.try(
             error={serviceInputErrors.tosUrls}
           />
           <InputText
+            label="Operating since"
+            name="operatingSince"
+            description="Date the service started operating"
+            inputProps={{
+              type: 'date',
+              value: service.operatingSince
+                ? new Date(
+                    service.operatingSince.getTime() - service.operatingSince.getTimezoneOffset() * 60000
+                  )
+                    .toISOString()
+                    .slice(0, 10)
+                : '',
+            }}
+            error={serviceInputErrors.operatingSince}
+          />
+          <InputText
             label="Referral link path"
             name="referral"
             inputProps={{

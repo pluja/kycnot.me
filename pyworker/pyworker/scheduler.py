@@ -62,25 +62,27 @@ class TaskScheduler:
             cron_expression: Cron expression defining the schedule.
             task_func: Function to execute.
             *args: Arguments to pass to the task function.
-            **kwargs: Keyword arguments to pass to the task function.
+            **kwargs: Keyword arguments to pass to the task function. `instantiate` is a special kwarg.
         """
+        instantiate = kwargs.pop("instantiate", True)
         # Declare task_instance variable with type annotation upfront
         task_instance: Any = None
 
-        # Initialize the appropriate task class based on the task name
-        if task_name.lower() == "tosreview":
-            task_instance = TosReviewTask()
-        elif task_name.lower() == "user_sentiment":
-            task_instance = UserSentimentTask()
-        elif task_name.lower() == "comment_moderation":
-            task_instance = CommentModerationTask()
-        elif task_name.lower() == "force_triggers":
-            task_instance = ForceTriggersTask()
-        elif task_name.lower() == "service_score_recalc":
-            task_instance = ServiceScoreRecalculationTask()
-        else:
-            self.logger.warning(f"Unknown task '{task_name}', skipping")
-            return
+        if instantiate:
+            # Initialize the appropriate task class based on the task name
+            if task_name.lower() == "tosreview":
+                task_instance = TosReviewTask()
+            elif task_name.lower() == "user_sentiment":
+                task_instance = UserSentimentTask()
+            elif task_name.lower() == "comment_moderation":
+                task_instance = CommentModerationTask()
+            elif task_name.lower() == "force_triggers":
+                task_instance = ForceTriggersTask()
+            elif task_name.lower() == "service_score_recalc":
+                task_instance = ServiceScoreRecalculationTask()
+            else:
+                self.logger.warning(f"Unknown task '{task_name}', skipping")
+                return
 
         self.tasks[task_name] = {
             "cron": cron_expression,
@@ -126,8 +128,12 @@ class TaskScheduler:
                     self.logger.info(f"Running task '{task_name}'")
                     # Use task instance as a context manager to ensure
                     # a single database connection is used for the entire task
-                    with task_info["instance"]:
-                        # Execute the registered task function with its arguments
+                    if task_info["instance"]:
+                        with task_info["instance"]:
+                            # Execute the registered task function with its arguments
+                            task_info["func"](*task_info["args"], **task_info["kwargs"])
+                    else:
+                        # Execute the registered task function without a context manager
                         task_info["func"](*task_info["args"], **task_info["kwargs"])
                     self.logger.info(f"Task '{task_name}' completed")
                 except Exception as e:

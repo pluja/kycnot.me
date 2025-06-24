@@ -1,5 +1,6 @@
 import { ActionError } from 'astro:actions'
 import { z } from 'astro:content'
+import { pick } from 'lodash-es'
 
 import { karmaUnlocksById } from '../constants/karmaUnlocks'
 import { createAccount } from '../lib/accountCreate'
@@ -7,7 +8,7 @@ import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../li
 import { defineProtectedAction } from '../lib/defineProtectedAction'
 import { saveFileLocally } from '../lib/fileStorage'
 import { handleHoneypotTrap } from '../lib/honeypot'
-import { startImpersonating } from '../lib/impersonation'
+import { startImpersonating, stopImpersonating } from '../lib/impersonation'
 import { makeKarmaUnlockMessage, makeUserWithKarmaUnlocks } from '../lib/karmaUnlocks'
 import { prisma } from '../lib/prisma'
 import { redisPreGeneratedSecretTokens } from '../lib/redis/redisPreGeneratedSecretTokens'
@@ -223,6 +224,38 @@ export const accountActions = {
       })
 
       return { user }
+    },
+  }),
+
+  delete: defineProtectedAction({
+    accept: 'form',
+    permissions: 'user',
+    input: z
+      .object({
+        ...captchaFormSchemaProperties,
+      })
+      .superRefine(captchaFormSchemaSuperRefine),
+    handler: async (_input, context) => {
+      if (context.locals.user.admin || context.locals.user.moderator) {
+        throw new ActionError({
+          code: 'FORBIDDEN',
+          message: 'Admins and moderators cannot delete their own accounts.',
+        })
+      }
+
+      await prisma.user.delete({
+        where: { id: context.locals.user.id },
+      })
+
+      const deletedUser = pick(context.locals.user, ['id', 'name', 'displayName', 'picture'])
+
+      if (context.locals.actualUser) {
+        await stopImpersonating(context)
+      } else {
+        await logout(context)
+      }
+
+      return { deletedUser }
     },
   }),
 }

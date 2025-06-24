@@ -95,6 +95,12 @@ def parse_args(args: List[str]) -> argparse.Namespace:
         help="Recalculate scores for all services (ignores --service-id)",
     )
 
+    # Service Score Recalculation task for all services
+    subparsers.add_parser(
+        "service-score-recalc-all",
+        help="Recalculate service scores for all services",
+    )
+
     return parser.parse_args(args)
 
 
@@ -358,6 +364,13 @@ def run_service_score_recalc_task(
         close_db_pool()
 
 
+def run_service_score_recalc_all_task() -> int:
+    """
+    Run the service score recalculation task for all services.
+    """
+    return run_service_score_recalc_task(all_services=True)
+
+
 def run_worker_mode() -> int:
     """
     Run in worker mode, scheduling tasks to run periodically.
@@ -396,6 +409,12 @@ def run_worker_mode() -> int:
             scheduler.register_task(
                 task_name, cron_expression, run_service_score_recalc_task
             )
+        elif task_name.lower() == "service_score_recalc_all":
+            scheduler.register_task(
+                task_name,
+                cron_expression,
+                run_service_score_recalc_all_task,
+            )
         else:
             logger.warning(f"Unknown task '{task_name}', skipping")
 
@@ -404,6 +423,12 @@ def run_worker_mode() -> int:
         "service_score_recalc",
         "*/5 * * * *",
         run_service_score_recalc_task,
+    )
+    # Register daily service score recalculation for all services
+    scheduler.register_task(
+        "service_score_recalc_all",
+        "0 0 * * *",
+        run_service_score_recalc_all_task,
     )
 
     # Start the scheduler if tasks were registered
@@ -457,6 +482,8 @@ def main() -> int:
             return run_service_score_recalc_task(
                 args.service_id, getattr(args, "all", False)
             )
+        elif args.task == "service-score-recalc-all":
+            return run_service_score_recalc_all_task()
         elif args.task:
             logger.error(f"Unknown task: {args.task}")
             return 1

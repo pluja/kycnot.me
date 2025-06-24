@@ -250,6 +250,16 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       error={inputErrors.tosUrls}
     />
 
+    <InputText
+      label="Operating since"
+      name="operatingSince"
+      description="Date the service started operating"
+      inputProps={{
+        type: 'date',
+      }}
+      error={(inputErrors as Record<string, unknown>).operatingSince}
+    />
+
     <InputCardGroup
       name="kycLevel"
       label="KYC Level"

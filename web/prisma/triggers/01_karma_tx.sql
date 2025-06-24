@@ -65,18 +65,36 @@ CREATE OR REPLACE FUNCTION handle_comment_approval(
     NEW RECORD,
     OLD RECORD
 ) RETURNS VOID AS $$
+DECLARE
+    is_user_related_to_service BOOLEAN;
+    is_user_admin_or_moderator BOOLEAN;
 BEGIN
     IF OLD.status = 'PENDING' AND NEW.status = 'APPROVED' THEN
-        PERFORM insert_karma_transaction(
-            NEW."authorId",
-            1,
-            'COMMENT_APPROVED',
-            NEW.id,
-            format('Your comment #comment-%s in %s has been approved!', 
-                NEW.id, 
-                (SELECT name FROM "Service" WHERE id = NEW."serviceId"))
-        );
-        PERFORM update_user_karma(NEW."authorId", 1);
+        -- Check if the user is related to the service (e.g., owns/manages it)
+        SELECT EXISTS(
+            SELECT 1 FROM "ServiceUser" 
+            WHERE "userId" = NEW."authorId" AND "serviceId" = NEW."serviceId"
+        ) INTO is_user_related_to_service;
+        
+        -- Check if the user is an admin or moderator
+        SELECT (admin = true OR moderator = true)
+        FROM "User"
+        WHERE id = NEW."authorId"
+        INTO is_user_admin_or_moderator;
+        
+        -- Only award karma if the user is NOT related to the service AND is NOT an admin/moderator
+        IF NOT is_user_related_to_service AND NOT COALESCE(is_user_admin_or_moderator, false) THEN
+            PERFORM insert_karma_transaction(
+                NEW."authorId",
+                1,
+                'COMMENT_APPROVED',
+                NEW.id,
+                format('Your comment #comment-%s in %s has been approved!', 
+                    NEW.id, 
+                    (SELECT name FROM "Service" WHERE id = NEW."serviceId"))
+            );
+            PERFORM update_user_karma(NEW."authorId", 1);
+        END IF;
     END IF;
 END;
 $$ LANGUAGE plpgsql;
@@ -86,18 +104,29 @@ CREATE OR REPLACE FUNCTION handle_comment_verification(
     NEW RECORD,
     OLD RECORD
 ) RETURNS VOID AS $$
+DECLARE
+    is_user_admin_or_moderator BOOLEAN;
 BEGIN
     IF NEW.status = 'VERIFIED' AND OLD.status != 'VERIFIED' THEN
-        PERFORM insert_karma_transaction(
-            NEW."authorId",
-            5,
-            'COMMENT_VERIFIED',
-            NEW.id,
-            format('Your comment #comment-%s in %s has been verified!', 
-                NEW.id, 
-                (SELECT name FROM "Service" WHERE id = NEW."serviceId"))
-        );
-        PERFORM update_user_karma(NEW."authorId", 5);
+        -- Check if the comment author is an admin or moderator
+        SELECT (admin = true OR moderator = true)
+        FROM "User"
+        WHERE id = NEW."authorId"
+        INTO is_user_admin_or_moderator;
+
+        -- Only award karma if the user is NOT an admin/moderator
+        IF NOT COALESCE(is_user_admin_or_moderator, false) THEN
+            PERFORM insert_karma_transaction(
+                NEW."authorId",
+                5,
+                'COMMENT_VERIFIED',
+                NEW.id,
+                format('Your comment #comment-%s in %s has been verified!', 
+                    NEW.id, 
+                    (SELECT name FROM "Service" WHERE id = NEW."serviceId"))
+            );
+            PERFORM update_user_karma(NEW."authorId", 5);
+        END IF;
     END IF;
 END;
 $$ LANGUAGE plpgsql;
@@ -146,11 +175,18 @@ DECLARE
     comment_author_id INT;
     service_name TEXT;
     upvote_change INT := 0; -- Variable to track change in upvotes
+    is_author_admin_or_moderator BOOLEAN;
 BEGIN
     -- Get comment author and service info
     SELECT c."authorId", s.name INTO comment_author_id, service_name
     FROM "Comment" c
     JOIN "Service" s ON c.id = COALESCE(NEW."commentId", OLD."commentId") AND c."serviceId" = s.id;
+
+    -- Check if the comment author is an admin or moderator
+    SELECT (admin = true OR moderator = true)
+    FROM "User"
+    WHERE id = comment_author_id
+    INTO is_author_admin_or_moderator;
 
     -- Calculate karma impact based on vote type
     IF TG_OP = 'INSERT' THEN
@@ -181,16 +217,19 @@ BEGIN
         upvote_change := CASE WHEN NEW.downvote THEN -2 ELSE 2 END; -- -2 if upvote->downvote, +2 if downvote->upvote
     END IF;
 
-    -- Record karma transaction and update user karma
-    PERFORM insert_karma_transaction(
-        comment_author_id,
-        karma_points,
-        vote_action,
-        COALESCE(NEW."commentId", OLD."commentId"),
-        vote_description
-    );
-    
-    PERFORM update_user_karma(comment_author_id, karma_points);
+    -- Only award karma if the author is NOT an admin/moderator
+    IF NOT COALESCE(is_author_admin_or_moderator, false) THEN
+        -- Record karma transaction and update user karma
+        PERFORM insert_karma_transaction(
+            comment_author_id,
+            karma_points,
+            vote_action,
+            COALESCE(NEW."commentId", OLD."commentId"),
+            vote_description
+        );
+        
+        PERFORM update_user_karma(comment_author_id, karma_points);
+    END IF;
     
     -- Update comment's upvotes count incrementally
     UPDATE "Comment"
@@ -236,26 +275,36 @@ CREATE OR REPLACE FUNCTION handle_suggestion_status_change()
 RETURNS TRIGGER AS $$
 DECLARE
     service_name TEXT;
+    is_user_admin_or_moderator BOOLEAN;
 BEGIN
     -- Award karma for first approval
     -- Check that OLD.status is not NULL to handle the initial creation case if needed,
     -- and ensure it wasn't already APPROVED.
     IF OLD.status IS DISTINCT FROM 'APPROVED' AND NEW.status = 'APPROVED' THEN
-        -- Fetch service name for the description
-        SELECT name INTO service_name FROM "Service" WHERE id = NEW."serviceId";
+        -- Check if the user is an admin or moderator
+        SELECT (admin = true OR moderator = true)
+        FROM "User"
+        WHERE id = NEW."userId"
+        INTO is_user_admin_or_moderator;
+        
+        -- Only award karma if the user is NOT an admin/moderator
+        IF NOT COALESCE(is_user_admin_or_moderator, false) THEN
+            -- Fetch service name for the description
+            SELECT name INTO service_name FROM "Service" WHERE id = NEW."serviceId";
 
-        -- Insert karma transaction, linking it to the suggestion
-        PERFORM insert_karma_transaction(
-            NEW."userId",
-            10,
-            'SUGGESTION_APPROVED',
-            NULL, -- p_comment_id (not applicable)
-            format('Your suggestion for service ''%s'' has been approved!', service_name),
-            NEW.id -- p_suggestion_id
-        );
+            -- Insert karma transaction, linking it to the suggestion
+            PERFORM insert_karma_transaction(
+                NEW."userId",
+                10,
+                'SUGGESTION_APPROVED',
+                NULL, -- p_comment_id (not applicable)
+                format('Your suggestion for service ''%s'' has been approved!', service_name),
+                NEW.id -- p_suggestion_id
+            );
 
-        -- Update user's total karma
-        PERFORM update_user_karma(NEW."userId", 10);
+            -- Update user's total karma
+            PERFORM update_user_karma(NEW."userId", 10);
+        END IF;
     END IF;
 
     RETURN NEW; -- Result is ignored since this is an AFTER trigger

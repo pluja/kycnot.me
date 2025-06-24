@@ -1,3 +1,4 @@
+import { differenceInMonths, differenceInYears } from 'date-fns'
 import { orderBy } from 'lodash-es'
 
 import { getAttributeCategoryInfo } from '../constants/attributeCategories'
@@ -45,6 +46,7 @@ type NonDbAttributeFull = NonDbAttribute & {
         acceptedCurrencies: true
         kycLevel: true
         kycLevelClarification: true
+        operatingSince: true
       }
     }>
   ) => Partial<Pick<NonDbAttribute, 'description' | 'title'>> & {
@@ -254,6 +256,57 @@ export const nonDbAttributes: NonDbAttributeFull[] = [
     customize: (service) => ({
       show: service.acceptedCurrencies.includes('MONERO'),
     }),
+  },
+  {
+    slug: 'new-service',
+    title: 'New service',
+    type: 'WARNING',
+    category: 'TRUST',
+    description:
+      'The service started operations less than a year ago and it does not have a proven track record. Use with caution and follow the [safe swapping rules](https://blog.kycnot.me/p/stay-safe-using-services#the-rules).',
+    privacyPoints: 0,
+    trustPoints: -4,
+    links: [],
+    customize: (service) => {
+      const started = service.operatingSince as unknown as Date | null
+      if (!started) return { show: false }
+
+      const yearsOperated = differenceInYears(new Date(), started)
+      if (yearsOperated >= 1) return { show: false }
+
+      const monthsOperated = differenceInMonths(new Date(), started)
+      return {
+        show: true,
+        description: `The service started operations ${
+          monthsOperated === 0
+            ? 'less than a month'
+            : `${String(monthsOperated)} month${monthsOperated > 1 ? 's' : ''}`
+        } ago and it does not have a proven track record. Use with caution and follow the [safe swapping rules](https://blog.kycnot.me/p/stay-safe-using-services#the-rules).`,
+      }
+    },
+  },
+  {
+    slug: 'mature-service',
+    title: 'Mature service',
+    type: 'GOOD',
+    category: 'TRUST',
+    description:
+      'This service has been operational for at least 2 years. While this indicates stability, it is not a future-proof guarantee.',
+    privacyPoints: 0,
+    trustPoints: 5,
+    links: [],
+    customize: (service) => {
+      const started = service.operatingSince as unknown as Date | null
+      if (!started) return { show: false }
+
+      const yearsOperated = differenceInYears(new Date(), started)
+      return {
+        show: yearsOperated >= 2,
+        description: `This service has been operational for **${String(
+          yearsOperated
+        )} years**. While this indicates stability, it is not a future-proof guarantee.`,
+      }
+    },
   },
 ]
 

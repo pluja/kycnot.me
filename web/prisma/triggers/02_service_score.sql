@@ -95,6 +95,7 @@ DECLARE
     attributes_score INT := 0;
     recently_approved_factor INT := 0;
     tos_penalty_factor INT := 0;
+    operating_since_factor INT := 0;
 BEGIN
     -- Get verification status factor
     SELECT 
@@ -148,8 +149,20 @@ BEGIN
         tos_penalty_factor := -3;
     END IF;
     
+    -- Determine trust adjustment based on operatingSince
+    SELECT
+        CASE
+            WHEN "operatingSince" IS NULL THEN 0
+            WHEN AGE(NOW(), "operatingSince") < INTERVAL '1 year' THEN -4   -- New service penalty
+            WHEN AGE(NOW(), "operatingSince") >= INTERVAL '2 years' THEN 5   -- Mature service bonus
+            ELSE 0
+        END
+    INTO operating_since_factor
+    FROM "Service"
+    WHERE id = service_id;
+
     -- Calculate final trust score (base 100)
-    trust_score := 50 + verification_factor + attributes_score + recently_approved_factor + tos_penalty_factor;
+    trust_score := 50 + verification_factor + attributes_score + recently_approved_factor + tos_penalty_factor + operating_since_factor;
 
     -- Ensure the score is in reasonable bounds (0-100)
     trust_score := GREATEST(0, LEAST(100, trust_score));

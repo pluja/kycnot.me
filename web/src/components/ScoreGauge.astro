@@ -6,17 +6,29 @@ import { interpolate } from '../lib/numbers'
 import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
 import { transformCase } from '../lib/strings'
 
-import type { HTMLAttributes } from 'astro/types'
+import type { HTMLTag, Polymorphic } from 'astro/types'
 import type { Review, WithContext } from 'schema-dts'
 
-export type Props = HTMLAttributes<'div'> & {
+type Props = Polymorphic<{
+  as: HTMLTag
   score: number
   label: string
   total?: number
   itemReviewedId?: string
-}
+  showInfo?: boolean
+  children?: never
+}>
 
-const { score, label, total = 100, class: className, itemReviewedId, ...htmlProps } = Astro.props
+const {
+  as: Tag = 'div',
+  score,
+  label,
+  total = 100,
+  class: className,
+  itemReviewedId,
+  showInfo = false,
+  ...htmlProps
+} = Astro.props
 
 const progress = total === 0 ? 0 : Math.min(Math.max(score / total, 0), 1)
 
@@ -65,13 +77,13 @@ const { text, step, angle, formattedScore } = makeScoreInfo(score, total)
   )
 }
 
-<div
+<Tag
   {...htmlProps}
   class={cn(
     '2xs:size-24 relative flex aspect-square size-18 flex-col items-center justify-start text-white',
     className
   )}
-  role="group"
+  role={htmlProps.role ?? 'group'}
 >
   <div
     class={cn('2xs:text-[2rem] mt-[25%] mb-1 text-[1.5rem] leading-none font-bold tracking-tight', {
@@ -166,10 +178,14 @@ const { text, step, angle, formattedScore } = makeScoreInfo(score, total)
       transform={angle !== undefined ? `rotate(${angle}, 48, 48)` : undefined}
       class="stroke-night-700"></path>
 
-    <!-- Info icon -->
-    <!-- <path
-      d="M88 13C85.2386 13 83 10.7614 83 8C83 5.23857 85.2386 3 88 3C90.7614 3 93 5.23857 93 8C93 10.7614 90.7614 13 88 13ZM88 12C90.2092 12 92 10.2092 92 8C92 5.79086 90.2092 4 88 4C85.7909 4 84 5.79086 84 8C84 10.2092 85.7909 12 88 12ZM87.5 5.5H88.5V6.5H87.5V5.5ZM87.5 7.5H88.5V10.5H87.5V7.5Z"
-      fill="white"
-      fill-opacity="0.67"></path> -->
+    {
+      showInfo && (
+        <path
+          d="M88 13C85.2386 13 83 10.7614 83 8C83 5.23857 85.2386 3 88 3C90.7614 3 93 5.23857 93 8C93 10.7614 90.7614 13 88 13ZM88 12C90.2092 12 92 10.2092 92 8C92 5.79086 90.2092 4 88 4C85.7909 4 84 5.79086 84 8C84 10.2092 85.7909 12 88 12ZM87.5 5.5H88.5V6.5H87.5V5.5ZM87.5 7.5H88.5V10.5H87.5V7.5Z"
+          class="text-current/60"
+          fill="currentColor"
+        />
+      )
+    }
   </svg>
-</div>
+</Tag>
