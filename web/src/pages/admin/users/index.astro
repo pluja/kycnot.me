@@ -319,7 +319,7 @@ const makeSortUrl = (sortBy: NonNullable<(typeof filters)['sort-by']>) => {
                     <span
                       class={`font-medium ${user.totalKarma >= 100 ? 'text-green-400' : user.totalKarma >= 0 ? 'text-zinc-300' : 'text-red-400'}`}
                     >
-                      {user.totalKarma}
+                      {user.totalKarma.toLocaleString()}
                     </span>
                   </td>
                   <td class="px-4 py-3 text-center text-sm">
