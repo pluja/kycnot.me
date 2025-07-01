@@ -367,13 +367,8 @@ const apiCalls = await Astro.locals.banners.try(
             description="Date the service started operating"
             inputProps={{
               type: 'date',
-              value: service.operatingSince
-                ? new Date(
-                    service.operatingSince.getTime() - service.operatingSince.getTimezoneOffset() * 60000
-                  )
-                    .toISOString()
-                    .slice(0, 10)
-                : '',
+              value: service.operatingSince?.toISOString().slice(0, 10),
+              max: new Date().toISOString().slice(0, 10),
             }}
             error={serviceInputErrors.operatingSince}
           />

@@ -268,13 +268,12 @@ export const nonDbAttributes: NonDbAttributeFull[] = [
     trustPoints: -4,
     links: [],
     customize: (service) => {
-      const started = service.operatingSince as unknown as Date | null
-      if (!started) return { show: false }
+      if (!service.operatingSince) return { show: false }
 
-      const yearsOperated = differenceInYears(new Date(), started)
+      const yearsOperated = differenceInYears(new Date(), service.operatingSince)
       if (yearsOperated >= 1) return { show: false }
 
-      const monthsOperated = differenceInMonths(new Date(), started)
+      const monthsOperated = differenceInMonths(new Date(), service.operatingSince)
       return {
         show: true,
         description: `The service started operations ${
@@ -296,10 +295,9 @@ export const nonDbAttributes: NonDbAttributeFull[] = [
     trustPoints: 5,
     links: [],
     customize: (service) => {
-      const started = service.operatingSince as unknown as Date | null
-      if (!started) return { show: false }
+      if (!service.operatingSince) return { show: false }
 
-      const yearsOperated = differenceInYears(new Date(), started)
+      const yearsOperated = differenceInYears(new Date(), service.operatingSince)
       return {
         show: yearsOperated >= 2,
         description: `This service has been operational for **${String(

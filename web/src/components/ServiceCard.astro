@@ -6,7 +6,6 @@ import { serviceVisibilitiesById } from '../constants/serviceVisibility'
 import { verificationStatusesByValue } from '../constants/verificationStatus'
 import { cn } from '../lib/cn'
 import { makeOverallScoreInfo } from '../lib/overallScore'
-import { transformCase } from '../lib/strings'
 
 import MyPicture from './MyPicture.astro'
 import Tooltip from './Tooltip.astro'
@@ -23,6 +22,8 @@ type Props = HTMLAttributes<'a'> & {
       slug: true
       description: true
       overallScore: true
+      privacyScore: true
+      trustScore: true
       kycLevel: true
       imageUrl: true
       verificationStatus: true
@@ -45,6 +46,8 @@ const {
     slug,
     description,
     overallScore,
+    privacyScore,
+    trustScore,
     kycLevel,
     imageUrl,
     categories,
@@ -163,7 +166,7 @@ const overallScoreInfo = makeOverallScoreInfo(overallScore)
         'inline-flex size-6 items-center justify-center rounded-sm text-lg font-bold',
         overallScoreInfo.classNameBg
       )}
-      text={`${transformCase(overallScoreInfo.text, 'sentence')} score (${overallScoreInfo.formattedScore}/10)`}
+      text={`${Math.round(privacyScore).toLocaleString()}% Privacy | ${Math.round(trustScore).toLocaleString()}% Trust`}
     >
       {overallScoreInfo.formattedScore}
     </Tooltip>

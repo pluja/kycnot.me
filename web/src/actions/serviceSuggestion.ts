@@ -165,6 +165,7 @@ export const serviceSuggestionActions = {
             message: 'You must accept the suggestion rules and process to continue',
           }),
         }),
+        operatingSince: z.coerce.date().optional(),
         /** @deprecated Honey pot field, do not use */
         message: z.unknown().optional(),
         skipDuplicateCheck: z
@@ -239,6 +240,7 @@ export const serviceSuggestionActions = {
             name: input.name,
             slug: input.slug,
             description: input.description,
+            operatingSince: input.operatingSince,
             serviceUrls,
             tosUrls: input.tosUrls,
             onionUrls,

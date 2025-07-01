@@ -238,27 +238,29 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       />
     </div>
 
-    <InputTextArea
-      label="ToS URLs"
-      description="One per line. AI review uses the first working URL only."
-      name="tosUrls"
-      inputProps={{
-        placeholder: 'example.com/tos',
-        required: true,
-        class: 'min-h-10',
-      }}
-      error={inputErrors.tosUrls}
-    />
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <InputTextArea
+        label="ToS URLs"
+        description="One per line. AI review uses the first working URL only."
+        name="tosUrls"
+        inputProps={{
+          placeholder: 'example.com/tos',
+          required: true,
+          class: 'min-h-10',
+        }}
+        error={inputErrors.tosUrls}
+      />
 
-    <InputText
-      label="Operating since"
-      name="operatingSince"
-      description="Date the service started operating"
-      inputProps={{
-        type: 'date',
-      }}
-      error={(inputErrors as Record<string, unknown>).operatingSince}
-    />
+      <InputText
+        label="Operating since"
+        name="operatingSince"
+        inputProps={{
+          type: 'date',
+          max: new Date().toISOString().slice(0, 10),
+        }}
+        error={inputErrors.operatingSince}
+      />
+    </div>
 
     <InputCardGroup
       name="kycLevel"
@@ -321,6 +323,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
           icon: [attribute.categoryInfo.icon, attribute.typeInfo.icon],
           iconClassName: [attribute.categoryInfo.classNames.icon, attribute.typeInfo.classNames.icon],
         }))}
+        description="See list of [all attributes](/attributes) and their scoring."
         error={inputErrors.attributes}
         size="lg"
       />

@@ -8,6 +8,7 @@ import { pwaInfo } from 'virtual:pwa-info'
 import { isNotArray } from '../lib/arrays'
 import { DEPLOYMENT_MODE } from '../lib/client/envVariables'
 
+import AdminNavigationFixScript from './AdminNavigationFixScript.astro'
 import DevToolsMessageScript from './DevToolsMessageScript.astro'
 import DynamicFavicon from './DynamicFavicon.astro'
 import HtmxScript from './HtmxScript.astro'
@@ -108,6 +109,7 @@ const ogImageUrl = makeOgImageUrl(ogImage, Astro.url)
 <DynamicFavicon />
 
 <ClientRouter />
+<AdminNavigationFixScript />
 
 <LoadingIndicator color="green" />
 <TailwindJsPluggin />

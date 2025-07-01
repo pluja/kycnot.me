@@ -1,0 +1,24 @@
+---
+if (!Astro.locals.user?.admin) return
+---
+
+<script>
+  /////////////////////////////////////////////////////////////////////////////////////////////
+  // Script that adds data-astro-reload to all admin links or all links if on an admin page. //
+  // This is a workaround to prevent the client router messing up inputs.                    //
+  /////////////////////////////////////////////////////////////////////////////////////////////
+
+  document.addEventListener('astro:page-load', () => {
+    document.querySelectorAll<HTMLAnchorElement | HTMLFormElement>('a,form').forEach((element) => {
+      const isAdminPage = window.location.pathname.startsWith('/admin')
+      if (isAdminPage) {
+        element.setAttribute('data-astro-reload', '')
+      }
+
+      const url = element.href ? new URL(element.href) : null
+      if (url?.pathname.startsWith('/admin')) {
+        element.setAttribute('data-astro-reload', '')
+      }
+    })
+  })
+</script>
