@@ -62,7 +62,7 @@ type ServiceResponse = {
   kycLevelClarification: 'NONE' | 'DEPENDS_ON_PARTNERS' | ...
   kycLevelClarificationInfo: {
     value: 'NONE' | 'DEPENDS_ON_PARTNERS' | ...
-    name: string
+    label: string
     description: string
   }
   categories: {
@@ -135,8 +135,10 @@ curl -X QUERY https://kycnot.me/api/v1/service/get \
 
 ```json
 {
+  "id": 123,
   "name": "My Example Service",
   "description": "This is a description of my example service",
+  "slug": "my-example-service",
   "serviceVisibility": "PUBLIC",
   "verificationStatus": "VERIFICATION_SUCCESS",
   "verificationStatusInfo": {
@@ -157,6 +159,7 @@ curl -X QUERY https://kycnot.me/api/v1/service/get \
   "kycLevelClarification": "NONE",
   "kycLevelClarificationInfo": {
     "value": "NONE",
+    "label": "None",
     "description": "No clarification needed."
   },
   "categories": [

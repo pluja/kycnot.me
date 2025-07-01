@@ -133,7 +133,7 @@ export const apiServiceActions = {
         kycLevelClarification: service.kycLevelClarification,
         kycLevelClarificationInfo: pick(getKycLevelClarificationInfo(service.kycLevelClarification), [
           'value',
-          'name',
+          'label',
           'description',
         ]),
         categories: service.categories,
