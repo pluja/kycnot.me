@@ -85,7 +85,7 @@ const Tag = announcement.link ? 'a' : 'div'
   </div>
 
   {
-    !!announcement.linkText && (
+    !!announcement.link && !!announcement.linkText && (
       <div class="text-day-300 group-focus-visible:outline-primary transition-background 2xs:px-4 relative inline-flex h-full shrink-0 cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-full border border-white/20 bg-black/10 p-[1px] px-1 py-1 text-sm font-medium shadow-sm backdrop-blur-3xl transition-colors group-hover:bg-white/5 group-focus-visible:ring-2 group-focus-visible:ring-blue-500 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-black/80 sm:min-w-[120px]">
         <span class="2xs:inline-block hidden">{announcement.linkText}</span>
         <Icon
