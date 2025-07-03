@@ -5,10 +5,12 @@ import { actions } from 'astro:actions'
 
 import Button from '../components/Button.astro'
 import CopyButton from '../components/CopyButton.astro'
+import Pagination from '../components/Pagination.astro'
 import PushNotificationBanner from '../components/PushNotificationBanner.astro'
 import TimeFormatted from '../components/TimeFormatted.astro'
 import Tooltip from '../components/Tooltip.astro'
 import { getNotificationTypeInfo } from '../constants/notificationTypes'
+import { getReadStatus, readStatusZodEnum } from '../constants/readStatus'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { cn } from '../lib/cn'
 import { getOrCreateNotificationPreferences } from '../lib/notificationPreferences'
@@ -16,6 +18,10 @@ import { makeNotificationActions, makeNotificationContent, makeNotificationTitle
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { makeLoginUrl } from '../lib/redirectUrls'
+import { transformCase } from '../lib/strings'
+import { urlWithParams } from '../lib/urls'
+
+import type { Prisma } from '@prisma/client'
 
 const user = Astro.locals.user
 if (!user) return Astro.redirect(makeLoginUrl(Astro.url))
@@ -25,10 +31,18 @@ const PAGE_SIZE = 20
 const { data: params } = zodParseQueryParamsStoringErrors(
   {
     page: z.coerce.number().int().min(1).default(1),
+    readStatus: readStatusZodEnum.optional(),
   },
   Astro
 )
 const skip = (params.page - 1) * PAGE_SIZE
+
+const readStatusInfo = params.readStatus ? getReadStatus(params.readStatus) : undefined
+
+const notificationWhereClause: Prisma.NotificationWhereInput = {
+  userId: user.id,
+  read: readStatusInfo?.readValue,
+}
 
 const [dbNotifications, notificationPreferences, totalNotifications, pushSubscriptions] =
   await Astro.locals.banners.tryMany([
@@ -36,9 +50,7 @@ const [dbNotifications, notificationPreferences, totalNotifications, pushSubscri
       'Error while fetching notifications',
       () =>
         prisma.notification.findMany({
-          where: {
-            userId: user.id,
-          },
+          where: notificationWhereClause,
           orderBy: {
             createdAt: 'desc',
           },
@@ -153,7 +165,7 @@ const [dbNotifications, notificationPreferences, totalNotifications, pushSubscri
     ],
     [
       'Error while fetching total notifications',
-      () => prisma.notification.count({ where: { userId: user.id } }),
+      () => prisma.notification.count({ where: notificationWhereClause }),
       0,
     ],
     [
@@ -227,13 +239,18 @@ const notifications = dbNotifications.map((notification) => ({
       )
     }
 
-    <div class="mb-4 flex items-center justify-between">
+    <div class="xs:flex-row xs:flex-wrap mb-4 flex flex-col items-center justify-between gap-2">
       <h1 class="font-title flex items-center text-2xl leading-tight font-bold tracking-wider">
         <Icon name="ri:notification-line" class="mr-2 size-6 text-zinc-400" />
-        Notifications
+
+        {transformCase(`${readStatusInfo?.label ?? ''} notifications`.trim(), 'sentence')}
       </h1>
 
-      <form method="POST" action={actions.notification.updateReadStatus}>
+      <form
+        method="POST"
+        action={actions.notification.updateReadStatus}
+        class="xs:justify-start flex flex-1 flex-row-reverse flex-wrap items-center justify-center gap-2"
+      >
         <input type="hidden" name="notificationId" value="all" />
         <input type="hidden" name="read" value="true" />
         <Button
@@ -243,6 +260,25 @@ const notifications = dbNotifications.map((notification) => ({
           disabled={notifications.length === 0}
           color="white"
         />
+        {
+          params.readStatus === 'unread' ? (
+            <Button
+              as="a"
+              href={urlWithParams(Astro.url, { readStatus: null }, { clearExisting: true })}
+              label="See all"
+              icon="ri:eye-line"
+              color="black"
+            />
+          ) : (
+            <Button
+              as="a"
+              href={urlWithParams(Astro.url, { readStatus: 'unread' }, { clearExisting: true })}
+              label="See unread only"
+              icon="ri:eye-off-line"
+              color="black"
+            />
+          )
+        }
       </form>
     </div>
 
@@ -323,31 +359,12 @@ const notifications = dbNotifications.map((notification) => ({
           ))}
 
           {totalPages > 1 && (
-            <div class="mt-8 flex justify-center gap-4">
-              <form method="GET" action="/notifications" class="inline">
-                <input type="hidden" name="page" value={params.page - 1} />
-                <button
-                  type="submit"
-                  class="rounded-md border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-200 transition-colors duration-200 hover:bg-zinc-700"
-                  disabled={params.page <= 1}
-                >
-                  Previous
-                </button>
-              </form>
-              <span class="inline-flex items-center px-2 text-sm text-zinc-400">
-                Page {params.page} of {totalPages}
-              </span>
-              <form method="GET" action="/notifications" class="inline">
-                <input type="hidden" name="page" value={params.page + 1} />
-                <button
-                  type="submit"
-                  class="rounded-md border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-200 transition-colors duration-200 hover:bg-zinc-700"
-                  disabled={params.page >= totalPages}
-                >
-                  Next
-                </button>
-              </form>
-            </div>
+            <Pagination
+              currentPage={params.page}
+              totalPages={totalPages}
+              currentUrl={Astro.url}
+              class="mt-8"
+            />
           )}
         </div>
       )

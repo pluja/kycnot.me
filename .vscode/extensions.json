@@ -7,7 +7,8 @@
     "golang.go",
     "bradlc.vscode-tailwindcss",
     "craigrbroughton.htmx-attributes",
-    "nefrob.vscode-just-syntax"
+    "nefrob.vscode-just-syntax",
+    "prisma.prisma"
   ],
   "unwantedRecommendations": []
 }

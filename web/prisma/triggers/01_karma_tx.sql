@@ -275,7 +275,7 @@ CREATE OR REPLACE FUNCTION handle_suggestion_status_change()
 RETURNS TRIGGER AS $$
 DECLARE
     service_name TEXT;
-    service_visibility "serviceVisibility";
+    service_visibility "ServiceVisibility";
     is_user_admin_or_moderator BOOLEAN;
 BEGIN
     -- Award karma for first approval
@@ -283,7 +283,7 @@ BEGIN
     -- and ensure it wasn't already APPROVED.
     IF OLD.status IS DISTINCT FROM 'APPROVED' AND NEW.status = 'APPROVED' THEN
         -- Fetch service details for the description
-        SELECT name, serviceVisibility INTO service_name, service_visibility FROM "Service" WHERE id = NEW."serviceId";
+        SELECT name, "serviceVisibility" INTO service_name, service_visibility FROM "Service" WHERE id = NEW."serviceId";
         
         -- Only award karma if the service is public
         IF service_visibility = 'PUBLIC' THEN
