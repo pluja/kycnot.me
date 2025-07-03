@@ -1,6 +1,7 @@
 ---
 import LoadingIndicator from 'astro-loading-indicator/component'
 import { Schema } from 'astro-seo-schema'
+import { ONION_ADDRESS } from 'astro:env/server'
 import { ClientRouter } from 'astro:transitions'
 import { pwaAssetsHead } from 'virtual:pwa-assets/head'
 import { pwaInfo } from 'virtual:pwa-info'
@@ -78,30 +79,32 @@ const fullTitle = `${pageTitle} | KYCnot.me ${modeName}`
 const ogImageUrl = makeOgImageUrl(ogImage, Astro.url)
 ---
 
-<!-- Primary Meta Tags -->
+{/* Primary Meta Tags */}
 <meta name="generator" content={Astro.generator} />
 <meta name="description" content={description} />
 <title>{fullTitle}</title>
-<!-- {canonicalUrl && <link rel="canonical" href={canonicalUrl} />} -->
+{/* canonicalUrl && <link rel="canonical" href={canonicalUrl} /> */}
+<meta http-equiv="onion-location" content={ONION_ADDRESS} />
 
-<!-- Open Graph / Facebook -->
+{/* Open Graph / Facebook */}
 <meta property="og:type" content="website" />
 <meta property="og:url" content={Astro.url} />
 <meta property="og:title" content={fullTitle} />
 <meta property="og:description" content={description} />
 {!!ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
 
-<!-- Twitter -->
+{/* Twitter */}
 <meta property="twitter:card" content="summary_large_image" />
 <meta property="twitter:url" content={Astro.url} />
 <meta property="twitter:title" content={fullTitle} />
 <meta property="twitter:description" content={description} />
 {!!ogImageUrl && <meta property="twitter:image" content={ogImageUrl} />}
 
-<!-- Other -->
+{/* Other */}
 <link rel="sitemap" href="/sitemap-index.xml" />
+<link rel="sitemap" href="/sitemaps/search.xml" />
 
-<!-- PWA -->
+{/* PWA */}
 {pwaAssetsHead.themeColor && <meta name="theme-color" content={pwaAssetsHead.themeColor.content} />}
 {pwaAssetsHead.links.filter((link) => link.rel !== 'icon').map((link) => <link {...link} />)}
 {pwaInfo && <Fragment set:html={pwaInfo.webManifest.linkTag} />}
@@ -115,10 +118,10 @@ const ogImageUrl = makeOgImageUrl(ogImage, Astro.url)
 <TailwindJsPluggin />
 {htmx && <HtmxScript />}
 
-<!-- JSON-LD Schemas -->
+{/* JSON-LD Schemas */}
 {schemas?.map((item) => <Schema item={item} />)}
 
-<!-- Breadcrumbs -->
+{/* Breadcrumbs */}
 {
   breadcrumbLists.map((breadcrumbList) => (
     <Schema

@@ -9,9 +9,7 @@ import Pagination from '../components/Pagination.astro'
 import ServiceFiltersPillsRow from '../components/ServiceFiltersPillsRow.astro'
 import ServicesFilters from '../components/ServicesFilters.astro'
 import ServicesSearchResults from '../components/ServicesSearchResults.astro'
-import { getAttributeCategoryInfo } from '../constants/attributeCategories'
-import { getAttributeTypeInfo } from '../constants/attributeTypes'
-import { currencies, currenciesZodEnumBySlug, currencySlugToId } from '../constants/currencies'
+import { currenciesZodEnumBySlug, currencySlugToId } from '../constants/currencies'
 import { networks } from '../constants/networks'
 import {
   verificationStatuses,
@@ -25,88 +23,17 @@ import { parseIntWithFallback } from '../lib/numbers'
 import { areEqualObjectsWithoutOrder } from '../lib/objects'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
+import {
+  defaultSortOption,
+  makeSearchFiltersOptions,
+  modeOptions,
+  sortOptions,
+} from '../lib/searchFiltersOptions'
 import { makeSortSeed } from '../lib/sortSeed'
 
 import type { Prisma } from '@prisma/client'
 
-const MIN_CATEGORIES_TO_SHOW = 8
-const MIN_ATTRIBUTES_TO_SHOW = 8
-
 const PAGE_SIZE = 30
-
-const sortOptions = [
-  {
-    value: 'score-desc',
-    label: 'Score (High → Low)',
-    orderBy: {
-      key: 'overallScore',
-      direction: 'desc',
-    },
-  },
-  {
-    value: 'score-asc',
-    label: 'Score (Low → High)',
-    orderBy: {
-      key: 'overallScore',
-      direction: 'asc',
-    },
-  },
-  {
-    value: 'name-asc',
-    label: 'Name (A → Z)',
-    orderBy: {
-      key: 'name',
-      direction: 'asc',
-    },
-  },
-  {
-    value: 'name-desc',
-    label: 'Name (Z → A)',
-    orderBy: {
-      key: 'name',
-      direction: 'desc',
-    },
-  },
-  {
-    value: 'recent',
-    label: 'Date listed (New → Old)',
-    orderBy: {
-      key: 'listedAt',
-      direction: 'desc',
-    },
-  },
-  {
-    value: 'oldest',
-    label: 'Date listed (Old → New)',
-    orderBy: {
-      key: 'listedAt',
-      direction: 'asc',
-    },
-  },
-] as const satisfies {
-  value: string
-  label: string
-  orderBy: {
-    key: keyof Prisma.ServiceSelect
-    direction: 'asc' | 'desc'
-  }
-}[]
-
-const defaultSortOption = sortOptions[0]
-
-const modeOptions = [
-  {
-    value: 'or',
-    label: 'OR',
-  },
-  {
-    value: 'and',
-    label: 'AND',
-  },
-] as const satisfies {
-  value: string
-  label: string
-}[]
 
 export type AttributeOption = {
   value: string
@@ -478,62 +405,11 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
     ],
   ])
 
-const attributesByCategory = orderBy(
-  Object.entries(
-    groupBy(
-      attributes.map((attr) => {
-        return {
-          typeInfo: getAttributeTypeInfo(attr.type),
-          ...attr,
-          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-          value: filters.attr?.[attr.id] || undefined,
-        }
-      }),
-      'category'
-    )
-  ).map(([category, attributes]) => ({
-    category,
-    categoryInfo: getAttributeCategoryInfo(category),
-    attributes: orderBy(
-      attributes,
-      ['value', 'type', '_count.services', 'title'],
-      ['asc', 'asc', 'desc', 'asc']
-    ).map((attr, i) => ({
-      ...attr,
-      showAlways: i < MIN_ATTRIBUTES_TO_SHOW || attr.value !== undefined,
-    })),
-  })),
-  ['category'],
-  ['asc']
-)
-
-const categoriesSorted = orderBy(
-  categories.map((category) => {
-    const checked = filters.categories.includes(category.slug)
-
-    return {
-      ...category,
-      checked,
-    }
-  }),
-  ['checked', '_count.services', 'name'],
-  ['desc', 'desc', 'asc']
-).map((category, i) => ({
-  ...category,
-  showAlways: i < MIN_CATEGORIES_TO_SHOW || category.checked,
-}))
-
-const filtersOptions = {
-  currencies,
-  categories: categoriesSorted,
-  sort: sortOptions,
-  modeOptions,
-  network: networks,
-  verification: verificationStatuses,
-  attributesByCategory,
-} as const
-
-export type ServicesFiltersOptions = typeof filtersOptions
+const filtersOptions = makeSearchFiltersOptions({
+  filters,
+  categories,
+  attributes,
+})
 
 const searchResultsId = 'search-results'
 const showFiltersId = 'show-filters'

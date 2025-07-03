@@ -15,7 +15,8 @@ import Button from './Button.astro'
 import ServiceCard from './ServiceCard.astro'
 import ServiceFiltersPillsRow from './ServiceFiltersPillsRow.astro'
 
-import type { AttributeOption, ServicesFiltersObject, ServicesFiltersOptions } from '../pages/index.astro'
+import type { ServicesFiltersOptions } from '../lib/searchFiltersOptions'
+import type { AttributeOption, ServicesFiltersObject } from '../pages/index.astro'
 import type { Prisma } from '@prisma/client'
 import type { ComponentProps, HTMLAttributes } from 'astro/types'
 
@@ -82,6 +83,7 @@ const urlIfIncludingCommunity = urlWithParams(Astro.url, {
   ]),
 })
 
+// NOTE: If you make changes to this function, remember to update the sitemap: src/pages/sitemaps/search.xml.ts
 const searchTitle = (() => {
   if (filters.q) {
     return `Search results for “${filters.q}”`

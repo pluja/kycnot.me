@@ -1,15 +1,15 @@
 ---
 import { Icon } from 'astro-icon/components'
 
-import { kycLevels } from '../constants/kycLevels'
 import { cn } from '../lib/cn'
 import { makeOverallScoreInfo } from '../lib/overallScore'
-import { type ServicesFiltersObject, type ServicesFiltersOptions } from '../pages/index.astro'
+import { type ServicesFiltersObject } from '../pages/index.astro'
 
 import Button from './Button.astro'
 import PillsRadioGroup from './PillsRadioGroup.astro'
 import Tooltip from './Tooltip.astro'
 
+import type { ServicesFiltersOptions } from '../lib/searchFiltersOptions'
 import type { HTMLAttributes } from 'astro/types'
 
 export type Props = HTMLAttributes<'form'> & {
@@ -111,7 +111,7 @@ const {
     <legend class="font-title mb-3 leading-none text-green-500">Type</legend>
     <ul class="[&:not(:has(~_.peer:checked))]:[&>li:not([data-show-always])]:hidden">
       {
-        options.categories?.map((category) => (
+        options.categories.map((category) => (
           <li data-show-always={category.showAlways ? '' : undefined}>
             <label class="flex cursor-pointer items-center gap-2 text-sm text-white">
               <input
@@ -252,7 +252,7 @@ const {
     </div>
     <div class="text-day-400 mt-1 flex justify-between px-1 text-xs">
       {
-        kycLevels.map((level) => (
+        options.kycLevels.map((level) => (
           <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">
             {level.value}
             <Icon name={level.icon} class="ms-1 size-3 shrink-0" />
@@ -334,7 +334,7 @@ const {
                 <li data-show-always={attribute.showAlways ? '' : undefined} class="cursor-pointer">
                   <fieldset class="relative flex max-w-full min-w-0 cursor-pointer items-center text-sm text-white">
                     <legend class="sr-only">
-                      {attribute.title} ({attribute._count?.services})
+                      {attribute.title} ({attribute._count.services})
                     </legend>
                     <input
                       type="radio"
@@ -417,7 +417,7 @@ const {
                       <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                         {attribute.title}
                       </span>
-                      <span class="text-day-500 ml-2 font-normal">{attribute._count?.services}</span>
+                      <span class="text-day-500 ml-2 font-normal">{attribute._count.services}</span>
                     </label>
                     <label
                       for={emptyId}
@@ -432,7 +432,7 @@ const {
                       <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                         {attribute.title}
                       </span>
-                      <span class="text-day-500 ml-2 font-normal">{attribute._count?.services}</span>
+                      <span class="text-day-500 ml-2 font-normal">{attribute._count.services}</span>
                     </label>
                   </fieldset>
                 </li>

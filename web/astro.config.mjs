@@ -14,6 +14,8 @@ import { postgresListener } from './src/lib/postgresListenerIntegration'
 import { getServerEnvVariable } from './src/lib/serverEnvVariables'
 
 const SITE_URL = getServerEnvVariable('SITE_URL')
+const ONION_ADDRESS = getServerEnvVariable('ONION_ADDRESS')
+const I2P_ADDRESS = getServerEnvVariable('I2P_ADDRESS')
 
 export default defineConfig({
   site: SITE_URL,
@@ -95,6 +97,18 @@ export default defineConfig({
   server: {
     open: false,
     allowedHosts: [new URL(SITE_URL).hostname],
+    headers: {
+      'Onion-Location': ONION_ADDRESS,
+      'X-I2P-Location': I2P_ADDRESS,
+      'X-Frame-Options': 'DENY',
+      // Astro is working on this feature, when it's stable use it instead of this.
+      // https://astro.build/blog/astro-590/#experimental-content-security-policy-support
+      'Content-Security-Policy':
+        SITE_URL === 'http://localhost:4321'
+          ? "frame-ancestors 'none'; upgrade-insecure-requests"
+          : "default-src 'self'; img-src 'self' *; frame-ancestors 'none'; upgrade-insecure-requests",
+      'Strict-Transport-Security': 'max-age=31536000; includeSubdomains; preload;',
+    },
   },
   image: {
     domains: [new URL(SITE_URL).hostname],
