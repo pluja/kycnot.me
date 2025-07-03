@@ -5,6 +5,7 @@ import { Icon } from 'astro-icon/components'
 import BadgeSmall from '../../components/BadgeSmall.astro'
 import CommentModeration from '../../components/CommentModeration.astro'
 import MyPicture from '../../components/MyPicture.astro'
+import Pagination from '../../components/Pagination.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import UserBadge from '../../components/UserBadge.astro'
 import {
@@ -27,7 +28,7 @@ if (!user || (!user.admin && !user.moderator)) {
 const { data: params } = zodParseQueryParamsStoringErrors(
   {
     status: commentStatusFiltersZodEnum.default('all'),
-    page: z.number().int().positive().default(1),
+    page: z.coerce.number().int().positive().default(1),
   },
   Astro
 )
@@ -241,29 +242,5 @@ const totalPages = Math.ceil(totalComments / PAGE_SIZE)
   </div>
 
   <!-- Pagination -->
-  {
-    totalPages > 1 && (
-      <div class="mt-8 flex justify-center gap-2">
-        {params.page > 1 && (
-          <a
-            href={urlWithParams(Astro.url, { page: params.page - 1 })}
-            class="font-title rounded-md border border-zinc-700 px-3 py-1 text-sm transition-colors hover:border-green-500/50"
-          >
-            Previous
-          </a>
-        )}
-        <span class="font-title px-3 py-1 text-sm">
-          Page {params.page} of {totalPages}
-        </span>
-        {params.page < totalPages && (
-          <a
-            href={urlWithParams(Astro.url, { page: params.page + 1 })}
-            class="font-title rounded-md border border-zinc-700 px-3 py-1 text-sm transition-colors hover:border-green-500/50"
-          >
-            Next
-          </a>
-        )}
-      </div>
-    )
-  }
+  {totalPages > 1 && <Pagination currentPage={params.page} totalPages={totalPages} class="mt-8" />}
 </BaseLayout>
