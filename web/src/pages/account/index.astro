@@ -1,6 +1,7 @@
 ---
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
+import { differenceInCalendarDays } from 'date-fns'
 import { sortBy } from 'lodash-es'
 
 import BadgeSmall from '../../components/BadgeSmall.astro'
@@ -19,6 +20,7 @@ import { verificationStatusesByValue } from '../../constants/verificationStatus'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
 import { makeUserWithKarmaUnlocks } from '../../lib/karmaUnlocks'
+import { pluralize } from '../../lib/pluralize'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
 import { formatDateShort } from '../../lib/timeAgo'
@@ -49,6 +51,7 @@ const user = await Astro.locals.banners.try('user', async () => {
         verifiedLink: true,
         totalKarma: true,
         createdAt: true,
+        scheduledDeletionAt: true,
         _count: {
           select: {
             comments: true,
@@ -158,6 +161,10 @@ const user = await Astro.locals.banners.try('user', async () => {
 })
 
 if (!user) return Astro.rewrite('/404')
+
+const daysUntilDeletion = user.scheduledDeletionAt
+  ? differenceInCalendarDays(user.scheduledDeletionAt, new Date())
+  : null
 ---
 
 <BaseLayout
@@ -393,6 +400,33 @@ if (!user) return Astro.rewrite('/404')
                 }
               </div>
             </li>
+
+            {
+              daysUntilDeletion && (
+                <li class="flex items-start">
+                  <span class="text-day-500 mt-0.5 mr-2">
+                    <Icon name="ri:delete-bin-line" class="size-4" />
+                  </span>
+                  <div>
+                    <p class="text-day-500 text-xs">Deletion Status</p>
+                    <span class="rounded-full border border-red-500/50 bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
+                      Scheduled for deletion
+                      {daysUntilDeletion <= 0 ? (
+                        'today'
+                      ) : (
+                        <>
+                          in {daysUntilDeletion.toLocaleString()}&nbsp;{pluralize('day', daysUntilDeletion)}
+                        </>
+                      )}
+                    </span>
+                    <p class="text-day-400 mt-2 text-xs">
+                      To prevent deletion, take any action such as voting, commenting, or suggesting a
+                      service.
+                    </p>
+                  </div>
+                </li>
+              )
+            }
 
             <li class="flex items-start">
               <span class="text-day-500 mt-0.5 mr-2"><Icon name="ri:calendar-line" class="size-4" /></span>

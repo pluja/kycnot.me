@@ -49,33 +49,51 @@ const findPossibleDuplicates = async (input: { name: string }) => {
   })
 }
 
-const serializeExtraNotes = <T extends Record<string, unknown>>(
+const serializeExtraNotes = async <T extends Record<string, unknown>, NK extends keyof T>(
   input: T,
-  skipKeys: (keyof T)[] = []
-): string => {
-  return Object.entries(input)
-    .filter(([key]) => !skipKeys.includes(key as keyof T))
-    .map(([key, value]) => {
-      let serializedValue = ''
-      if (typeof value === 'string') {
-        serializedValue = value
-      } else if (value === undefined || value === null) {
-        serializedValue = ''
-      } else if (Array.isArray(value)) {
-        serializedValue = value.map((item) => String(item)).join(', ')
-      } else if (typeof value === 'object' && 'toString' in value && typeof value.toString === 'function') {
-        // eslint-disable-next-line @typescript-eslint/no-base-to-string
-        serializedValue = value.toString()
-      } else {
-        try {
-          serializedValue = JSON.stringify(value)
-        } catch (error) {
-          serializedValue = `Error serializing value: ${error instanceof Error ? error.message : 'Unknown error'}`
-        }
-      }
-      return `- ${key}: ${serializedValue}`
-    })
-    .join('\n')
+  skipKeys: NK[] = [],
+  mapKeys: { [P in Exclude<Extract<keyof T, string>, NK>]?: (value: T[P]) => unknown } = {}
+): Promise<string> => {
+  return (
+    await Promise.all(
+      Object.entries(input)
+        .filter(
+          (
+            entry
+          ): entry is [Exclude<Extract<keyof T, string>, NK>, T[Exclude<Extract<keyof T, string>, NK>]] =>
+            !skipKeys.some((k) => k === entry[0])
+        )
+        .map(async ([key, originalValue]) => {
+          const value = mapKeys[key] ? await mapKeys[key](originalValue) : originalValue
+          let serializedValue = ''
+          if (typeof value === 'string') {
+            serializedValue = value
+          } else if (value === undefined || value === null) {
+            serializedValue = ''
+          } else if (Array.isArray(value)) {
+            serializedValue = value.map((item) => String(item)).join(', ')
+          } else if (typeof value === 'object' && value instanceof Date) {
+            serializedValue = value.toISOString()
+          } else if (
+            typeof value === 'object' &&
+            'toString' in value &&
+            typeof value.toString === 'function' &&
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
+            value.toString() !== '[object Object]'
+          ) {
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
+            serializedValue = value.toString()
+          } else {
+            try {
+              serializedValue = JSON.stringify(value)
+            } catch (error) {
+              serializedValue = `Error serializing value: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
+          }
+          return `- ${key}: ${serializedValue}`
+        })
+    )
+  ).join('\n')
 }
 
 export const serviceSuggestionActions = {
@@ -200,14 +218,37 @@ export const serviceSuggestionActions = {
           return {
             hasDuplicates: true,
             possibleDuplicates,
-            extraNotes: serializeExtraNotes(input, [
-              'skipDuplicateCheck',
-              'message',
-              'imageFile',
-              'captcha-value',
-              'captcha-solution-hash',
-              'rulesConfirm',
-            ]),
+            extraNotes: await serializeExtraNotes(
+              input,
+              [
+                'skipDuplicateCheck',
+                'message',
+                'imageFile',
+                'captcha-value',
+                'captcha-solution-hash',
+                'rulesConfirm',
+              ],
+              {
+                attributes: async (value) => {
+                  const dbAttributes = await prisma.attribute.findMany({
+                    select: {
+                      title: true,
+                    },
+                    where: { id: { in: value } },
+                  })
+                  return dbAttributes.map((attribute) => `\n  - ${attribute.title}`).join('')
+                },
+                categories: async (value) => {
+                  const dbCategories = await prisma.category.findMany({
+                    select: {
+                      name: true,
+                    },
+                    where: { id: { in: value } },
+                  })
+                  return dbCategories.map((category) => category.name)
+                },
+              }
+            ),
             serviceSuggestion: undefined,
             service: undefined,
           } as const

@@ -11,9 +11,19 @@ type Props = HTMLAttributes<'a'> & {
   searchParamValue?: string
   icon?: string
   iconClass?: string
+  inlineIcons?: boolean
 }
 
-const { text, searchParamName, searchParamValue, icon, iconClass, class: className, ...aProps } = Astro.props
+const {
+  text,
+  searchParamName,
+  searchParamValue,
+  icon,
+  iconClass,
+  inlineIcons = true,
+  class: className,
+  ...aProps
+} = Astro.props
 
 const makeUrlWithoutFilter = (filter: string, value?: string) => {
   const url = new URL(Astro.url)
@@ -30,7 +40,7 @@ const makeUrlWithoutFilter = (filter: string, value?: string) => {
     className
   )}
 >
-  {icon && <Icon name={icon} class={cn('size-4', iconClass)} />}
+  {icon && <Icon name={icon} class={cn('size-4', iconClass)} is:inline={inlineIcons} />}
   {text}
-  <Icon name="ri:close-large-line" class="text-day-400 size-4" />
+  <Icon name="ri:close-large-line" class="text-day-400 size-4" is:inline={inlineIcons} />
 </a>

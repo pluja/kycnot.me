@@ -14,6 +14,7 @@ from pyworker.database import close_db_pool
 from .tasks import (
     CommentModerationTask,
     ForceTriggersTask,
+    InactiveUsersTask,
     ServiceScoreRecalculationTask,
     TosReviewTask,
     UserSentimentTask,
@@ -80,6 +81,8 @@ class TaskScheduler:
                 task_instance = ForceTriggersTask()
             elif task_name.lower() == "service_score_recalc":
                 task_instance = ServiceScoreRecalculationTask()
+            elif task_name.lower() == "inactive_users":
+                task_instance = InactiveUsersTask()
             else:
                 self.logger.warning(f"Unknown task '{task_name}', skipping")
                 return

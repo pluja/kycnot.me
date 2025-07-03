@@ -20,7 +20,7 @@ export const areSameNormalized = (str1: string, str2: string): boolean => {
   return normalize(str1) === normalize(str2)
 }
 
-export type TransformCaseType = 'lower' | 'original' | 'sentence' | 'title' | 'upper'
+export type TransformCaseType = 'first-upper' | 'lower' | 'original' | 'sentence' | 'title' | 'upper'
 
 /**
  * Transform a string to a different case.
@@ -31,6 +31,7 @@ export type TransformCaseType = 'lower' | 'original' | 'sentence' | 'title' | 'u
  * transformCase('hello WORLD', 'sentence') // 'Hello world'
  * transformCase('hello WORLD', 'title') // 'Hello World'
  * transformCase('hello WORLD', 'original') // 'hello WORLD'
+ * transformCase('Hello WORLD', 'first-upper') // 'Hello WORLD'
  */
 export const transformCase = <T extends string, C extends TransformCaseType>(
   str: T,
@@ -43,7 +44,9 @@ export const transformCase = <T extends string, C extends TransformCaseType>(
       ? Capitalize<Lowercase<T>>
       : C extends 'title'
         ? Capitalize<Lowercase<T>>
-        : T => {
+        : C extends 'first-upper'
+          ? Capitalize<T>
+          : T => {
   switch (caseType) {
     case 'lower':
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
@@ -54,6 +57,9 @@ export const transformCase = <T extends string, C extends TransformCaseType>(
     case 'sentence':
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return (str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()) as any
+    case 'first-upper':
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      return (str.charAt(0).toUpperCase() + str.slice(1)) as any
     case 'title':
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return str

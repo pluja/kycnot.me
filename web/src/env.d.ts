@@ -3,7 +3,7 @@
 import type { ErrorBanners } from './lib/errorBanners'
 import type { KarmaUnlocks } from './lib/karmaUnlocks'
 import type { Prisma } from '@prisma/client'
-import type * as htmx from 'htmx.org'
+import type htmx from 'htmx.org'
 
 declare global {
   namespace App {

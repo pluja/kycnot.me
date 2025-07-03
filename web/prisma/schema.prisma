@@ -144,6 +144,10 @@ enum NotificationType {
   ACCOUNT_STATUS_CHANGE
   EVENT_CREATED
   SERVICE_VERIFICATION_STATUS_CHANGE
+  ACCOUNT_DELETION_WARNING_30_DAYS
+  ACCOUNT_DELETION_WARNING_15_DAYS
+  ACCOUNT_DELETION_WARNING_5_DAYS
+  ACCOUNT_DELETION_WARNING_1_DAY
 }
 
 enum CommentStatusChange {
@@ -498,20 +502,22 @@ model InternalServiceNote {
 }
 
 model User {
-  id              Int     @id @default(autoincrement())
-  name            String  @unique
-  displayName     String?
-  link            String?
-  picture         String?
-  spammer         Boolean @default(false)
-  verified        Boolean @default(false)
-  admin           Boolean @default(false)
-  moderator       Boolean @default(false)
-  verifiedLink    String?
-  secretTokenHash String  @unique
-  feedId          String  @unique @default(cuid(2))
+  id                  Int       @id @default(autoincrement())
+  name                String    @unique
+  displayName         String?
+  link                String?
+  picture             String?
+  spammer             Boolean   @default(false)
+  verified            Boolean   @default(false)
+  admin               Boolean   @default(false)
+  moderator           Boolean   @default(false)
+  verifiedLink        String?
+  secretTokenHash     String    @unique
+  feedId              String    @unique @default(cuid(2))
   /// Computed via trigger. Do not update through prisma.
-  totalKarma      Int     @default(0)
+  totalKarma          Int       @default(0)
+  /// Date when user is scheduled for deletion due to inactivity
+  scheduledDeletionAt DateTime? @db.Date
 
   createdAt                DateTime                     @default(now())
   updatedAt                DateTime                     @default(now()) @updatedAt
@@ -609,10 +615,11 @@ model VerificationStep {
 }
 
 model Category {
-  id   Int    @id @default(autoincrement())
-  name String @unique
-  icon String
-  slug String @unique
+  id             Int     @id @default(autoincrement())
+  name           String  @unique
+  namePluralLong String?
+  icon           String
+  slug           String  @unique
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @default(now()) @updatedAt

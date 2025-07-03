@@ -1,16 +1,22 @@
 ---
 import { Icon } from 'astro-icon/components'
-import { uniq } from 'lodash-es'
+import { uniq, orderBy } from 'lodash-es'
 
-import { verificationStatusesByValue } from '../constants/verificationStatus'
+import { getCurrencyInfo } from '../constants/currencies'
+import { getKycLevelInfo } from '../constants/kycLevels'
+import { verificationStatusesByValue, getVerificationStatusInfo } from '../constants/verificationStatus'
+import { areEqualArraysWithoutOrder } from '../lib/arrays'
 import { cn } from '../lib/cn'
 import { pluralize } from '../lib/pluralize'
+import { transformCase } from '../lib/strings'
 import { createPageUrl, urlWithParams } from '../lib/urls'
 
 import Button from './Button.astro'
 import ServiceCard from './ServiceCard.astro'
+import ServiceFiltersPillsRow from './ServiceFiltersPillsRow.astro'
 
-import type { ServicesFiltersObject } from '../pages/index.astro'
+import type { AttributeOption, ServicesFiltersObject, ServicesFiltersOptions } from '../pages/index.astro'
+import type { Prisma } from '@prisma/client'
 import type { ComponentProps, HTMLAttributes } from 'astro/types'
 
 type Props = HTMLAttributes<'div'> & {
@@ -23,6 +29,22 @@ type Props = HTMLAttributes<'div'> & {
   filters: ServicesFiltersObject
   countCommunityOnly: number | null
   inlineIcons?: boolean
+  filtersOptions: ServicesFiltersOptions
+  categories: Prisma.CategoryGetPayload<{
+    select: {
+      name: true
+      namePluralLong: true
+      slug: true
+      icon: true
+    }
+  }>[]
+  attributes: Prisma.AttributeGetPayload<{
+    select: {
+      title: true
+      id: true
+    }
+  }>[]
+  attributeOptions: AttributeOption[]
 }
 
 const {
@@ -36,6 +58,10 @@ const {
   filters,
   countCommunityOnly,
   inlineIcons,
+  categories,
+  filtersOptions,
+  attributes,
+  attributeOptions,
   ...divProps
 } = Astro.props
 
@@ -55,9 +81,117 @@ const urlIfIncludingCommunity = urlWithParams(Astro.url, {
     verificationStatusesByValue.COMMUNITY_CONTRIBUTED.slug,
   ]),
 })
+
+const searchTitle = (() => {
+  if (filters.q) {
+    return `Search results for “${filters.q}”`
+  }
+  const listOrformatter = new Intl.ListFormat('en', { style: 'long', type: 'disjunction' })
+  const listAndformatter = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' })
+
+  let [prefix, base, attributesPart, currencies, kycLevel, score] = ['', 'services', '', '', '', '']
+
+  if (!hasDefaultFilters) {
+    prefix = 'filtered'
+  }
+
+  const attributesFilters = Object.entries(filters.attr ?? {})
+    .filter((entry): entry is [string, 'no' | 'yes'] => entry[1] === 'yes' || entry[1] === 'no')
+    .map(([attributeId, attributeValue]) => {
+      const attribute = attributes.find((attr) => String(attr.id) === attributeId)
+      if (!attribute) return null
+      const valueInfo = attributeOptions.find((option) => option.value === attributeValue)
+      const prefix = valueInfo?.prefix ?? transformCase(attributeValue, 'title')
+      const prefixWith = valueInfo?.prefixWith ?? transformCase(attributeValue, 'title')
+      return {
+        prefix,
+        prefixWith,
+        attribute,
+        valueInfo,
+        value: attributeValue,
+      }
+    })
+    .filter((attr) => !!attr)
+
+  if (attributesFilters.length === 1 || attributesFilters.length === 2) {
+    const formatter = filters['attribute-mode'] === 'and' ? listAndformatter : listOrformatter
+    attributesPart = formatter.format(
+      attributesFilters.map((attr) => `${attr.prefixWith} ${attr.attribute.title}`)
+    )
+    prefix = ''
+  }
+
+  if (
+    filters.verification.length === 1 ||
+    (!attributesFilters.length &&
+      !filters.currencies.length &&
+      !(filters['max-kyc'] <= 3) &&
+      !(filters['min-score'] >= 1) &&
+      areEqualArraysWithoutOrder(filters.verification, ['APPROVED', 'VERIFICATION_SUCCESS']))
+  ) {
+    base = `${listAndformatter.format(
+      orderBy(
+        filters.verification.map((v) => getVerificationStatusInfo(v)),
+        'order',
+        'desc'
+      ).map((v) => v.label)
+    )} services`
+    prefix = ''
+  }
+
+  if (filters.categories.length >= 1) {
+    base = listAndformatter.format(
+      filters.categories.map((c) => {
+        const cat = categories.find((cat) => cat.slug === c)
+        if (!cat) return c
+        return cat.namePluralLong ?? cat.name
+      })
+    )
+    prefix = ''
+  }
+
+  if (filters.currencies.length >= 1) {
+    const currenciesList = filters.currencies.map((c) => getCurrencyInfo(c).name)
+    const formatter = filters['currency-mode'] === 'and' ? listAndformatter : listOrformatter
+    currencies = `that accept ${formatter.format(currenciesList)}`
+    prefix = ''
+  }
+
+  if (filters['max-kyc'] === 0) {
+    const kycLevelInfo = getKycLevelInfo(String(filters['max-kyc']))
+    kycLevel = `with ${kycLevelInfo.name}`
+    prefix = ''
+  } else if (filters['max-kyc'] <= 3) {
+    kycLevel = `with KYC level ${filters['max-kyc']} or better`
+    prefix = ''
+  }
+
+  if (filters['min-score'] >= 1) {
+    score = `with score ${filters['min-score'].toLocaleString()} or more`
+    prefix = ''
+  }
+
+  const finalArray = [attributesPart, currencies, kycLevel, score].filter((str) => !!str)
+  const title = transformCase(`${prefix} ${base} ${finalArray.join('; ')}`.trim(), 'first-upper')
+
+  return title.length > 60 ? 'Filtered Services' : title
+})()
 ---
 
-<div {...divProps} class={cn('flex-1', className)}>
+<div {...divProps} class={cn('min-w-0 flex-1', className)}>
+  <div class="hidden flex-wrap items-center justify-between gap-x-4 sm:flex">
+    <h1 class="font-title text-day-100 mb-2 text-xl leading-tight lg:text-2xl">
+      {searchTitle}
+    </h1>
+    <ServiceFiltersPillsRow
+      class="mask-l-from-[calc(100%-var(--spacing)*4)] pb-2"
+      filters={filters}
+      filtersOptions={filtersOptions}
+      categories={categories}
+      attributes={attributes}
+      attributeOptions={attributeOptions}
+    />
+  </div>
   <div class="flex items-center justify-between">
     <span class="text-day-500 xs:gap-x-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm sm:gap-x-6">
       {total.toLocaleString()}

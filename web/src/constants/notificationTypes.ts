@@ -76,5 +76,25 @@ export const {
       label: 'Service verification changed',
       icon: 'ri:verified-badge-line',
     },
+    {
+      id: 'ACCOUNT_DELETION_WARNING_30_DAYS',
+      label: 'Account deletion warning - 30 days',
+      icon: 'ri:alarm-warning-line',
+    },
+    {
+      id: 'ACCOUNT_DELETION_WARNING_15_DAYS',
+      label: 'Account deletion warning - 15 days',
+      icon: 'ri:alarm-warning-line',
+    },
+    {
+      id: 'ACCOUNT_DELETION_WARNING_5_DAYS',
+      label: 'Account deletion warning - 5 days',
+      icon: 'ri:alarm-warning-line',
+    },
+    {
+      id: 'ACCOUNT_DELETION_WARNING_1_DAY',
+      label: 'Account deletion warning - 1 day',
+      icon: 'ri:alarm-warning-line',
+    },
   ] as const satisfies NotificationTypeInfo<NotificationType>[]
 )

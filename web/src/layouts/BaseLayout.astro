@@ -1,12 +1,16 @@
 ---
+import { differenceInCalendarDays } from 'date-fns'
+
 import AnnouncementBanner from '../components/AnnouncementBanner.astro'
 import BaseHead from '../components/BaseHead.astro'
 import Footer from '../components/Footer.astro'
 import Header from '../components/Header.astro'
 import { cn } from '../lib/cn'
+import { pluralize } from '../lib/pluralize'
 import { prisma } from '../lib/prisma'
 
 import type { AstroChildren } from '../lib/astro'
+import type { Prisma } from '@prisma/client'
 import type { ComponentProps } from 'astro/types'
 
 import '@fontsource-variable/space-grotesk'
@@ -71,6 +75,26 @@ const announcement = await Astro.locals.banners.try(
     }),
   null
 )
+
+function getDeletionAnnouncement(
+  user: Prisma.UserGetPayload<{ select: { scheduledDeletionAt: true } }> | null,
+  currentDate: Date = new Date()
+) {
+  if (!user?.scheduledDeletionAt) return null
+  const daysUntilDeletion = differenceInCalendarDays(user.scheduledDeletionAt, currentDate)
+
+  return {
+    id: 0,
+    content: `Your account will be deleted ${daysUntilDeletion <= 0 ? 'today' : `in ${daysUntilDeletion.toLocaleString()} ${pluralize('day', daysUntilDeletion)}`} due to inactivity.`,
+    type: 'ALERT' as const,
+    link: '/account',
+    linkText: 'Prevent deletion',
+    startDate: currentDate,
+    endDate: null,
+    isActive: true,
+  }
+}
+const deletionAnnouncement = getDeletionAnnouncement(Astro.locals.user, currentDate)
 ---
 
 <html lang="en" transition:name="root" transition:animate="none">
@@ -85,6 +109,14 @@ const announcement = await Astro.locals.banners.try(
     data-is-logged-in={Astro.locals.user !== null ? '' : undefined}
   >
     {announcement && <AnnouncementBanner announcement={announcement} transition:name="header-announcement" />}
+    {
+      deletionAnnouncement && (
+        <AnnouncementBanner
+          announcement={deletionAnnouncement}
+          transition:name="deletion-warning-announcement"
+        />
+      )
+    }
     <Header
       classNames={{
         nav: cn(

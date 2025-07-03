@@ -6,20 +6,14 @@ import seedrandom from 'seedrandom'
 import Button from '../components/Button.astro'
 import InputText from '../components/InputText.astro'
 import Pagination from '../components/Pagination.astro'
-import ServiceFiltersPill from '../components/ServiceFiltersPill.astro'
+import ServiceFiltersPillsRow from '../components/ServiceFiltersPillsRow.astro'
 import ServicesFilters from '../components/ServicesFilters.astro'
 import ServicesSearchResults from '../components/ServicesSearchResults.astro'
 import { getAttributeCategoryInfo } from '../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../constants/attributeTypes'
+import { currencies, currenciesZodEnumBySlug, currencySlugToId } from '../constants/currencies'
+import { networks } from '../constants/networks'
 import {
-  currencies,
-  currenciesZodEnumBySlug,
-  currencySlugToId,
-  getCurrencyInfo,
-} from '../constants/currencies'
-import { getNetworkInfo, networks } from '../constants/networks'
-import {
-  getVerificationStatusInfo,
   verificationStatuses,
   verificationStatusesZodEnumBySlug,
   verificationStatusSlugToId,
@@ -32,7 +26,6 @@ import { areEqualObjectsWithoutOrder } from '../lib/objects'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { makeSortSeed } from '../lib/sortSeed'
-import { transformCase } from '../lib/strings'
 
 import type { Prisma } from '@prisma/client'
 
@@ -115,23 +108,29 @@ const modeOptions = [
   label: string
 }[]
 
+export type AttributeOption = {
+  value: string
+  prefix: string
+  prefixWith: string
+}
+
 const attributeOptions = [
   {
     value: 'yes',
     prefix: 'Has',
+    prefixWith: 'with',
   },
   {
     value: 'no',
     prefix: 'Not',
+    prefixWith: 'without',
   },
   {
     value: '',
     prefix: '',
+    prefixWith: '',
   },
-] as const satisfies {
-  value: string
-  prefix: string
-}[]
+] as const satisfies AttributeOption[]
 
 const ignoredKeysForDefaultData = ['sort-seed']
 
@@ -309,6 +308,7 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
         prisma.category.findMany({
           select: {
             name: true,
+            namePluralLong: true,
             slug: true,
             icon: true,
             _count: {
@@ -322,6 +322,7 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
             },
           },
         }),
+      [],
     ],
     [
       'Unable to load services.',
@@ -507,7 +508,7 @@ const attributesByCategory = orderBy(
 )
 
 const categoriesSorted = orderBy(
-  categories?.map((category) => {
+  categories.map((category) => {
     const checked = filters.categories.includes(category.slug)
 
     return {
@@ -584,114 +585,13 @@ const showFiltersId = 'show-filters'
             />
           </form>
         ) : (
-          <div class="-ml-4 flex flex-1 items-center gap-2 overflow-x-auto mask-r-from-[calc(100%-var(--spacing)*16)] pr-12 pl-4">
-            {filters.q && (
-              <ServiceFiltersPill text={`"${filters.q}"`} searchParamName="q" searchParamValue={filters.q} />
-            )}
-
-            {!areEqualArraysWithoutOrder(
-              filters.verification,
-              filtersOptions.verification
-                .filter((verification) => verification.default)
-                .map((verification) => verification.value)
-            ) &&
-              filters.verification.map((verificationStatus) => {
-                const verificationStatusInfo = getVerificationStatusInfo(verificationStatus)
-
-                return (
-                  <ServiceFiltersPill
-                    text={verificationStatusInfo.label}
-                    icon={verificationStatusInfo.icon}
-                    iconClass={verificationStatusInfo.classNames.icon}
-                    searchParamName="verification"
-                    searchParamValue={verificationStatusInfo.slug}
-                  />
-                )
-              })}
-
-            {filters.categories.map((categorySlug) => {
-              const category = categories?.find((c) => c.slug === categorySlug)
-              if (!category) return null
-
-              return (
-                <ServiceFiltersPill
-                  text={category.name}
-                  icon={category.icon}
-                  searchParamName="categories"
-                  searchParamValue={categorySlug}
-                />
-              )
-            })}
-            {filters.currencies.map((currencyId) => {
-              const currency = getCurrencyInfo(currencyId)
-
-              return (
-                <ServiceFiltersPill
-                  text={currency.name}
-                  searchParamName="currencies"
-                  searchParamValue={currency.slug}
-                  icon={currency.icon}
-                />
-              )
-            })}
-            {filters.networks.map((network) => {
-              const networkOption = getNetworkInfo(network)
-
-              return (
-                <ServiceFiltersPill
-                  text={networkOption.name}
-                  icon={networkOption.icon}
-                  searchParamName="networks"
-                  searchParamValue={network}
-                />
-              )
-            })}
-            {filters['max-kyc'] < 4 && (
-              <ServiceFiltersPill
-                text={`KYC Lvl ≤ ${filters['max-kyc'].toLocaleString()}`}
-                icon="ri:shield-keyhole-line"
-                searchParamName="max-kyc"
-              />
-            )}
-            {filters['user-rating'] > 0 && (
-              <ServiceFiltersPill
-                text={`Rating ≥ ${filters['user-rating'].toLocaleString()}★`}
-                icon="ri:star-fill"
-                searchParamName="user-rating"
-              />
-            )}
-            {filters['min-score'] > 0 && (
-              <ServiceFiltersPill
-                text={`Score ≥ ${filters['min-score'].toLocaleString()}`}
-                icon="ri:medal-line"
-                searchParamName="min-score"
-              />
-            )}
-            {filters['attribute-mode'] === 'and' && filters.attr && Object.keys(filters.attr).length > 1 && (
-              <ServiceFiltersPill
-                text="Attributes: AND"
-                icon="ri:filter-3-line"
-                searchParamName="attribute-mode"
-                searchParamValue="and"
-              />
-            )}
-            {filters.attr &&
-              Object.entries(filters.attr)
-                .filter((entry): entry is [string, 'no' | 'yes'] => entry[1] === 'yes' || entry[1] === 'no')
-                .map(([attributeId, attributeValue]) => {
-                  const attribute = attributes.find((attr) => String(attr.id) === attributeId)
-                  if (!attribute) return null
-                  const valueInfo = attributeOptions.find((option) => option.value === attributeValue)
-                  const prefix = valueInfo?.prefix ?? transformCase(attributeValue, 'title')
-                  return (
-                    <ServiceFiltersPill
-                      text={`${prefix}: ${attribute.title}`}
-                      searchParamName={`attr-${attributeId}`}
-                      searchParamValue={attributeValue}
-                    />
-                  )
-                })}
-          </div>
+          <ServiceFiltersPillsRow
+            filters={filters}
+            filtersOptions={filtersOptions}
+            categories={categories}
+            attributes={attributes}
+            attributeOptions={attributeOptions}
+          />
         )
       }
 
@@ -739,6 +639,10 @@ const showFiltersId = 'show-filters'
       filters={filters}
       countCommunityOnly={countCommunityOnly}
       inlineIcons
+      categories={categories}
+      filtersOptions={filtersOptions}
+      attributes={attributes}
+      attributeOptions={attributeOptions}
     />
   </div>
   {

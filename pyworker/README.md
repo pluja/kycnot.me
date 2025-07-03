@@ -38,6 +38,7 @@ Required environment variables:
 - `CRON_MODERATION_TASK`: Cron expression for comment moderation task
 - `CRON_FORCE_TRIGGERS_TASK`: Cron expression for force triggers task
 - `CRON_SERVICE_SCORE_RECALC_TASK`: Cron expression for service score recalculation task
+- `CRON_INACTIVE_USERS_TASK`: Cron expression for inactive users cleanup task
 
 ## Usage
 
@@ -60,6 +61,9 @@ uv run -m pyworker force-triggers
 
 # Run service score recalculation task
 uv run -m pyworker service-score-recalc [--service-id ID]
+
+# Run inactive users cleanup task
+uv run -m pyworker inactive-users
 ```
 
 ### Worker Mode
@@ -106,6 +110,15 @@ Tasks will run according to their configured cron schedules.
 - Calculates privacy, trust, and overall scores
 - Scheduled via `CRON_SERVICE-SCORE-RECALC_TASK`
 
+### Inactive Users Task
+
+- Handles cleanup of inactive user accounts
+- Identifies users who have been inactive for 1 year (no comments, votes, suggestions, and 0 karma)
+- Sends deletion warning notifications at 30, 15, 5, and 1 day intervals
+- Deletes accounts that remain inactive after the warning period
+- Cancels deletion for users who become active again
+- Scheduled via `CRON_INACTIVE_USERS_TASK`
+
 ## Development
 
 ### Project Structure
@@ -124,6 +137,7 @@ pyworker/
 │   │   ├── base.py
 │   │   ├── comment_moderation.py
 │   │   ├── force_triggers.py
+│   │   ├── inactive_users.py
 │   │   ├── service_score_recalc.py
 │   │   ├── tos_review.py
 │   │   └── user_sentiment.py

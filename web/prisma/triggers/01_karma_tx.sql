@@ -275,35 +275,39 @@ CREATE OR REPLACE FUNCTION handle_suggestion_status_change()
 RETURNS TRIGGER AS $$
 DECLARE
     service_name TEXT;
+    service_visibility "ServiceVisibility";
     is_user_admin_or_moderator BOOLEAN;
 BEGIN
     -- Award karma for first approval
     -- Check that OLD.status is not NULL to handle the initial creation case if needed,
     -- and ensure it wasn't already APPROVED.
     IF OLD.status IS DISTINCT FROM 'APPROVED' AND NEW.status = 'APPROVED' THEN
-        -- Check if the user is an admin or moderator
-        SELECT (admin = true OR moderator = true)
-        FROM "User"
-        WHERE id = NEW."userId"
-        INTO is_user_admin_or_moderator;
+        -- Fetch service details for the description
+        SELECT name, visibility INTO service_name, service_visibility FROM "Service" WHERE id = NEW."serviceId";
         
-        -- Only award karma if the user is NOT an admin/moderator
-        IF NOT COALESCE(is_user_admin_or_moderator, false) THEN
-            -- Fetch service name for the description
-            SELECT name INTO service_name FROM "Service" WHERE id = NEW."serviceId";
+        -- Only award karma if the service is public
+        IF service_visibility = 'PUBLIC' THEN
+            -- Check if the user is an admin or moderator
+            SELECT (admin = true OR moderator = true)
+            FROM "User"
+            WHERE id = NEW."userId"
+            INTO is_user_admin_or_moderator;
+            
+            -- Only award karma if the user is NOT an admin/moderator
+            IF NOT COALESCE(is_user_admin_or_moderator, false) THEN
+                -- Insert karma transaction, linking it to the suggestion
+                PERFORM insert_karma_transaction(
+                    NEW."userId",
+                    10,
+                    'SUGGESTION_APPROVED',
+                    NULL, -- p_comment_id (not applicable)
+                    format('Your suggestion for service ''%s'' has been approved!', service_name),
+                    NEW.id -- p_suggestion_id
+                );
 
-            -- Insert karma transaction, linking it to the suggestion
-            PERFORM insert_karma_transaction(
-                NEW."userId",
-                10,
-                'SUGGESTION_APPROVED',
-                NULL, -- p_comment_id (not applicable)
-                format('Your suggestion for service ''%s'' has been approved!', service_name),
-                NEW.id -- p_suggestion_id
-            );
-
-            -- Update user's total karma
-            PERFORM update_user_karma(NEW."userId", 10);
+                -- Update user's total karma
+                PERFORM update_user_karma(NEW."userId", 10);
+            END IF;
         END IF;
     END IF;
 

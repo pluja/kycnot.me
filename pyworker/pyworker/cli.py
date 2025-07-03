@@ -17,6 +17,7 @@ from pyworker.scheduler import TaskScheduler
 from .tasks import (
     CommentModerationTask,
     ForceTriggersTask,
+    InactiveUsersTask,
     ServiceScoreRecalculationTask,
     TosReviewTask,
     UserSentimentTask,
@@ -99,6 +100,12 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     subparsers.add_parser(
         "service-score-recalc-all",
         help="Recalculate service scores for all services",
+    )
+
+    # Inactive users task
+    subparsers.add_parser(
+        "inactive-users",
+        help="Handle inactive users - send deletion warnings and clean up accounts",
     )
 
     return parser.parse_args(args)
@@ -371,6 +378,30 @@ def run_service_score_recalc_all_task() -> int:
     return run_service_score_recalc_task(all_services=True)
 
 
+def run_inactive_users_task() -> int:
+    """
+    Run the inactive users task.
+
+    Returns:
+        Exit code.
+    """
+    logger.info("Starting inactive users task")
+
+    try:
+        # Initialize task and use as context manager
+        with InactiveUsersTask() as task:  # type: ignore
+            result = task.run()  # type: ignore
+            logger.info(f"Inactive users task completed. Results: {result}")
+
+        return 0
+    except Exception as e:
+        logger.exception(f"Error running inactive users task: {e}")
+        return 1
+    finally:
+        # Ensure connection pool is closed even if an error occurs
+        close_db_pool()
+
+
 def run_worker_mode() -> int:
     """
     Run in worker mode, scheduling tasks to run periodically.
@@ -382,54 +413,37 @@ def run_worker_mode() -> int:
 
     # Get task schedules from config
     task_schedules = config.task_schedules
-    if not task_schedules:
+    logger.info(
+        "Found %s cron schedule%s from environment variables: %s",
+        len(task_schedules),
+        "s" if len(task_schedules) != 1 else "",
+        ", ".join(task_schedules.keys()) if task_schedules else "<none>",
+    )
+
+    required_tasks: dict[str, Any] = {
+        "tosreview": run_tos_task,
+        "user_sentiment": run_sentiment_task,
+        "comment_moderation": run_moderation_task,
+        "force_triggers": run_force_triggers_task,
+        "inactive_users": run_inactive_users_task,
+        "service_score_recalc": run_service_score_recalc_task,
+        "service_score_recalc_all": run_service_score_recalc_all_task,
+    }
+
+    missing_tasks = [t for t in required_tasks if t not in task_schedules]
+    if missing_tasks:
         logger.error(
-            "No task schedules defined. Set CRON_TASKNAME_TASK environment variables."
+            "Missing cron schedule for task%s: %s. Set the corresponding CRON_<TASKNAME>_TASK environment variable%s.",
+            "s" if len(missing_tasks) != 1 else "",
+            ", ".join(missing_tasks),
+            "s" if len(missing_tasks) != 1 else "",
         )
         return 1
 
-    logger.info(
-        f"Found {len(task_schedules)} scheduled tasks: {', '.join(task_schedules.keys())}"
-    )
-
-    # Initialize the scheduler
     scheduler = TaskScheduler()
 
-    # Register tasks with their schedules
-    for task_name, cron_expression in task_schedules.items():
-        if task_name.lower() == "tosreview":
-            scheduler.register_task(task_name, cron_expression, run_tos_task)
-        elif task_name.lower() == "user_sentiment":
-            scheduler.register_task(task_name, cron_expression, run_sentiment_task)
-        elif task_name.lower() == "comment_moderation":
-            scheduler.register_task(task_name, cron_expression, run_moderation_task)
-        elif task_name.lower() == "force_triggers":
-            scheduler.register_task(task_name, cron_expression, run_force_triggers_task)
-        elif task_name.lower() == "service_score_recalc":
-            scheduler.register_task(
-                task_name, cron_expression, run_service_score_recalc_task
-            )
-        elif task_name.lower() == "service_score_recalc_all":
-            scheduler.register_task(
-                task_name,
-                cron_expression,
-                run_service_score_recalc_all_task,
-            )
-        else:
-            logger.warning(f"Unknown task '{task_name}', skipping")
-
-    # Register service score recalculation task (every 5 minutes)
-    scheduler.register_task(
-        "service_score_recalc",
-        "*/5 * * * *",
-        run_service_score_recalc_task,
-    )
-    # Register daily service score recalculation for all services
-    scheduler.register_task(
-        "service_score_recalc_all",
-        "0 0 * * *",
-        run_service_score_recalc_all_task,
-    )
+    for task_name, task_callable in required_tasks.items():
+        scheduler.register_task(task_name, task_schedules[task_name], task_callable)
 
     # Start the scheduler if tasks were registered
     if scheduler.tasks:
@@ -484,6 +498,8 @@ def main() -> int:
             )
         elif args.task == "service-score-recalc-all":
             return run_service_score_recalc_all_task()
+        elif args.task == "inactive-users":
+            return run_inactive_users_task()
         elif args.task:
             logger.error(f"Unknown task: {args.task}")
             return 1

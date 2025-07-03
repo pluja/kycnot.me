@@ -110,6 +110,16 @@
   }
 }
 
+@utility no-scrollbar {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  & {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
 @theme {
   --animate-text-gradient: text-gradient 4s linear 0s infinite normal forwards running;
 

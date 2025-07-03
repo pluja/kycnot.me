@@ -6,20 +6,24 @@ import { cn } from '../lib/cn'
 
 import type { Prisma } from '@prisma/client'
 import type { HTMLAttributes } from 'astro/types'
+import type { O } from 'ts-toolbelt'
 
 type Props = HTMLAttributes<'div'> & {
-  announcement: Prisma.AnnouncementGetPayload<{
-    select: {
-      id: true
-      content: true
-      type: true
-      link: true
-      linkText: true
-      startDate: true
-      endDate: true
-      isActive: true
-    }
-  }>
+  announcement: O.Optional<
+    Prisma.AnnouncementGetPayload<{
+      select: {
+        id: true
+        content: true
+        type: true
+        link: true
+        linkText: true
+        startDate: true
+        endDate: true
+        isActive: true
+      }
+    }>,
+    'link' | 'linkText'
+  >
 }
 
 const { announcement, class: className, ...props } = Astro.props
@@ -31,7 +35,9 @@ const Tag = announcement.link ? 'a' : 'div'
 
 <Tag
   href={announcement.link}
-  target={announcement.link ? '_blank' : undefined}
+  target={announcement.link && new URL(announcement.link, Astro.url.origin).origin !== Astro.url.origin
+    ? '_blank'
+    : undefined}
   rel="noopener noreferrer"
   class={cn(
     'group xs:px-6 2xs:px-4 relative isolate z-50 flex items-center justify-center gap-x-2 overflow-hidden border-b border-zinc-800 bg-black px-2 py-2 focus-visible:outline-none sm:gap-x-6 sm:px-3.5',
@@ -78,15 +84,15 @@ const Tag = announcement.link ? 'a' : 'div'
     </span>
   </div>
 
-  <div
-    class="text-day-300 group-focus-visible:outline-primary transition-background 2xs:px-4 relative inline-flex h-full shrink-0 cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-full border border-white/20 bg-black/10 p-[1px] px-1 py-1 text-sm font-medium shadow-sm backdrop-blur-3xl transition-colors group-hover:bg-white/5 group-focus-visible:ring-2 group-focus-visible:ring-blue-500 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-black/80 sm:min-w-[120px]"
-  >
-    <span class="2xs:inline-block hidden">
-      {announcement.linkText}
-    </span>
-    <Icon
-      name="ri:arrow-right-line"
-      class="size-4 shrink-0 transition-transform group-hover:translate-x-0.5"
-    />
-  </div>
+  {
+    !!announcement.linkText && (
+      <div class="text-day-300 group-focus-visible:outline-primary transition-background 2xs:px-4 relative inline-flex h-full shrink-0 cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-full border border-white/20 bg-black/10 p-[1px] px-1 py-1 text-sm font-medium shadow-sm backdrop-blur-3xl transition-colors group-hover:bg-white/5 group-focus-visible:ring-2 group-focus-visible:ring-blue-500 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-black/80 sm:min-w-[120px]">
+        <span class="2xs:inline-block hidden">{announcement.linkText}</span>
+        <Icon
+          name="ri:arrow-right-line"
+          class="size-4 shrink-0 transition-transform group-hover:translate-x-0.5"
+        />
+      </div>
+    )
+  }
 </Tag>

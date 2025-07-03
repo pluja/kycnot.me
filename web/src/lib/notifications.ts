@@ -185,6 +185,18 @@ export function makeNotificationTitle(
         serviceVerificationStatusChangesById[notification.aboutServiceVerificationStatusChange]
       return `${serviceName} ${statusChange.notificationTitle}`
     }
+    case 'ACCOUNT_DELETION_WARNING_30_DAYS': {
+      return 'Account deletion warning - 30 days remaining'
+    }
+    case 'ACCOUNT_DELETION_WARNING_15_DAYS': {
+      return 'Account deletion warning - 15 days remaining'
+    }
+    case 'ACCOUNT_DELETION_WARNING_5_DAYS': {
+      return 'Account deletion warning - 5 days remaining'
+    }
+    case 'ACCOUNT_DELETION_WARNING_1_DAY': {
+      return 'Account deletion warning - 1 day remaining'
+    }
   }
 }
 
@@ -250,6 +262,12 @@ export function makeNotificationContent(
     case 'EVENT_CREATED': {
       if (!notification.aboutEvent) return null
       return notification.aboutEvent.title
+    }
+    case 'ACCOUNT_DELETION_WARNING_30_DAYS':
+    case 'ACCOUNT_DELETION_WARNING_15_DAYS':
+    case 'ACCOUNT_DELETION_WARNING_5_DAYS':
+    case 'ACCOUNT_DELETION_WARNING_1_DAY': {
+      return 'Your account will be deleted due to inactivity. Log in and perform any activity (comment, vote, or create a suggestion) to prevent deletion.'
     }
   }
 }
@@ -408,6 +426,19 @@ export function makeNotificationActions(
           title: 'View',
           ...iconNameAndUrl('ri:arrow-right-line'),
           url: `${origin}/service/${notification.aboutService.slug}#verification`,
+        },
+      ]
+    }
+    case 'ACCOUNT_DELETION_WARNING_30_DAYS':
+    case 'ACCOUNT_DELETION_WARNING_15_DAYS':
+    case 'ACCOUNT_DELETION_WARNING_5_DAYS':
+    case 'ACCOUNT_DELETION_WARNING_1_DAY': {
+      return [
+        {
+          action: 'login',
+          title: 'Login & Stay Active',
+          ...iconNameAndUrl('ri:login-box-line'),
+          url: `${origin}/login`,
         },
       ]
     }

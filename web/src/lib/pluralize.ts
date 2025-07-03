@@ -25,6 +25,10 @@ const knownPlurals = {
     singular: 'Request',
     plural: 'Requests',
   },
+  day: {
+    singular: 'Day',
+    plural: 'Days',
+  },
   something: {
     singular: 'Something',
     plural: 'Somethings',

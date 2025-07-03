@@ -1,0 +1,182 @@
+---
+import { orderBy } from 'lodash-es'
+
+import { getCurrencyInfo } from '../constants/currencies'
+import { getNetworkInfo } from '../constants/networks'
+import { getVerificationStatusInfo } from '../constants/verificationStatus'
+import { areEqualArraysWithoutOrder } from '../lib/arrays'
+import { cn } from '../lib/cn'
+import { transformCase } from '../lib/strings'
+
+import ServiceFiltersPill from './ServiceFiltersPill.astro'
+
+import type { AttributeOption, ServicesFiltersObject, ServicesFiltersOptions } from '../pages/index.astro'
+import type { Prisma } from '@prisma/client'
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = HTMLAttributes<'div'> & {
+  filters: ServicesFiltersObject
+  filtersOptions: ServicesFiltersOptions
+  categories: Prisma.CategoryGetPayload<{
+    select: {
+      name: true
+      slug: true
+      icon: true
+    }
+  }>[]
+  attributes: Prisma.AttributeGetPayload<{
+    select: {
+      title: true
+      id: true
+    }
+  }>[]
+  attributeOptions: AttributeOption[]
+}
+
+const {
+  class: className,
+  filters,
+  filtersOptions,
+  categories,
+  attributes,
+  attributeOptions,
+  ...divProps
+} = Astro.props
+---
+
+<div
+  class={cn(
+    'not-pointer-coarse:no-scrollbar -ml-4 flex shrink grow items-center gap-2 overflow-x-auto mask-r-from-[calc(100%-var(--spacing)*16)] pr-12 pl-4',
+    className
+  )}
+  {...divProps}
+>
+  {
+    filters.q && (
+      <ServiceFiltersPill text={`"${filters.q}"`} searchParamName="q" searchParamValue={filters.q} />
+    )
+  }
+
+  {
+    filters.categories.map((categorySlug) => {
+      const category = categories.find((c) => c.slug === categorySlug)
+      if (!category) return null
+
+      return (
+        <ServiceFiltersPill
+          text={category.name}
+          icon={category.icon}
+          searchParamName="categories"
+          searchParamValue={categorySlug}
+        />
+      )
+    })
+  }
+  {
+    filters.currencies.map((currencyId) => {
+      const currency = getCurrencyInfo(currencyId)
+
+      return (
+        <ServiceFiltersPill
+          text={currency.name}
+          searchParamName="currencies"
+          searchParamValue={currency.slug}
+          icon={currency.icon}
+        />
+      )
+    })
+  }
+  {
+    filters.networks.map((network) => {
+      const networkOption = getNetworkInfo(network)
+
+      return (
+        <ServiceFiltersPill
+          text={networkOption.name}
+          icon={networkOption.icon}
+          searchParamName="networks"
+          searchParamValue={network}
+        />
+      )
+    })
+  }
+  {
+    filters['max-kyc'] < 4 && (
+      <ServiceFiltersPill
+        text={`KYC Lvl ≤ ${filters['max-kyc'].toLocaleString()}`}
+        icon="ri:shield-keyhole-line"
+        searchParamName="max-kyc"
+      />
+    )
+  }
+  {
+    filters['user-rating'] > 0 && (
+      <ServiceFiltersPill
+        text={`Rating ≥ ${filters['user-rating'].toLocaleString()}★`}
+        icon="ri:star-fill"
+        searchParamName="user-rating"
+      />
+    )
+  }
+  {
+    filters['min-score'] > 0 && (
+      <ServiceFiltersPill
+        text={`Score ≥ ${filters['min-score'].toLocaleString()}`}
+        icon="ri:medal-line"
+        searchParamName="min-score"
+      />
+    )
+  }
+  {
+    filters['attribute-mode'] === 'and' && filters.attr && Object.keys(filters.attr).length > 1 && (
+      <ServiceFiltersPill
+        text="Attributes: AND"
+        icon="ri:filter-3-line"
+        searchParamName="attribute-mode"
+        searchParamValue="and"
+      />
+    )
+  }
+  {
+    filters.attr &&
+      Object.entries(filters.attr)
+        .filter((entry): entry is [string, 'no' | 'yes'] => entry[1] === 'yes' || entry[1] === 'no')
+        .map(([attributeId, attributeValue]) => {
+          const attribute = attributes.find((attr) => String(attr.id) === attributeId)
+          if (!attribute) return null
+          const valueInfo = attributeOptions.find((option) => option.value === attributeValue)
+          const prefix = valueInfo?.prefix ?? transformCase(attributeValue, 'title')
+          return (
+            <ServiceFiltersPill
+              text={`${prefix}: ${attribute.title}`}
+              searchParamName={`attr-${attributeId}`}
+              searchParamValue={attributeValue}
+            />
+          )
+        })
+  }
+
+  {
+    !areEqualArraysWithoutOrder(
+      filters.verification,
+      filtersOptions.verification
+        .filter((verification) => verification.default)
+        .map((verification) => verification.value)
+    ) &&
+      orderBy(
+        filters.verification.map((verificationStatus) => getVerificationStatusInfo(verificationStatus)),
+        'order',
+        'desc'
+      ).map((verificationStatusInfo) => {
+        return (
+          <ServiceFiltersPill
+            text={verificationStatusInfo.label}
+            icon={verificationStatusInfo.icon}
+            iconClass={verificationStatusInfo.classNames.icon}
+            searchParamName="verification"
+            searchParamValue={verificationStatusInfo.slug}
+          />
+        )
+      })
+  }
+</div>
