@@ -414,7 +414,10 @@ const {
                         class={cn('mr-2 size-3 shrink-0 opacity-80', attribute.typeInfo.classNames.icon)}
                         aria-hidden="true"
                       />
-                      <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                      <span
+                        class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                        title={attribute.title}
+                      >
                         {attribute.title}
                       </span>
                       <span class="text-day-500 ml-2 font-normal">{attribute._count.services}</span>
@@ -429,7 +432,10 @@ const {
                         class={cn('mr-2 size-3 shrink-0 opacity-100', attribute.typeInfo.classNames.icon)}
                         aria-hidden="true"
                       />
-                      <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                      <span
+                        class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                        title={attribute.title}
+                      >
                         {attribute.title}
                       </span>
                       <span class="text-day-500 ml-2 font-normal">{attribute._count.services}</span>
