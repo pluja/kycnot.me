@@ -376,6 +376,28 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
         descriptionInline="Require proof of being a client for comments."
       />
 
+      <div>
+        <label for="commentSectionMessage" class="font-title mb-2 block text-sm text-green-500"
+          >Comment Section Message</label
+        >
+        <div class="space-y-2">
+          <textarea
+            transition:persist
+            name="commentSectionMessage"
+            id="commentSectionMessage"
+            rows={4}
+            placeholder="Markdown supported. This message will be displayed in the comment section for root comments."
+            class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
+            set:text=""
+          />
+        </div>
+        {
+          inputErrors.commentSectionMessage && (
+            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.commentSectionMessage.join(', ')}</p>
+          )
+        }
+      </div>
+
       <button
         type="submit"
         class="font-title inline-flex justify-center rounded-md border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm text-green-400 shadow-xs transition-colors duration-200 hover:bg-green-500/20 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"

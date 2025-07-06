@@ -553,6 +553,17 @@ const apiCalls = await Astro.locals.banners.try(
           descriptionInline="Require proof of being a client for comments."
         />
 
+        <InputTextArea
+          label="Comment Section Message"
+          name="commentSectionMessage"
+          value={service.commentSectionMessage ?? ''}
+          description="Markdown supported"
+          inputProps={{
+            rows: 4,
+          }}
+          error={serviceInputErrors.commentSectionMessage}
+        />
+
         <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
       </form>
     </FormSection>

@@ -407,6 +407,7 @@ model Service {
   affiliatedUsers                 ServiceUser[]             @relation("ServiceUsers")
 
   strictCommentingEnabled Boolean @default(false)
+  commentSectionMessage   String?
 
   @@index([listedAt])
   @@index([approvedAt])

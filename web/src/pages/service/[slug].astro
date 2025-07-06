@@ -103,6 +103,7 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
           averageUserRating: true,
           isRecentlyApproved: true,
           strictCommentingEnabled: true,
+          commentSectionMessage: true,
           contactMethods: {
             select: {
               value: true,

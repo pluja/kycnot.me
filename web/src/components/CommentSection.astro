@@ -36,6 +36,7 @@ type Props = {
       description: true
       createdAt: true
       strictCommentingEnabled: true
+      commentSectionMessage: true
     }
   }>
 }
@@ -178,6 +179,7 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
     serviceId={service.id}
     activeRatingComment={activeRatingComment}
     strictCommentingEnabled={service.strictCommentingEnabled}
+    commentSectionMessage={service.commentSectionMessage}
     class="xs:mb-4 mb-2"
   />
 

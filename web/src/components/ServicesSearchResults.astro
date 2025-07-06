@@ -3,7 +3,6 @@ import { Icon } from 'astro-icon/components'
 import { uniq, orderBy } from 'lodash-es'
 
 import { getCurrencyInfo } from '../constants/currencies'
-import { getKycLevelInfo } from '../constants/kycLevels'
 import { verificationStatusesByValue, getVerificationStatusInfo } from '../constants/verificationStatus'
 import { areEqualArraysWithoutOrder } from '../lib/arrays'
 import { cn } from '../lib/cn'
@@ -160,8 +159,7 @@ const searchTitle = (() => {
   }
 
   if (filters['max-kyc'] === 0) {
-    const kycLevelInfo = getKycLevelInfo(String(filters['max-kyc']))
-    kycLevel = `with ${kycLevelInfo.name}`
+    kycLevel = 'without KYC'
     prefix = ''
   } else if (filters['max-kyc'] <= 3) {
     kycLevel = `with KYC level ${filters['max-kyc']} or better`

@@ -1,7 +1,9 @@
 ---
 import { Icon } from 'astro-icon/components'
+import { Markdown } from 'astro-remote'
 import { actions } from 'astro:actions'
 
+import { COMMENT_ORDER_ID_MAX_LENGTH } from '../actions/comment'
 import { cn } from '../lib/cn'
 import { makeLoginUrl } from '../lib/redirectUrls'
 
@@ -21,6 +23,7 @@ type Props = Omit<HTMLAttributes<'form'>, 'action' | 'enctype' | 'method'> & {
   parentId?: number
   commentId?: number
   strictCommentingEnabled?: boolean
+  commentSectionMessage?: string | null
   activeRatingComment?: Prisma.CommentGetPayload<{
     select: {
       id: true
@@ -35,6 +38,7 @@ const {
   commentId,
   activeRatingComment,
   strictCommentingEnabled,
+  commentSectionMessage,
   class: className,
   ...htmlProps
 } = Astro.props
@@ -97,70 +101,83 @@ const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
             </div>
 
             {!parentId ? (
-              <div class="[&:has(input[name='rating'][value='']:checked)_[data-show-if-rating]]:hidden">
-                <div class="flex flex-wrap gap-4">
-                  <InputRating name="rating" label="Rating" />
+              <>
+                <div class="[&:has(input[name='rating'][value='']:checked)_[data-show-if-rating]]:hidden">
+                  <div class="flex flex-wrap gap-4">
+                    <InputRating name="rating" label="Rating" />
 
-                  <InputWrapper label="I experienced..." name="tags">
-                    <label class="flex cursor-pointer items-center gap-2">
-                      <input type="checkbox" name="issueKycRequested" class="text-red-400" />
-                      <span class="flex items-center gap-1 text-xs text-red-400">
-                        <Icon name="ri:user-forbid-fill" class="size-3" />
-                        KYC Issue
-                      </span>
-                    </label>
+                    <InputWrapper label="I experienced..." name="tags">
+                      <label class="flex cursor-pointer items-center gap-2">
+                        <input type="checkbox" name="issueKycRequested" class="text-red-400" />
+                        <span class="flex items-center gap-1 text-xs text-red-400">
+                          <Icon name="ri:user-forbid-fill" class="size-3" />
+                          KYC Issue
+                        </span>
+                      </label>
 
-                    <label class="flex cursor-pointer items-center gap-2">
-                      <input type="checkbox" name="issueFundsBlocked" class="text-orange-400" />
-                      <span class="flex items-center gap-1 text-xs text-orange-400">
-                        <Icon name="ri:wallet-3-fill" class="size-3" />
-                        Funds Blocked
-                      </span>
-                    </label>
-                  </InputWrapper>
+                      <label class="flex cursor-pointer items-center gap-2">
+                        <input type="checkbox" name="issueFundsBlocked" class="text-orange-400" />
+                        <span class="flex items-center gap-1 text-xs text-orange-400">
+                          <Icon name="ri:wallet-3-fill" class="size-3" />
+                          Funds Blocked
+                        </span>
+                      </label>
+                    </InputWrapper>
 
-                  <InputText
-                    label="Order ID"
-                    name="orderId"
-                    inputProps={{
-                      maxlength: 100,
-                      placeholder: 'Order ID / URL / Proof',
-                      class: 'bg-night-800',
-                      required: strictCommentingEnabled,
-                    }}
-                    descriptionLabel="Only visible to admins, to verify your comment"
-                    class="grow"
-                  />
-                </div>
+                    <InputText
+                      label="Order ID"
+                      name="orderId"
+                      inputProps={{
+                        maxlength: COMMENT_ORDER_ID_MAX_LENGTH,
+                        placeholder: 'Order ID / URL / Proof',
+                        class: 'bg-night-800',
+                        required: strictCommentingEnabled,
+                      }}
+                      descriptionLabel="Only visible to admins, to verify your comment"
+                      class="grow"
+                    />
+                  </div>
 
-                <div class="mt-4 flex items-start justify-end gap-2">
-                  {!!activeRatingComment?.rating && (
-                    <div
-                      class="rounded-sm bg-yellow-500/10 px-2 py-1.5 text-xs text-yellow-400"
-                      data-show-if-rating
-                    >
-                      <Icon name="ri:information-line" class="mr-1 inline size-3.5" />
-                      <a
-                        href={`${Astro.url.origin}${Astro.url.pathname}#comment-${activeRatingComment.id}`}
-                        class="inline-flex items-center gap-1 underline"
-                        target="_blank"
-                        rel="noopener noreferrer"
+                  <div class="mt-4 flex flex-wrap items-start justify-end gap-x-4 gap-y-2">
+                    {!!activeRatingComment?.rating && (
+                      <div
+                        class="mt-1 rounded-sm bg-yellow-500/10 px-2 py-1.5 text-xs text-yellow-400"
+                        data-show-if-rating
                       >
-                        Your previous rating
-                        <Icon name="ri:external-link-line" class="inline size-2.5 align-[-0.1em]" />
-                      </a>
-                      of
-                      {[
-                        activeRatingComment.rating.toLocaleString(),
-                        <Icon name="ri:star-fill" class="inline size-3 align-[-0.1em]" />,
-                      ]}
-                      won't count for the total.
-                    </div>
-                  )}
+                        <Icon name="ri:information-line" class="mr-1 inline size-3.5" />
+                        <a
+                          href={`${Astro.url.origin}${Astro.url.pathname}#comment-${activeRatingComment.id}`}
+                          class="inline-flex items-center gap-1 underline"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Your previous rating
+                          <Icon name="ri:external-link-line" class="inline size-2.5 align-[-0.1em]" />
+                        </a>
+                        of
+                        {[
+                          activeRatingComment.rating.toLocaleString(),
+                          <Icon name="ri:star-fill" class="inline size-3 align-[-0.1em]" />,
+                        ]}
+                        won't count for the total.
+                      </div>
+                    )}
 
-                  <Button type="submit" label="Send" icon="ri:send-plane-2-line" />
+                    <div class="flex flex-wrap items-start justify-end gap-x-4 gap-y-2">
+                      {!!commentSectionMessage && (
+                        <div class="flex items-start gap-1 pt-1.5">
+                          <Icon name="ri:information-line" class="mt-1.25 inline size-3.5" />
+                          <div class="prose prose-invert prose-sm text-day-200 max-w-none grow">
+                            <Markdown content={commentSectionMessage} />
+                          </div>
+                        </div>
+                      )}
+
+                      <Button type="submit" label="Send" icon="ri:send-plane-2-line" />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </>
             ) : (
               <div class="flex items-center justify-end gap-2">
                 <Button type="submit" label="Reply" icon="ri:reply-line" />

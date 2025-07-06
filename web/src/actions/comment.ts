@@ -17,6 +17,7 @@ import type { CommentStatus, Prisma } from '@prisma/client'
 const COMMENT_RATE_LIMIT_WINDOW_MINUTES = 2
 const MAX_COMMENTS_PER_WINDOW = 1
 const MAX_COMMENTS_PER_WINDOW_VERIFIED_USER = 10
+export const COMMENT_ORDER_ID_MAX_LENGTH = 600
 
 export const commentActions = {
   vote: defineProtectedAction({
@@ -103,7 +104,7 @@ export const commentActions = {
         issueFundsBlocked: z.coerce.boolean().optional(),
         issueScam: z.coerce.boolean().optional(),
         issueDetails: z.string().max(120).optional(),
-        orderId: z.string().max(100).optional(),
+        orderId: z.string().max(COMMENT_ORDER_ID_MAX_LENGTH).optional(),
       })
       .superRefine((data, ctx) => {
         if (data.rating && data.parentId) {
