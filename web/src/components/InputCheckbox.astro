@@ -7,6 +7,8 @@ import type { ComponentProps } from 'astro/types'
 
 type Props = Pick<ComponentProps<typeof InputWrapper>, 'error' | 'name' | 'required'> & {
   disabled?: boolean
+  checked?: boolean
+  descriptionInline?: string
   id?: string
 } & (
     | {
@@ -19,12 +21,10 @@ type Props = Pick<ComponentProps<typeof InputWrapper>, 'error' | 'name' | 'requi
       }
   )
 
-const { disabled, name, required, error, id, label } = Astro.props
+const { disabled, name, required, error, id, label, checked, descriptionInline } = Astro.props
 
 const hasError = !!error && error.length > 0
 ---
-
-{}
 
 <div>
   <label
@@ -41,9 +41,11 @@ const hasError = !!error && error.length > 0
       name={name}
       required={required}
       disabled={disabled}
+      checked={checked}
       class={cn(disabled && 'opacity-50')}
     />
     <span class="text-sm leading-none text-pretty">{label ?? <slot />}</span>
+    {descriptionInline && <p class="text-day-400 text-xs">{descriptionInline}</p>}
   </label>
 
   {

@@ -720,6 +720,7 @@ const generateFakeService = (users: User[]) => {
       }),
       { probability: 0.33 }
     ),
+    strictCommentingEnabled: faker.datatype.boolean(0.33333),
   } as const satisfies Prisma.ServiceCreateInput
 }
 

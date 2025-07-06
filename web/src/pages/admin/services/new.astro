@@ -3,6 +3,7 @@ import { AttributeCategory, Currency, VerificationStatus } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 
+import InputCheckbox from '../../../components/InputCheckbox.astro'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { cn } from '../../../lib/cn'
 import { prisma } from '../../../lib/prisma'
@@ -367,6 +368,13 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
           )
         }
       </div>
+
+      <InputCheckbox
+        label="Strict Commenting"
+        name="strictCommentingEnabled"
+        checked={false}
+        descriptionInline="Require proof of being a client for comments."
+      />
 
       <button
         type="submit"

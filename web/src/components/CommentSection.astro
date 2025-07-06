@@ -35,6 +35,7 @@ type Props = {
       name: true
       description: true
       createdAt: true
+      strictCommentingEnabled: true
     }
   }>
 }
@@ -173,7 +174,12 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
       comment: comments.map(makeReplySchema),
     } as WithContext<DiscussionForumPosting>}
   />
-  <CommentReply serviceId={service.id} activeRatingComment={activeRatingComment} class="xs:mb-4 mb-2" />
+  <CommentReply
+    serviceId={service.id}
+    activeRatingComment={activeRatingComment}
+    strictCommentingEnabled={service.strictCommentingEnabled}
+    class="xs:mb-4 mb-2"
+  />
 
   <div class="mb-6 flex flex-wrap items-center justify-between gap-2">
     <div class="flex items-center">
@@ -258,6 +264,7 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
             showPending={params.showPending}
             serviceSlug={service.slug}
             itemReviewedId={itemReviewedId}
+            strictCommentingEnabled={service.strictCommentingEnabled}
           />
         ))
       ) : (

@@ -63,6 +63,7 @@ const serviceSchemaBase = z.object({
   overallScore: zodCohercedNumber(z.number().int().min(0).max(10)).optional(),
   serviceVisibility: z.nativeEnum(ServiceVisibility),
   internalNote: z.string().optional(),
+  strictCommentingEnabled: z.boolean().optional().default(false),
 })
 
 // Define schema for the create action input
@@ -127,6 +128,7 @@ export const adminServiceActions = {
           verificationSummary: input.verificationSummary,
           verificationProofMd: input.verificationProofMd,
           acceptedCurrencies: input.acceptedCurrencies,
+          strictCommentingEnabled: input.strictCommentingEnabled,
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
           referral: input.referral || null,
           serviceVisibility: input.serviceVisibility,
@@ -247,6 +249,7 @@ export const adminServiceActions = {
           verificationSummary: input.verificationSummary,
           verificationProofMd: input.verificationProofMd,
           acceptedCurrencies: input.acceptedCurrencies,
+          strictCommentingEnabled: input.strictCommentingEnabled,
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
           referral: input.referral || null,
           serviceVisibility: input.serviceVisibility,

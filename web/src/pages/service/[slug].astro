@@ -102,6 +102,7 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
           userSentimentAt: true,
           averageUserRating: true,
           isRecentlyApproved: true,
+          strictCommentingEnabled: true,
           contactMethods: {
             select: {
               value: true,
@@ -1533,6 +1534,20 @@ const activeEventToShow =
         <li>Moderation is light.</li>
         <li>Double-check before trusting.</li>
       </ul>
+
+      {
+        service.strictCommentingEnabled && (
+          <p class="mt-2">
+            <Icon
+              name="ri:verified-badge-fill"
+              class="me-0.5 inline-block size-4 align-[-0.3em] text-orange-100/95"
+            />
+            <span class="font-medium text-orange-100/95">Proof of being a client required</span>, for this
+            service.
+          </p>
+        )
+      }
+
       <div class="absolute inset-y-2 right-2 flex flex-col justify-center">
         <Icon name="ri:alert-line" class="xs:opacity-20 h-full max-h-16 w-auto opacity-10" />
       </div>

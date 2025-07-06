@@ -20,6 +20,7 @@ type Props = Omit<HTMLAttributes<'form'>, 'action' | 'enctype' | 'method'> & {
   serviceId: number
   parentId?: number
   commentId?: number
+  strictCommentingEnabled?: boolean
   activeRatingComment?: Prisma.CommentGetPayload<{
     select: {
       id: true
@@ -28,7 +29,15 @@ type Props = Omit<HTMLAttributes<'form'>, 'action' | 'enctype' | 'method'> & {
   }> | null
 }
 
-const { serviceId, parentId, commentId, activeRatingComment, class: className, ...htmlProps } = Astro.props
+const {
+  serviceId,
+  parentId,
+  commentId,
+  activeRatingComment,
+  strictCommentingEnabled,
+  class: className,
+  ...htmlProps
+} = Astro.props
 
 const MIN_COMMENT_LENGTH = parentId ? 10 : 30
 
@@ -117,6 +126,7 @@ const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
                       maxlength: 100,
                       placeholder: 'Order ID / URL / Proof',
                       class: 'bg-night-800',
+                      required: strictCommentingEnabled,
                     }}
                     descriptionLabel="Only visible to admins, to verify your comment"
                     class="grow"

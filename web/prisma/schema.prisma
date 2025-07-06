@@ -406,6 +406,8 @@ model Service {
   Notification                    Notification[]
   affiliatedUsers                 ServiceUser[]             @relation("ServiceUsers")
 
+  strictCommentingEnabled Boolean @default(false)
+
   @@index([listedAt])
   @@index([approvedAt])
   @@index([verifiedAt])

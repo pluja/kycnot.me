@@ -10,6 +10,7 @@ import Button from '../../../../components/Button.astro'
 import FormSection from '../../../../components/FormSection.astro'
 import FormSubSection from '../../../../components/FormSubSection.astro'
 import InputCardGroup from '../../../../components/InputCardGroup.astro'
+import InputCheckbox from '../../../../components/InputCheckbox.astro'
 import InputCheckboxGroup from '../../../../components/InputCheckboxGroup.astro'
 import InputImageFile from '../../../../components/InputImageFile.astro'
 import InputSelect from '../../../../components/InputSelect.astro'
@@ -543,6 +544,13 @@ const apiCalls = await Astro.locals.banners.try(
           selectedValue={service.serviceVisibility}
           error={serviceInputErrors.serviceVisibility}
           cardSize="sm"
+        />
+
+        <InputCheckbox
+          label="Strict Commenting"
+          name="strictCommentingEnabled"
+          checked={service.strictCommentingEnabled}
+          descriptionInline="Require proof of being a client for comments."
         />
 
         <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />

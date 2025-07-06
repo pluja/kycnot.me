@@ -33,6 +33,7 @@ type Props = HTMLAttributes<'div'> & {
   highlightedCommentId: number | null
   serviceSlug: string
   itemReviewedId: string
+  strictCommentingEnabled?: boolean
 }
 
 const {
@@ -42,6 +43,7 @@ const {
   highlightedCommentId = null,
   serviceSlug,
   itemReviewedId,
+  strictCommentingEnabled,
   class: className,
   ...htmlProps
 } = Astro.props
@@ -492,6 +494,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
           serviceId={comment.serviceId}
           parentId={comment.id}
           commentId={comment.id}
+          strictCommentingEnabled={strictCommentingEnabled}
           class="mt-2 hidden peer-checked/collapse:hidden peer-checked/reply:block"
         />
       </>
