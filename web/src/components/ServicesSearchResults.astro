@@ -201,6 +201,7 @@ const searchTitle = (() => {
         name="ri:loader-4-line"
         id="search-indicator"
         class="htmx-request:opacity-100 xs:-mx-1.5 -mx-1 inline-block size-4 animate-spin text-white opacity-0 transition-opacity duration-500 sm:-mx-3"
+        aria-hidden="true"
         is:inline={inlineIcons}
       />
 
@@ -346,24 +347,26 @@ const searchTitle = (() => {
       </div>
     ) : (
       <>
-        <div class="mt-6 grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*80),1fr))]">
+        <ol class="mt-6 grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*80),1fr))]">
           {services.map((service, i) => (
-            <ServiceCard
-              inlineIcons={inlineIcons}
-              service={service}
-              data-hx-search-results-card
-              {...(i === services.length - 1 && currentPage < totalPages
-                ? {
-                    'hx-get': createPageUrl(currentPage + 1, Astro.url, { 'sort-seed': sortSeed }),
-                    'hx-trigger': 'revealed',
-                    'hx-swap': 'afterend',
-                    'hx-select': '[data-hx-search-results-card]',
-                    'hx-indicator': '#infinite-scroll-indicator',
-                  }
-                : {})}
-            />
+            <li>
+              <ServiceCard
+                inlineIcons={inlineIcons}
+                service={service}
+                data-hx-search-results-card
+                {...(i === services.length - 1 && currentPage < totalPages
+                  ? {
+                      'hx-get': createPageUrl(currentPage + 1, Astro.url, { 'sort-seed': sortSeed }),
+                      'hx-trigger': 'revealed',
+                      'hx-swap': 'afterend',
+                      'hx-select': '[data-hx-search-results-card]',
+                      'hx-indicator': '#infinite-scroll-indicator',
+                    }
+                  : {})}
+              />
+            </li>
           ))}
-        </div>
+        </ol>
 
         <div class="no-js:hidden mt-8 flex justify-center" id="infinite-scroll-indicator">
           <div class="htmx-request:opacity-100 flex items-center gap-2 opacity-0 transition-opacity duration-500">

@@ -13,7 +13,7 @@ import Tooltip from './Tooltip.astro'
 import type { Prisma } from '@prisma/client'
 import type { HTMLAttributes } from 'astro/types'
 
-type Props = HTMLAttributes<'a'> & {
+type Props = HTMLAttributes<'article'> & {
   inlineIcons?: boolean
   withoutLink?: boolean
   service: Prisma.ServiceGetPayload<{
@@ -57,7 +57,7 @@ const {
   },
   class: className,
   withoutLink = false,
-  ...aProps
+  ...htmlProps
 } = Astro.props
 
 const statusIcon = {
@@ -70,127 +70,129 @@ const Element = withoutLink ? 'div' : 'a'
 const overallScoreInfo = makeOverallScoreInfo(overallScore)
 ---
 
-<Element
-  href={Element === 'a' ? `/service/${slug}` : undefined}
-  {...aProps}
-  class={cn(
-    'border-night-600 group/card bg-night-800 flex flex-col gap-(--gap) rounded-xl border p-(--gap) [--gap:calc(var(--spacing)*3)]',
-    (serviceVisibility === 'ARCHIVED' || verificationStatus === 'VERIFICATION_FAILED') &&
-      'opacity-75 transition-opacity hover:opacity-100 focus-visible:opacity-100',
-    className
-  )}
->
-  <!-- Header with Icon and Title -->
-  <div class="flex items-center gap-(--gap)">
-    <MyPicture
-      src={imageUrl}
-      fallback="service"
-      alt={name || 'Service logo'}
-      class={cn(
-        'size-12 shrink-0 rounded-sm object-contain text-white',
-        (serviceVisibility === 'ARCHIVED' || verificationStatus === 'VERIFICATION_FAILED') &&
-          'grayscale-67 transition-all group-hover/card:grayscale-0 group-focus-visible/card:grayscale-0'
-      )}
-      width={48}
-      height={48}
-    />
+<article {...htmlProps}>
+  <Element
+    href={Element === 'a' ? `/service/${slug}` : undefined}
+    aria-label={Element === 'a' ? name : undefined}
+    class={cn(
+      'border-night-600 group/card bg-night-800 flex flex-col gap-(--gap) rounded-xl border p-(--gap) [--gap:calc(var(--spacing)*3)]',
+      (serviceVisibility === 'ARCHIVED' || verificationStatus === 'VERIFICATION_FAILED') &&
+        'opacity-75 transition-opacity hover:opacity-100 focus-visible:opacity-100',
+      className
+    )}
+  >
+    <!-- Header with Icon and Title -->
+    <div class="flex items-center gap-(--gap)">
+      <MyPicture
+        src={imageUrl}
+        fallback="service"
+        alt="Logo"
+        class={cn(
+          'size-12 shrink-0 rounded-sm object-contain text-white',
+          (serviceVisibility === 'ARCHIVED' || verificationStatus === 'VERIFICATION_FAILED') &&
+            'grayscale-67 transition-all group-hover/card:grayscale-0 group-focus-visible/card:grayscale-0'
+        )}
+        width={48}
+        height={48}
+      />
 
-    <div class="flex min-w-0 flex-1 flex-col justify-center self-stretch">
-      <h3 class="font-title text-lg leading-none font-medium tracking-wide text-white">
-        {name}{
-          statusIcon && (
-            <Tooltip
-              text={statusIcon.label}
-              position="right"
-              class="-my-2 shrink-0 whitespace-nowrap"
-              enabled={verificationStatus !== 'VERIFICATION_FAILED'}
-            >
-              {[
+      <div class="flex min-w-0 flex-1 flex-col justify-center self-stretch">
+        <h1 class="font-title text-lg leading-none font-medium tracking-wide text-white">
+          {name}{
+            statusIcon && (
+              <Tooltip
+                text={statusIcon.label}
+                position="right"
+                class="-my-2 shrink-0 whitespace-nowrap"
+                enabled={verificationStatus !== 'VERIFICATION_FAILED'}
+              >
+                {[
+                  <Icon
+                    is:inline={inlineIcons}
+                    name={statusIcon.icon}
+                    class={cn(
+                      'inline-block size-6 shrink-0 rounded-lg p-1 align-[-0.37em]',
+                      verificationStatus === 'VERIFICATION_FAILED' && 'pr-0',
+                      statusIcon.classNames.icon
+                    )}
+                  />,
+                  verificationStatus === 'VERIFICATION_FAILED' && (
+                    <span class="text-sm font-bold text-red-500">SCAM</span>
+                  ),
+                ]}
+              </Tooltip>
+            )
+          }{
+            serviceVisibility === 'ARCHIVED' && (
+              <Tooltip
+                text={serviceVisibilitiesById.ARCHIVED.label}
+                position="right"
+                class="-my-2 shrink-0 whitespace-nowrap"
+              >
                 <Icon
                   is:inline={inlineIcons}
-                  name={statusIcon.icon}
+                  name={serviceVisibilitiesById.ARCHIVED.icon}
                   class={cn(
                     'inline-block size-6 shrink-0 rounded-lg p-1 align-[-0.37em]',
-                    verificationStatus === 'VERIFICATION_FAILED' && 'pr-0',
-                    statusIcon.classNames.icon
+                    serviceVisibilitiesById.ARCHIVED.iconClass
                   )}
-                />,
-                verificationStatus === 'VERIFICATION_FAILED' && (
-                  <span class="text-sm font-bold text-red-500">SCAM</span>
-                ),
-              ]}
-            </Tooltip>
-          )
-        }{
-          serviceVisibility === 'ARCHIVED' && (
-            <Tooltip
-              text={serviceVisibilitiesById.ARCHIVED.label}
-              position="right"
-              class="-my-2 shrink-0 whitespace-nowrap"
-            >
-              <Icon
-                is:inline={inlineIcons}
-                name={serviceVisibilitiesById.ARCHIVED.icon}
-                class={cn(
-                  'inline-block size-6 shrink-0 rounded-lg p-1 align-[-0.37em]',
-                  serviceVisibilitiesById.ARCHIVED.iconClass
-                )}
-              />
-            </Tooltip>
-          )
-        }
-      </h3>
-      <div class="max-h-2 flex-1"></div>
-      <div class="flex items-center gap-4 overflow-hidden mask-r-from-[calc(100%-var(--spacing)*4)]">
+                />
+              </Tooltip>
+            )
+          }
+        </h1>
+        <div class="max-h-2 flex-1" aria-hidden="true"></div>
+        <div class="flex items-center gap-4 overflow-hidden mask-r-from-[calc(100%-var(--spacing)*4)]">
+          {
+            categories.map((category) => (
+              <span class="text-day-300 inline-flex shrink-0 items-center gap-1 text-sm leading-none">
+                <Icon name={category.icon} class="size-4" is:inline={inlineIcons} />
+                <span>{category.name}</span>
+              </span>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="flex-1">
+      <p class="text-day-400 line-clamp-3 text-sm leading-tight">
+        {description}
+      </p>
+    </div>
+
+    <div class="flex items-center justify-start">
+      <Tooltip
+        class={cn(
+          'inline-flex size-6 items-center justify-center rounded-sm text-lg font-bold',
+          overallScoreInfo.classNameBg
+        )}
+        text={`${Math.round(privacyScore).toLocaleString()}% Privacy | ${Math.round(trustScore).toLocaleString()}% Trust`}
+      >
+        {overallScoreInfo.formattedScore}
+      </Tooltip>
+
+      <span class="text-day-300 ml-3 text-sm font-bold whitespace-nowrap">
+        KYC &nbsp;{kycLevel.toLocaleString()}
+      </span>
+
+      <div class="-m-1 ml-auto flex">
         {
-          categories.map((category) => (
-            <span class="text-day-300 inline-flex shrink-0 items-center gap-1 text-sm leading-none">
-              <Icon name={category.icon} class="size-4" is:inline={inlineIcons} />
-              <span>{category.name}</span>
-            </span>
-          ))
+          currencies.map((currency) => {
+            const isAccepted = acceptedCurrencies.includes(currency.id)
+
+            return (
+              <Tooltip text={currency.name}>
+                <Icon
+                  is:inline={inlineIcons}
+                  name={currency.icon}
+                  class={cn('text-day-600 box-content size-4 p-1', { 'text-white': isAccepted })}
+                />
+              </Tooltip>
+            )
+          })
         }
       </div>
     </div>
-  </div>
-
-  <div class="flex-1">
-    <p class="text-day-400 line-clamp-3 text-sm leading-tight">
-      {description}
-    </p>
-  </div>
-
-  <div class="flex items-center justify-start">
-    <Tooltip
-      class={cn(
-        'inline-flex size-6 items-center justify-center rounded-sm text-lg font-bold',
-        overallScoreInfo.classNameBg
-      )}
-      text={`${Math.round(privacyScore).toLocaleString()}% Privacy | ${Math.round(trustScore).toLocaleString()}% Trust`}
-    >
-      {overallScoreInfo.formattedScore}
-    </Tooltip>
-
-    <span class="text-day-300 ml-3 text-sm font-bold whitespace-nowrap">
-      KYC &nbsp;{kycLevel.toLocaleString()}
-    </span>
-
-    <div class="-m-1 ml-auto flex">
-      {
-        currencies.map((currency) => {
-          const isAccepted = acceptedCurrencies.includes(currency.id)
-
-          return (
-            <Tooltip text={currency.name}>
-              <Icon
-                is:inline={inlineIcons}
-                name={currency.icon}
-                class={cn('text-day-600 box-content size-4 p-1', { 'text-white': isAccepted })}
-              />
-            </Tooltip>
-          )
-        })
-      }
-    </div>
-  </div>
-</Element>
+  </Element>
+</article>
