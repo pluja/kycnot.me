@@ -32,6 +32,7 @@ type Props = HTMLAttributes<'div'> & {
     }
   }>[]
   attributeOptions: AttributeOption[]
+  inlineIcons?: boolean
 }
 
 const {
@@ -41,6 +42,7 @@ const {
   categories,
   attributes,
   attributeOptions,
+  inlineIcons = true,
   ...divProps
 } = Astro.props
 ---
@@ -55,7 +57,12 @@ const {
 >
   {
     filters.q && (
-      <ServiceFiltersPill text={`"${filters.q}"`} searchParamName="q" searchParamValue={filters.q} />
+      <ServiceFiltersPill
+        text={`"${filters.q}"`}
+        searchParamName="q"
+        searchParamValue={filters.q}
+        inlineIcons={inlineIcons}
+      />
     )
   }
 
@@ -70,6 +77,7 @@ const {
           icon={category.icon}
           searchParamName="categories"
           searchParamValue={categorySlug}
+          inlineIcons={inlineIcons}
         />
       )
     })
@@ -84,6 +92,7 @@ const {
           searchParamName="currencies"
           searchParamValue={currency.slug}
           icon={currency.icon}
+          inlineIcons={inlineIcons}
         />
       )
     })
@@ -98,6 +107,7 @@ const {
           icon={networkOption.icon}
           searchParamName="networks"
           searchParamValue={network}
+          inlineIcons={inlineIcons}
         />
       )
     })
@@ -108,6 +118,7 @@ const {
         text={`KYC Lvl ≤ ${filters['max-kyc'].toLocaleString()}`}
         icon="ri:shield-keyhole-line"
         searchParamName="max-kyc"
+        inlineIcons={inlineIcons}
       />
     )
   }
@@ -117,6 +128,7 @@ const {
         text={`Rating ≥ ${filters['user-rating'].toLocaleString()}★`}
         icon="ri:star-fill"
         searchParamName="user-rating"
+        inlineIcons={inlineIcons}
       />
     )
   }
@@ -126,6 +138,7 @@ const {
         text={`Score ≥ ${filters['min-score'].toLocaleString()}`}
         icon="ri:medal-line"
         searchParamName="min-score"
+        inlineIcons={inlineIcons}
       />
     )
   }
@@ -136,6 +149,7 @@ const {
         icon="ri:filter-3-line"
         searchParamName="attribute-mode"
         searchParamValue="and"
+        inlineIcons={inlineIcons}
       />
     )
   }
@@ -153,6 +167,7 @@ const {
               text={`${prefix}: ${attribute.title}`}
               searchParamName={`attr-${attributeId}`}
               searchParamValue={attributeValue}
+              inlineIcons={inlineIcons}
             />
           )
         })
@@ -177,6 +192,7 @@ const {
             iconClass={verificationStatusInfo.classNames.icon}
             searchParamName="verification"
             searchParamValue={verificationStatusInfo.slug}
+            inlineIcons={inlineIcons}
           />
         )
       })
