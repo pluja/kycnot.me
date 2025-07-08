@@ -107,7 +107,8 @@ export default defineConfig({
         SITE_URL === 'http://localhost:4321'
           ? "frame-ancestors 'none'; upgrade-insecure-requests"
           : "default-src 'self'; img-src 'self' *; frame-ancestors 'none'; upgrade-insecure-requests",
-      'Strict-Transport-Security': 'max-age=31536000; includeSubdomains; preload;',
+      'Strict-Transport-Security':
+        SITE_URL === 'http://localhost:4321' ? undefined : 'max-age=31536000; includeSubdomains; preload;',
     },
   },
   image: {
