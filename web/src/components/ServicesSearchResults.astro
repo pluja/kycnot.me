@@ -350,21 +350,19 @@ const searchTitle = (() => {
       <>
         <ol class="mt-6 grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*80),1fr))]">
           {services.map((service, i) => (
-            <li>
-              <ServiceCard
-                inlineIcons={inlineIcons}
-                service={service}
-                data-hx-search-results-card
-                {...(i === services.length - 1 && currentPage < totalPages
-                  ? {
-                      'hx-get': createPageUrl(currentPage + 1, Astro.url, { 'sort-seed': sortSeed }),
-                      'hx-trigger': 'revealed',
-                      'hx-swap': 'afterend',
-                      'hx-select': '[data-hx-search-results-card]',
-                      'hx-indicator': '#infinite-scroll-indicator',
-                    }
-                  : {})}
-              />
+            <li
+              data-hx-search-results-card
+              {...(i === services.length - 1 && currentPage < totalPages
+                ? {
+                    'hx-get': createPageUrl(currentPage + 1, Astro.url, { 'sort-seed': sortSeed }),
+                    'hx-trigger': 'revealed',
+                    'hx-swap': 'afterend',
+                    'hx-select': '[data-hx-search-results-card]',
+                    'hx-indicator': '#infinite-scroll-indicator',
+                  }
+                : {})}
+            >
+              <ServiceCard inlineIcons={inlineIcons} service={service} />
             </li>
           ))}
         </ol>
