@@ -58,9 +58,13 @@ const ogImageTemplateData = {
     class="prose prose-invert prose-headings:text-green-400 prose-h1:text-[2.5rem] prose-h1:font-bold prose-h1:my-8 prose-h1:drop-shadow-[0_0_10px_rgba(0,255,0,0.3)] prose-h2:text-green-500 prose-h2:text-[1.8rem] prose-h2:font-semibold prose-h2:my-6 prose-h2:border-b prose-h2:border-green-900 prose-h2:pb-1 prose-h3:text-green-600 prose-h3:text-[1.4rem] prose-h3:font-semibold prose-h3:my-4 prose-h4:text-green-700 prose-h4:text-[1.2rem] prose-h4:font-semibold prose-h4:my-3 prose-strong:font-semibold prose-strong:drop-shadow-[0_0_5px_rgba(0,255,0,0.2)] prose-p:text-gray-300 prose-p:my-4 prose-p:leading-relaxed prose-a:text-green-400 prose-a:no-underline prose-a:transition-all prose-a:border-b prose-a:border-green-900 prose-a:hover:text-green-400 prose-a:hover:drop-shadow-[0_0_8px_rgba(0,255,0,0.4)] prose-a:hover:border-green-400 prose-ul:text-gray-300 prose-ol:text-gray-300 prose-li:my-2 prose-li:leading-relaxed mx-auto"
   >
     <h1 class="mb-0!">{frontmatter.title}</h1>
-    <p class="mt-2! opacity-70">
-      Updated {frontmatter.updatedAt && <TimeFormatted date={new Date(frontmatter.updatedAt)} />}
-    </p>
+    {
+      !!frontmatter.updatedAt && (
+        <p class="mt-2! opacity-70">
+          Updated <TimeFormatted date={new Date(frontmatter.updatedAt)} />
+        </p>
+      )
+    }
 
     <slot />
   </div>

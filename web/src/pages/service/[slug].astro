@@ -426,6 +426,30 @@ const activeAlertOrWarningEvents = service.events
   .filter((event) => event.typeInfo.showBanner && (event.endedAt === null || event.endedAt >= now))
 const activeEventToShow =
   activeAlertOrWarningEvents.find((event) => event.type === EventType.ALERT) ?? activeAlertOrWarningEvents[0]
+
+// Sort verification steps: failed first, then warnings, then others, newest first within each group
+const getVerificationStepPriority = (status: VerificationStepStatus) => {
+  switch (status) {
+    case VerificationStepStatus.FAILED:
+      return 0 // Highest priority
+    case VerificationStepStatus.WARNING:
+      return 1
+    case VerificationStepStatus.IN_PROGRESS:
+      return 2
+    case VerificationStepStatus.PENDING:
+      return 3
+    case VerificationStepStatus.PASSED:
+      return 4 // Lowest priority
+    default:
+      return 5
+  }
+}
+
+const sortedVerificationSteps = orderBy(
+  service.verificationSteps,
+  [(step) => getVerificationStepPriority(step.status), (step) => step.updatedAt],
+  ['asc', 'desc'] // Priority ascending (failed first), date descending (newest first)
+)
 ---
 
 <BaseLayout
@@ -1476,11 +1500,11 @@ const activeEventToShow =
     )
   }
   {
-    service.verificationSteps.length > 0 && (
+    sortedVerificationSteps.length > 0 && (
       <>
         <h3 class="font-title text-md mt-6 mb-2 font-semibold">Verification Steps</h3>
         <ul class="mb-8 space-y-2">
-          {service.verificationSteps.map((step) => {
+          {sortedVerificationSteps.map((step) => {
             const statusInfo = getVerificationStepStatusInfo(step.status)
 
             return (
