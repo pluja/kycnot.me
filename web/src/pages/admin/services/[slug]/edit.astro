@@ -25,6 +25,7 @@ import UserBadge from '../../../../components/UserBadge.astro'
 import { getAttributeCategoryInfo } from '../../../../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../../../../constants/attributeTypes'
 import { contactMethodUrlTypes, formatContactMethod } from '../../../../constants/contactMethods'
+import { countries } from '../../../../constants/countries'
 import { currencies } from '../../../../constants/currencies'
 import { eventTypes, getEventTypeInfo } from '../../../../constants/eventTypes'
 import { kycLevelClarifications } from '../../../../constants/kycLevelClarifications'
@@ -383,6 +384,36 @@ const apiCalls = await Astro.locals.banners.try(
             error={serviceInputErrors.referral}
             class="self-end"
             description="Will be appended to the service URL"
+          />
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <InputText
+            label="Registered Company Name"
+            name="registeredCompanyName"
+            description="Official name of the registered company"
+            inputProps={{
+              value: service.registeredCompanyName,
+              placeholder: 'e.g. Example Corp Ltd.',
+            }}
+            error={serviceInputErrors.registeredCompanyName}
+          />
+
+          <InputSelect
+            name="registrationCountryCode"
+            label="Company Registration Country"
+            description="Country where the service company is legally registered"
+            options={[
+              { label: 'Not registered', value: '' },
+              ...countries
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((country) => ({
+                  label: `${country.flag} ${country.name}`,
+                  value: country.code,
+                }))
+            ]}
+            selectedValue={service.registrationCountryCode || ''}
+            error={serviceInputErrors.registrationCountryCode}
           />
         </div>
 

@@ -1,8 +1,10 @@
 import { differenceInMonths, differenceInYears } from 'date-fns'
+import he from 'he'
 import { orderBy } from 'lodash-es'
 
 import { getAttributeCategoryInfo } from '../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../constants/attributeTypes'
+import { getCountryInfo } from '../constants/countries'
 import { kycLevelClarifications } from '../constants/kycLevelClarifications'
 import { kycLevels } from '../constants/kycLevels'
 import { serviceVisibilitiesById } from '../constants/serviceVisibility'
@@ -47,6 +49,8 @@ type NonDbAttributeFull = NonDbAttribute & {
         kycLevel: true
         kycLevelClarification: true
         operatingSince: true
+        registrationCountryCode: true
+        registeredCompanyName: true
       }
     }>
   ) => Partial<Pick<NonDbAttribute, 'description' | 'title'>> & {
@@ -303,6 +307,42 @@ export const nonDbAttributes: NonDbAttributeFull[] = [
         description: `This service has been operational for **${String(
           yearsOperated
         )} years**. While this indicates stability, it is not a future-proof guarantee.`,
+      }
+    },
+  },
+  {
+    slug: 'legally-registered',
+    title: 'Legally registered',
+    type: 'INFO',
+    category: 'TRUST',
+    description: 'This service is legally registered as a company.',
+    privacyPoints: 0,
+    trustPoints: 2,
+    links: [],
+    customize: (service) => {
+      const countryCode = service.registrationCountryCode
+      const companyName = service.registeredCompanyName
+
+      if (!countryCode && !companyName) {
+        return { show: false }
+      }
+
+      const countryInfo = countryCode ? getCountryInfo(countryCode) : null
+      const flagTitle = countryInfo ? `${countryInfo.flag} Legally registered` : 'Legally registered'
+
+      let description = 'Legally registered.'
+      if (companyName && countryCode && countryInfo) {
+        description = `Legally registered as **${he.escape(companyName)}** in **${countryInfo.name}**.`
+      } else if (companyName) {
+        description = `Legally registered as **${he.escape(companyName)}**.`
+      } else if (countryCode && countryInfo) {
+        description = `Legally registered in **${countryInfo.name}**.`
+      }
+
+      return {
+        show: true,
+        title: flagTitle,
+        description,
       }
     },
   },

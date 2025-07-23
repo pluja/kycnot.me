@@ -28,6 +28,7 @@ import { generateUsername } from 'unique-username-generator'
 import { kycLevels } from '../src/constants/kycLevels'
 import { undefinedIfEmpty } from '../src/lib/arrays'
 import { transformCase } from '../src/lib/strings'
+import { countries } from '../src/constants/countries'
 
 // Exit if not in development mode
 if (process.env.NODE_ENV === 'production') {
@@ -697,6 +698,12 @@ const generateFakeService = (users: User[]) => {
       { count: { min: 0, max: 2 } }
     ),
     imageUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&format=svg`,
+    registrationCountryCode: faker.helpers.maybe(() => faker.helpers.arrayElement(countries).code, {
+      probability: 0.7,
+    }),
+    registeredCompanyName: faker.helpers.maybe(() => faker.company.name(), {
+      probability: 0.6,
+    }),
     listedAt:
       serviceVisibility === 'PUBLIC' || serviceVisibility === 'ARCHIVED'
         ? faker.date.recent({ days: 30 })

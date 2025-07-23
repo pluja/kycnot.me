@@ -4,6 +4,7 @@ import { ActionError } from 'astro:actions'
 import { uniq } from 'lodash-es'
 import slugify from 'slugify'
 
+import { countriesZodEnumById } from '../../constants/countries'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { saveFileLocally, deleteFileLocally } from '../../lib/fileStorage'
 import { prisma } from '../../lib/prisma'
@@ -59,6 +60,14 @@ const serviceSchemaBase = z.object({
     .nullable()
     .default(null),
   operatingSince: z.coerce.date().optional().nullable(),
+  registrationCountryCode: z
+    .union([countriesZodEnumById, z.literal('')])
+    .optional()
+    .nullable()
+    .refine((val) => val === null || val === undefined || val === '' || val.length === 2, {
+      message: 'Country code must be a valid 2-character code or empty',
+    }),
+  registeredCompanyName: z.string().trim().max(100).optional().nullable(),
   imageFile: imageFileSchema,
   overallScore: zodCohercedNumber(z.number().int().min(0).max(10)).optional(),
   serviceVisibility: z.nativeEnum(ServiceVisibility),
@@ -283,6 +292,8 @@ export const adminServiceActions = {
             })),
           },
           operatingSince: input.operatingSince,
+          registrationCountryCode: input.registrationCountryCode ?? null,
+          registeredCompanyName: input.registeredCompanyName,
         },
       })
 

@@ -345,60 +345,64 @@ model ServiceSuggestionMessage {
 }
 
 model Service {
-  id                     Int                          @id @default(autoincrement())
-  name                   String
-  slug                   String                       @unique
-  previousSlugs          String[]                     @default([])
-  description            String
-  categories             Category[]                   @relation("ServiceToCategory")
-  kycLevel               Int                          @default(4)
-  kycLevelClarification  KycLevelClarification        @default(NONE)
+  id                      Int                          @id @default(autoincrement())
+  name                    String
+  slug                    String                       @unique
+  previousSlugs           String[]                     @default([])
+  description             String
+  categories              Category[]                   @relation("ServiceToCategory")
+  kycLevel                Int                          @default(4)
+  kycLevelClarification   KycLevelClarification        @default(NONE)
   /// Date only, no time.
-  operatingSince         DateTime?                    @db.Date
-  overallScore           Int                          @default(0)
-  privacyScore           Int                          @default(0)
-  trustScore             Int                          @default(0)
+  operatingSince          DateTime?                    @db.Date
+  overallScore            Int                          @default(0)
+  privacyScore            Int                          @default(0)
+  trustScore              Int                          @default(0)
   /// Computed via trigger. Do not update through prisma.
-  averageUserRating      Float?
-  serviceVisibility      ServiceVisibility            @default(PUBLIC)
-  serviceInfoBanner      ServiceInfoBanner            @default(NONE)
-  serviceInfoBannerNotes String?
-  verificationStatus     VerificationStatus           @default(COMMUNITY_CONTRIBUTED)
-  verificationSummary    String?
-  verificationRequests   ServiceVerificationRequest[]
-  verificationProofMd    String?
+  averageUserRating       Float?
+  serviceVisibility       ServiceVisibility            @default(PUBLIC)
+  serviceInfoBanner       ServiceInfoBanner            @default(NONE)
+  serviceInfoBannerNotes  String?
+  verificationStatus      VerificationStatus           @default(COMMUNITY_CONTRIBUTED)
+  verificationSummary     String?
+  verificationRequests    ServiceVerificationRequest[]
+  verificationProofMd     String?
   /// [UserSentiment]
-  userSentiment          Json?
-  userSentimentAt        DateTime?
-  referral               String?
-  acceptedCurrencies     Currency[]                   @default([])
-  serviceUrls            String[]
-  tosUrls                String[]                     @default([])
-  onionUrls              String[]                     @default([])
-  i2pUrls                String[]                     @default([])
-  imageUrl               String?
+  userSentiment           Json?
+  userSentimentAt         DateTime?
+  referral                String?
+  acceptedCurrencies      Currency[]                   @default([])
+  serviceUrls             String[]
+  tosUrls                 String[]                     @default([])
+  onionUrls               String[]                     @default([])
+  i2pUrls                 String[]                     @default([])
+  imageUrl                String?
+  /// ISO 3166-1 alpha-2 country code where the service company is registered
+  registrationCountryCode String?                      @db.VarChar(2)
+  /// Official name of the registered company
+  registeredCompanyName   String?
   /// [TosReview]
-  tosReview              Json?
-  tosReviewAt            DateTime?
-  createdAt              DateTime                     @default(now())
-  updatedAt              DateTime                     @default(now()) @updatedAt
+  tosReview               Json?
+  tosReviewAt             DateTime?
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @default(now()) @updatedAt
   /// Computed via trigger when the visibility is PUBLIC or (ARCHIVED and listedAt was null). Do not update through prisma.
-  listedAt               DateTime?
+  listedAt                DateTime?
   /// Computed via trigger when the verification status is APPROVED. Do not update through prisma.
-  approvedAt             DateTime?
+  approvedAt              DateTime?
   /// Computed via trigger when the verification status is VERIFICATION_SUCCESS. Do not update through prisma.
-  verifiedAt             DateTime?
+  verifiedAt              DateTime?
   /// Computed via trigger when the verification status is VERIFICATION_FAILED. Do not update through prisma.
-  spamAt                 DateTime?
+  spamAt                  DateTime?
   /// Computed via trigger. Do not update through prisma.
-  isRecentlyApproved     Boolean                      @default(false)
-  comments               Comment[]
-  events                 Event[]
-  contactMethods         ServiceContactMethod[]       @relation("ServiceToContactMethod")
-  attributes             ServiceAttribute[]
-  verificationSteps      VerificationStep[]
-  suggestions            ServiceSuggestion[]
-  internalNotes          InternalServiceNote[]        @relation("ServiceRecievedNotes")
+  isRecentlyApproved      Boolean                      @default(false)
+  comments                Comment[]
+  events                  Event[]
+  contactMethods          ServiceContactMethod[]       @relation("ServiceToContactMethod")
+  attributes              ServiceAttribute[]
+  verificationSteps       VerificationStep[]
+  suggestions             ServiceSuggestion[]
+  internalNotes           InternalServiceNote[]        @relation("ServiceRecievedNotes")
 
   onEventCreatedForServices       NotificationPreferences[] @relation("onEventCreatedForServices")
   onRootCommentCreatedForServices NotificationPreferences[] @relation("onRootCommentCreatedForServices")

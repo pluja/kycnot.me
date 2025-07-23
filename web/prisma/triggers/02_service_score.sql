@@ -96,6 +96,7 @@ DECLARE
     recently_approved_factor INT := 0;
     tos_penalty_factor INT := 0;
     operating_since_factor INT := 0;
+    legally_registered_factor INT := 0;
 BEGIN
     -- Get verification status factor
     SELECT 
@@ -160,9 +161,17 @@ BEGIN
     INTO operating_since_factor
     FROM "Service"
     WHERE id = service_id;
+    
+    -- Check for legal registration (country code or company name)
+    IF EXISTS (
+        SELECT 1 FROM "Service" 
+        WHERE id = service_id AND ("registrationCountryCode" IS NOT NULL OR "registeredCompanyName" IS NOT NULL)
+    ) THEN
+        legally_registered_factor := 2;
+    END IF;
 
     -- Calculate final trust score (base 100)
-    trust_score := 50 + verification_factor + attributes_score + recently_approved_factor + tos_penalty_factor + operating_since_factor;
+    trust_score := 50 + verification_factor + attributes_score + recently_approved_factor + tos_penalty_factor + operating_since_factor + legally_registered_factor;
 
     -- Ensure the score is in reasonable bounds (0-100)
     trust_score := GREATEST(0, LEAST(100, trust_score));

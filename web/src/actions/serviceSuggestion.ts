@@ -3,6 +3,7 @@ import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 import { formatDistanceStrict } from 'date-fns'
 
+import { countriesZodEnumById } from '../constants/countries'
 import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../lib/captchaValidation'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
 import { saveFileLocally } from '../lib/fileStorage'
@@ -184,6 +185,14 @@ export const serviceSuggestionActions = {
           }),
         }),
         operatingSince: z.coerce.date().optional(),
+        registrationCountryCode: z
+          .union([countriesZodEnumById, z.literal('')])
+          .optional()
+          .nullable()
+          .refine((val) => val === null || val === undefined || val === '' || val.length === 2, {
+            message: 'Country code must be a valid 2-character code or empty',
+          }),
+        registeredCompanyName: z.string().trim().max(100).optional(),
         /** @deprecated Honey pot field, do not use */
         message: z.unknown().optional(),
         skipDuplicateCheck: z
@@ -282,6 +291,8 @@ export const serviceSuggestionActions = {
             slug: input.slug,
             description: input.description,
             operatingSince: input.operatingSince,
+            registrationCountryCode: input.registrationCountryCode ?? null,
+            registeredCompanyName: input.registeredCompanyName,
             serviceUrls,
             tosUrls: input.tosUrls,
             onionUrls,

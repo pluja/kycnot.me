@@ -44,6 +44,8 @@
     "astro-seo-schema": "5.0.0",
     "canvas": "3.1.2",
     "clsx": "2.1.1",
+    "countries-list": "3.1.1",
+    "country-flag-icons": "1.5.19",
     "he": "1.2.0",
     "htmx.org": "2.0.6",
     "javascript-time-ago": "2.5.11",

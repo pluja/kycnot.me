@@ -15,12 +15,14 @@ import InputCheckbox from '../../components/InputCheckbox.astro'
 import InputCheckboxGroup from '../../components/InputCheckboxGroup.astro'
 import InputHoneypotTrap from '../../components/InputHoneypotTrap.astro'
 import InputImageFile from '../../components/InputImageFile.astro'
+import InputSelect from '../../components/InputSelect.astro'
 import InputSubmitButton from '../../components/InputSubmitButton.astro'
 import InputText from '../../components/InputText.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
 import { getAttributeCategoryInfo } from '../../constants/attributeCategories'
 import { getAttributeTypeInfo } from '../../constants/attributeTypes'
 import { contactMethodUrlTypes } from '../../constants/contactMethods'
+import { countries } from '../../constants/countries'
 import { currencies } from '../../constants/currencies'
 import { kycLevelClarifications } from '../../constants/kycLevelClarifications'
 import { kycLevels } from '../../constants/kycLevels'
@@ -259,6 +261,33 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
           max: new Date().toISOString().slice(0, 10),
         }}
         error={inputErrors.operatingSince}
+      />
+    </div>
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <InputText
+        label="Registered Company Name"
+        name="registeredCompanyName"
+        description="Official name of the registered company (optional)"
+        inputProps={{
+          placeholder: 'e.g. Example Corp Ltd.',
+        }}
+      />
+
+      <InputSelect
+        name="registrationCountryCode"
+        label="Company Registration Country"
+        description="Country where the service company is legally registered (optional)"
+        options={[
+          { label: 'Not registered', value: '' },
+          ...countries
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((country) => ({
+              label: `${country.flag} ${country.name}`,
+              value: country.code,
+            }))
+        ]}
+        selectedValue=""
       />
     </div>
 
