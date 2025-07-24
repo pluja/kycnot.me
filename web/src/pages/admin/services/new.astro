@@ -1,24 +1,57 @@
 ---
-import { AttributeCategory, Currency, VerificationStatus } from '@prisma/client'
-import { Icon } from 'astro-icon/components'
+import { ServiceVisibility, VerificationStatus } from '@prisma/client'
 import { actions, isInputError } from 'astro:actions'
+import { orderBy } from 'lodash-es'
 
+import InputCardGroup from '../../../components/InputCardGroup.astro'
 import InputCheckbox from '../../../components/InputCheckbox.astro'
+import InputCheckboxGroup from '../../../components/InputCheckboxGroup.astro'
+import InputImageFile from '../../../components/InputImageFile.astro'
+import InputSelect from '../../../components/InputSelect.astro'
+import InputSubmitButton from '../../../components/InputSubmitButton.astro'
+import InputText from '../../../components/InputText.astro'
+import InputTextArea from '../../../components/InputTextArea.astro'
+import { getAttributeCategoryInfo } from '../../../constants/attributeCategories'
+import { getAttributeTypeInfo } from '../../../constants/attributeTypes'
+import { contactMethodUrlTypes } from '../../../constants/contactMethods'
+import { countries } from '../../../constants/countries'
+import { currencies } from '../../../constants/currencies'
+import { kycLevelClarifications } from '../../../constants/kycLevelClarifications'
+import { kycLevels } from '../../../constants/kycLevels'
+import { serviceVisibilities } from '../../../constants/serviceVisibility'
+import { verificationStatuses } from '../../../constants/verificationStatus'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
-import { cn } from '../../../lib/cn'
 import { prisma } from '../../../lib/prisma'
 
-const categories = await Astro.locals.banners.try('Failed to fetch categories', () =>
-  prisma.category.findMany({
-    orderBy: { name: 'asc' },
-  })
-)
-
-const attributes = await Astro.locals.banners.try('Failed to fetch attributes', () =>
-  prisma.attribute.findMany({
-    orderBy: { category: 'asc' },
-  })
-)
+const [categories, attributes] = await Astro.locals.banners.tryMany([
+  [
+    'Failed to fetch categories',
+    () =>
+      prisma.category.findMany({
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          icon: true,
+        },
+      }),
+    [],
+  ],
+  [
+    'Failed to fetch attributes',
+    () =>
+      prisma.attribute.findMany({
+        orderBy: { category: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          category: true,
+          type: true,
+        },
+      }),
+    [],
+  ],
+])
 
 const result = Astro.getActionResult(actions.admin.service.create)
 Astro.locals.banners.addIfSuccess(result, 'Service created successfully')
@@ -28,382 +61,287 @@ if (result && !result.error) {
 const inputErrors = isInputError(result?.error) ? result.error.fields : {}
 ---
 
-<BaseLayout pageTitle="Create Service" widthClassName="max-w-screen-sm">
-  <section class="mb-8">
-    <div class="font-title mb-4">
-      <span class="text-sm text-green-500">service.create</span>
-    </div>
+<BaseLayout
+  pageTitle="Create Service"
+  description="Create a new service for KYCnot.me"
+  widthClassName="max-w-screen-md"
+>
+  <h1 class="font-title mt-12 mb-6 text-center text-3xl font-bold">Create Service</h1>
 
-    <form
-      method="POST"
-      action={actions.admin.service.create}
-      class="space-y-4 rounded-lg border border-green-500/30 bg-black/40 p-6 shadow-[0_0_15px_rgba(34,197,94,0.2)] backdrop-blur-xs"
-      enctype="multipart/form-data"
-    >
-      <div>
-        <label for="name" class="font-title mb-2 block text-sm text-green-500">name</label>
-        <input
-          transition:persist
-          type="text"
-          name="name"
-          id="name"
-          required
-          class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-        />
-        {
-          inputErrors.name && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.name.join(', ')}</p>
-          )
-        }
-      </div>
+  <form
+    method="POST"
+    action={actions.admin.service.create}
+    enctype="multipart/form-data"
+    class="space-y-6"
+  >
+    <InputText
+      label="Name"
+      name="name"
+      inputProps={{
+        required: true,
+        maxlength: 40,
+      }}
+      error={inputErrors.name}
+    />
 
-      <div>
-        <label for="description" class="font-title mb-2 block text-sm text-green-500">description</label>
-        <textarea
-          transition:persist
-          name="description"
-          id="description"
-          required
-          class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-          set:text=""
-        />
-        {
-          inputErrors.description && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.description.join(', ')}</p>
-          )
-        }
-      </div>
+    <InputTextArea
+      label="Description"
+      name="description"
+      inputProps={{
+        required: true,
+      }}
+      error={inputErrors.description}
+    />
 
-      <div>
-        <label for="allServiceUrls" class="font-title mb-2 block text-sm text-green-500">Service URLs</label>
-        <textarea
-          transition:persist
-          class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-          name="allServiceUrls"
-          id="allServiceUrls"
-          rows={3}
-          placeholder="https://example1.com\nhttps://example2.onion\nhttps://example3.b32.i2p"
-          set:text=""
-        />
-        {
-          inputErrors.allServiceUrls && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.allServiceUrls.join(', ')}</p>
-          )
-        }
-      </div>
-
-      <div>
-        <label for="tosUrls" class="font-title mb-2 block text-sm text-green-500">tosUrls</label>
-        <textarea
-          transition:persist
-          class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-          name="tosUrls"
-          id="tosUrls"
-          rows={3}
-          placeholder="https://example1.com/tos https://example2.com/tos"
-          set:text=""
-        />
-        {
-          inputErrors.tosUrls && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.tosUrls.join(', ')}</p>
-          )
-        }
-      </div>
-
-      <div>
-        <label for="imageFile" class="font-title mb-2 block text-sm text-green-500">serviceImage</label>
-        <div class="space-y-2">
-          <input
-            transition:persist
-            type="file"
-            name="imageFile"
-            id="imageFile"
-            accept="image/*"
-            required
-            class="font-title file:font-title block w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 file:mr-3 file:rounded-md file:border-0 file:bg-green-500/30 file:px-3 file:py-1 file:text-gray-300 focus:border-green-500 focus:ring-green-500"
-          />
-          <p class="font-title text-xs text-gray-400">
-            Upload a square image for best results. Supported formats: JPG, PNG, WebP, SVG.
-          </p>
-        </div>
-        {
-          inputErrors.imageFile && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.imageFile.join(', ')}</p>
-          )
-        }
-      </div>
-
-      <div>
-        <label class="font-title mb-2 block text-sm text-green-500" for="categories">categories</label>
-        <div class="mt-2 grid grid-cols-2 gap-2">
-          {
-            categories?.map((category) => (
-              <label class="inline-flex items-center">
-                <input
-                  transition:persist
-                  type="checkbox"
-                  name="categories"
-                  value={category.id}
-                  class="rounded-sm border-green-500/30 bg-black/50 text-green-500 focus:ring-green-500 focus:ring-offset-black"
-                />
-                <span class="font-title ml-2 flex items-center gap-2 text-gray-300">
-                  <Icon class="h-3 w-3 text-green-500" name={category.icon} />
-                  {category.name}
-                </span>
-              </label>
-            ))
-          }
-        </div>
-        {
-          inputErrors.categories && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.categories.join(', ')}</p>
-          )
-        }
-      </div>
-
-      <div>
-        <label for="kycLevel" class="font-title mb-2 block text-sm text-green-500">kycLevel</label>
-        <input
-          transition:persist
-          class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-          type="number"
-          name="kycLevel"
-          id="kycLevel"
-          min={0}
-          max={4}
-          value={4}
-          required
-        />
-        {
-          inputErrors.kycLevel && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.kycLevel.join(', ')}</p>
-          )
-        }
-      </div>
-
-      <div>
-        <label class="font-title mb-2 block text-sm text-green-500" for="attributes">attributes</label>
-        <div class="space-y-4">
-          {
-            Object.values(AttributeCategory).map((category) => (
-              <div class="rounded-md border border-green-500/20 bg-black/30 p-4">
-                <h4 class="font-title mb-3 text-green-400">{category}</h4>
-                <div class="grid grid-cols-1 gap-2">
-                  {attributes
-                    ?.filter((attr) => attr.category === category)
-                    .map((attr) => (
-                      <label class="inline-flex items-center">
-                        <input
-                          transition:persist
-                          type="checkbox"
-                          name="attributes"
-                          value={attr.id}
-                          class="rounded-sm border-green-500/30 bg-black/50 text-green-500 focus:ring-green-500 focus:ring-offset-black"
-                        />
-                        <span class="font-title ml-2 flex items-center gap-2 text-gray-300">
-                          {attr.title}
-                          <span
-                            class={cn('font-title rounded-sm px-1.5 py-0.5 text-xs', {
-                              'border border-green-500/50 bg-green-500/20 text-green-400':
-                                attr.type === 'GOOD',
-                              'border border-red-500/50 bg-red-500/20 text-red-400': attr.type === 'BAD',
-                              'border border-yellow-500/50 bg-yellow-500/20 text-yellow-400':
-                                attr.type === 'WARNING',
-                              'border border-blue-500/50 bg-blue-500/20 text-blue-400': attr.type === 'INFO',
-                            })}
-                          >
-                            {attr.type}
-                          </span>
-                        </span>
-                      </label>
-                    ))}
-                </div>
-                {inputErrors.attributes && (
-                  <p class="font-title mt-1 text-sm text-red-500">{inputErrors.attributes.join(', ')}</p>
-                )}
-              </div>
-            ))
-          }
-        </div>
-      </div>
-
-      <div>
-        <label class="font-title mb-2 block text-sm text-green-500" for="verificationStatus"
-          >verificationStatus</label
-        >
-        <select
-          transition:persist
-          class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 focus:border-green-500 focus:ring-green-500"
-          name="verificationStatus"
-          id="verificationStatus"
-          required
-        >
-          {Object.values(VerificationStatus).map((status) => <option value={status}>{status}</option>)}
-        </select>
-        {
-          inputErrors.verificationStatus && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.verificationStatus.join(', ')}</p>
-          )
-        }
-      </div>
-
-      <div>
-        <label class="font-title mb-2 block text-sm text-green-500" for="verificationSummary"
-          >verificationSummary</label
-        >
-        <textarea
-          transition:persist
-          class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-          name="verificationSummary"
-          id="verificationSummary"
-          rows={3}
-          set:text=""
-        />
-        {
-          inputErrors.verificationSummary && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.verificationSummary.join(', ')}</p>
-          )
-        }
-      </div>
-
-      <div>
-        <label class="font-title mb-2 block text-sm text-green-500" for="verificationProofMd"
-          >verificationProofMd</label
-        >
-        <textarea
-          transition:persist
-          class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-          name="verificationProofMd"
-          id="verificationProofMd"
-          rows={10}
-          set:text=""
-        />
-        {
-          inputErrors.verificationProofMd && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.verificationProofMd.join(', ')}</p>
-          )
-        }
-      </div>
-
-      <div>
-        <label class="font-title mb-2 block text-sm text-green-500" for="acceptedCurrencies"
-          >acceptedCurrencies</label
-        >
-        <div class="mt-2 grid grid-cols-2 gap-2">
-          {
-            Object.values(Currency).map((currency) => (
-              <label class="inline-flex items-center">
-                <input
-                  transition:persist
-                  type="checkbox"
-                  name="acceptedCurrencies"
-                  value={currency}
-                  class="rounded-sm border-green-500/30 bg-black/50 text-green-500 focus:ring-green-500 focus:ring-offset-black"
-                />
-                <span class="font-title ml-2 text-gray-300">{currency}</span>
-              </label>
-            ))
-          }
-        </div>
-        {
-          inputErrors.acceptedCurrencies && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.acceptedCurrencies.join(', ')}</p>
-          )
-        }
-      </div>
-
-      <div>
-        <label class="font-title mb-2 block text-sm text-green-500" for="overallScore">overallScore</label>
-        <input
-          transition:persist
-          type="number"
-          name="overallScore"
-          id="overallScore"
-          value={0}
-          min={0}
-          max={10}
-          required
-          class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 focus:border-green-500 focus:ring-green-500"
-        />
-        {
-          inputErrors.overallScore && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.overallScore.join(', ')}</p>
-          )
-        }
-      </div>
-
-      <div>
-        <label class="font-title mb-2 block text-sm text-green-500" for="referral">referral link path</label>
-        <input
-          transition:persist
-          type="text"
-          name="referral"
-          id="referral"
-          placeholder="e.g. ?ref=123 or /ref/123"
-          class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-        />
-        {
-          inputErrors.referral && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.referral.join(', ')}</p>
-          )
-        }
-      </div>
-
-      <div>
-        <label for="internalNote" class="font-title mb-2 block text-sm text-green-500">internalNote</label>
-        <div class="space-y-2">
-          <textarea
-            transition:persist
-            name="internalNote"
-            id="internalNote"
-            rows={4}
-            placeholder="Markdown supported"
-            class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-            set:text=""
-          />
-        </div>
-        {
-          inputErrors.internalNote && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.internalNote.join(', ')}</p>
-          )
-        }
-      </div>
-
-      <InputCheckbox
-        label="Strict Commenting"
-        name="strictCommentingEnabled"
-        checked={false}
-        descriptionInline="Require proof of being a client for comments."
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <InputTextArea
+        label="Service URLs"
+        description="One per line. Accepts **Web**, **Onion**, and **I2P** URLs."
+        name="allServiceUrls"
+        inputProps={{
+          placeholder: 'example1.com\nexample2.onion\nexample3.b32.i2p',
+          class: 'md:min-h-20 min-h-24 h-full',
+          required: true,
+        }}
+        class="flex flex-col self-stretch"
+        error={inputErrors.allServiceUrls}
       />
 
-      <div>
-        <label for="commentSectionMessage" class="font-title mb-2 block text-sm text-green-500"
-          >Comment Section Message</label
-        >
-        <div class="space-y-2">
-          <textarea
-            transition:persist
-            name="commentSectionMessage"
-            id="commentSectionMessage"
-            rows={4}
-            placeholder="Markdown supported. This message will be displayed in the comment section for root comments."
-            class="font-title w-full rounded-md border border-green-500/30 bg-black/50 p-2 text-gray-300 placeholder-gray-500 focus:border-green-500 focus:ring-green-500"
-            set:text=""
-          />
-        </div>
-        {
-          inputErrors.commentSectionMessage && (
-            <p class="font-title mt-1 text-sm text-red-500">{inputErrors.commentSectionMessage.join(', ')}</p>
-          )
-        }
-      </div>
+      <InputTextArea
+        label="Contact Methods"
+        description={[
+          'One per line.',
+          `Accepts: ${contactMethodUrlTypes.map((type: any) => type.labelPlural).join(', ')}`,
+        ].join('\n')}
+        name="contactMethods"
+        inputProps={{
+          placeholder: 'contact@example.com\nt.me/example\n+123 456 7890',
+          class: 'h-full',
+        }}
+        class="flex flex-col self-stretch"
+        error={inputErrors.contactMethods}
+      />
+    </div>
 
-      <button
-        type="submit"
-        class="font-title inline-flex justify-center rounded-md border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm text-green-400 shadow-xs transition-colors duration-200 hover:bg-green-500/20 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
-      >
-        Create Service
-      </button>
-    </form>
-  </section>
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <InputTextArea
+        label="ToS URLs"
+        description="One per line. AI review uses the first working URL only."
+        name="tosUrls"
+        inputProps={{
+          placeholder: 'example.com/tos',
+          required: true,
+          class: 'min-h-10',
+        }}
+        error={inputErrors.tosUrls}
+      />
+
+      <InputText
+        label="Operating since"
+        name="operatingSince"
+        inputProps={{
+          type: 'date',
+          max: new Date().toISOString().slice(0, 10),
+        }}
+        error={inputErrors.operatingSince}
+      />
+    </div>
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <InputText
+        label="Registered Company Name"
+        name="registeredCompanyName"
+        description="Official name of the registered company (optional)"
+        inputProps={{
+          placeholder: 'e.g. Example Corp Ltd.',
+        }}
+      />
+
+      <InputSelect
+        name="registrationCountryCode"
+        label="Company Registration Country"
+        description="Country where the service company is legally registered (optional)"
+        options={[
+          { label: 'Not registered', value: '' },
+          ...countries
+            .sort((a: any, b: any) => a.name.localeCompare(b.name))
+            .map((country: any) => ({
+              label: `${country.flag} ${country.name}`,
+              value: country.code,
+            }))
+        ]}
+        selectedValue=""
+      />
+    </div>
+
+    <InputCardGroup
+      name="kycLevel"
+      label="KYC Level"
+      options={kycLevels.map((kycLevel: any) => ({
+        label: kycLevel.name,
+        value: kycLevel.id.toString(),
+        icon: kycLevel.icon,
+        description: `${kycLevel.description}\n\n_KYC Level ${kycLevel.value}/4_`,
+      }))}
+      iconSize="md"
+      cardSize="md"
+      required
+      error={inputErrors.kycLevel}
+    />
+
+    <InputCardGroup
+      name="kycLevelClarification"
+      label="KYC Level Clarification"
+      options={kycLevelClarifications.map((clarification: any) => ({
+        label: clarification.label,
+        value: clarification.value,
+        icon: clarification.icon,
+        description: clarification.description,
+      }))}
+      selectedValue="NONE"
+      iconSize="sm"
+      cardSize="sm"
+      error={inputErrors.kycLevelClarification}
+    />
+
+    <div class="xs:grid-cols-[1fr_2fr] grid grid-cols-1 items-stretch gap-x-4 gap-y-6">
+      <InputCheckboxGroup
+        name="categories"
+        label="Categories"
+        required
+        options={categories.map((category: any) => ({
+          label: category.name,
+          value: category.id.toString(),
+          icon: category.icon,
+        }))}
+        size="lg"
+        error={inputErrors.categories}
+        class="min-w-auto"
+      />
+
+      <InputCheckboxGroup
+        name="attributes"
+        label="Attributes"
+        options={orderBy(
+          attributes.map((attribute: any) => ({
+            ...attribute,
+            categoryInfo: getAttributeCategoryInfo(attribute.category),
+            typeInfo: getAttributeTypeInfo(attribute.type),
+          })),
+          ['categoryInfo.order', 'typeInfo.order']
+        ).map((attribute: any) => ({
+          label: attribute.title,
+          value: attribute.id.toString(),
+          icon: [attribute.categoryInfo.icon, attribute.typeInfo.icon],
+          iconClassName: [attribute.categoryInfo.classNames.icon, attribute.typeInfo.classNames.icon],
+        }))}
+        description="See list of [all attributes](/attributes) and their scoring."
+        error={inputErrors.attributes}
+        size="lg"
+      />
+    </div>
+
+    <InputCardGroup
+      name="acceptedCurrencies"
+      label="Accepted Currencies"
+      options={currencies.map((currency: any) => ({
+        label: currency.name,
+        value: currency.id,
+        icon: currency.icon,
+      }))}
+      error={inputErrors.acceptedCurrencies}
+      multiple
+    />
+
+    <InputImageFile
+      label="Service Image"
+      name="imageFile"
+      description="Square image. At least 192x192px. Transparency supported."
+      error={inputErrors.imageFile}
+      square
+      required
+    />
+
+    <InputSelect
+      name="verificationStatus"
+      label="Verification Status"
+      options={Object.values(VerificationStatus).map((status) => ({
+        label: status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase()),
+        value: status,
+      }))}
+      error={inputErrors.verificationStatus}
+    />
+
+    <InputTextArea
+      label="Verification Summary"
+      name="verificationSummary"
+      error={inputErrors.verificationSummary}
+    />
+
+    <InputTextArea
+      label="Verification Proof (Markdown)"
+      name="verificationProofMd"
+      inputProps={{
+        rows: 10,
+      }}
+      error={inputErrors.verificationProofMd}
+    />
+
+    <InputText
+      label="Referral Link Path"
+      name="referral"
+      inputProps={{
+        placeholder: 'e.g. ?ref=123 or /ref/123',
+      }}
+      error={inputErrors.referral}
+      description="Will be appended to the service URL"
+    />
+
+    <InputCardGroup
+      name="serviceVisibility"
+      label="Service Visibility"
+      options={serviceVisibilities.map((visibility: any) => ({
+        label: visibility.label,
+        value: visibility.value,
+        icon: visibility.icon,
+        iconClass: visibility.iconClass,
+        description: visibility.description,
+      }))}
+      selectedValue="PUBLIC"
+      error={inputErrors.serviceVisibility}
+      cardSize="sm"
+    />
+
+    <InputTextArea
+      label="Internal Note"
+      name="internalNote"
+      description="Markdown supported. Internal notes for admins."
+      inputProps={{
+        rows: 4,
+      }}
+      error={inputErrors.internalNote}
+    />
+
+    <InputCheckbox
+      label="Strict Commenting"
+      name="strictCommentingEnabled"
+      checked={false}
+      descriptionInline="Require proof of being a client for comments."
+      error={inputErrors.strictCommentingEnabled}
+    />
+
+    <InputTextArea
+      label="Comment Section Message"
+      name="commentSectionMessage"
+      description="Markdown supported. This message will be displayed in the comment section for root comments."
+      inputProps={{
+        rows: 4,
+      }}
+      error={inputErrors.commentSectionMessage}
+    />
+
+    <InputSubmitButton label="Create Service" icon="ri:add-line" hideCancel />
+      </form>
+    </FormSection>
+  </div>
 </BaseLayout>

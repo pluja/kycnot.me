@@ -11,6 +11,7 @@ import { prisma } from '../../lib/prisma'
 import { separateServiceUrlsByType } from '../../lib/urls'
 import {
   imageFileSchema,
+  stringListOfContactMethodsSchema,
   stringListOfUrlsSchemaRequired,
   zodCohercedNumber,
   zodContactMethod,
@@ -45,6 +46,7 @@ const serviceSchemaBase = z.object({
   description: z.string().min(1),
   allServiceUrls: stringListOfUrlsSchemaRequired,
   tosUrls: stringListOfUrlsSchemaRequired,
+  contactMethods: stringListOfContactMethodsSchema,
   kycLevel: z.coerce.number().int().min(0).max(4),
   kycLevelClarification: z.nativeEnum(KycLevelClarification).optional().nullable().default(null),
   attributes: z.array(z.coerce.number().int().positive()),
@@ -52,7 +54,7 @@ const serviceSchemaBase = z.object({
   verificationStatus: z.nativeEnum(VerificationStatus),
   verificationSummary: z.string().optional().nullable().default(null),
   verificationProofMd: z.string().optional().nullable().default(null),
-  acceptedCurrencies: z.array(z.nativeEnum(Currency)),
+  acceptedCurrencies: z.array(z.nativeEnum(Currency)).min(1),
   referral: z
     .string()
     .regex(/^(\?\w+=.|\/.+)/, 'Referral must be a valid URL parameter or path, not a full URL')
@@ -69,7 +71,6 @@ const serviceSchemaBase = z.object({
     }),
   registeredCompanyName: z.string().trim().max(100).optional().nullable(),
   imageFile: imageFileSchema,
-  overallScore: zodCohercedNumber(z.number().int().min(0).max(10)).optional(),
   serviceVisibility: z.nativeEnum(ServiceVisibility),
   internalNote: z.string().optional(),
   strictCommentingEnabled: z.boolean().optional().default(false),
@@ -144,7 +145,6 @@ export const adminServiceActions = {
           referral: input.referral || null,
           serviceVisibility: input.serviceVisibility,
           slug: input.slug,
-          overallScore: input.overallScore,
           categories: {
             connect: input.categories.map((id) => ({ id })),
           },
@@ -153,6 +153,11 @@ export const adminServiceActions = {
               attribute: {
                 connect: { id: attributeId },
               },
+            })),
+          },
+          contactMethods: {
+            create: input.contactMethods.map((value) => ({
+              value,
             })),
           },
           imageUrl,
@@ -165,6 +170,8 @@ export const adminServiceActions = {
               }
             : undefined,
           operatingSince: input.operatingSince,
+          registrationCountryCode: input.registrationCountryCode ?? null,
+          registeredCompanyName: input.registeredCompanyName,
         },
         select: {
           id: true,
@@ -266,7 +273,6 @@ export const adminServiceActions = {
           referral: input.referral || null,
           serviceVisibility: input.serviceVisibility,
           slug: input.slug,
-          overallScore: input.overallScore,
           previousSlugs:
             existingService.slug !== input.slug
               ? {
@@ -354,7 +360,6 @@ export const adminServiceActions = {
         await prisma.serviceContactMethod.delete({
           where: { id: input.id },
         })
-        return { success: true }
       },
     }),
   },
@@ -480,7 +485,6 @@ export const adminServiceActions = {
       input: evidenceImageDeleteSchema,
       handler: async (input) => {
         await deleteFileLocally(input.fileUrl)
-        return { success: true }
       },
     }),
   },
