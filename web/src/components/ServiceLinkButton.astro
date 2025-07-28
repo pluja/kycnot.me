@@ -7,13 +7,21 @@ import { cn } from '../lib/cn'
 
 import type { HTMLAttributes } from 'astro/types'
 
-type Props = Omit<HTMLAttributes<'a'>, 'href' | 'rel' | 'target'> & {
+type Props = Omit<HTMLAttributes<'a' | 'span'>, 'href' | 'rel' | 'target'> & {
   url: string
   referral: string | null
   enableMinWidth?: boolean
+  isScam?: boolean
 }
 
-const { url: baseUrl, referral, class: className, enableMinWidth = false, ...htmlProps } = Astro.props
+const {
+  url: baseUrl,
+  referral,
+  class: className,
+  enableMinWidth = false,
+  isScam = false,
+  ...htmlProps
+} = Astro.props
 
 function makeLink(url: string, referral: string | null) {
   const hostname = new URL(url).hostname
@@ -124,28 +132,39 @@ const link = makeLink(baseUrl, referral)
 if (!z.string().url().safeParse(link.url).success) {
   console.error(`Invalid service URL with referral: ${link.url}`)
 }
+
+const Tag = isScam ? 'span' : 'a'
 ---
 
-<a
-  href={link.url}
-  target="_blank"
-  rel="noopener noreferrer"
+<Tag
+  href={isScam ? undefined : link.url}
+  target={isScam ? undefined : '_blank'}
+  rel={isScam ? undefined : 'noopener noreferrer'}
   class={cn(
     '2xs:text-sm 2xs:h-8 2xs:gap-2 focus-visible:ring-offset-night-700 inline-flex h-6 items-center gap-1 rounded-full bg-white text-xs whitespace-nowrap text-black focus-visible:ring-4 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:outline-none',
+    isScam && 'bg-day-800 cursor-not-allowed text-red-300',
     className
   )}
+  title={link.url}
   {...htmlProps}
 >
-  <Icon name={link.icon} class="2xs:ml-2 2xs:size-5 2xs:-mr-0.5 -mr-0.25 ml-1 size-4" />
+  <Icon
+    name={isScam ? 'ri:alert-line' : link.icon}
+    class={cn('2xs:ml-2 2xs:size-5 2xs:-mr-0.5 -mr-0.25 ml-1 size-4', isScam && 'text-red-400')}
+  />
   <span class={cn('font-title font-bold', { 'min-w-[29ch]': enableMinWidth })}>
     {
       link.textBits.map((textBit) => (
-        <span class={cn(textBit.style === 'irrelevant' && 'text-zinc-500')}>{textBit.text}</span>
+        <span class={cn(textBit.style === 'irrelevant' && 'opacity-60')}>{textBit.text}</span>
       ))
     }
   </span>
-  <Icon
-    name="ri:arrow-right-line"
-    class="2xs:size-6 mr-1 size-4 rounded-full bg-orange-500 p-0.5 text-white"
-  />
-</a>
+  {
+    !isScam && (
+      <Icon
+        name="ri:arrow-right-line"
+        class="2xs:size-6 mr-1 size-4 rounded-full bg-orange-500 p-0.5 text-white"
+      />
+    )
+  }
+</Tag>
