@@ -48,9 +48,6 @@ const {
   ...baseHeadProps
 } = Astro.props
 
-const actualErrors = [...errors, ...Astro.locals.banners.errors]
-const actualSuccess = [...success, ...Astro.locals.banners.successes]
-
 const currentDate = new Date()
 const announcement = await Astro.locals.banners.try(
   'Unable to load announcements.',
@@ -95,6 +92,9 @@ function getDeletionAnnouncement(
   }
 }
 const deletionAnnouncement = getDeletionAnnouncement(Astro.locals.user, currentDate)
+
+const actualErrors = [...errors, ...Astro.locals.banners.errors]
+const actualSuccess = [...success, ...Astro.locals.banners.successes]
 ---
 
 <html lang="en" transition:name="root" transition:animate="none">

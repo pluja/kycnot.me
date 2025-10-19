@@ -1,5 +1,4 @@
 import { differenceInMonths, differenceInYears } from 'date-fns'
-import he from 'he'
 import { orderBy } from 'lodash-es'
 
 import { getAttributeCategoryInfo } from '../constants/attributeCategories'
@@ -328,21 +327,14 @@ export const nonDbAttributes: NonDbAttributeFull[] = [
       }
 
       const countryInfo = countryCode ? getCountryInfo(countryCode) : null
-      const flagTitle = countryInfo ? `${countryInfo.flag} Legally registered` : 'Legally registered'
-
-      let description = 'Legally registered.'
-      if (companyName && countryCode && countryInfo) {
-        description = `Legally registered as **${he.escape(companyName)}** in **${countryInfo.name}**.`
-      } else if (companyName) {
-        description = `Legally registered as **${he.escape(companyName)}**.`
-      } else if (countryCode && countryInfo) {
-        description = `Legally registered in **${countryInfo.name}**.`
-      }
 
       return {
         show: true,
-        title: flagTitle,
-        description,
+        title: 'Legally registered',
+        description:
+          companyName || countryInfo
+            ? `Legally registered${companyName ? ` as **${companyName}**` : ''}${countryInfo ? ` in **${countryInfo.name}**  ${countryInfo.flag}` : ''}.`
+            : 'This service is legally registered as a company.',
       }
     },
   },

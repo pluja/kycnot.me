@@ -3,7 +3,7 @@ import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 import { formatDistanceStrict } from 'date-fns'
 
-import { countriesZodEnumById } from '../constants/countries'
+import { countriesZodEnumByCode } from '../constants/countries'
 import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../lib/captchaValidation'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
 import { saveFileLocally } from '../lib/fileStorage'
@@ -186,7 +186,7 @@ export const serviceSuggestionActions = {
         }),
         operatingSince: z.coerce.date().optional(),
         registrationCountryCode: z
-          .union([countriesZodEnumById, z.literal('')])
+          .union([countriesZodEnumByCode, z.literal('')])
           .optional()
           .nullable()
           .refine((val) => val === null || val === undefined || val === '' || val.length === 2, {

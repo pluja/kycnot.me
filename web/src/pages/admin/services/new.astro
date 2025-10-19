@@ -1,5 +1,5 @@
 ---
-import { ServiceVisibility, VerificationStatus } from '@prisma/client'
+import { VerificationStatus } from '@prisma/client'
 import { actions, isInputError } from 'astro:actions'
 import { orderBy } from 'lodash-es'
 
@@ -19,7 +19,6 @@ import { currencies } from '../../../constants/currencies'
 import { kycLevelClarifications } from '../../../constants/kycLevelClarifications'
 import { kycLevels } from '../../../constants/kycLevels'
 import { serviceVisibilities } from '../../../constants/serviceVisibility'
-import { verificationStatuses } from '../../../constants/verificationStatus'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { prisma } from '../../../lib/prisma'
 
@@ -68,12 +67,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
 >
   <h1 class="font-title mt-12 mb-6 text-center text-3xl font-bold">Create Service</h1>
 
-  <form
-    method="POST"
-    action={actions.admin.service.create}
-    enctype="multipart/form-data"
-    class="space-y-6"
-  >
+  <form method="POST" action={actions.admin.service.create} enctype="multipart/form-data" class="space-y-6">
     <InputText
       label="Name"
       name="name"
@@ -111,7 +105,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
         label="Contact Methods"
         description={[
           'One per line.',
-          `Accepts: ${contactMethodUrlTypes.map((type: any) => type.labelPlural).join(', ')}`,
+          `Accepts: ${contactMethodUrlTypes.map((type) => type.labelPlural).join(', ')}`,
         ].join('\n')}
         name="contactMethods"
         inputProps={{
@@ -164,11 +158,11 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
         options={[
           { label: 'Not registered', value: '' },
           ...countries
-            .sort((a: any, b: any) => a.name.localeCompare(b.name))
-            .map((country: any) => ({
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((country) => ({
               label: `${country.flag} ${country.name}`,
               value: country.code,
-            }))
+            })),
         ]}
         selectedValue=""
       />
@@ -177,7 +171,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
     <InputCardGroup
       name="kycLevel"
       label="KYC Level"
-      options={kycLevels.map((kycLevel: any) => ({
+      options={kycLevels.map((kycLevel) => ({
         label: kycLevel.name,
         value: kycLevel.id.toString(),
         icon: kycLevel.icon,
@@ -192,7 +186,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
     <InputCardGroup
       name="kycLevelClarification"
       label="KYC Level Clarification"
-      options={kycLevelClarifications.map((clarification: any) => ({
+      options={kycLevelClarifications.map((clarification) => ({
         label: clarification.label,
         value: clarification.value,
         icon: clarification.icon,
@@ -209,7 +203,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
         name="categories"
         label="Categories"
         required
-        options={categories.map((category: any) => ({
+        options={categories.map((category) => ({
           label: category.name,
           value: category.id.toString(),
           icon: category.icon,
@@ -223,13 +217,13 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
         name="attributes"
         label="Attributes"
         options={orderBy(
-          attributes.map((attribute: any) => ({
+          attributes.map((attribute) => ({
             ...attribute,
             categoryInfo: getAttributeCategoryInfo(attribute.category),
             typeInfo: getAttributeTypeInfo(attribute.type),
           })),
           ['categoryInfo.order', 'typeInfo.order']
-        ).map((attribute: any) => ({
+        ).map((attribute) => ({
           label: attribute.title,
           value: attribute.id.toString(),
           icon: [attribute.categoryInfo.icon, attribute.typeInfo.icon],
@@ -244,7 +238,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
     <InputCardGroup
       name="acceptedCurrencies"
       label="Accepted Currencies"
-      options={currencies.map((currency: any) => ({
+      options={currencies.map((currency) => ({
         label: currency.name,
         value: currency.id,
         icon: currency.icon,
@@ -266,7 +260,10 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
       name="verificationStatus"
       label="Verification Status"
       options={Object.values(VerificationStatus).map((status) => ({
-        label: status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase()),
+        label: status
+          .replace(/_/g, ' ')
+          .toLowerCase()
+          .replace(/\b\w/g, (l: string) => l.toUpperCase()),
         value: status,
       }))}
       error={inputErrors.verificationStatus}
@@ -300,7 +297,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
     <InputCardGroup
       name="serviceVisibility"
       label="Service Visibility"
-      options={serviceVisibilities.map((visibility: any) => ({
+      options={serviceVisibilities.map((visibility) => ({
         label: visibility.label,
         value: visibility.value,
         icon: visibility.icon,
@@ -341,7 +338,5 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
     />
 
     <InputSubmitButton label="Create Service" icon="ri:add-line" hideCancel />
-      </form>
-    </FormSection>
-  </div>
+  </form>
 </BaseLayout>

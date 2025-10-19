@@ -262,7 +262,7 @@ const apiCalls = await Astro.locals.banners.try(
               alt=""
               width={80}
               height={80}
-              class="mx-auto mb-2 block size-20 rounded-xl"
+              class="mx-auto mb-2 block size-20 rounded-xl object-contain"
             />
           )
         }
@@ -391,10 +391,10 @@ const apiCalls = await Astro.locals.banners.try(
           <InputText
             label="Registered Company Name"
             name="registeredCompanyName"
-            description="Official name of the registered company"
+            description="If legally registered, the official name of the company."
             inputProps={{
               value: service.registeredCompanyName,
-              placeholder: 'e.g. Example Corp Ltd.',
+              placeholder: 'Example Corp LTD',
             }}
             error={serviceInputErrors.registeredCompanyName}
           />
@@ -402,7 +402,7 @@ const apiCalls = await Astro.locals.banners.try(
           <InputSelect
             name="registrationCountryCode"
             label="Company Registration Country"
-            description="Country where the service company is legally registered"
+            description="Where is the company legally registered?"
             options={[
               { label: 'Not registered', value: '' },
               ...countries
@@ -410,9 +410,9 @@ const apiCalls = await Astro.locals.banners.try(
                 .map((country) => ({
                   label: `${country.flag} ${country.name}`,
                   value: country.code,
-                }))
+                })),
             ]}
-            selectedValue={service.registrationCountryCode || ''}
+            selectedValue={service.registrationCountryCode ?? ''}
             error={serviceInputErrors.registrationCountryCode}
           />
         </div>

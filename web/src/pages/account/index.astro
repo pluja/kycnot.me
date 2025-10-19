@@ -198,7 +198,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
             <MyPicture
               src={user.picture}
               alt=""
-              class="ring-day-500/30 xs:size-14 size-12 rounded-full ring-2 sm:size-16"
+              class="ring-day-500/30 xs:size-14 size-12 rounded-full object-cover ring-2 sm:size-16"
               width={64}
               height={64}
             />
@@ -515,7 +515,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                     alt={affiliation.service.name}
                     width={40}
                     height={40}
-                    class="size-10 shrink-0 rounded-lg"
+                    class="size-10 shrink-0 rounded-lg object-contain"
                   />
                   <div class="flex min-w-0 flex-1 flex-col justify-center">
                     <div class="flex items-center gap-1.5">

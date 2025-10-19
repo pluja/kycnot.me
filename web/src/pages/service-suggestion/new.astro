@@ -285,7 +285,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
             .map((country) => ({
               label: `${country.flag} ${country.name}`,
               value: country.code,
-            }))
+            })),
         ]}
         selectedValue=""
       />

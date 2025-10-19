@@ -133,7 +133,7 @@ export default tseslint.config(
         'single',
         {
           avoidEscape: true,
-          allowTemplateLiterals: false,
+          allowTemplateLiterals: 'never',
         },
       ],
     },

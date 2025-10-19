@@ -32,7 +32,7 @@ function makeDownloadFilename(value: string) {
     src={value}
     alt="Preview"
     class={cn(
-      'block h-24 rounded object-cover',
+      'block h-24 rounded object-contain',
       square && 'aspect-square',
       'no-js:hidden not-[[src]]:hidden [&[src=""]]:hidden',
       '[&:is(:has([data-remove-checkbox]:checked)_~_*)]:hidden'

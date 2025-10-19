@@ -3,7 +3,7 @@ volumes:
 
 services:
   database:
-    image: postgres:latest
+    image: postgres:17
     volumes:
       - database:/var/lib/postgresql/data:z
     restart: unless-stopped

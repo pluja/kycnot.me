@@ -25,10 +25,10 @@ import { differenceInDays, isPast } from 'date-fns'
 import { omit, uniqBy } from 'lodash-es'
 import { generateUsername } from 'unique-username-generator'
 
+import { countries } from '../src/constants/countries'
 import { kycLevels } from '../src/constants/kycLevels'
 import { undefinedIfEmpty } from '../src/lib/arrays'
 import { transformCase } from '../src/lib/strings'
-import { countries } from '../src/constants/countries'
 
 // Exit if not in development mode
 if (process.env.NODE_ENV === 'production') {

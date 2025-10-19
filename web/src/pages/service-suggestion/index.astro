@@ -163,7 +163,7 @@ const success = !!createResult && !createResult.error
                     alt={suggestion.service.name}
                     width={32}
                     height={32}
-                    class="inline-block size-8 min-w-8 shrink-0 rounded-md"
+                    class="inline-block size-8 min-w-8 shrink-0 rounded-md object-contain"
                   />
                   <span class="shrink truncate">{suggestion.service.name}</span>
                 </a>
@@ -174,8 +174,7 @@ const success = !!createResult && !createResult.error
                   as="span"
                   text={statusInfo.label}
                   class={cn(
-                    'border-night-500 bg-night-800 box-content inline-flex h-8 items-center justify-center gap-1 rounded-full border px-2',
-                    statusInfo.iconClass
+                    'border-night-500 bg-night-800 box-content inline-flex h-8 items-center justify-center gap-1 rounded-full border px-2'
                   )}
                   classNames={{ tooltip: 'md:hidden!' }}
                 >
