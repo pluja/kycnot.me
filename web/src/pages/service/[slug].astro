@@ -48,7 +48,7 @@ import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
 import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
 import { transformCase } from '../../lib/strings'
-import { urlDomain } from '../../lib/urls'
+import { urlDomain, urlWithParams } from '../../lib/urls'
 
 import type { BreadcrumArray } from '../../components/BaseHead.astro'
 import type { Prisma } from '@prisma/client'
@@ -749,6 +749,7 @@ const sortedVerificationSteps = orderBy(
     class={cn('mt-2 flex flex-row items-start gap-2', {
       'xs:flex-row xs:items-start flex-col-reverse items-center': service.categories.length >= 3,
     })}
+    aria-label="Categories"
   >
     <ul
       class={cn('flex flex-1 flex-wrap justify-start gap-2', {
@@ -756,11 +757,18 @@ const sortedVerificationSteps = orderBy(
       })}
       aria-label="Categories"
     >
-      {
-        service.categories.map((category) => (
-          <BadgeStandard as="li" icon={category.icon} text={category.name} />
-        ))
-      }
+      <li class="contents">
+        {
+          service.categories.map((category) => (
+            <BadgeStandard
+              as="a"
+              href={urlWithParams(new URL('/', Astro.url), { categories: [category.slug] })}
+              icon={category.icon}
+              text={category.name}
+            />
+          ))
+        }
+      </li>
     </ul>
 
     <div class="flex px-1 py-0.5">

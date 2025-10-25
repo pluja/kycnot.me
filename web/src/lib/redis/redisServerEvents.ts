@@ -45,7 +45,8 @@ export class RedisServerEvents extends RedisGenericManager {
     await subscriber.subscribe(channel, (message, channelKey) => {
       try {
         const data = JSON.parse(message) as ServerEventsData[T extends 'all' ? keyof ServerEventsData : T]
-        const type = channelKey.split(':')[2] as T extends 'all' ? keyof ServerEventsData : T
+        const semicolonsInPrefix = this.prefix.split(':').length - 1
+        const type = channelKey.split(':')[semicolonsInPrefix] as T extends 'all' ? keyof ServerEventsData : T
         const event = { type, data } as T extends 'all'
           ? ServerEventsEvent
           : Extract<ServerEventsEvent, { type: T }>
