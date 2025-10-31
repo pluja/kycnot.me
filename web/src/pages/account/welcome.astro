@@ -4,7 +4,6 @@ import { actions } from 'astro:actions'
 
 import Button from '../../components/Button.astro'
 import CopyButton from '../../components/CopyButton.astro'
-import { SUPPORT_EMAIL } from '../../constants/project'
 import MiniLayout from '../../layouts/MiniLayout.astro'
 import { prettifyUserSecretToken } from '../../lib/userSecretToken'
 
@@ -76,10 +75,11 @@ const prettyToken = result ? prettifyUserSecretToken(result.data.token) : null
         </div>
 
         <p class="text-day-300 mt-2 text-center text-sm text-balance">
-          If you lost it, contact us at
-          <a href={`mailto:${SUPPORT_EMAIL}`} class="text-green-400 hover:underline focus-visible:underline">
-            {SUPPORT_EMAIL}
+          If you lost it,
+          <a href="/about#contact" class="text-green-400 hover:underline focus-visible:underline">
+            contact us
           </a>
+          .
         </p>
       </>
     )

@@ -3,7 +3,6 @@ import { z } from 'astro/zod'
 import { Icon } from 'astro-icon/components'
 import { LOGS_UI_URL } from 'astro:env/server'
 
-import { SUPPORT_EMAIL } from '../constants/project'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { DEPLOYMENT_MODE } from '../lib/client/envVariables'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
@@ -86,7 +85,7 @@ const {
       Go back home
     </a>
     <a
-      href={`mailto:${SUPPORT_EMAIL}`}
+      href="/about#contact"
       class="focus-visible:outline-primary group flex items-center gap-2 px-3.5 py-2.5 text-white"
     >
       <Icon

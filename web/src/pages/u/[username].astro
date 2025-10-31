@@ -14,7 +14,6 @@ import Tooltip from '../../components/Tooltip.astro'
 import UserBadge from '../../components/UserBadge.astro'
 import { getKarmaTransactionActionInfo } from '../../constants/karmaTransactionActions'
 import { karmaUnlocks } from '../../constants/karmaUnlocks'
-import { SUPPORT_EMAIL } from '../../constants/project'
 import { getServiceSuggestionStatusInfo } from '../../constants/serviceSuggestionStatus'
 import { getServiceSuggestionTypeInfo } from '../../constants/serviceSuggestionType'
 import { getServiceUserRoleInfo } from '../../constants/serviceUserRoles'
@@ -334,7 +333,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
           )
         }
         <a
-          href={`mailto:${SUPPORT_EMAIL}?subject=User report - ${user.displayName ?? user.name}&body=${Astro.locals.user ? `I'm ${Astro.locals.user.displayName ? `${Astro.locals.user.displayName} (${Astro.locals.user.name})` : user.name}. ` : ''}I'm reporting the user ${user.displayName ? `"${user.displayName}" (${user.name})` : `"${user.name}"`} because...`}
+          href="/about#contact"
           class="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-sm text-red-400 shadow-xs transition-colors duration-200 hover:bg-red-500/20 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
         >
           <Icon name="ri:alert-line" class="size-4" /> Report

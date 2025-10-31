@@ -2,7 +2,6 @@
 import { Icon } from 'astro-icon/components'
 import { VAPID_PUBLIC_KEY } from 'astro:env/server'
 
-import { SUPPORT_EMAIL } from '../constants/project'
 import { cn } from '../lib/cn'
 
 import Button from './Button.astro'
@@ -90,9 +89,7 @@ const { class: className, dismissable = false, pushSubscriptions, hideIfEnabled,
     <Icon name="ri:error-warning-line" class="size-5 shrink-0" />
     <span>
       <span data-error-message></span>
-      <a href={`mailto:${SUPPORT_EMAIL}`} class="text-red-300 underline hover:text-red-200">
-        Contact support
-      </a>
+      <a href="/about#contact" class="text-red-300 underline hover:text-red-200"> Contact support </a>
     </span>
   </div>
 </div>

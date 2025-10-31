@@ -12,7 +12,6 @@ import Tooltip from '../../components/Tooltip.astro'
 import UserBadge from '../../components/UserBadge.astro'
 import { getKarmaTransactionActionInfo } from '../../constants/karmaTransactionActions'
 import { karmaUnlocks, karmaUnlocksById } from '../../constants/karmaUnlocks'
-import { SUPPORT_EMAIL } from '../../constants/project'
 import { getServiceSuggestionStatusInfo } from '../../constants/serviceSuggestionStatus'
 import { getServiceSuggestionTypeInfo } from '../../constants/serviceSuggestionType'
 import { getServiceUserRoleInfo } from '../../constants/serviceUserRoles'
@@ -466,12 +465,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
             }
 
             <li>
-              <Button
-                as="a"
-                href={`mailto:${SUPPORT_EMAIL}?subject=User verification request - ${user.displayName ?? user.name}&body=I would like to be verified as related to https://www.example.com`}
-                label="Request verification"
-                size="sm"
-              />
+              <Button as="a" href="/about#account-verification" label="Request verification" size="sm" />
             </li>
           </ul>
         </div>
@@ -485,12 +479,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
         <Icon name="ri:building-4-line" class="mr-2 inline-block size-5" />
         Service Affiliations
       </h2>
-      <Button
-        as="a"
-        href={`mailto:${SUPPORT_EMAIL}?subject=Service Affiliation Verification Request - ${user.displayName ?? user.name}&body=I would like to be verified as related to the services ACME as Admin and XYZ as Team Member. Here is the proof...`}
-        label="Request"
-        size="md"
-      />
+      <Button as="a" href="/contact#account-verification" label="Request" size="md" />
     </header>
 
     {
