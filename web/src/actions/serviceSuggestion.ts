@@ -8,8 +8,8 @@ import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../li
 import { defineProtectedAction } from '../lib/defineProtectedAction'
 import { saveFileLocally } from '../lib/fileStorage'
 import { findServicesBySimilarity } from '../lib/findServicesBySimilarity'
-import { handleHoneypotTrap } from '../lib/honeypot'
 import { prisma } from '../lib/prisma'
+import { handleHoneypotTrap } from '../lib/spamDetection'
 import { separateServiceUrlsByType } from '../lib/urls'
 import {
   imageFileSchemaRequired,

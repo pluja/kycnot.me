@@ -1,0 +1,14 @@
+---
+import { markdownToHtml } from '../lib/markdown'
+
+type Props = {
+  content: string
+  allowImages?: boolean
+}
+
+const { content, allowImages } = Astro.props
+
+const html = await markdownToHtml(content, { allowImages })
+---
+
+<Fragment set:html={html} />

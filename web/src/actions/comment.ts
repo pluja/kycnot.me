@@ -6,10 +6,10 @@ import { formatDistanceStrict } from 'date-fns'
 
 import { karmaUnlocksById } from '../constants/karmaUnlocks'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
-import { handleHoneypotTrap } from '../lib/honeypot'
 import { makeKarmaUnlockMessage } from '../lib/karmaUnlocks'
 import { getOrCreateNotificationPreferences } from '../lib/notificationPreferences'
 import { prisma } from '../lib/prisma'
+import { handleHoneypotTrap, handleXSSDetection } from '../lib/spamDetection'
 import { timeTrapSecretKey } from '../lib/timeTrapSecret'
 
 import type { CommentStatus, Prisma } from '@prisma/client'
@@ -140,6 +140,14 @@ export const commentActions = {
         honeyPotTrapField: 'message',
         userId: context.locals.user.id,
         location: 'comment.create',
+      })
+
+      await handleXSSDetection({
+        input,
+        contentField: 'content',
+        userId: context.locals.user.id,
+        location: `service with id ${input.serviceId.toString()}`,
+        dontMarkAsSpammer: context.locals.user.admin,
       })
 
       // --- Time Trap Validation Start ---

@@ -1,7 +1,6 @@
 ---
 import { VerificationStepStatus, EventType } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
-import { Markdown } from 'astro-remote'
 import { Schema } from 'astro-seo-schema'
 import { actions } from 'astro:actions'
 import { head, orderBy, pick, shuffle, sortBy, tail } from 'lodash-es'
@@ -17,6 +16,7 @@ import DropdownButtonItemLink from '../../components/DropdownButtonItemLink.astr
 import FormatTimeInterval from '../../components/FormatTimeInterval.astro'
 import InputSubmitButton from '../../components/InputSubmitButton.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
+import Markdown from '../../components/Markdown.astro'
 import MyPicture from '../../components/MyPicture.astro'
 import { makeOgImageUrl, type OgImageAllTemplatesWithProps } from '../../components/OgImage'
 import ScoreGauge from '../../components/ScoreGauge.astro'

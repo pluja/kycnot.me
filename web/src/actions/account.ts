@@ -7,11 +7,11 @@ import { createAccount } from '../lib/accountCreate'
 import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../lib/captchaValidation'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
 import { saveFileLocally } from '../lib/fileStorage'
-import { handleHoneypotTrap } from '../lib/honeypot'
 import { startImpersonating, stopImpersonating } from '../lib/impersonation'
 import { makeKarmaUnlockMessage, makeUserWithKarmaUnlocks } from '../lib/karmaUnlocks'
 import { prisma } from '../lib/prisma'
 import { redisPreGeneratedSecretTokens } from '../lib/redis/redisPreGeneratedSecretTokens'
+import { handleHoneypotTrap } from '../lib/spamDetection'
 import { login, logout, setUserSessionIdCookie } from '../lib/userCookies'
 import {
   generateUserSecretToken,
