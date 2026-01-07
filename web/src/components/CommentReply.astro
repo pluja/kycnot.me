@@ -1,6 +1,5 @@
 ---
 import { Icon } from 'astro-icon/components'
-import { Markdown } from 'astro-remote'
 import { actions } from 'astro:actions'
 
 import { COMMENT_ORDER_ID_MAX_LENGTH } from '../actions/comment'
@@ -167,8 +166,8 @@ const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
                       {!!commentSectionMessage && (
                         <div class="flex items-start gap-1 pt-1.5">
                           <Icon name="ri:information-line" class="mt-1.25 inline size-3.5" />
-                          <div class="prose prose-invert prose-sm text-day-200 max-w-none grow">
-                            <Markdown content={commentSectionMessage} />
+                          <div class="prose prose-invert prose-sm text-day-200 max-w-none grow whitespace-pre-wrap break-words">
+                            {commentSectionMessage}
                           </div>
                         </div>
                       )}
