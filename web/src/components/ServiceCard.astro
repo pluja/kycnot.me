@@ -2,6 +2,7 @@
 import { Icon } from 'astro-icon/components'
 
 import { currencies } from '../constants/currencies'
+import { getKycLevelInfo } from '../constants/kycLevels'
 import { serviceVisibilitiesById } from '../constants/serviceVisibility'
 import { verificationStatusesByValue } from '../constants/verificationStatus'
 import { cn } from '../lib/cn'
@@ -68,6 +69,8 @@ const statusIcon = {
 const Element = withoutLink ? 'div' : 'a'
 
 const overallScoreInfo = makeOverallScoreInfo(overallScore)
+
+const kycLevelInfo = getKycLevelInfo(`${kycLevel}`)
 ---
 
 <article {...htmlProps}>
@@ -172,9 +175,13 @@ const overallScoreInfo = makeOverallScoreInfo(overallScore)
         {overallScoreInfo.formattedScore}
       </Tooltip>
 
-      <span class="text-day-300 ml-3 text-sm font-bold whitespace-nowrap">
-        KYC &nbsp;{kycLevel.toLocaleString()}
-      </span>
+      <Tooltip
+        class="text-day-300 ml-3 inline-flex items-center gap-1 text-sm font-bold whitespace-nowrap"
+        text={kycLevelInfo.description}
+      >
+        <Icon name={kycLevelInfo.icon} class="size-4" />
+        KYC &nbsp;{kycLevelInfo.id}
+      </Tooltip>
 
       <div class="-m-1 ml-auto flex">
         {

@@ -235,28 +235,25 @@ const {
 
   <!-- KYC Level Filter -->
   <fieldset class="mb-6">
-    <legend class="font-title mb-3 leading-none text-green-500">
-      <label for="max-kyc">KYC Level (max)</label>
-    </legend>
-    <div class="flex items-center gap-2">
-      <input
-        type="range"
-        min="0"
-        max="4"
-        name="max-kyc"
-        id="max-kyc"
-        value={filters['max-kyc'] ?? 4}
-        class="w-full accent-green-500"
-        data-trigger-on-change
-      />
-    </div>
-    <div class="text-day-400 mt-1 flex justify-between px-1 text-xs">
+    <legend class="font-title mb-3 leading-none text-green-500">KYC Level</legend>
+    <div class="">
       {
         options.kycLevels.map((level) => (
-          <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">
-            {level.value}
-            <Icon name={level.icon} class="ms-1 size-3 shrink-0" />
-          </span>
+          <label class="group flex cursor-pointer items-start gap-2 rounded-lg py-1 text-sm text-white first:pt-0 last:pb-0">
+            <input
+              type="radio"
+              class="peer group-has-[~_*_input:checked]:checkbox-force-checked row-span-2 text-green-500"
+              name="max-kyc"
+              value={level.value}
+              checked={(filters['max-kyc'] ?? 4) === level.value}
+              data-trigger-on-change
+            />
+            <Icon name={level.icon} class="size-4" />
+            <span class="leading-none text-balance group-has-[~_*_input:checked]:font-bold peer-checked:font-bold">
+              {level.name}
+              <span class="text-day-500 ml-0.5 font-normal whitespace-nowrap">lvl. {level.value}</span>
+            </span>
+          </label>
         ))
       }
     </div>

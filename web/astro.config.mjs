@@ -110,7 +110,7 @@ export default defineConfig({
       // https://astro.build/blog/astro-590/#experimental-content-security-policy-support
       'Content-Security-Policy':
         SITE_URL === 'http://localhost:4321'
-          ? "frame-ancestors 'none'; upgrade-insecure-requests"
+          ? "frame-ancestors 'none'"
           : "default-src 'self'; img-src 'self' *; frame-ancestors 'none'; upgrade-insecure-requests",
       'Strict-Transport-Security':
         SITE_URL === 'http://localhost:4321' ? undefined : 'max-age=31536000; includeSubdomains; preload;',
