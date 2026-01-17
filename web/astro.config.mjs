@@ -36,7 +36,6 @@ export default defineConfig({
       },
     }),
     AstroPWA({
-      mode: 'development',
       base: '/',
       scope: '/',
       registerType: 'autoUpdate',
@@ -70,9 +69,9 @@ export default defineConfig({
           },
         },
       },
-      workbox: {
-        navigateFallback: '/404',
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,jpg,jpeg,png,svg,webp,avif}'],
+        globIgnores: ['**/_astro/*.css'],
       },
       strategies: 'injectManifest',
       srcDir: 'src',
