@@ -71,7 +71,6 @@ export default defineConfig({
       },
       injectManifest: {
         globPatterns: ['**/*.{js,wasm,css,html,ico,jpg,jpeg,png,svg,webp,avif,jxl}'],
-        globIgnores: ['**/node_modules/**/*', '**/_astro/*.css'],
       },
       strategies: 'injectManifest',
       srcDir: 'src',
