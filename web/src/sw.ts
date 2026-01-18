@@ -3,7 +3,7 @@
 /// <reference lib="webworker" />
 
 import { clientsClaim } from 'workbox-core'
-import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
+import { cleanupOutdatedCaches } from 'workbox-precaching'
 
 import {
   makeBrowserNotificationOptions,
@@ -17,7 +17,8 @@ declare const self: ServiceWorkerGlobalScope
 void self.skipWaiting()
 clientsClaim()
 cleanupOutdatedCaches()
-precacheAndRoute(self.__WB_MANIFEST)
+
+// I don't call precacheAndRoute(self.__WB_MANIFEST) because I don't want to use cache.
 
 self.addEventListener('message', (event) => {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access

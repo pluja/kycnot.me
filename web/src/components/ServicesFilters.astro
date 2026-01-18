@@ -47,6 +47,7 @@ const {
     .map((verification) => verification.slug)}
   {...formProps}
   class={cn(
+    '@container',
     // Check the scam filter when there is a text quey and the user has checked verified and approved
     'has-[input[name=q]:not(:placeholder-shown)]:has-[&_input[name=verification][value=verified]:checked]:has-[&_input[name=verification][value=approved]:checked]:[&_input[name=verification][value=scam]]:checkbox-force-checked',
     'has-[input[name=q]:placeholder-shown]:[&_[data-hide-if-q-is-empty]]:hidden has-[input[name=q]:not(:placeholder-shown)]:[&_[data-hide-if-q-is-filled]]:hidden',
@@ -109,10 +110,15 @@ const {
   <!-- Type Filter -->
   <fieldset class="mb-6">
     <legend class="font-title mb-3 leading-none text-green-500">Type</legend>
-    <ul class="[&:not(:has(~_.peer:checked))]:[&>li:not([data-show-always])]:hidden">
+    <ul
+      class="@2xs:grid @2xs:grid-cols-2 @max-2xs:[&:not(:has(~_*>.peer:checked))]:[&>li:not([data-show-always])]:hidden @2xs:[&:not(:has(~_*>.peer:checked))]:[&>li:not([data-show-always],[data-show-always-on-large])]:hidden"
+    >
       {
         options.categories.map((category) => (
-          <li data-show-always={category.showAlways ? '' : undefined}>
+          <li
+            data-show-always={category.showAlways ? '' : undefined}
+            data-show-always-on-large={category.showAlwaysOnLarge ? '' : undefined}
+          >
             <label class="flex cursor-pointer items-center gap-2 text-sm text-white">
               <input
                 type="checkbox"
@@ -134,7 +140,15 @@ const {
     </ul>
     {
       options.categories.filter((category) => category.showAlways).length < options.categories.length && (
-        <>
+        <div
+          class="@2xs:not-data-has-more-on-large:hidden"
+          data-has-more-on-large={
+            options.categories.filter((category) => category.showAlways || category.showAlwaysOnLarge)
+              .length < options.categories.length
+              ? ''
+              : undefined
+          }
+        >
           <input type="checkbox" id="show-more-categories" class="peer sr-only" hx-preserve />
           <label
             for="show-more-categories"
@@ -148,7 +162,7 @@ const {
           >
             - Show less
           </label>
-        </>
+        </div>
       )
     }
   </fieldset>
@@ -176,62 +190,64 @@ const {
     </div>
   </fieldset>
 
-  <!-- Accepted currencies Filter -->
-  <fieldset class="mb-6">
-    <div class="mb-3 flex items-center justify-between">
-      <legend class="font-title leading-none text-green-500">Currencies</legend>
-      <PillsRadioGroup
-        name="currency-mode"
-        options={options.modeOptions}
-        selectedValue={filters['currency-mode']}
-        class="-my-2"
-        inputProps={{
-          'data-trigger-on-change': true,
-        }}
-      />
-    </div>
-    <div>
-      {
-        options.currencies.map((currency) => (
-          <label class="flex cursor-pointer items-center gap-2 text-sm text-white">
-            <input
-              type="checkbox"
-              class="peer text-green-500"
-              name="currencies"
-              value={currency.slug}
-              checked={filters.currencies?.some((id) => id === currency.id)}
-              data-trigger-on-change
-            />
-            <Icon name={currency.icon} class="size-4" />
-            <span class="peer-checked:font-bold">{currency.name}</span>
-          </label>
-        ))
-      }
-    </div>
-  </fieldset>
+  <div class="@2xs:grid @2xs:grid-cols-2">
+    <!-- Network Filter -->
+    <fieldset class="mb-6">
+      <legend class="font-title mb-3 leading-none text-green-500">Networks</legend>
+      <div>
+        {
+          options.network.map((network) => (
+            <label class="flex cursor-pointer items-center gap-2 text-sm text-white">
+              <input
+                type="checkbox"
+                class="peer text-green-500"
+                name="networks"
+                value={network.slug}
+                checked={filters.networks?.some((slug) => slug === network.slug)}
+                data-trigger-on-change
+              />
+              <Icon name={network.icon} class="size-4" />
+              <span class="peer-checked:font-bold">{network.name}</span>
+            </label>
+          ))
+        }
+      </div>
+    </fieldset>
 
-  <!-- Network Filter -->
-  <fieldset class="mb-6">
-    <legend class="font-title mb-3 leading-none text-green-500">Networks</legend>
-    <div>
-      {
-        options.network.map((network) => (
-          <label class="flex cursor-pointer items-center gap-2 text-sm text-white">
-            <input
-              type="checkbox"
-              class="peer text-green-500"
-              name="networks"
-              value={network.slug}
-              checked={filters.networks?.some((slug) => slug === network.slug)}
-              data-trigger-on-change
-            />
-            <Icon name={network.icon} class="size-4" />
-            <span class="peer-checked:font-bold">{network.name}</span>
-          </label>
-        ))
-      }
-    </div>
-  </fieldset>
+    <!-- Accepted currencies Filter -->
+    <fieldset class="mb-6">
+      <div class="mb-3 flex items-center justify-between">
+        <legend class="font-title leading-none text-green-500">Currencies</legend>
+        <PillsRadioGroup
+          name="currency-mode"
+          options={options.modeOptions}
+          selectedValue={filters['currency-mode']}
+          class="-my-2"
+          inputProps={{
+            'data-trigger-on-change': true,
+          }}
+        />
+      </div>
+      <div>
+        {
+          options.currencies.map((currency) => (
+            <label class="flex cursor-pointer items-center gap-2 text-sm text-white">
+              <input
+                type="checkbox"
+                class="peer text-green-500"
+                name="currencies"
+                value={currency.slug}
+                checked={filters.currencies?.some((id) => id === currency.id)}
+                data-trigger-on-change
+              />
+              <Icon name={currency.icon} class="size-4" />
+              <span class="peer-checked:font-bold">{currency.name}</span>
+            </label>
+          ))
+        }
+      </div>
+    </fieldset>
+  </div>
 
   <!-- KYC Level Filter -->
   <fieldset class="mb-6">

@@ -170,6 +170,7 @@ export function makeSearchFiltersOptions({
   ).map((category, i) => ({
     ...category,
     showAlways: i < MIN_CATEGORIES_TO_SHOW || category.checked,
+    showAlwaysOnLarge: !category.checked && i >= MIN_CATEGORIES_TO_SHOW && i < MIN_CATEGORIES_TO_SHOW * 2,
   }))
 
   return {
