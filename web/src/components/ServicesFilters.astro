@@ -108,7 +108,7 @@ const {
   </fieldset>
 
   <!-- Type Filter -->
-  <fieldset class="mb-6">
+  <fieldset class="mb-6 min-w-0">
     <legend class="font-title mb-3 leading-none text-green-500">Type</legend>
     <ul
       class="@2xs:grid @2xs:grid-cols-2 @max-2xs:[&:not(:has(~_*>.peer:checked))]:[&>li:not([data-show-always])]:hidden @2xs:[&:not(:has(~_*>.peer:checked))]:[&>li:not([data-show-always],[data-show-always-on-large])]:hidden"
@@ -128,8 +128,8 @@ const {
                 checked={category.checked}
                 data-trigger-on-change
               />
-              <Icon name={category.icon} class="size-4" />
-              <span class="peer-checked:font-bold">
+              <Icon name={category.icon} class="size-4 shrink-0" />
+              <span class="peer-checked:font-bold text-ellipsis whitespace-nowrap overflow-hidden">
                 {category.name}
                 <span class="text-day-500 font-normal">{category._count.services}</span>
               </span>
