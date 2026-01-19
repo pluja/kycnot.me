@@ -3,14 +3,14 @@ import { Icon } from 'astro-icon/components'
 
 import { cn } from '../lib/cn'
 
-import type { ActionInputNoFormData, AnyAction } from '../lib/astroActions'
+import type { ActionInput, AnyAction } from '../lib/astroActions'
 import type { HTMLAttributes } from 'astro/types'
 
 export type Props<TAction extends AnyAction = AnyAction> = Omit<HTMLAttributes<'form'>, 'action'> & {
   label: string
   icon?: string
   action: TAction
-  data: ActionInputNoFormData<TAction>
+  data: ActionInput<TAction>
 }
 
 const { label, icon, action, data, class: className, ...htmlProps } = Astro.props

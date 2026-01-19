@@ -9,7 +9,7 @@ import { baseInputClassNames } from '../lib/formInputs'
 
 import ChatMessages, { type ChatMessage } from './ChatMessages.astro'
 
-import type { ActionInputNoFormData, AnyAction } from '../lib/astroActions'
+import type { ActionInput, AnyAction } from '../lib/astroActions'
 import type { HTMLAttributes } from 'astro/types'
 
 export type Props<TAction extends AnyAction | undefined = AnyAction | undefined> =
@@ -19,9 +19,7 @@ export type Props<TAction extends AnyAction | undefined = AnyAction | undefined>
     userId: number | null
     action: TAction
     formData?: TAction extends AnyAction
-      ? ActionInputNoFormData<TAction> extends Record<string, unknown>
-        ? Omit<ActionInputNoFormData<TAction>, 'content'>
-        : ActionInputNoFormData<TAction>
+      ?   Omit<ActionInput<TAction>, 'content'> 
       : undefined
   }
 
