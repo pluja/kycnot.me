@@ -4,6 +4,8 @@
 
 import { clientsClaim } from 'workbox-core'
 import { cleanupOutdatedCaches } from 'workbox-precaching'
+import { registerRoute, setDefaultHandler } from 'workbox-routing'
+import { NetworkFirst } from 'workbox-strategies'
 
 import {
   makeBrowserNotificationOptions,
@@ -11,14 +13,23 @@ import {
 } from './lib/client/notificationOptions'
 
 import type { NotificationData, NotificationPayload } from './lib/serverEventsTypes'
+import type { ManifestEntry } from 'workbox-build'
 
-declare const self: ServiceWorkerGlobalScope
+declare const self: ServiceWorkerGlobalScope & {
+  __WB_MANIFEST: ManifestEntry[]
+}
 
 void self.skipWaiting()
 clientsClaim()
 cleanupOutdatedCaches()
 
-// I don't call precacheAndRoute(self.__WB_MANIFEST) because I don't want to use cache.
+// Keep the manifest placeholder for injectManifest (required by Vite PWA)
+// The manifest will be injected here by workbox-build, but we don't use it for caching
+const doNothing = (..._ignore: unknown[]) => undefined
+doNothing(self.__WB_MANIFEST)
+
+setDefaultHandler(new NetworkFirst())
+registerRoute(({ request }) => request.destination === 'document', new NetworkFirst())
 
 self.addEventListener('message', (event) => {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
