@@ -31,7 +31,7 @@ const { layoutHeader, size = 'xs', ...baseLayoutProps } = Astro.props
   <div
     class={cn('bg-night-800 border-night-500 contents w-full rounded-xl border p-8', {
       'xs:block xs:max-w-screen-xs': size === 'xs',
-      'md:block md:max-w-screen-md': size === 'md',
+      'md:block md:max-w-3xl': size === 'md',
     })}
   >
     <div class="bg-day-200 mx-auto flex size-12 items-center justify-center rounded-lg">

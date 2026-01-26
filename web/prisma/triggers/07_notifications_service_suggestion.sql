@@ -50,6 +50,8 @@ BEGIN
     IF NEW.status <> OLD.status THEN
       IF NEW.status = 'PENDING' THEN
         suggestion_status_change := 'STATUS_CHANGED_TO_PENDING';
+      ELSIF NEW.status = 'UNDER_REVIEW' THEN
+        suggestion_status_change := 'STATUS_CHANGED_TO_UNDER_REVIEW';
       ELSIF NEW.status = 'APPROVED' THEN
         suggestion_status_change := 'STATUS_CHANGED_TO_APPROVED';
       ELSIF NEW.status = 'REJECTED' THEN

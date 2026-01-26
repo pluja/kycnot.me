@@ -81,7 +81,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
     description: 'Suggest a new service to be listed',
     icon: 'ri:add-circle-line',
   }}
-  widthClassName="max-w-screen-md"
+  widthClassName="max-w-3xl"
   breadcrumbs={[
     {
       name: 'Service suggestions',
@@ -296,7 +296,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       label="KYC Level"
       options={kycLevels.map((kycLevel) => ({
         label: kycLevel.name,
-        value: kycLevel.id.toString(),
+        value: kycLevel.id,
         icon: kycLevel.icon,
         description: `${kycLevel.description}\n\n_KYC Level ${kycLevel.value}/4_`,
       }))}

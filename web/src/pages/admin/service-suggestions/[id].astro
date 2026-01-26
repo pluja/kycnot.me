@@ -108,7 +108,7 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
 <BaseLayout
   pageTitle={`${serviceSuggestion.service.name} | Admin Service Suggestion`}
   description="View and manage service suggestion"
-  widthClassName="max-w-screen-md"
+  widthClassName="max-w-3xl"
   htmx
 >
   <h1 class="font-title mt-12 mb-6 text-center text-3xl font-bold">Service suggestion</h1>
@@ -189,6 +189,7 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
     formData={{
       suggestionId: serviceSuggestion.id,
     }}
+    suggestionId={serviceSuggestion.id}
     class="mt-12"
   />
 </BaseLayout>

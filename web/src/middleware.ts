@@ -90,7 +90,7 @@ const impersonate = defineMiddleware(async (context, next) => {
   if (user?.admin) {
     const impersonationInfo = await getImpersonationInfo(context.cookies)
 
-    if (impersonationInfo && impersonationInfo.adminId === user.id) {
+    if (impersonationInfo !== null && impersonationInfo.adminId === user.id) {
       const impersonatedUser = await prisma.user.findUnique({
         where: { id: impersonationInfo.targetId },
       })

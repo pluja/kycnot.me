@@ -5,6 +5,7 @@ Command line interface for the pyworker package.
 import argparse
 import sys
 import time
+from functools import partial
 from typing import List, Optional, Dict, Any
 
 from pyworker.config import config
@@ -111,7 +112,7 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     return parser.parse_args(args)
 
 
-def run_tos_task(service_id: Optional[int] = None) -> int:
+def run_tos_task(service_id: Optional[int] = None, close_pool: bool = True) -> int:
     """
     Run the TOS retrieval task.
 
@@ -160,11 +161,14 @@ def run_tos_task(service_id: Optional[int] = None) -> int:
         logger.info("TOS retrieval task completed")
         return 0
     finally:
-        # Ensure connection pool is closed even if an error occurs
-        close_db_pool()
+        if close_pool:
+            # Ensure connection pool is closed even if an error occurs
+            close_db_pool()
 
 
-def run_sentiment_task(service_id: Optional[int] = None) -> int:
+def run_sentiment_task(
+    service_id: Optional[int] = None, close_pool: bool = True
+) -> int:
     """
     Run the user sentiment analysis task.
 
@@ -203,11 +207,14 @@ def run_sentiment_task(service_id: Optional[int] = None) -> int:
         logger.info("User sentiment analysis task completed")
         return 0
     finally:
-        # Ensure connection pool is closed even if an error occurs
-        close_db_pool()
+        if close_pool:
+            # Ensure connection pool is closed even if an error occurs
+            close_db_pool()
 
 
-def run_moderation_task(service_id: Optional[int] = None) -> int:
+def run_moderation_task(
+    service_id: Optional[int] = None, close_pool: bool = True
+) -> int:
     """
     Run the comment moderation task.
 
@@ -284,11 +291,12 @@ def run_moderation_task(service_id: Optional[int] = None) -> int:
         logger.info("Comment moderation task completed")
         return 0
     finally:
-        # Ensure connection pool is closed even if an error occurs
-        close_db_pool()
+        if close_pool:
+            # Ensure connection pool is closed even if an error occurs
+            close_db_pool()
 
 
-def run_force_triggers_task() -> int:
+def run_force_triggers_task(close_pool: bool = True) -> int:
     """
     Runs the force triggers task.
 
@@ -309,12 +317,15 @@ def run_force_triggers_task() -> int:
             logger.error("Force triggers task failed.")
             return 1
     finally:
-        # Ensure connection pool is closed even if an error occurs
-        close_db_pool()
+        if close_pool:
+            # Ensure connection pool is closed even if an error occurs
+            close_db_pool()
 
 
 def run_service_score_recalc_task(
-    service_id: Optional[int] = None, all_services: bool = False
+    service_id: Optional[int] = None,
+    all_services: bool = False,
+    close_pool: bool = True,
 ) -> int:
     """
     Run the service score recalculation task.
@@ -367,18 +378,19 @@ def run_service_score_recalc_task(
         logger.info("Service score recalculation task completed")
         return 0
     finally:
-        # Ensure connection pool is closed even if an error occurs
-        close_db_pool()
+        if close_pool:
+            # Ensure connection pool is closed even if an error occurs
+            close_db_pool()
 
 
-def run_service_score_recalc_all_task() -> int:
+def run_service_score_recalc_all_task(close_pool: bool = True) -> int:
     """
     Run the service score recalculation task for all services.
     """
-    return run_service_score_recalc_task(all_services=True)
+    return run_service_score_recalc_task(all_services=True, close_pool=close_pool)
 
 
-def run_inactive_users_task() -> int:
+def run_inactive_users_task(close_pool: bool = True) -> int:
     """
     Run the inactive users task.
 
@@ -398,8 +410,9 @@ def run_inactive_users_task() -> int:
         logger.exception(f"Error running inactive users task: {e}")
         return 1
     finally:
-        # Ensure connection pool is closed even if an error occurs
-        close_db_pool()
+        if close_pool:
+            # Ensure connection pool is closed even if an error occurs
+            close_db_pool()
 
 
 def run_worker_mode() -> int:
@@ -421,13 +434,17 @@ def run_worker_mode() -> int:
     )
 
     required_tasks: dict[str, Any] = {
-        "tosreview": run_tos_task,
-        "user_sentiment": run_sentiment_task,
-        "comment_moderation": run_moderation_task,
-        "force_triggers": run_force_triggers_task,
-        "inactive_users": run_inactive_users_task,
-        "service_score_recalc": run_service_score_recalc_task,
-        "service_score_recalc_all": run_service_score_recalc_all_task,
+        "tosreview": partial(run_tos_task, close_pool=False),
+        "user_sentiment": partial(run_sentiment_task, close_pool=False),
+        "comment_moderation": partial(run_moderation_task, close_pool=False),
+        "force_triggers": partial(run_force_triggers_task, close_pool=False),
+        "inactive_users": partial(run_inactive_users_task, close_pool=False),
+        "service_score_recalc": partial(
+            run_service_score_recalc_task, close_pool=False
+        ),
+        "service_score_recalc_all": partial(
+            run_service_score_recalc_all_task, close_pool=False
+        ),
     }
 
     missing_tasks = [t for t in required_tasks if t not in task_schedules]

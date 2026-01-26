@@ -26,11 +26,15 @@ export type ServerEventsData = {
   'new-connection': {
     timestamp: string
   }
+  'new-chat-message': {
+    suggestionId: number
+  }
 }
 
 export const allServerEventsData = [
   'new-notification',
   'new-connection',
+  'new-chat-message',
 ] as const satisfies (keyof ServerEventsData)[]
 
 type _ExpectServerEventsDataToHaveAllValues = Assert<

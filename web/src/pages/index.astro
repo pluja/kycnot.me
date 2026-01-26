@@ -395,7 +395,13 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
             type: true,
             _count: {
               select: {
-                services: true,
+                services: {
+                  where: {
+                    service: {
+                      serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
+                    },
+                  },
+                },
               },
             },
           },

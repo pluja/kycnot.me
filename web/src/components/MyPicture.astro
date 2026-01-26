@@ -1,23 +1,22 @@
 ---
-import type { ComponentProps } from 'react'
-
 import { Picture } from 'astro:assets'
 
 import defaultServiceImage from '../assets/fallback-service-image.jpg'
 import { cn } from '../lib/cn'
 
+import type { ComponentProps } from 'astro/types'
+
 const fallbackImages = {
   service: defaultServiceImage,
 } as const satisfies Record<string, typeof defaultServiceImage>
 
-type Props = Omit<ComponentProps<typeof Picture>, 'src'> & {
+type Props = Omit<ComponentProps<typeof Picture>, 'formats' | 'src'> & {
   src: ComponentProps<typeof Picture>['src'] | null | undefined
   fallback?: keyof typeof fallbackImages
 }
 
 const {
   src,
-  formats = ['avif', 'webp'],
   fallback = undefined as keyof typeof fallbackImages | undefined,
   height,
   width,
@@ -26,16 +25,24 @@ const {
 } = Astro.props
 
 const fallbackImage = fallback ? fallbackImages[fallback] : undefined
+
+const finalSrc = typeof src === 'string' ? new URL(src, Astro.url).href : (src ?? fallbackImage)
+
+const isSvg =
+  (typeof finalSrc === 'string' && new URL(finalSrc, Astro.url).href.toLowerCase().endsWith('.svg')) ||
+  (typeof finalSrc === 'object' &&
+    finalSrc !== null &&
+    'src' in finalSrc &&
+    typeof finalSrc.src === 'string' &&
+    new URL(finalSrc.src, Astro.url).href.toLowerCase().endsWith('.svg'))
 ---
 
 {/* eslint-disable @typescript-eslint/no-explicit-any */}
 {
-  !!(src ?? fallbackImage) && (
+  !!finalSrc && (
     <Picture
-      src={
-        typeof src === 'string' ? new URL(src, Astro.url).href : ((src ?? fallbackImage) as unknown as string)
-      }
-      formats={formats}
+      src={finalSrc}
+      formats={isSvg ? ['svg'] : ['avif', 'webp']}
       height={height ? Number(height) * 2 : undefined}
       width={width ? Number(width) * 2 : undefined}
       pictureAttributes={{

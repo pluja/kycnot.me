@@ -9,6 +9,7 @@ import { defineProtectedAction } from '../lib/defineProtectedAction'
 import { saveFileLocally } from '../lib/fileStorage'
 import { findServicesBySimilarity } from '../lib/findServicesBySimilarity'
 import { prisma } from '../lib/prisma'
+import { sendChatMessageEvents } from '../lib/sendChatEvents'
 import { handleHoneypotTrap } from '../lib/spamDetection'
 import { separateServiceUrlsByType } from '../lib/urls'
 import {
@@ -432,6 +433,8 @@ export const serviceSuggestionActions = {
           userId: context.locals.user.id,
         },
       })
+
+      sendChatMessageEvents(suggestion.id, context.locals.user.id).catch(console.error)
     },
   }),
 }

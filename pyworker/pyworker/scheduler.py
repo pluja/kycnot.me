@@ -141,9 +141,6 @@ class TaskScheduler:
                     self.logger.info(f"Task '{task_name}' completed")
                 except Exception as e:
                     self.logger.exception(f"Error running task '{task_name}': {e}")
-                finally:
-                    # Close the database pool after task execution
-                    close_db_pool()
 
     def start(self):
         """Start the scheduler."""

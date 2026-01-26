@@ -481,7 +481,7 @@ const apiCalls = await Astro.locals.banners.try(
           label="KYC Level"
           options={kycLevels.map((kycLevel) => ({
             label: `${kycLevel.name} (${kycLevel.value}/4)`,
-            value: kycLevel.id.toString(),
+            value: kycLevel.id,
             icon: kycLevel.icon,
             description: kycLevel.description,
           }))}

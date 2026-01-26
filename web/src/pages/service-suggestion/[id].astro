@@ -98,7 +98,7 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
     description: 'View and manage your service suggestion',
     icon: 'ri:service-line',
   }}
-  widthClassName="max-w-screen-md"
+  widthClassName="max-w-3xl"
   htmx
   breadcrumbs={[
     {
@@ -180,6 +180,7 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
     formData={{
       suggestionId: serviceSuggestion.id,
     }}
+    suggestionId={serviceSuggestion.id}
     class="mt-12"
   />
 </BaseLayout>

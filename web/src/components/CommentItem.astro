@@ -30,7 +30,7 @@ type Props = HTMLAttributes<'div'> & {
   comment: CommentWithRepliesPopulated
   depth?: number
   showPending?: boolean
-  highlightedCommentId: number | null
+  highlightedCommentId?: number | null
   serviceSlug: string
   itemReviewedId: string
   strictCommentingEnabled?: boolean

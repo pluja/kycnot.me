@@ -48,6 +48,8 @@ model Comment {
   ratingActive        Boolean            @default(false)
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @default(now()) @updatedAt
+  /// Computed via trigger when the status is APPROVED or VERIFIED. Do not update through prisma.
+  approvedAt          DateTime?
   author              User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
   authorId            Int
   service             Service            @relation(fields: [serviceId], references: [id], onDelete: Cascade)
@@ -64,6 +66,7 @@ model Comment {
   @@unique([serviceId, orderId], name: "unique_orderId_per_service")
   @@index([status])
   @@index([createdAt])
+  @@index([approvedAt])
   @@index([serviceId])
   @@index([authorId])
   @@index([upvotes])
@@ -170,6 +173,7 @@ enum ServiceVerificationStatusChange {
 
 enum ServiceSuggestionStatusChange {
   STATUS_CHANGED_TO_PENDING
+  STATUS_CHANGED_TO_UNDER_REVIEW
   STATUS_CHANGED_TO_APPROVED
   STATUS_CHANGED_TO_REJECTED
   STATUS_CHANGED_TO_WITHDRAWN
@@ -294,6 +298,7 @@ model Event {
 
 enum ServiceSuggestionStatus {
   PENDING
+  UNDER_REVIEW
   APPROVED
   REJECTED
   WITHDRAWN

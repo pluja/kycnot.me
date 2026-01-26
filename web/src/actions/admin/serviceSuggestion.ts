@@ -4,6 +4,7 @@ import { ActionError } from 'astro:actions'
 
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { prisma } from '../../lib/prisma'
+import { sendChatMessageEvents } from '../../lib/sendChatEvents'
 
 export const adminServiceSuggestionActions = {
   update: defineProtectedAction({
@@ -66,6 +67,8 @@ export const adminServiceSuggestionActions = {
           userId: context.locals.user.id,
         },
       })
+
+      sendChatMessageEvents(suggestion.id, context.locals.user.id).catch(console.error)
     },
   }),
 }

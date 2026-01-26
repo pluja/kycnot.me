@@ -28,6 +28,11 @@ export const {
       notificationTitle: 'status changed to pending',
     },
     {
+      value: 'STATUS_CHANGED_TO_UNDER_REVIEW',
+      label: 'status changed to under review',
+      notificationTitle: 'status changed to under review',
+    },
+    {
       value: 'STATUS_CHANGED_TO_APPROVED',
       label: 'status changed to approved',
       notificationTitle: 'status changed to approved',

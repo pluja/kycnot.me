@@ -6,8 +6,14 @@ import BadgeSmall from '../../components/BadgeSmall.astro'
 import CommentModeration from '../../components/CommentModeration.astro'
 import MyPicture from '../../components/MyPicture.astro'
 import Pagination from '../../components/Pagination.astro'
+import SortArrowIcon from '../../components/SortArrowIcon.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
+import Tooltip from '../../components/Tooltip.astro'
 import UserBadge from '../../components/UserBadge.astro'
+import {
+  adminCommentSortOptions,
+  adminCommentSortOptionsZodEnum,
+} from '../../constants/adminCommentSortOptions'
 import {
   commentStatusFilters,
   commentStatusFiltersZodEnum,
@@ -29,6 +35,8 @@ const { data: params } = zodParseQueryParamsStoringErrors(
   {
     status: commentStatusFiltersZodEnum.default('all'),
     page: z.coerce.number().int().positive().default(1),
+    'sort-by': adminCommentSortOptionsZodEnum.default('createdAt'),
+    'sort-order': z.enum(['asc', 'desc']).default('desc'),
   },
   Astro
 )
@@ -63,7 +71,7 @@ const [comments = [], totalComments = 0] = await Astro.locals.banners.try(
         },
         votes: true,
       },
-      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      orderBy: [{ [params['sort-by']]: params['sort-order'] }, { id: 'asc' }],
       skip: (params.page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
@@ -72,7 +80,7 @@ const [comments = [], totalComments = 0] = await Astro.locals.banners.try(
 const totalPages = Math.ceil(totalComments / PAGE_SIZE)
 ---
 
-<BaseLayout pageTitle="Comment Moderation" widthClassName="max-w-screen-xl">
+<BaseLayout pageTitle="Comment Moderation" widthClassName="max-w-7xl">
   <div class="mb-8">
     <h1 class="font-title mb-4 text-2xl text-green-500">&gt; comments.moderate</h1>
 
@@ -91,6 +99,31 @@ const totalPages = Math.ceil(totalComments / PAGE_SIZE)
           >
             <Icon name={filter.icon} class="size-4 shrink-0" />
             {filter.label}
+          </a>
+        ))
+      }
+    </div>
+
+    <!-- Sorting Options -->
+    <div class="mt-4 flex flex-wrap items-center gap-2">
+      <span class="text-sm text-zinc-400">Sort by:</span>
+      {
+        adminCommentSortOptions.map((sortOption) => (
+          <a
+            href={urlWithParams(Astro.url, {
+              'sort-by': sortOption.value,
+              'sort-order':
+                params['sort-by'] === sortOption.value && params['sort-order'] === 'asc' ? 'desc' : 'asc',
+            })}
+            class={cn([
+              'font-title flex items-center gap-1 rounded-md border px-3 py-1 text-sm transition-colors',
+              params['sort-by'] === sortOption.value
+                ? 'border-blue-500 bg-blue-500/10 text-blue-400'
+                : 'border-zinc-700 hover:border-blue-500/50',
+            ])}
+          >
+            {sortOption.label}
+            <SortArrowIcon active={params['sort-by'] === sortOption.value} sortOrder={params['sort-order']} />
           </a>
         ))
       }
@@ -140,6 +173,22 @@ const totalPages = Math.ceil(totalComments / PAGE_SIZE)
                 caseType="sentence"
                 class="text-sm text-zinc-400"
               />
+
+              {/* Approved Date */}
+              {comment.approvedAt && (
+                <>
+                  <span class="text-xs text-zinc-500">•</span>
+                  <Tooltip as="span" class="inline-flex items-center gap-1 text-zinc-500" text="Approved at">
+                    <Icon name="ri:check-line" class="size-4" />
+                    <TimeFormatted
+                      date={comment.approvedAt}
+                      hourPrecision
+                      caseType="sentence"
+                      class="text-sm"
+                    />
+                  </Tooltip>
+                </>
+              )}
 
               <span class="text-xs text-zinc-500">•</span>
 

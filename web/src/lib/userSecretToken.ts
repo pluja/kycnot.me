@@ -132,7 +132,7 @@ export function prettifyUserSecretToken(token: string): string {
   const parsedToken = parseUserSecretToken(token)
 
   const groups = parsedToken.toLocaleUpperCase().match(/.{4}/g)
-  if (!groups || groups.length !== 5) {
+  if (groups?.length !== 5) {
     throw new Error('Error while prettifying user secret token')
   }
   return groups.join('-')

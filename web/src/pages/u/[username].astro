@@ -105,6 +105,11 @@ const user = await Astro.locals.banners.try('user', async () => {
           take: 5,
         },
         comments: {
+          where: {
+            service: {
+              serviceVisibility: { in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'] },
+            },
+          },
           select: {
             id: true,
             content: true,
@@ -123,6 +128,13 @@ const user = await Astro.locals.banners.try('user', async () => {
           take: 5,
         },
         commentVotes: {
+          where: {
+            comment: {
+              service: {
+                serviceVisibility: { in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'] },
+              },
+            },
+          },
           select: {
             id: true,
             downvote: true,
@@ -145,6 +157,11 @@ const user = await Astro.locals.banners.try('user', async () => {
           take: 5,
         },
         serviceAffiliations: {
+          where: {
+            service: {
+              serviceVisibility: { in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'] },
+            },
+          },
           select: {
             role: true,
             service: {
@@ -194,7 +211,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
     description: 'User profile page',
     icon: 'ri:user-3-line',
   }}
-  widthClassName="max-w-screen-md"
+  widthClassName="max-w-3xl"
   classNames={{
     main: 'space-y-6',
   }}

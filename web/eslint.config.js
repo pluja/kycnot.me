@@ -1,13 +1,14 @@
 // @ts-check
-import pluginJs from '@eslint/js'
+import eslint from '@eslint/js'
 import stylistic from '@stylistic/eslint-plugin'
-import { configs as eslintAstroPluginConfig } from 'eslint-plugin-astro'
+import { defineConfig } from 'eslint/config'
+import eslintPluginAstro from 'eslint-plugin-astro'
 import importPlugin from 'eslint-plugin-import'
 import globals from 'globals'
 import { without } from 'lodash-es'
-import tseslint, { configs as tseslintConfigs } from 'typescript-eslint'
+import tseslint from 'typescript-eslint'
 
-export default tseslint.config(
+export default defineConfig(
   {
     ignores: [
       '**/node_modules/**',
@@ -32,15 +33,19 @@ export default tseslint.config(
       },
     },
   },
-  pluginJs.configs.recommended,
-  tseslintConfigs.strictTypeChecked,
-  tseslintConfigs.stylisticTypeChecked,
+  eslint.configs.recommended,
+  // eslint-disable-next-line import/no-named-as-default-member
+  tseslint.configs.strictTypeChecked,
+  // eslint-disable-next-line import/no-named-as-default-member
+  tseslint.configs.stylisticTypeChecked,
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
   importPlugin.flatConfigs.recommended,
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
   importPlugin.flatConfigs.typescript,
-  eslintAstroPluginConfig['flat/recommended'],
-  eslintAstroPluginConfig['flat/jsx-a11y-strict'],
+  // eslint-disable-next-line import/no-named-as-default-member
+  eslintPluginAstro.configs['flat/recommended'],
+  // eslint-disable-next-line import/no-named-as-default-member
+  eslintPluginAstro.configs['flat/jsx-a11y-strict'],
   [
     // These rules don't work with Astro and produce false positives
     {

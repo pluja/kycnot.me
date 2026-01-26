@@ -1,8 +1,9 @@
 ---
-description: 
+description:
 globs: web/src/pages,web/src/components
 alwaysApply: false
 ---
+
 - On .astro files, don't forget to include the three dashes (`---`) at the begining of the file and where the server js ends. I noticed that sometimes you forget them.
 - For icons use the `Icon` component from `astro-icon/components`.
 - For icons use the Remix Icon library preferably.
@@ -14,6 +15,7 @@ alwaysApply: false
 - When redirecting to the 404 not found page, use `Astro.rewrite` (Like this example: `if (!user) return Astro.rewrite('/404')`)
 - Include schema markup in the pages when it makes sense. Examples: [[slug].astro](mdc:web/src/pages/service/[slug].astro)
 - When creating forms, we already have utilities, components and established design patterns. Follow this example. (Note that this example may come slightly outdaded, but the overall philosophy doesn't change)
+
   ```astro
   ---
   import { actions, isInputError } from 'astro:actions'
@@ -92,7 +94,7 @@ alwaysApply: false
       description: 'Suggest an edit to service',
       icon: 'ri:edit-line',
     }}
-    widthClassName="max-w-screen-md"
+    widthClassName="max-w-3xl"
   >
     <h1 class="font-title mt-12 mb-6 text-center text-3xl font-bold">Edit service</h1>
 

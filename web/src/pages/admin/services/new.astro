@@ -63,7 +63,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
 <BaseLayout
   pageTitle="Create Service"
   description="Create a new service for KYCnot.me"
-  widthClassName="max-w-screen-md"
+  widthClassName="max-w-3xl"
 >
   <h1 class="font-title mt-12 mb-6 text-center text-3xl font-bold">Create Service</h1>
 
@@ -173,7 +173,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
       label="KYC Level"
       options={kycLevels.map((kycLevel) => ({
         label: kycLevel.name,
-        value: kycLevel.id.toString(),
+        value: kycLevel.id,
         icon: kycLevel.icon,
         description: `${kycLevel.description}\n\n_KYC Level ${kycLevel.value}/4_`,
       }))}

@@ -41,6 +41,14 @@ export const {
       default: true,
     },
     {
+      value: 'UNDER_REVIEW',
+      slug: 'under-review',
+      label: 'Under review',
+      icon: 'ri:eye-line',
+      color: 'blue',
+      default: false,
+    },
+    {
       value: 'APPROVED',
       slug: 'approved',
       label: 'Approved',
