@@ -17,10 +17,10 @@ const releaseDate =
     subtitle: 'Current release',
   }}
 >
-  <p class="text-day-200 font-title text-center text-6xl font-medium tracking-wider">
+  <p class="text-center font-title text-6xl font-medium tracking-wider text-day-200">
     {RELEASE_NUMBER ? `#${RELEASE_NUMBER}` : '???'}
   </p>
-  <time class="text-day-400 mt-4 block text-center text-xl" datetime={releaseDate?.toISOString()}>
+  <time class="mt-4 block text-center text-xl text-day-400" datetime={releaseDate?.toISOString()}>
     {
       releaseDate?.toLocaleString('en-US', {
         year: 'numeric',
@@ -33,7 +33,7 @@ const releaseDate =
   </time>
   {
     !!releaseDate && (
-      <p class="text-day-500 mt-2 text-center">
+      <p class="mt-2 text-center text-day-500">
         (<time datetime={releaseDate.toISOString()}>{timeAgo.format(releaseDate, 'round')}</time>)
       </p>
     )

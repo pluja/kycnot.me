@@ -17,8 +17,8 @@ const HeadingTag = heading
 ---
 
 <section class={cn('mt-6 space-y-2 first:mt-0', className)} {...props}>
-  <HeadingTag class="font-title text-day-400 text-center text-lg font-medium">{title}</HeadingTag>
-  {subtitle && <p class="text-day-400 text-center">{subtitle}</p>}
+  <HeadingTag class="text-center font-title text-lg font-medium text-day-400">{title}</HeadingTag>
+  {subtitle && <p class="text-center text-day-400">{subtitle}</p>}
 
   <slot />
 </section>

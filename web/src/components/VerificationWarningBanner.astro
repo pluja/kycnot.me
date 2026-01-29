@@ -114,7 +114,10 @@ const { service } = Astro.props
         href="#verification"
         class="mb-3 flex items-center gap-2 rounded-md bg-yellow-600/30 p-2 text-sm text-yellow-200 transition-colors hover:bg-yellow-600/40"
       >
-        <Icon name={verificationStepStatusesByValue.WARNING.icon} class={cn('size-5 text-yellow-400')} />
+        <Icon
+          name={verificationStepStatusesByValue.WARNING.icon}
+          class={cn('size-5', verificationStepStatusesByValue.WARNING.iconClass)}
+        />
         <span>Some verification steps are marked as warnings.</span>
       </a>
     )

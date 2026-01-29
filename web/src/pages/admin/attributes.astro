@@ -158,7 +158,7 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
     id="create-attribute-form"
     class="mb-6 hidden rounded-lg border border-zinc-700 bg-zinc-800/50 p-4 shadow-lg"
   >
-    <h2 class="font-title mb-3 text-lg font-semibold text-green-400">Create New Attribute</h2>
+    <h2 class="mb-3 font-title text-lg font-semibold text-green-400">Create New Attribute</h2>
     <form method="POST" action={actions.admin.attribute.create} class="space-y-4">
       <div>
         <label for="title-create" class="block text-sm font-medium text-zinc-300">Title</label>
@@ -566,9 +566,7 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
                   </tr>
                   <tr id={`edit-form-${index}`} class="hidden bg-zinc-700/20">
                     <td colspan="7" class="p-4">
-                      <h3 class="font-title text-md mb-2 font-semibold text-blue-300">
-                        Edit: {attribute.title}
-                      </h3>
+                      <h3 class="mb-2 font-title font-semibold text-blue-300">Edit: {attribute.title}</h3>
                       <form method="POST" action={actions.admin.attribute.update} class="space-y-4">
                         <input type="hidden" name="id" value={attribute.id} />
 

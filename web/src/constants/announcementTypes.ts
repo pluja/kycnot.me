@@ -1,7 +1,9 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import type { Assert } from '../lib/assert'
 import type { AnnouncementType } from '@prisma/client'
+import type { Equals } from 'ts-toolbelt/out/Any/Equals'
 
 type AnnouncementTypeInfo<T extends string | null | undefined = string> = {
   value: T
@@ -73,3 +75,5 @@ export const {
     },
   ] as const satisfies AnnouncementTypeInfo<AnnouncementType>[]
 )
+
+type _ExpectToHaveAllValues = Assert<Equals<(typeof announcementTypes)[number]['value'], AnnouncementType>>

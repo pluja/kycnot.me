@@ -13,6 +13,7 @@ import UserBadge from '../../components/UserBadge.astro'
 import {
   adminCommentSortOptions,
   adminCommentSortOptionsZodEnum,
+  getAdminCommentSortOptionInfo,
 } from '../../constants/adminCommentSortOptions'
 import {
   commentStatusFilters,
@@ -31,18 +32,21 @@ if (!user || (!user.admin && !user.moderator)) {
   return Astro.rewrite('/404')
 }
 
+const DEFAULT_SORT_ORDER = 'desc'
+
 const { data: params } = zodParseQueryParamsStoringErrors(
   {
     status: commentStatusFiltersZodEnum.default('all'),
     page: z.coerce.number().int().positive().default(1),
     'sort-by': adminCommentSortOptionsZodEnum.default('createdAt'),
-    'sort-order': z.enum(['asc', 'desc']).default('desc'),
+    'sort-order': z.enum(['asc', 'desc']).default(DEFAULT_SORT_ORDER),
   },
   Astro
 )
 const PAGE_SIZE = 20
 
 const statusFilter = getCommentStatusFilterInfo(params.status)
+const sortBy = getAdminCommentSortOptionInfo(params['sort-by'])
 
 const [comments = [], totalComments = 0] = await Astro.locals.banners.try(
   'Error fetching comments',
@@ -71,7 +75,14 @@ const [comments = [], totalComments = 0] = await Astro.locals.banners.try(
         },
         votes: true,
       },
-      orderBy: [{ [params['sort-by']]: params['sort-order'] }, { id: 'asc' }],
+      orderBy: [
+        {
+          [sortBy.value]: sortBy.hasNulls
+            ? { sort: params['sort-order'], nulls: 'last' }
+            : params['sort-order'],
+        },
+        { id: 'asc' },
+      ],
       skip: (params.page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
@@ -82,7 +93,7 @@ const totalPages = Math.ceil(totalComments / PAGE_SIZE)
 
 <BaseLayout pageTitle="Comment Moderation" widthClassName="max-w-7xl">
   <div class="mb-8">
-    <h1 class="font-title mb-4 text-2xl text-green-500">&gt; comments.moderate</h1>
+    <h1 class="mb-4 font-title text-2xl text-green-500">&gt; comments.moderate</h1>
 
     <!-- Status Filters -->
     <div class="flex flex-wrap gap-2">
@@ -91,7 +102,7 @@ const totalPages = Math.ceil(totalComments / PAGE_SIZE)
           <a
             href={urlWithParams(Astro.url, { status: filter.value })}
             class={cn([
-              'font-title flex items-center gap-2 rounded-md border px-3 py-1 text-sm',
+              'flex items-center gap-2 rounded-md border px-3 py-1 font-title text-sm',
               params.status === filter.value
                 ? filter.classNames.filter
                 : 'border-zinc-700 transition-colors hover:border-green-500/50',
@@ -105,28 +116,37 @@ const totalPages = Math.ceil(totalComments / PAGE_SIZE)
     </div>
 
     <!-- Sorting Options -->
-    <div class="mt-4 flex flex-wrap items-center gap-2">
-      <span class="text-sm text-zinc-400">Sort by:</span>
-      {
-        adminCommentSortOptions.map((sortOption) => (
-          <a
-            href={urlWithParams(Astro.url, {
-              'sort-by': sortOption.value,
-              'sort-order':
-                params['sort-by'] === sortOption.value && params['sort-order'] === 'asc' ? 'desc' : 'asc',
-            })}
-            class={cn([
-              'font-title flex items-center gap-1 rounded-md border px-3 py-1 text-sm transition-colors',
-              params['sort-by'] === sortOption.value
-                ? 'border-blue-500 bg-blue-500/10 text-blue-400'
-                : 'border-zinc-700 hover:border-blue-500/50',
-            ])}
-          >
-            {sortOption.label}
-            <SortArrowIcon active={params['sort-by'] === sortOption.value} sortOrder={params['sort-order']} />
-          </a>
-        ))
-      }
+    <div class="mt-4 flex flex-col gap-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-sm text-zinc-400">Sort by:</span>
+        {
+          adminCommentSortOptions.map((o) => (
+            <a
+              href={urlWithParams(Astro.url, {
+                'sort-by': o.value,
+                'sort-order':
+                  sortBy.value === o.value
+                    ? params['sort-order'] === 'asc'
+                      ? 'desc'
+                      : 'asc'
+                    : DEFAULT_SORT_ORDER,
+              })}
+              class={cn([
+                'flex items-center gap-1 rounded-md border px-3 py-1 font-title text-sm transition-colors',
+                sortBy.value === o.value
+                  ? 'border-blue-500 bg-blue-500/10 text-blue-400'
+                  : 'border-zinc-700 hover:border-blue-500/50',
+              ])}
+            >
+              {o.label}
+              <SortArrowIcon active={sortBy.value === o.value} sortOrder={params['sort-order']} />
+            </a>
+          ))
+        }
+        <span class="text-xs text-zinc-500">
+          {params['sort-order'] === 'desc' ? 'Newest' : 'Oldest'} first
+        </span>
+      </div>
     </div>
   </div>
 
@@ -205,7 +225,7 @@ const totalPages = Math.ceil(totalComments / PAGE_SIZE)
               {/* Link to Comment */}
               <a
                 href={`/service/${comment.service.slug}?showPending=true#comment-${comment.id.toString()}`}
-                class="text-whit/50 flex items-center gap-1 text-sm transition-colors hover:underline"
+                class="flex items-center gap-1 text-sm text-white/50 transition-colors hover:underline"
               >
                 <Icon name="ri:link" class="size-4" />
                 Open

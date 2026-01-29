@@ -105,7 +105,7 @@ const adminLinks: AdminLink[] = [
 ---
 
 <BaseLayout pageTitle="Admin Dashboard" widthClassName="max-w-7xl">
-  <h1 class="font-title text-day-100 mb-8 text-3xl font-bold">
+  <h1 class="mb-8 font-title text-3xl font-bold text-day-100">
     <Icon name="ri:home-gear-line" class="me-1 inline-block size-10 align-[-0.35em]" />
     Admin Dashboard
   </h1>
@@ -118,7 +118,7 @@ const adminLinks: AdminLink[] = [
           .map((link) => (
             <li
               class={cn(
-                'group ease-out-back transition-transform duration-250 hover:-translate-y-0.5 hover:scale-105',
+                'group transition-transform duration-250 ease-out-back hover:-translate-y-0.5 hover:scale-105',
                 link.classNames.base
               )}
             >

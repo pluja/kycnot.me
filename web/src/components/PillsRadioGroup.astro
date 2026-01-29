@@ -18,7 +18,7 @@ const { name, options, selectedValue, inputProps, class: className, ...rest } = 
 
 <div
   class={cn(
-    'bg-night-500 divide-night-700 has-focus-visible:ring-offset-night-700 flex divide-x-2 overflow-hidden rounded-md text-[0.6875rem] has-focus-visible:ring-2 has-focus-visible:ring-blue-500 has-focus-visible:ring-offset-2',
+    'flex divide-x-2 divide-night-700 overflow-hidden rounded-md bg-night-500 text-[0.6875rem] has-focus-visible:ring-2 has-focus-visible:ring-blue-500 has-focus-visible:ring-offset-2 has-focus-visible:ring-offset-night-700',
     className
   )}
   {...rest}
@@ -34,7 +34,7 @@ const { name, options, selectedValue, inputProps, class: className, ...rest } = 
           class="peer sr-only"
           {...inputProps}
         />
-        <span class="peer-checked:bg-night-400 inline-block cursor-pointer px-1.5 py-0.5 text-white peer-checked:text-green-500">
+        <span class="inline-block cursor-pointer px-1.5 py-0.5 text-white peer-checked:bg-night-400 peer-checked:text-green-500">
           {option.label}
         </span>
       </label>

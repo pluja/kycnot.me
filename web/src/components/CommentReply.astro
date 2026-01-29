@@ -73,12 +73,12 @@ const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
       user ? (
         userCommentsDisabled ? (
           <div class="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-sm text-red-400">
-            <Icon name="ri:forbid-line" class="mr-1 inline h-4 w-4 align-[-0.2em]" />
+            <Icon name="ri:forbid-line" class="mr-1 inline size-4 align-[-0.2em]" />
             You cannot comment due to low karma.
           </div>
         ) : (
           <>
-            <div class="text-day-400 flex items-center gap-2 text-xs peer-checked/use-form-secret-token:hidden">
+            <div class="flex items-center gap-2 text-xs text-day-400 peer-checked/use-form-secret-token:hidden">
               <Icon name="ri:user-line" class="size-3.5" />
               <span>
                 Commenting as: <UserBadge user={user} size="sm" class="text-green-400" />
@@ -96,7 +96,7 @@ const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
                 maxlength={2000}
                 rows="4"
                 placeholder="Write your comment..."
-                class="placeholder:text-day-500 focus:ring-day-500 border-night-500 bg-night-800 focus:border-night-600 max-h-128 min-h-16 w-full resize-y rounded-lg border px-2.5 py-2 text-sm focus:ring-1 focus:outline-hidden"
+                class="max-h-128 min-h-16 w-full resize-y rounded-lg border border-night-500 bg-night-800 px-2.5 py-2 text-sm placeholder:text-day-500 focus:border-night-600 focus:ring-1 focus:ring-day-500 focus:outline-hidden"
               />
             </div>
 
@@ -167,7 +167,7 @@ const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
                       {!!commentSectionMessage && (
                         <div class="flex items-start gap-1 pt-1.5">
                           <Icon name="ri:information-line" class="mt-1.25 inline size-3.5" />
-                          <div class="prose prose-invert prose-sm text-day-200 max-w-none grow">
+                          <div class="prose prose-sm max-w-none grow text-day-200 prose-invert">
                             <Markdown content={commentSectionMessage} />
                           </div>
                         </div>
@@ -189,7 +189,7 @@ const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
         <a
           href={makeLoginUrl(Astro.url, { message: 'Login to comment' })}
           data-astro-reload
-          class="font-title mb-4 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 text-xs text-blue-400 shadow-xs transition-colors duration-200 hover:bg-blue-500/20 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+          class="mb-4 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 font-title text-xs text-blue-400 shadow-xs transition-colors duration-200 hover:bg-blue-500/20 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
         >
           <Icon name="ri:login-box-line" class="size-3.5" />
           Login to comment

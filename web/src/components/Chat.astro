@@ -38,7 +38,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
 ---
 
 <div class={cn(className)} {...htmlProps}>
-  {!!title && <h3 class="text-day-200 font-title mb-2 text-center text-xl font-bold">{title}</h3>}
+  {!!title && <h3 class="mb-2 text-center font-title text-xl font-bold text-day-200">{title}</h3>}
 
   <ChatMessages
     id="chat-messages"

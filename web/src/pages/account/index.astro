@@ -189,7 +189,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
     },
   ]}
 >
-  <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+  <section class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
     <header class="flex flex-wrap items-center justify-center gap-4">
       <div class="flex grow flex-wrap items-center justify-center gap-4">
         {
@@ -197,12 +197,12 @@ const daysUntilDeletion = user.scheduledDeletionAt
             <MyPicture
               src={user.picture}
               alt=""
-              class="ring-day-500/30 xs:size-14 size-12 rounded-full object-cover ring-2 sm:size-16"
+              class="size-12 rounded-full object-cover ring-2 ring-day-500/30 xs:size-14 sm:size-16"
               width={64}
               height={64}
             />
           ) : (
-            <div class="bg-day-500/10 ring-day-500/30 text-day-400 flex size-16 items-center justify-center rounded-full ring-2">
+            <div class="flex size-16 items-center justify-center rounded-full bg-day-500/10 text-day-400 ring-2 ring-day-500/30">
               <Icon name="ri:user-3-line" class="size-8" />
             </div>
           )
@@ -211,7 +211,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
           <h1 class="font-title text-lg font-bold tracking-wider text-white">
             {user.displayName ?? user.name}
           </h1>
-          {user.displayName && <p class="text-day-200 font-title">{user.name}</p>}
+          {user.displayName && <p class="font-title text-day-200">{user.name}</p>}
           {
             (user.admin || user.verified || user.moderator) && (
               <div class="mt-1 flex gap-2">
@@ -239,7 +239,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
         <Tooltip
           as="a"
           href={`/u/${user.name}`}
-          class="border-day-500/30 bg-day-500/10 text-day-400 hover:bg-day-500/20 focus:ring-day-500 inline-flex items-center gap-1 rounded-md border p-2 text-sm shadow-xs transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
+          class="inline-flex items-center gap-1 rounded-md border border-day-500/30 bg-day-500/10 p-2 text-sm text-day-400 shadow-xs transition-colors duration-200 hover:bg-day-500/20 focus:ring-2 focus:ring-day-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
           text="View public profile"
         >
           <Icon name="ri:global-line" class="size-4" />
@@ -248,7 +248,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
           as="a"
           href="/account/logout"
           data-astro-prefetch="tap"
-          class="border-day-500/30 bg-day-500/10 text-day-400 hover:bg-day-500/20 focus:ring-day-500 inline-flex items-center gap-1 rounded-md border p-2 text-sm shadow-xs transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
+          class="inline-flex items-center gap-1 rounded-md border border-day-500/30 bg-day-500/10 p-2 text-sm text-day-400 shadow-xs transition-colors duration-200 hover:bg-day-500/20 focus:ring-2 focus:ring-day-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
           text="Logout"
         >
           <Icon name="ri:logout-box-r-line" class="size-4" />
@@ -257,32 +257,32 @@ const daysUntilDeletion = user.scheduledDeletionAt
           as="a"
           text="Edit Profile"
           href="/account/edit"
-          class="border-day-500/30 bg-day-500/10 text-day-400 hover:bg-day-500/20 focus:ring-day-500 inline-flex items-center gap-1 rounded-md border p-2 text-sm shadow-xs transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
+          class="inline-flex items-center gap-1 rounded-md border border-day-500/30 bg-day-500/10 p-2 text-sm text-day-400 shadow-xs transition-colors duration-200 hover:bg-day-500/20 focus:ring-2 focus:ring-day-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
         >
           <Icon name="ri:edit-line" class="size-4" />
         </Tooltip>
       </nav>
     </header>
 
-    <div class="border-night-400 mt-6 border-t pt-6">
+    <div class="mt-6 border-t border-night-400 pt-6">
       <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div>
-          <h3 class="font-title text-day-200 mb-4 text-sm">Profile Information</h3>
+          <h3 class="mb-4 font-title text-sm text-day-200">Profile Information</h3>
           <ul class="flex flex-col items-start gap-2">
             <li class="flex items-start">
-              <span class="text-day-500 mt-0.5 mr-2"><Icon name="ri:user-3-line" class="size-4" /></span>
+              <span class="mt-0.5 mr-2 text-day-500"><Icon name="ri:user-3-line" class="size-4" /></span>
               <div>
-                <p class="text-day-500 text-xs">Username</p>
+                <p class="text-xs text-day-500">Username</p>
                 <p class="text-day-300">{user.name}</p>
               </div>
             </li>
 
             <Tooltip as="li" text="Unlock with more karma" class="inline-flex items-start">
-              <span class="text-day-500 mt-0.5 mr-2">
+              <span class="mt-0.5 mr-2 text-day-500">
                 <Icon name="ri:user-smile-line" class="size-4" />
               </span>
               <div>
-                <p class="text-day-500 text-xs">
+                <p class="text-xs text-day-500">
                   Display Name {
                     !user.karmaUnlocks.displayName && (
                       <Icon name="ri:lock-line" class="inline-block size-3 align-[-0.15em]" />
@@ -297,11 +297,11 @@ const daysUntilDeletion = user.scheduledDeletionAt
             </Tooltip>
 
             <Tooltip as="li" text="Unlock with more karma" class="inline-flex items-start">
-              <span class="text-day-500 mt-0.5 mr-2">
+              <span class="mt-0.5 mr-2 text-day-500">
                 <Icon name="ri:link" class="size-4" />
               </span>
               <div>
-                <p class="text-day-500 text-xs">
+                <p class="text-xs text-day-500">
                   Website {
                     !user.karmaUnlocks.websiteLink && (
                       <Icon name="ri:lock-line" class="inline-block size-3 align-[-0.15em]" />
@@ -329,9 +329,9 @@ const daysUntilDeletion = user.scheduledDeletionAt
             </Tooltip>
 
             <li class="flex items-start">
-              <span class="text-day-500 mt-0.5 mr-2"><Icon name="ri:award-line" class="size-4" /></span>
+              <span class="mt-0.5 mr-2 text-day-500"><Icon name="ri:award-line" class="size-4" /></span>
               <div>
-                <p class="text-day-500 text-xs">Karma</p>
+                <p class="text-xs text-day-500">Karma</p>
                 <p class="text-day-300">{user.totalKarma.toLocaleString()}</p>
               </div>
             </li>
@@ -339,14 +339,14 @@ const daysUntilDeletion = user.scheduledDeletionAt
         </div>
 
         <div id="account-status">
-          <h3 class="font-title text-day-200 mb-4 text-sm">Account Status</h3>
+          <h3 class="mb-4 font-title text-sm text-day-200">Account Status</h3>
           <ul class="space-y-3">
             <li class="flex items-start">
-              <span class="text-day-500 mt-0.5 mr-2">
+              <span class="mt-0.5 mr-2 text-day-500">
                 <Icon name="ri:shield-check-line" class="size-4" />
               </span>
               <div>
-                <p class="text-day-500 text-xs">Account Type</p>
+                <p class="text-xs text-day-500">Account Type</p>
                 <div class="mt-1 flex flex-wrap gap-2">
                   {
                     user.admin && (
@@ -371,7 +371,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                   }
                   {
                     !user.admin && !user.verified && !user.moderator && (
-                      <span class="border-day-700/50 bg-day-700/20 text-day-400 rounded-full border px-2 py-0.5 text-xs">
+                      <span class="rounded-full border border-day-700/50 bg-day-700/20 px-2 py-0.5 text-xs text-day-400">
                         Standard User
                       </span>
                     )
@@ -381,11 +381,11 @@ const daysUntilDeletion = user.scheduledDeletionAt
             </li>
 
             <li class="flex items-start">
-              <span class="text-day-500 mt-0.5 mr-2">
+              <span class="mt-0.5 mr-2 text-day-500">
                 <Icon name="ri:spam-2-line" class="size-4" />
               </span>
               <div>
-                <p class="text-day-500 text-xs">Spam Status</p>
+                <p class="text-xs text-day-500">Spam Status</p>
                 {
                   user.spammer ? (
                     <span class="rounded-full border border-red-500/50 bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
@@ -403,11 +403,11 @@ const daysUntilDeletion = user.scheduledDeletionAt
             {
               daysUntilDeletion && (
                 <li class="flex items-start">
-                  <span class="text-day-500 mt-0.5 mr-2">
+                  <span class="mt-0.5 mr-2 text-day-500">
                     <Icon name="ri:delete-bin-line" class="size-4" />
                   </span>
                   <div>
-                    <p class="text-day-500 text-xs">Deletion Status</p>
+                    <p class="text-xs text-day-500">Deletion Status</p>
                     <span class="rounded-full border border-red-500/50 bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
                       Scheduled for deletion
                       {daysUntilDeletion <= 0 ? (
@@ -418,7 +418,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                         </>
                       )}
                     </span>
-                    <p class="text-day-400 mt-2 text-xs">
+                    <p class="mt-2 text-xs text-day-400">
                       To prevent deletion, take any action such as voting, commenting, or suggesting a
                       service.
                     </p>
@@ -428,9 +428,9 @@ const daysUntilDeletion = user.scheduledDeletionAt
             }
 
             <li class="flex items-start">
-              <span class="text-day-500 mt-0.5 mr-2"><Icon name="ri:calendar-line" class="size-4" /></span>
+              <span class="mt-0.5 mr-2 text-day-500"><Icon name="ri:calendar-line" class="size-4" /></span>
               <div>
-                <p class="text-day-500 text-xs">Joined</p>
+                <p class="text-xs text-day-500">Joined</p>
                 <p class="text-day-300">
                   {
                     formatDateShort(user.createdAt, {
@@ -446,11 +446,11 @@ const daysUntilDeletion = user.scheduledDeletionAt
             {
               user.verifiedLink && (
                 <li class="flex items-start">
-                  <span class="text-day-500 mt-0.5 mr-2">
+                  <span class="mt-0.5 mr-2 text-day-500">
                     <Icon name="ri:check-double-line" class="size-4" />
                   </span>
                   <div>
-                    <p class="text-day-500 text-xs">Verified as related to</p>
+                    <p class="text-xs text-day-500">Verified as related to</p>
                     <a
                       href={user.verifiedLink}
                       target="_blank"
@@ -473,9 +473,9 @@ const daysUntilDeletion = user.scheduledDeletionAt
     </div>
   </section>
 
-  <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+  <section class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
     <header class="flex items-center justify-between">
-      <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+      <h2 class="mb-4 font-title text-xl font-bold text-day-200">
         <Icon name="ri:building-4-line" class="mr-2 inline-block size-5" />
         Service Affiliations
       </h2>
@@ -484,7 +484,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
 
     {
       user.serviceAffiliations.length > 0 ? (
-        <ul class="2xs:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] grid gap-4">
+        <ul class="grid gap-4 2xs:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
           {user.serviceAffiliations.map((affiliation) => {
             const roleInfo = getServiceUserRoleInfo(affiliation.role)
             const statusIcon = {
@@ -496,7 +496,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
               <li class="shrink-0">
                 <a
                   href={`/service/${affiliation.service.slug}`}
-                  class="text-day-300 group flex min-w-32 items-center gap-2 text-sm"
+                  class="group flex min-w-32 items-center gap-2 text-sm text-day-300"
                 >
                   <MyPicture
                     src={affiliation.service.imageUrl}
@@ -512,10 +512,8 @@ const daysUntilDeletion = user.scheduledDeletionAt
                       <span class="text-day-500">of</span>
                     </div>
 
-                    <div class="text-day-300 flex items-center gap-1 font-semibold">
-                      <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap group-hover:underline">
-                        {affiliation.service.name}
-                      </span>
+                    <div class="flex items-center gap-1 font-semibold text-day-300">
+                      <span class="min-w-0 truncate group-hover:underline">{affiliation.service.name}</span>
                       {statusIcon && (
                         <Tooltip text={statusIcon.label} position="right" class="-m-1 shrink-0">
                           <Icon
@@ -536,22 +534,22 @@ const daysUntilDeletion = user.scheduledDeletionAt
           })}
         </ul>
       ) : (
-        <p class="text-day-400 mb-6">No service affiliations yet.</p>
+        <p class="mb-6 text-day-400">No service affiliations yet.</p>
       )
     }
   </section>
 
   <section
-    class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs"
+    class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs"
     id="karma-unlocks"
   >
     <header>
-      <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+      <h2 class="mb-4 font-title text-xl font-bold text-day-200">
         <Icon name="ri:lock-unlock-line" class="mr-2 inline-block size-5" />
         Karma Unlocks
       </h2>
 
-      <div class="border-night-500 bg-night-800/70 mb-4 rounded-md border px-4 py-3">
+      <div class="mb-4 rounded-md border border-night-500 bg-night-800/70 px-4 py-3">
         <p class="text-day-300">
           Earn karma to unlock features and privileges. <a
             href="/docs/karma"
@@ -566,10 +564,10 @@ const daysUntilDeletion = user.scheduledDeletionAt
         <input type="checkbox" id="positive-unlocks-toggle" class="peer sr-only md:hidden" checked />
         <label
           for="positive-unlocks-toggle"
-          class="flex cursor-pointer items-center justify-between border-b border-green-500/20 pb-2 md:cursor-default peer-checked:[&_[data-expand-arrow]]:rotate-180"
+          class="flex cursor-pointer items-center justify-between border-b border-green-500/20 pb-2 peer-checked:**:data-expand-arrow:rotate-180 md:cursor-default"
         >
-          <h3 class="font-title text-day-200 text-sm">Positive unlocks</h3>
-          <Icon name="ri:arrow-down-s-line" class="text-day-400 size-5 md:hidden" data-expand-arrow />
+          <h3 class="font-title text-sm text-day-200">Positive unlocks</h3>
+          <Icon name="ri:arrow-down-s-line" class="size-5 text-day-400 md:hidden" data-expand-arrow />
         </label>
 
         <div class="mt-3 hidden space-y-3 peer-checked:block md:block">
@@ -599,16 +597,16 @@ const daysUntilDeletion = user.scheduledDeletionAt
                     >
                       {unlock.name}
                     </p>
-                    <p class="text-day-500 text-sm">{unlock.karma.toLocaleString()} karma</p>
+                    <p class="text-sm text-day-500">{unlock.karma.toLocaleString()} karma</p>
                   </div>
                 </div>
                 <div>
                   {user.karmaUnlocks[unlock.id] ? (
-                    <span class="bg-day-500/20 text-day-300 inline-flex items-center rounded-full px-2 py-1 text-xs">
+                    <span class="inline-flex items-center rounded-full bg-day-500/20 px-2 py-1 text-xs text-day-300">
                       <Icon name="ri:check-line" class="mr-1 size-3" /> Unlocked
                     </span>
                   ) : (
-                    <span class="bg-night-800 text-day-400 inline-flex items-center rounded-full px-2 py-1 text-xs">
+                    <span class="inline-flex items-center rounded-full bg-night-800 px-2 py-1 text-xs text-day-400">
                       <Icon name="ri:lock-line" class="mr-1 size-3" /> Locked
                     </span>
                   )}
@@ -624,10 +622,10 @@ const daysUntilDeletion = user.scheduledDeletionAt
 
         <label
           for="negative-unlocks-toggle"
-          class="flex cursor-pointer items-center justify-between border-b border-red-500/20 pb-2 md:cursor-default peer-checked:[&_[data-expand-arrow]]:rotate-180"
+          class="flex cursor-pointer items-center justify-between border-b border-red-500/20 pb-2 peer-checked:**:data-expand-arrow:rotate-180 md:cursor-default"
         >
           <h3 class="font-title text-sm text-red-400">Negative unlocks</h3>
-          <Icon name="ri:arrow-down-s-line" class="text-day-400 size-5 md:hidden" data-expand-arrow />
+          <Icon name="ri:arrow-down-s-line" class="size-5 text-day-400 md:hidden" data-expand-arrow />
         </label>
 
         <div class="mt-3 hidden space-y-3 peer-checked:block md:block">
@@ -659,7 +657,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                       >
                         {unlock.name}
                       </p>
-                      <p class="text-day-500 text-sm">{unlock.karma.toLocaleString()} karma</p>
+                      <p class="text-sm text-day-500">{unlock.karma.toLocaleString()} karma</p>
                     </div>
                   </div>
                   <div>
@@ -668,7 +666,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                         <Icon name="ri:alert-line" class="mr-1 size-3" /> Active
                       </span>
                     ) : (
-                      <span class="bg-night-800 text-day-400 inline-flex items-center rounded-full px-2 py-1 text-xs">
+                      <span class="inline-flex items-center rounded-full bg-night-800 px-2 py-1 text-xs text-day-400">
                         <Icon name="ri:shield-check-line" class="mr-1 size-3" /> Avoided
                       </span>
                     )}
@@ -677,7 +675,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
               ))
           }
 
-          <p class="text-day-400 border-night-500/30 bg-night-800/70 mt-4 rounded-md border p-3 text-xs">
+          <p class="mt-4 rounded-md border border-night-500/30 bg-night-800/70 p-3 text-xs text-day-400">
             <Icon name="ri:information-line" class="inline-block size-4" />
             Negative karma leads to restrictions. <br class="hidden sm:block" />Keep interactions positive to
             avoid penalties.
@@ -688,9 +686,9 @@ const daysUntilDeletion = user.scheduledDeletionAt
   </section>
 
   <div class="space-y-6">
-    <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+    <section class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
       <header class="flex items-center justify-between">
-        <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+        <h2 class="mb-4 font-title text-xl font-bold text-day-200">
           <Icon name="ri:chat-3-line" class="mr-2 inline-block size-5" />
           Recent Comments
         </h2>
@@ -702,38 +700,38 @@ const daysUntilDeletion = user.scheduledDeletionAt
           <p class="text-day-400">No comments yet.</p>
         ) : (
           <div class="overflow-x-auto">
-            <table class="divide-night-400/20 w-full min-w-full divide-y">
+            <table class="w-full min-w-full divide-y divide-night-400/20">
               <thead>
                 <tr>
-                  <th class="text-day-400 px-4 py-3 text-left text-xs">Service</th>
-                  <th class="text-day-400 px-4 py-3 text-left text-xs">Comment</th>
-                  <th class="text-day-400 px-4 py-3 text-center text-xs">Status</th>
-                  <th class="text-day-400 px-4 py-3 text-center text-xs">Upvotes</th>
-                  <th class="text-day-400 px-4 py-3 text-right text-xs">Date</th>
+                  <th class="px-4 py-3 text-left text-xs text-day-400">Service</th>
+                  <th class="px-4 py-3 text-left text-xs text-day-400">Comment</th>
+                  <th class="px-4 py-3 text-center text-xs text-day-400">Status</th>
+                  <th class="px-4 py-3 text-center text-xs text-day-400">Upvotes</th>
+                  <th class="px-4 py-3 text-right text-xs text-day-400">Date</th>
                 </tr>
               </thead>
-              <tbody class="divide-night-400/10 divide-y">
+              <tbody class="divide-y divide-night-400/10">
                 {user.comments.map((comment) => (
                   <tr class="hover:bg-night-500/5">
-                    <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
+                    <td class="px-4 py-3 text-xs whitespace-nowrap text-day-300">
                       <a href={`/service/${comment.service.slug}`} class="text-blue-400 hover:underline">
                         {comment.service.name}
                       </a>
                     </td>
-                    <td class="text-day-300 px-4 py-3">
+                    <td class="px-4 py-3 text-day-300">
                       <p class="line-clamp-1">{comment.content}</p>
                     </td>
                     <td class="px-4 py-3 text-center">
-                      <span class="border-day-700/20 bg-night-800/30 text-day-300 inline-flex rounded-full border px-2 py-0.5 text-xs">
+                      <span class="inline-flex rounded-full border border-day-700/20 bg-night-800/30 px-2 py-0.5 text-xs text-day-300">
                         {comment.status}
                       </span>
                     </td>
-                    <td class="text-day-300 px-4 py-3 text-center text-xs">
+                    <td class="px-4 py-3 text-center text-xs text-day-300">
                       <span class="inline-flex items-center">
                         <Icon name="ri:thumb-up-line" class="mr-1 size-4" /> {comment.upvotes}
                       </span>
                     </td>
-                    <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
+                    <td class="px-4 py-3 text-right text-xs whitespace-nowrap text-day-400">
                       <TimeFormatted
                         date={comment.createdAt}
                         prefix={false}
@@ -752,9 +750,9 @@ const daysUntilDeletion = user.scheduledDeletionAt
 
     {
       user.karmaUnlocks.voteComments || user._count.commentVotes ? (
-        <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+        <section class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
           <header class="flex items-center justify-between">
-            <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+            <h2 class="mb-4 font-title text-xl font-bold text-day-200">
               <Icon name="ri:thumb-up-line" class="mr-2 inline-block size-5" />
               Recent Votes
             </h2>
@@ -765,19 +763,19 @@ const daysUntilDeletion = user.scheduledDeletionAt
             <p class="text-day-400">No votes yet.</p>
           ) : (
             <div class="overflow-x-auto">
-              <table class="divide-night-400/20 w-full min-w-full divide-y">
+              <table class="w-full min-w-full divide-y divide-night-400/20">
                 <thead>
                   <tr>
-                    <th class="text-day-400 px-4 py-3 text-left text-xs">Service</th>
-                    <th class="text-day-400 px-4 py-3 text-left text-xs">Comment</th>
-                    <th class="text-day-400 px-4 py-3 text-center text-xs">Vote</th>
-                    <th class="text-day-400 px-4 py-3 text-right text-xs">Date</th>
+                    <th class="px-4 py-3 text-left text-xs text-day-400">Service</th>
+                    <th class="px-4 py-3 text-left text-xs text-day-400">Comment</th>
+                    <th class="px-4 py-3 text-center text-xs text-day-400">Vote</th>
+                    <th class="px-4 py-3 text-right text-xs text-day-400">Date</th>
                   </tr>
                 </thead>
-                <tbody class="divide-night-400/10 divide-y">
+                <tbody class="divide-y divide-night-400/10">
                   {user.commentVotes.map((vote) => (
                     <tr class="hover:bg-night-500/5">
-                      <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
+                      <td class="px-4 py-3 text-xs whitespace-nowrap text-day-300">
                         <a
                           href={`/service/${vote.comment.service.slug}`}
                           class="text-blue-400 hover:underline"
@@ -785,7 +783,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                           {vote.comment.service.name}
                         </a>
                       </td>
-                      <td class="text-day-300 px-4 py-3">
+                      <td class="px-4 py-3 text-day-300">
                         <p class="line-clamp-1">{vote.comment.content}</p>
                       </td>
                       <td class="px-4 py-3 text-center">
@@ -799,7 +797,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                           </span>
                         )}
                       </td>
-                      <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
+                      <td class="px-4 py-3 text-right text-xs whitespace-nowrap text-day-400">
                         <TimeFormatted
                           date={vote.createdAt}
                           prefix={false}
@@ -815,14 +813,14 @@ const daysUntilDeletion = user.scheduledDeletionAt
           )}
         </section>
       ) : (
-        <section class="border-night-400 bg-night-400/5 flex flex-wrap items-center justify-between gap-2 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
-          <h2 class="font-title text-day-200 grow-9999 text-xl font-bold">
+        <section class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
+          <h2 class="grow-9999 font-title text-xl font-bold text-day-200">
             <Icon name="ri:thumb-up-line" class="mr-2 inline-block size-5" />
             Recent Votes
           </h2>
           <Tooltip
             text={`Get ${(karmaUnlocksById.voteComments.karma - user.totalKarma).toLocaleString()} more karma to unlock`}
-            class="text-day-500 inline-flex grow items-center justify-center gap-1"
+            class="inline-flex grow items-center justify-center gap-1 text-day-500"
           >
             <Icon name="ri:lock-line" class="inline-block size-5" />
             Locked
@@ -831,15 +829,15 @@ const daysUntilDeletion = user.scheduledDeletionAt
       )
     }
 
-    <section class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs">
+    <section class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
       <header class="flex items-center justify-between">
-        <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+        <h2 class="mb-4 font-title text-xl font-bold text-day-200">
           <Icon name="ri:lightbulb-line" class="mr-2 inline-block size-5" />
           Recent Suggestions
         </h2>
         <a
           href="/service-suggestion"
-          class="border-day-500/30 bg-day-500/10 text-day-400 hover:bg-day-500/20 focus:ring-day-500 inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm shadow-xs transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
+          class="inline-flex items-center gap-1 rounded-md border border-day-500/30 bg-day-500/10 px-3 py-1.5 text-sm text-day-400 shadow-xs transition-colors duration-200 hover:bg-day-500/20 focus:ring-2 focus:ring-day-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
         >
           View all
         </a>
@@ -850,23 +848,23 @@ const daysUntilDeletion = user.scheduledDeletionAt
           <p class="text-day-400">No suggestions yet.</p>
         ) : (
           <div class="overflow-x-auto">
-            <table class="divide-night-400/20 w-full min-w-full divide-y">
+            <table class="w-full min-w-full divide-y divide-night-400/20">
               <thead>
                 <tr>
-                  <th class="text-day-400 px-4 py-3 text-left text-xs">Service</th>
-                  <th class="text-day-400 px-4 py-3 text-left text-xs">Type</th>
-                  <th class="text-day-400 px-4 py-3 text-center text-xs">Status</th>
-                  <th class="text-day-400 px-4 py-3 text-right text-xs">Date</th>
+                  <th class="px-4 py-3 text-left text-xs text-day-400">Service</th>
+                  <th class="px-4 py-3 text-left text-xs text-day-400">Type</th>
+                  <th class="px-4 py-3 text-center text-xs text-day-400">Status</th>
+                  <th class="px-4 py-3 text-right text-xs text-day-400">Date</th>
                 </tr>
               </thead>
-              <tbody class="divide-night-400/10 divide-y">
+              <tbody class="divide-y divide-night-400/10">
                 {user.suggestions.map((suggestion) => {
                   const typeInfo = getServiceSuggestionTypeInfo(suggestion.type)
                   const statusInfo = getServiceSuggestionStatusInfo(suggestion.status)
 
                   return (
                     <tr class="hover:bg-night-500/5">
-                      <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
+                      <td class="px-4 py-3 text-xs whitespace-nowrap text-day-300">
                         <a
                           href={`/service-suggestion/${suggestion.id}`}
                           class="text-blue-400 hover:underline"
@@ -874,19 +872,19 @@ const daysUntilDeletion = user.scheduledDeletionAt
                           {suggestion.service.name}
                         </a>
                       </td>
-                      <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
+                      <td class="px-4 py-3 text-xs whitespace-nowrap text-day-300">
                         <span class="inline-flex items-center">
                           <Icon name={typeInfo.icon} class="mr-1 size-4" />
                           {typeInfo.label}
                         </span>
                       </td>
                       <td class="px-4 py-3 text-center">
-                        <span class="border-night-500/20 bg-night-800/10 inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
+                        <span class="inline-flex items-center rounded-full border border-night-500/20 bg-night-800/10 px-2 py-0.5 text-xs">
                           <Icon name={statusInfo.icon} class="mr-1 size-3" />
                           {statusInfo.label}
                         </span>
                       </td>
-                      <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
+                      <td class="px-4 py-3 text-right text-xs whitespace-nowrap text-day-400">
                         <TimeFormatted
                           date={suggestion.createdAt}
                           prefix={false}
@@ -905,11 +903,11 @@ const daysUntilDeletion = user.scheduledDeletionAt
     </section>
 
     <section
-      class="border-night-400 bg-night-400/5 rounded-lg border p-6 shadow-sm backdrop-blur-xs"
+      class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs"
       id="karma-transactions"
     >
       <header class="flex items-center justify-between">
-        <h2 class="font-title text-day-200 mb-4 text-xl font-bold">
+        <h2 class="mb-4 font-title text-xl font-bold text-day-200">
           <Icon name="ri:exchange-line" class="mr-2 inline-block size-5" />
           Recent Karma Transactions
         </h2>
@@ -921,21 +919,21 @@ const daysUntilDeletion = user.scheduledDeletionAt
           <p class="text-day-400">No karma transactions yet.</p>
         ) : (
           <div class="overflow-x-auto">
-            <table class="divide-night-400/20 w-full min-w-full divide-y">
+            <table class="w-full min-w-full divide-y divide-night-400/20">
               <thead>
                 <tr>
-                  <th class="text-day-400 px-4 py-3 text-left text-xs">Action</th>
-                  <th class="text-day-400 px-4 py-3 text-left text-xs">Description</th>
-                  <th class="text-day-400 px-4 py-3 text-right text-xs">Points</th>
-                  <th class="text-day-400 px-4 py-3 text-right text-xs">Date</th>
+                  <th class="px-4 py-3 text-left text-xs text-day-400">Action</th>
+                  <th class="px-4 py-3 text-left text-xs text-day-400">Description</th>
+                  <th class="px-4 py-3 text-right text-xs text-day-400">Points</th>
+                  <th class="px-4 py-3 text-right text-xs text-day-400">Date</th>
                 </tr>
               </thead>
-              <tbody class="divide-night-400/10 divide-y">
+              <tbody class="divide-y divide-night-400/10">
                 {user.karmaTransactions.map((transaction) => {
                   const actionInfo = getKarmaTransactionActionInfo(transaction.action)
                   return (
                     <tr class="hover:bg-night-500/5">
-                      <td class="text-day-300 px-4 py-3 text-xs whitespace-nowrap">
+                      <td class="px-4 py-3 text-xs whitespace-nowrap text-day-300">
                         <span class="inline-flex items-center gap-1">
                           <Icon name={actionInfo.icon} class="size-4" />
                           {actionInfo.label}
@@ -947,7 +945,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                           )}
                         </span>
                       </td>
-                      <td class="text-day-300 px-4 py-3">{transaction.description}</td>
+                      <td class="px-4 py-3 text-day-300">{transaction.description}</td>
                       <td
                         class={cn(
                           'px-4 py-3 text-right text-xs whitespace-nowrap',
@@ -957,7 +955,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                         {transaction.points >= 0 && '+'}
                         {transaction.points}
                       </td>
-                      <td class="text-day-400 px-4 py-3 text-right text-xs whitespace-nowrap">
+                      <td class="px-4 py-3 text-right text-xs whitespace-nowrap text-day-400">
                         <TimeFormatted
                           date={transaction.createdAt}
                           prefix={false}
@@ -980,7 +978,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
     <a
       href="/account/logout"
       data-astro-prefetch="tap"
-      class="border-day-500/30 bg-day-500/10 text-day-400 hover:bg-day-500/20 focus:ring-day-500 inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm shadow-xs transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
+      class="inline-flex items-center gap-1 rounded-md border border-day-500/30 bg-day-500/10 px-3 py-1.5 text-sm text-day-400 shadow-xs transition-colors duration-200 hover:bg-day-500/20 focus:ring-2 focus:ring-day-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
     >
       <Icon name="ri:logout-box-r-line" class="size-4" /> Logout
     </a>

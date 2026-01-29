@@ -50,7 +50,7 @@ const {
     '@container',
     // Check the scam filter when there is a text quey and the user has checked verified and approved
     'has-[input[name=q]:not(:placeholder-shown)]:has-[&_input[name=verification][value=verified]:checked]:has-[&_input[name=verification][value=approved]:checked]:[&_input[name=verification][value=scam]]:checkbox-force-checked',
-    'has-[input[name=q]:placeholder-shown]:[&_[data-hide-if-q-is-empty]]:hidden has-[input[name=q]:not(:placeholder-shown)]:[&_[data-hide-if-q-is-filled]]:hidden',
+    'has-[input[name=q]:placeholder-shown]:**:data-hide-if-q-is-empty:hidden has-[input[name=q]:not(:placeholder-shown)]:**:data-hide-if-q-is-filled:hidden',
     className
   )}
 >
@@ -65,13 +65,13 @@ const {
 
   <!-- Sort Selector -->
   <fieldset class="mb-6">
-    <legend class="font-title mb-3 leading-none text-green-500">
+    <legend class="mb-3 font-title leading-none text-green-500">
       <label for="sort">Sort By</label>
     </legend>
     <select
       name="sort"
       id="sort"
-      class="border-night-600 bg-night-900 w-full rounded-md border p-2 text-white focus:border-green-500 focus:outline-hidden"
+      class="w-full rounded-md border border-night-600 bg-night-900 p-2 text-white focus:border-green-500 focus:outline-hidden"
       data-trigger-on-change
     >
       {
@@ -82,11 +82,11 @@ const {
         ))
       }
     </select>
-    <p class="text-day-500 mt-1.5 text-center text-sm" data-hide-if-q-is-filled>
+    <p class="mt-1.5 text-center text-sm text-day-500" data-hide-if-q-is-filled>
       <Icon name="ri:shuffle-line" class="inline-block size-3.5 align-[-0.125em]" />
       Ties randomly sorted
     </p>
-    <p class="text-day-500 mt-1.5 text-center text-sm" data-hide-if-q-is-empty>
+    <p class="mt-1.5 text-center text-sm text-day-500" data-hide-if-q-is-empty>
       <Icon name="ri:seo-line" class="inline-block size-3.5 align-[-0.125em]" />
       Sorted by match first
     </p>
@@ -94,7 +94,7 @@ const {
 
   <!-- Text Search -->
   <fieldset class="mb-6">
-    <legend class="font-title mb-3 leading-none text-green-500">
+    <legend class="mb-3 font-title leading-none text-green-500">
       <label for="q">Name</label>
     </legend>
     <input
@@ -103,13 +103,13 @@ const {
       id="q"
       value={filters?.q}
       placeholder="Search..."
-      class="placeholder-day-500 border-night-600 bg-night-900 w-full rounded-md border p-2 text-white focus:border-green-500 focus:outline-hidden"
+      class="w-full rounded-md border border-night-600 bg-night-900 p-2 text-white placeholder-day-500 focus:border-green-500 focus:outline-hidden"
     />
   </fieldset>
 
   <!-- Type Filter -->
   <fieldset class="mb-6 min-w-0">
-    <legend class="font-title mb-3 leading-none text-green-500">Type</legend>
+    <legend class="mb-3 font-title leading-none text-green-500">Type</legend>
     <ul
       class="@2xs:grid @2xs:grid-cols-2 @max-2xs:[&:not(:has(~_*>.peer:checked))]:[&>li:not([data-show-always])]:hidden @2xs:[&:not(:has(~_*>.peer:checked))]:[&>li:not([data-show-always],[data-show-always-on-large])]:hidden"
     >
@@ -129,9 +129,9 @@ const {
                 data-trigger-on-change
               />
               <Icon name={category.icon} class="size-4 shrink-0" />
-              <span class="peer-checked:font-bold text-ellipsis whitespace-nowrap overflow-hidden">
+              <span class="truncate peer-checked:font-bold">
                 {category.name}
-                <span class="text-day-500 font-normal">{category._count.services}</span>
+                <span class="font-normal text-day-500">{category._count.services}</span>
               </span>
             </label>
           </li>
@@ -152,13 +152,13 @@ const {
           <input type="checkbox" id="show-more-categories" class="peer sr-only" hx-preserve />
           <label
             for="show-more-categories"
-            class="peer-focus-visible:ring-offset-night-700 mt-2 block cursor-pointer rounded-sm text-sm text-green-500 peer-checked:hidden peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2"
+            class="mt-2 block cursor-pointer rounded-sm text-sm text-green-500 peer-checked:hidden peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-night-700"
           >
             + Show more
           </label>
           <label
             for="show-more-categories"
-            class="peer-focus-visible:ring-offset-night-700 mt-2 hidden cursor-pointer rounded-sm text-sm text-green-500 peer-checked:block peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2"
+            class="mt-2 hidden cursor-pointer rounded-sm text-sm text-green-500 peer-checked:block peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-night-700"
           >
             - Show less
           </label>
@@ -169,7 +169,7 @@ const {
 
   <!-- Verification Filter -->
   <fieldset class="mb-6">
-    <legend class="font-title mb-3 leading-none text-green-500">Verification</legend>
+    <legend class="mb-3 font-title leading-none text-green-500">Verification</legend>
     <div>
       {
         options.verification.map((verification) => (
@@ -193,7 +193,7 @@ const {
   <div class="@2xs:grid @2xs:grid-cols-2">
     <!-- Network Filter -->
     <fieldset class="mb-6">
-      <legend class="font-title mb-3 leading-none text-green-500">Networks</legend>
+      <legend class="mb-3 font-title leading-none text-green-500">Networks</legend>
       <div>
         {
           options.network.map((network) => (
@@ -251,14 +251,14 @@ const {
 
   <!-- KYC Level Filter -->
   <fieldset class="mb-6">
-    <legend class="font-title mb-3 leading-none text-green-500">KYC Level</legend>
+    <legend class="mb-3 font-title leading-none text-green-500">KYC Level</legend>
     <div class="">
       {
         options.kycLevels.map((level) => (
           <label class="group flex cursor-pointer items-start gap-2 rounded-lg py-1 text-sm text-white first:pt-0 last:pb-0">
             <input
               type="radio"
-              class="peer group-has-[~_*_input:checked]:checkbox-force-checked row-span-2 text-green-500"
+              class="peer row-span-2 text-green-500 group-has-[~_*_input:checked]:checkbox-force-checked"
               name="max-kyc"
               value={level.value}
               checked={(filters['max-kyc'] ?? 4) === level.value}
@@ -267,7 +267,7 @@ const {
             <Icon name={level.icon} class="size-4" />
             <span class="leading-none text-balance group-has-[~_*_input:checked]:font-bold peer-checked:font-bold">
               {level.name}
-              <span class="text-day-500 ml-0.5 font-normal whitespace-nowrap">lvl. {level.value}</span>
+              <span class="ml-0.5 font-normal whitespace-nowrap text-day-500">lvl. {level.value}</span>
             </span>
           </label>
         ))
@@ -277,7 +277,7 @@ const {
 
   <!-- User Score Filter -->
   <fieldset class="mb-6">
-    <legend class="font-title mb-3 leading-none text-green-500">
+    <legend class="mb-3 font-title leading-none text-green-500">
       <label for="user-rating">User Rating (min)</label>
     </legend>
     <div class="flex items-center gap-2">
@@ -292,7 +292,7 @@ const {
         data-trigger-on-change
       />
     </div>
-    <div class="text-day-400 mt-1 flex justify-between px-2 text-xs">
+    <div class="mt-1 flex justify-between px-2 text-xs text-day-400">
       <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">-</span>
       <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">
         1<Icon name="ri:star-line" class="size-3 shrink-0" />
@@ -326,7 +326,7 @@ const {
     {
       options.attributesByCategory.map(({ categoryInfo, attributes }) => (
         <fieldset class="min-w-0">
-          <legend class="font-title mb-0.5 inline-flex items-center gap-1 text-[0.8125rem] tracking-wide text-white uppercase">
+          <legend class="mb-0.5 inline-flex items-center gap-1 font-title text-[0.8125rem] tracking-wide text-white uppercase">
             <Icon
               name={categoryInfo.icon}
               class={cn('size-4 shrink-0 opacity-80', categoryInfo.classNames.icon)}
@@ -384,7 +384,7 @@ const {
 
                     <label
                       for={yesId}
-                      class="border-night-500 bg-night-600 relative flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-l-sm border border-r-0 peer-checked/yes:hidden before:absolute before:-inset-[3px] before:-right-[0.5px]"
+                      class="relative flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-l-sm border border-r-0 border-night-500 bg-night-600 peer-checked/yes:hidden before:absolute before:-inset-[3px] before:-right-[0.5px]"
                       aria-hidden="true"
                     >
                       <Icon name="ri:check-line" class="size-3" />
@@ -398,13 +398,13 @@ const {
                     </label>
 
                     <span
-                      class="bg-night-400 border-night-500 before:bg-night-400 before:border-night-600 pointer-events-none block h-4 w-px border-y peer-checked/no:w-[0.5px] peer-checked/yes:w-[0.5px] before:h-full before:w-px before:border-y-2"
+                      class="pointer-events-none block h-4 w-px border-y border-night-500 bg-night-400 peer-checked/no:w-[0.5px] peer-checked/yes:w-[0.5px] before:h-full before:w-px before:border-y-2 before:border-night-600 before:bg-night-400"
                       aria-hidden="true"
                     />
 
                     <label
                       for={noId}
-                      class="border-night-500 bg-night-600 relative flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-r-sm border border-l-0 peer-checked/no:hidden before:absolute before:-inset-[3px] before:-left-[0.5px]"
+                      class="relative flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-r-sm border border-l-0 border-night-500 bg-night-600 peer-checked/no:hidden before:absolute before:-inset-[3px] before:-left-[0.5px]"
                       aria-hidden="true"
                     >
                       <Icon name="ri:close-line" class="size-3" />
@@ -427,13 +427,10 @@ const {
                         class={cn('mr-2 size-3 shrink-0 opacity-80', attribute.typeInfo.classNames.icon)}
                         aria-hidden="true"
                       />
-                      <span
-                        class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-                        title={attribute.title}
-                      >
+                      <span class="flex-1 truncate" title={attribute.title}>
                         {attribute.title}
                       </span>
-                      <span class="text-day-500 ml-2 font-normal">{attribute._count.services}</span>
+                      <span class="ml-2 font-normal text-day-500">{attribute._count.services}</span>
                     </label>
                     <label
                       for={emptyId}
@@ -445,13 +442,10 @@ const {
                         class={cn('mr-2 size-3 shrink-0 opacity-100', attribute.typeInfo.classNames.icon)}
                         aria-hidden="true"
                       />
-                      <span
-                        class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-                        title={attribute.title}
-                      >
+                      <span class="flex-1 truncate" title={attribute.title}>
                         {attribute.title}
                       </span>
-                      <span class="text-day-500 ml-2 font-normal">{attribute._count.services}</span>
+                      <span class="ml-2 font-normal text-day-500">{attribute._count.services}</span>
                     </label>
                   </fieldset>
                 </li>
@@ -469,13 +463,13 @@ const {
               />
               <label
                 for={`show-more-attributes-${categoryInfo.slug}`}
-                class="peer-focus-visible:ring-offset-night-700 mt-2 block cursor-pointer rounded-sm text-sm text-green-500 peer-checked:hidden peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2"
+                class="mt-2 block cursor-pointer rounded-sm text-sm text-green-500 peer-checked:hidden peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-night-700"
               >
                 + Show more
               </label>
               <label
                 for={`show-more-attributes-${categoryInfo.slug}`}
-                class="peer-focus-visible:ring-offset-night-700 mt-2 hidden cursor-pointer rounded-sm text-sm text-green-500 peer-checked:block peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2"
+                class="mt-2 hidden cursor-pointer rounded-sm text-sm text-green-500 peer-checked:block peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-night-700"
               >
                 - Show less
               </label>
@@ -488,7 +482,7 @@ const {
 
   <!-- Score Filter -->
   <fieldset class="mb-6">
-    <legend class="font-title mb-3 leading-none text-green-500">
+    <legend class="mb-3 font-title leading-none text-green-500">
       <label for="min-score">Score (min)</label>
     </legend>
     <div class="flex items-center gap-2">
@@ -527,7 +521,7 @@ const {
   <input type="hidden" name="sort-seed" value={filters['sort-seed']} />
 
   <div
-    class="sm:js:hidden bg-night-700 sticky inset-x-0 bottom-0 mt-4 block rounded-t-md pb-4 shadow-[0_0_16px_16px_var(--color-night-700)]"
+    class="sticky inset-x-0 bottom-0 mt-4 block rounded-t-md bg-night-700 pb-4 shadow-[0_0_16px_16px_var(--color-night-700)] sm:js:hidden"
   >
     <Button type="submit" label="Apply" size="lg" class="w-full" color="success" shadow />
   </div>

@@ -43,7 +43,7 @@ const { data: filters } = zodParseQueryParamsStoringErrors(
       .enum(['service', 'status', 'type', 'user', 'createdAt', 'messageCount'])
       .default('createdAt'),
     'sort-order': z.enum(['asc', 'desc']).default('desc'),
-    'page': z.coerce.number().int().positive().default(1),
+    page: z.coerce.number().int().positive().default(1),
     'page-size': z.enum(['25', '50', '100']).default('25'),
     'priority-page': z.coerce.number().int().positive().default(1),
   },
@@ -180,7 +180,7 @@ const suggestionCount = suggestionsWithDetails.length
 
 // Pagination
 const pageSize = parseInt(filters['page-size'])
-const currentPage = filters['page']
+const currentPage = filters.page
 const priorityCurrentPage = filters['priority-page']
 
 // Priority suggestions pagination
@@ -232,11 +232,11 @@ const makePageSizeUrl = (size: string) => {
     <div class="mt-2 flex items-center gap-4 sm:mt-0">
       <span class="text-sm text-zinc-400">
         {suggestionCount} suggestions
-        {prioritySuggestions.length > 0 && (
-          <span class="ml-2 text-amber-400">
-            ({prioritySuggestions.length} priority)
-          </span>
-        )}
+        {
+          prioritySuggestions.length > 0 && (
+            <span class="ml-2 text-amber-400">({prioritySuggestions.length} priority)</span>
+          )
+        }
       </span>
     </div>
   </div>
@@ -302,7 +302,7 @@ const makePageSizeUrl = (size: string) => {
       </div>
     </form>
     <div class="mt-3 flex items-center justify-between border-t border-zinc-700 pt-3">
-      <label class="text-xs font-medium text-zinc-400">Page size:</label>
+      <span class="text-xs font-medium text-zinc-400">Page size:</span>
       <div class="flex gap-1">
         {
           ['25', '50', '100'].map((size) => (
@@ -324,8 +324,8 @@ const makePageSizeUrl = (size: string) => {
 
   {
     prioritySuggestions.length > 0 && (
-      <div class="mb-6 rounded-lg border border-amber-600/50 bg-gradient-to-br from-amber-900/20 to-orange-900/20 shadow-xl">
-        <div class="sticky top-0 z-10 border-b border-amber-700/50 bg-gradient-to-r from-amber-800/90 to-orange-800/90 px-4 py-3 backdrop-blur-sm">
+      <div class="mb-6 rounded-lg border border-amber-600/50 bg-linear-to-br from-amber-900/20 to-orange-900/20 shadow-xl">
+        <div class="sticky top-0 z-10 border-b border-amber-700/50 bg-linear-to-r from-amber-800/90 to-orange-800/90 px-4 py-3 backdrop-blur-sm">
           <div class="flex items-center gap-2">
             <Icon name="ri:star-fill" class="size-5 text-amber-400" />
             <h2 class="font-title font-semibold text-amber-300">
@@ -342,7 +342,7 @@ const makePageSizeUrl = (size: string) => {
             <span>Scroll horizontally to see more →</span>
           </div>
         </div>
-        <div class="scrollbar-thin max-w-full overflow-x-auto">
+        <div class="max-w-full overflow-x-auto">
           <div class="min-w-[900px]">
             <table class="w-full divide-y divide-amber-700/30">
               <thead class="bg-amber-950/30">
@@ -350,29 +350,46 @@ const makePageSizeUrl = (size: string) => {
                   <th class="w-[20%] px-4 py-3 text-left text-xs font-medium tracking-wider text-amber-300 uppercase">
                     <a href={makeSortUrl('service')} class="flex items-center hover:text-amber-200">
                       Service{' '}
-                      <SortArrowIcon active={filters['sort-by'] === 'service'} sortOrder={filters['sort-order']} />
+                      <SortArrowIcon
+                        active={filters['sort-by'] === 'service'}
+                        sortOrder={filters['sort-order']}
+                      />
                     </a>
                   </th>
                   <th class="w-[12%] px-4 py-3 text-left text-xs font-medium tracking-wider text-amber-300 uppercase">
                     <a href={makeSortUrl('user')} class="flex items-center hover:text-amber-200">
-                      User <SortArrowIcon active={filters['sort-by'] === 'user'} sortOrder={filters['sort-order']} />
+                      User{' '}
+                      <SortArrowIcon
+                        active={filters['sort-by'] === 'user'}
+                        sortOrder={filters['sort-order']}
+                      />
                     </a>
                   </th>
                   <th class="w-[10%] px-4 py-3 text-left text-xs font-medium tracking-wider text-amber-300 uppercase">
                     <a href={makeSortUrl('type')} class="flex items-center hover:text-amber-200">
-                      Type <SortArrowIcon active={filters['sort-by'] === 'type'} sortOrder={filters['sort-order']} />
+                      Type{' '}
+                      <SortArrowIcon
+                        active={filters['sort-by'] === 'type'}
+                        sortOrder={filters['sort-order']}
+                      />
                     </a>
                   </th>
                   <th class="w-[13%] px-4 py-3 text-left text-xs font-medium tracking-wider text-amber-300 uppercase">
                     <a href={makeSortUrl('status')} class="flex items-center hover:text-amber-200">
                       Status{' '}
-                      <SortArrowIcon active={filters['sort-by'] === 'status'} sortOrder={filters['sort-order']} />
+                      <SortArrowIcon
+                        active={filters['sort-by'] === 'status'}
+                        sortOrder={filters['sort-order']}
+                      />
                     </a>
                   </th>
                   <th class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-amber-300 uppercase">
                     <a href={makeSortUrl('createdAt')} class="flex items-center hover:text-amber-200">
                       Created{' '}
-                      <SortArrowIcon active={filters['sort-by'] === 'createdAt'} sortOrder={filters['sort-order']} />
+                      <SortArrowIcon
+                        active={filters['sort-by'] === 'createdAt'}
+                        sortOrder={filters['sort-order']}
+                      />
                     </a>
                   </th>
                   <th class="w-[10%] px-4 py-3 text-center text-xs font-medium tracking-wider text-amber-300 uppercase">
@@ -406,7 +423,7 @@ const makePageSizeUrl = (size: string) => {
                         </a>
                       </div>
                       <div
-                        class="text-2xs max-w-[220px] truncate text-zinc-500"
+                        class="max-w-[220px] truncate text-2xs text-zinc-500"
                         title={suggestion.service.description}
                       >
                         {suggestion.service.description}
@@ -474,8 +491,8 @@ const makePageSizeUrl = (size: string) => {
           <div class="border-t border-amber-700/50 bg-amber-950/20 px-4 py-3">
             <div class="flex items-center justify-between">
               <div class="text-xs text-amber-200/80">
-                Showing {priorityStartIndex + 1} to {Math.min(priorityEndIndex, prioritySuggestions.length)} of{' '}
-                {prioritySuggestions.length} priority suggestions
+                Showing {priorityStartIndex + 1} to {Math.min(priorityEndIndex, prioritySuggestions.length)}{' '}
+                of {prioritySuggestions.length} priority suggestions
               </div>
               <div class="flex gap-1">
                 {priorityValidPage > 1 && (
@@ -549,7 +566,7 @@ const makePageSizeUrl = (size: string) => {
             <span>Scroll horizontally to see more →</span>
           </div>
         </div>
-        <div class="scrollbar-thin max-w-full overflow-x-auto">
+        <div class="max-w-full overflow-x-auto">
           <div class="min-w-[900px]">
             <table class="w-full divide-y divide-zinc-700">
               <thead class="bg-zinc-900/30">
@@ -557,29 +574,46 @@ const makePageSizeUrl = (size: string) => {
                   <th class="w-[20%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase">
                     <a href={makeSortUrl('service')} class="flex items-center hover:text-zinc-200">
                       Service{' '}
-                      <SortArrowIcon active={filters['sort-by'] === 'service'} sortOrder={filters['sort-order']} />
+                      <SortArrowIcon
+                        active={filters['sort-by'] === 'service'}
+                        sortOrder={filters['sort-order']}
+                      />
                     </a>
                   </th>
                   <th class="w-[12%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase">
                     <a href={makeSortUrl('user')} class="flex items-center hover:text-zinc-200">
-                      User <SortArrowIcon active={filters['sort-by'] === 'user'} sortOrder={filters['sort-order']} />
+                      User{' '}
+                      <SortArrowIcon
+                        active={filters['sort-by'] === 'user'}
+                        sortOrder={filters['sort-order']}
+                      />
                     </a>
                   </th>
                   <th class="w-[10%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase">
                     <a href={makeSortUrl('type')} class="flex items-center hover:text-zinc-200">
-                      Type <SortArrowIcon active={filters['sort-by'] === 'type'} sortOrder={filters['sort-order']} />
+                      Type{' '}
+                      <SortArrowIcon
+                        active={filters['sort-by'] === 'type'}
+                        sortOrder={filters['sort-order']}
+                      />
                     </a>
                   </th>
                   <th class="w-[13%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase">
                     <a href={makeSortUrl('status')} class="flex items-center hover:text-zinc-200">
                       Status{' '}
-                      <SortArrowIcon active={filters['sort-by'] === 'status'} sortOrder={filters['sort-order']} />
+                      <SortArrowIcon
+                        active={filters['sort-by'] === 'status'}
+                        sortOrder={filters['sort-order']}
+                      />
                     </a>
                   </th>
                   <th class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase">
                     <a href={makeSortUrl('createdAt')} class="flex items-center hover:text-zinc-200">
                       Created{' '}
-                      <SortArrowIcon active={filters['sort-by'] === 'createdAt'} sortOrder={filters['sort-order']} />
+                      <SortArrowIcon
+                        active={filters['sort-by'] === 'createdAt'}
+                        sortOrder={filters['sort-order']}
+                      />
                     </a>
                   </th>
                   <th class="w-[10%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase">
@@ -613,7 +647,7 @@ const makePageSizeUrl = (size: string) => {
                         </a>
                       </div>
                       <div
-                        class="text-2xs max-w-[220px] truncate text-zinc-500"
+                        class="max-w-[220px] truncate text-2xs text-zinc-500"
                         title={suggestion.service.description}
                       >
                         {suggestion.service.description}
@@ -761,27 +795,5 @@ const makePageSizeUrl = (size: string) => {
   .text-2xs {
     font-size: 0.6875rem;
     line-height: 1rem;
-  }
-  .scrollbar-thin::-webkit-scrollbar {
-    height: 6px;
-    width: 6px;
-  }
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: rgba(30, 41, 59, 0.2);
-    border-radius: 3px;
-  }
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: rgba(75, 85, 99, 0.5);
-    border-radius: 3px;
-  }
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: rgba(100, 116, 139, 0.6);
-  }
-  @media (max-width: 768px) {
-    .scrollbar-thin {
-      scrollbar-width: thin;
-      scrollbar-color: rgba(75, 85, 99, 0.5) rgba(30, 41, 59, 0.2);
-      -webkit-overflow-scrolling: touch;
-    }
   }
 </style>

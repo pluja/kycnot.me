@@ -1,7 +1,9 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import type { Assert } from '../lib/assert'
 import type { Currency } from '@prisma/client'
+import type { Equals } from 'ts-toolbelt/out/Any/Equals'
 
 type CurrencyInfo<T extends string | null | undefined = string> = {
   id: T
@@ -59,3 +61,5 @@ export const {
     },
   ] as const satisfies CurrencyInfo<Currency>[]
 )
+
+type _ExpectToHaveAllValues = Assert<Equals<(typeof currencies)[number]['id'], Currency>>

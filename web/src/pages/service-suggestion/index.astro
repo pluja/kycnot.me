@@ -103,9 +103,9 @@ const success = !!createResult && !createResult.error
   ]}
 >
   <div
-    class="xs:flex-row xs:flex-wrap xs:justify-between mb-8 flex flex-col items-center justify-center gap-4 text-center sm:mt-8"
+    class="mb-8 flex flex-col items-center justify-center gap-4 text-center xs:flex-row xs:flex-wrap xs:justify-between sm:mt-8"
   >
-    <h1 class="font-title text-day-100 text-3xl">Service suggestions</h1>
+    <h1 class="font-title text-3xl text-day-100">Service suggestions</h1>
     <Button as="a" href="/service-suggestion/new" label="Create" icon="ri:add-line" />
   </div>
 
@@ -119,7 +119,7 @@ const success = !!createResult && !createResult.error
   }
 
   <div class="mb-6">
-    <div class="text-day-200 mb-2 font-medium">Filter by:</div>
+    <div class="mb-2 font-medium text-day-200">Filter by:</div>
     <div class="flex flex-wrap gap-2">
       {
         serviceSuggestionTypes.map((type) => (
@@ -174,7 +174,7 @@ const success = !!createResult && !createResult.error
                   as="span"
                   text={statusInfo.label}
                   class={cn(
-                    'border-night-500 bg-night-800 box-content inline-flex h-8 items-center justify-center gap-1 rounded-full border px-2'
+                    'box-content inline-flex h-8 items-center justify-center gap-1 rounded-full border border-night-500 bg-night-800 px-2'
                   )}
                   classNames={{ tooltip: 'md:hidden!' }}
                 >

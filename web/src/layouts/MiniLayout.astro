@@ -29,20 +29,20 @@ const { layoutHeader, size = 'xs', ...baseLayoutProps } = Astro.props
   {...baseLayoutProps}
 >
   <div
-    class={cn('bg-night-800 border-night-500 contents w-full rounded-xl border p-8', {
+    class={cn('contents w-full rounded-xl border border-night-500 bg-night-800 p-8', {
       'xs:block xs:max-w-screen-xs': size === 'xs',
       'md:block md:max-w-3xl': size === 'md',
     })}
   >
-    <div class="bg-day-200 mx-auto flex size-12 items-center justify-center rounded-lg">
-      <Icon name={layoutHeader.icon} class="text-night-800 size-8" />
+    <div class="mx-auto flex size-12 items-center justify-center rounded-lg bg-day-200">
+      <Icon name={layoutHeader.icon} class="size-8 text-night-800" />
     </div>
 
     <h1
       class={cn(
-        'font-title text-day-200 mt-1 text-center text-3xl font-semibold',
+        'mt-1 text-center font-title text-3xl font-semibold text-day-200',
         !layoutHeader.subtitle && {
-          'xs:mb-8 mb-6': size === 'xs',
+          'mb-6 xs:mb-8': size === 'xs',
           'mb-6 md:mb-8': size === 'md',
         }
       )}
@@ -52,7 +52,7 @@ const { layoutHeader, size = 'xs', ...baseLayoutProps } = Astro.props
     {
       !!layoutHeader.subtitle && (
         <p
-          class={cn('text-day-500 mt-1 mb-6 text-center', {
+          class={cn('mt-1 mb-6 text-center text-day-500', {
             'xs:mb-8': size === 'xs',
             'md:mb-8': size === 'md',
           })}

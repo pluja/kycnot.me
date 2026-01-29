@@ -57,7 +57,7 @@ const { class: className, ...htmlProps } = Astro.props
 ---
 
 <footer
-  class={cn('xs:gap-x-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 p-4', className)}
+  class={cn('flex flex-wrap items-center justify-center gap-x-3 gap-y-2 p-4 xs:gap-x-6', className)}
   {...htmlProps}
 >
   {
@@ -68,9 +68,9 @@ const { class: className, ...htmlProps } = Astro.props
             href={href}
             target={external ? '_blank' : undefined}
             rel={external ? 'noopener noreferrer' : undefined}
-            class="text-day-500 xs:gap-1 flex items-center gap-0.5 text-sm transition-colors hover:text-gray-200 hover:underline"
+            class="flex items-center gap-0.5 text-sm text-day-500 transition-colors hover:text-gray-200 hover:underline xs:gap-1"
           >
-            <Icon name={icon} class="xs:opacity-100 h-4 w-4 opacity-40" />
+            <Icon name={icon} class="size-4 opacity-40 xs:opacity-100" />
             {label}
           </a>
         )

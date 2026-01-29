@@ -27,7 +27,7 @@ const { label, icon, class: className, classNames, ...htmlProps } = Astro.props
 <div class={cn('group/dropdown relative', className)} {...htmlProps}>
   <Button
     class={cn(
-      'group-hover/dropdown:bg-night-900 group-focus-within/dropdown:bg-night-900 group-focus-within/dropdown:text-day-200 group-hover/dropdown:text-day-200',
+      'group-focus-within/dropdown:bg-night-900 group-focus-within/dropdown:text-day-200 group-hover/dropdown:bg-night-900 group-hover/dropdown:text-day-200',
       classNames?.button
     )}
     icon={icon}
@@ -47,7 +47,7 @@ const { label, icon, class: className, classNames, ...htmlProps } = Astro.props
   />
 
   <div
-    class="border-night-500 bg-night-900 absolute right-0 z-50 mt-1 hidden w-48 items-stretch rounded-md border py-1 shadow-lg group-focus-within/dropdown:block group-hover/dropdown:block before:absolute before:-inset-x-px before:bottom-[calc(100%-1*var(--spacing))] before:box-content before:h-2 before:pb-px"
+    class="absolute right-0 z-50 mt-1 hidden w-48 items-stretch rounded-md border border-night-500 bg-night-900 py-1 shadow-lg group-focus-within/dropdown:block group-hover/dropdown:block before:absolute before:-inset-x-px before:bottom-[calc(100%-1*var(--spacing))] before:box-content before:h-2 before:pb-px"
     role="menu"
     aria-orientation="vertical"
     aria-labelledby={buttonId}

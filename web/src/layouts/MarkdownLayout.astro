@@ -53,9 +53,9 @@ const ogImageTemplateData = {
     ...(schemas ?? []),
   ]}
 >
-  <div class="bg-dots-fade absolute inset-x-0 top-0 -z-1 h-128 opacity-15"></div>
+  <div class="custom-bg-dots-fade absolute inset-x-0 top-0 -z-1 h-128 opacity-15"></div>
   <div
-    class="prose prose-invert prose-headings:text-green-400 prose-h1:text-[2.5rem] prose-h1:font-bold prose-h1:my-8 prose-h1:drop-shadow-[0_0_10px_rgba(0,255,0,0.3)] prose-h2:text-green-500 prose-h2:text-[1.8rem] prose-h2:font-semibold prose-h2:my-6 prose-h2:border-b prose-h2:border-green-900 prose-h2:pb-1 prose-h3:text-green-600 prose-h3:text-[1.4rem] prose-h3:font-semibold prose-h3:my-4 prose-h4:text-green-700 prose-h4:text-[1.2rem] prose-h4:font-semibold prose-h4:my-3 prose-strong:font-semibold prose-strong:drop-shadow-[0_0_5px_rgba(0,255,0,0.2)] prose-p:text-gray-300 prose-p:my-4 prose-p:leading-relaxed prose-a:text-green-400 prose-a:no-underline prose-a:transition-all prose-a:border-b prose-a:border-green-900 prose-a:hover:text-green-400 prose-a:hover:drop-shadow-[0_0_8px_rgba(0,255,0,0.4)] prose-a:hover:border-green-400 prose-ul:text-gray-300 prose-ol:text-gray-300 prose-li:my-2 prose-li:leading-relaxed mx-auto"
+    class="mx-auto prose prose-invert prose-headings:text-green-400 prose-h1:my-8 prose-h1:text-[2.5rem] prose-h1:font-bold prose-h1:drop-shadow-[0_0_10px_rgba(0,255,0,0.3)] prose-h2:my-6 prose-h2:border-b prose-h2:border-green-900 prose-h2:pb-1 prose-h2:text-[1.8rem] prose-h2:font-semibold prose-h2:text-green-500 prose-h3:my-4 prose-h3:text-[1.4rem] prose-h3:font-semibold prose-h3:text-green-600 prose-h4:my-3 prose-h4:text-[1.2rem] prose-h4:font-semibold prose-h4:text-green-700 prose-p:my-4 prose-p:leading-relaxed prose-p:text-gray-300 prose-a:border-b prose-a:border-green-900 prose-a:text-green-400 prose-a:no-underline prose-a:transition-all prose-a:hover:border-green-400 prose-a:hover:text-green-400 prose-a:hover:drop-shadow-[0_0_8px_rgba(0,255,0,0.4)] prose-strong:font-semibold prose-strong:drop-shadow-[0_0_5px_rgba(0,255,0,0.2)] prose-ol:text-gray-300 prose-ul:text-gray-300 prose-li:my-2 prose-li:leading-relaxed"
   >
     <h1 class="mb-0!">{frontmatter.title}</h1>
     {
@@ -71,7 +71,7 @@ const ogImageTemplateData = {
 </BaseLayout>
 
 <style>
-  .bg-dots-fade {
+  .custom-bg-dots-fade {
     background:
       radial-gradient(closest-side, #777, #fff) 0/ 1em 1em space,
       linear-gradient(to bottom, #888, #fff);

@@ -164,7 +164,7 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
   }}
   htmx
 >
-  <h1 class="font-title mb-6 block text-center text-2xl font-bold text-white sm:hidden">
+  <h1 class="mb-6 block text-center font-title text-2xl font-bold text-white sm:hidden">
     Service Events Timeline
   </h1>
   <form
@@ -187,7 +187,7 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
         <Icon
           id="search-indicator"
           name="ri:loader-2-line"
-          class="htmx-request:inline-block hidden size-5 animate-spin align-[-0.1em] text-green-500"
+          class="hidden size-5 animate-spin align-[-0.1em] text-green-500 htmx-request:inline-block"
         />
       </h2>
 
@@ -246,11 +246,11 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
       }
     </select>
 
-    <Button type="submit" label="Apply" size="lg" class="sm:js:hidden mt-6 w-full" color="success" shadow />
+    <Button type="submit" label="Apply" size="lg" class="mt-6 w-full sm:js:hidden" color="success" shadow />
   </form>
 
   <div class="flex-1" id="events-list-container" data-has-default-filters={hasDefaultFilters}>
-    <h1 class="font-title mb-3 hidden text-2xl font-bold text-white sm:block">Service Events Timeline</h1>
+    <h1 class="mb-3 hidden font-title text-2xl font-bold text-white sm:block">Service Events Timeline</h1>
 
     <!-- Active filters -->
     {
@@ -375,8 +375,8 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
                 <div class="w-0.5 flex-1 bg-zinc-600" />
               </div>
 
-              <div class="xs:pb-12 -mt-0.5 flex-1 pb-8">
-                <h3 class="font-title min-h-5 flex-1 text-lg leading-tight font-semibold text-pretty text-white">
+              <div class="-mt-0.5 flex-1 pb-8 xs:pb-12">
+                <h3 class="min-h-5 flex-1 font-title text-lg/tight font-semibold text-pretty text-white">
                   {event.title}
                 </h3>
 
@@ -452,9 +452,9 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
 
           {!hasMorePages && (
             <div class="flex min-h-8 items-center gap-2" data-hx-event-item>
-              <div class="flex w-5 flex-shrink-0 flex-col items-center self-stretch">
+              <div class="flex w-5 shrink-0 flex-col items-center self-stretch">
                 <div class="w-0.5 flex-1 bg-zinc-600" />
-                <div class="size-2 flex-shrink-0 rounded-full bg-zinc-600" />
+                <div class="size-2 shrink-0 rounded-full bg-zinc-600" />
                 <div class="flex-1" />
               </div>
               <p class="flex-1 text-xs text-zinc-400 italic">
@@ -468,18 +468,18 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
           )}
 
           <div
-            class="no-js:hidden htmx-request:flex hidden min-h-8 items-center gap-2"
+            class="hidden min-h-8 items-center gap-2 htmx-request:flex no-js:hidden"
             id="infinite-scroll-indicator"
           >
-            <div class="flex w-5 flex-shrink-0 flex-col items-center self-stretch">
-              <div class="w-0.5 flex-1 bg-gradient-to-b from-zinc-600 to-transparent" />
+            <div class="flex w-5 shrink-0 flex-col items-center self-stretch">
+              <div class="w-0.5 flex-1 bg-linear-to-b from-zinc-600 to-transparent" />
             </div>
             <p class="flex-1 animate-pulse text-xs text-zinc-400 italic">Loading more events...</p>
           </div>
 
-          <div class="no-js:flex hidden min-h-8 items-center gap-2" id="infinite-scroll-indicator">
-            <div class="flex w-5 flex-shrink-0 flex-col items-center self-stretch">
-              <div class="w-0.5 flex-1 bg-gradient-to-b from-zinc-600 to-transparent" />
+          <div class="hidden min-h-8 items-center gap-2 no-js:flex" id="infinite-scroll-indicator">
+            <div class="flex w-5 shrink-0 flex-col items-center self-stretch">
+              <div class="w-0.5 flex-1 bg-linear-to-b from-zinc-600 to-transparent" />
             </div>
             <p class="flex-1 text-xs text-zinc-400 italic">Enable JavaScript to load more events</p>
           </div>

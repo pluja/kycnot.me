@@ -1,8 +1,10 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import type { Assert } from '../lib/assert'
 import type { TailwindColor } from '../lib/colors'
 import type { ServiceUserRole } from '@prisma/client'
+import type { Equals } from 'ts-toolbelt/out/Any/Equals'
 
 type ServiceUserRoleInfo<T extends string | null | undefined = string> = {
   value: T
@@ -21,7 +23,7 @@ export const {
   'value',
   (value): ServiceUserRoleInfo<typeof value> => ({
     value,
-    slug: value ? value.toLowerCase() : '',
+    slug: value ? value.toLowerCase().replace('_', '-') : '',
     label: value ? transformCase(value, 'title').replace('_', ' ') : String(value),
     icon: 'ri:user-3-line',
     order: Infinity,
@@ -70,3 +72,5 @@ export const {
     },
   ] as const satisfies ServiceUserRoleInfo<ServiceUserRole>[]
 )
+
+type _ExpectToHaveAllValues = Assert<Equals<(typeof serviceUserRoles)[number]['value'], ServiceUserRole>>

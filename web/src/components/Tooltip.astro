@@ -36,7 +36,7 @@ const {
         aria-hidden="true"
         class={cn(
           'pointer-events-none hidden select-none group-hover/tooltip:flex',
-          'ease-out-cubic scale-75 opacity-0 transition-all transition-discrete duration-100 group-hover/tooltip:scale-100 group-hover/tooltip:opacity-100 starting:group-hover/tooltip:scale-75 starting:group-hover/tooltip:opacity-0',
+          'scale-75 opacity-0 transition-all transition-discrete duration-100 ease-out-cubic group-hover/tooltip:scale-100 group-hover/tooltip:opacity-100 starting:group-hover/tooltip:scale-75 starting:group-hover/tooltip:opacity-0',
           'z-1000 w-max max-w-sm rounded-lg px-3 py-2 font-sans text-sm font-normal tracking-normal text-pretty wrap-anywhere whitespace-pre-wrap',
           // Position classes
           {
@@ -51,13 +51,13 @@ const {
           },
           // Arrow position classes
           {
-            'after:absolute after:top-[100%] after:left-1/2 after:-translate-x-1/2 after:border-8 after:border-x-transparent after:border-b-transparent after:content-[""]':
+            'after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-8 after:border-x-transparent after:border-b-transparent after:content-[""]':
               position === 'top',
-            'after:absolute after:bottom-[100%] after:left-1/2 after:-translate-x-1/2 after:border-8 after:border-x-transparent after:border-t-transparent after:content-[""]':
+            'after:absolute after:bottom-full after:left-1/2 after:-translate-x-1/2 after:border-8 after:border-x-transparent after:border-t-transparent after:content-[""]':
               position === 'bottom',
-            'after:absolute after:top-1/2 after:left-[100%] after:-translate-y-1/2 after:border-8 after:border-y-transparent after:border-r-transparent after:content-[""]':
+            'after:absolute after:top-1/2 after:left-full after:-translate-y-1/2 after:border-8 after:border-y-transparent after:border-r-transparent after:content-[""]':
               position === 'left',
-            'after:absolute after:top-1/2 after:right-[100%] after:-translate-y-1/2 after:border-8 after:border-y-transparent after:border-l-transparent after:content-[""]':
+            'after:absolute after:top-1/2 after:right-full after:-translate-y-1/2 after:border-8 after:border-y-transparent after:border-l-transparent after:content-[""]':
               position === 'right',
           },
           // Background and text color classes

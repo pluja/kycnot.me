@@ -20,11 +20,11 @@ const inputId = id ?? Astro.locals.makeId(`input-${wrapperProps.name}`)
 
 <InputWrapper inputId={inputId} required={required} {...wrapperProps}>
   <div
-    class="group/fieldset has-focus-visible:ring-day-200 has-focus-visible:ring-offset-night-700 relative flex items-center has-focus-visible:rounded-full has-focus-visible:ring-2 has-focus-visible:ring-offset-2 [&>*:has(~_*:hover)]:[&>[data-star]]:opacity-100!"
+    class="group/fieldset relative flex items-center has-focus-visible:rounded-full has-focus-visible:ring-2 has-focus-visible:ring-day-200 has-focus-visible:ring-offset-2 has-focus-visible:ring-offset-night-700 [&>*:has(~_*:hover)]:*:data-star:opacity-100!"
   >
     <label
       aria-label="Clear"
-      class="has-focus-visible:before:bg-day-200 hover:before:bg-day-200 relative order-last block size-6 p-0.5 text-zinc-500 not-has-checked:cursor-pointer before:absolute before:inset-0.5 before:-z-1 before:rounded-full hover:text-black has-checked:before:hidden has-focus-visible:text-black has-focus-visible:before:block!"
+      class="relative order-last block size-6 p-0.5 text-zinc-500 not-has-checked:cursor-pointer before:absolute before:inset-0.5 before:-z-1 before:rounded-full hover:text-black hover:before:bg-day-200 has-checked:before:hidden has-focus-visible:text-black has-focus-visible:before:block! has-focus-visible:before:bg-day-200"
     >
       <input
         type="radio"
@@ -42,7 +42,7 @@ const inputId = id ?? Astro.locals.makeId(`input-${wrapperProps.name}`)
 
     {
       ratings.toSorted().map((rating) => (
-        <label class="relative cursor-pointer [&:has(~_*_*:checked)]:[&>[data-star]]:opacity-100 [&:has(~_*:hover),&:hover]:[&>[data-star]]:opacity-100!">
+        <label class="relative cursor-pointer [&:has(~_*_*:checked)]:*:data-star:opacity-100 [&:has(~_*:hover),&:hover]:*:data-star:opacity-100!">
           <input
             type="radio"
             name={wrapperProps.name}

@@ -80,13 +80,13 @@ const { text, step, angle, formattedScore } = makeScoreInfo(score, total)
 <Tag
   {...htmlProps}
   class={cn(
-    '2xs:size-24 relative flex aspect-square size-18 flex-col items-center justify-start text-white',
+    'relative flex aspect-square size-18 flex-col items-center justify-start text-white 2xs:size-24',
     className
   )}
   role={htmlProps.role ?? 'group'}
 >
   <div
-    class={cn('2xs:text-[2rem] mt-[25%] mb-1 text-[1.5rem] leading-none font-bold tracking-tight', {
+    class={cn('mt-[25%] mb-1 text-[1.5rem] leading-none font-bold tracking-tight 2xs:text-[2rem]', {
       'text-score-saturate-1 text-shadow-glow': step === 1,
       'text-score-saturate-2 text-shadow-glow': step === 2,
       'text-score-saturate-3 text-shadow-glow': step === 3,
@@ -99,7 +99,7 @@ const { text, step, angle, formattedScore } = makeScoreInfo(score, total)
     <span>{formattedScore}</span>
   </div>
 
-  <div class="2xs:mb-0.5 text-base leading-none font-bold tracking-wide uppercase">
+  <div class="text-base leading-none font-bold tracking-wide uppercase 2xs:mb-0.5">
     {label}
   </div>
 
@@ -131,7 +131,7 @@ const { text, step, angle, formattedScore } = makeScoreInfo(score, total)
         step === 1 && (
           <path
             d="M19.84 29.962C20.8221 30.3687 21.3066 31.4709 21.0222 32.4951C20.3586 34.8848 20.0039 37.4031 20.0039 40.0042C20.0039 42.6054 20.3586 45.1237 21.0223 47.5135C21.3067 48.5376 20.8221 49.6398 19.8401 50.0466L7.05214 55.3435C5.88072 55.8288 4.55702 55.1152 4.38993 53.8583C4.13532 51.9431 4.00391 49.989 4.00391 48.0042C4.00391 40.5588 5.85316 33.5454 9.11742 27.3981C9.58659 26.5145 10.656 26.1579 11.5803 26.5407L19.84 29.962Z"
-            class="text-score-saturate-1 drop-shadow-glow fill-current"
+            class="fill-current text-score-saturate-1 drop-shadow-glow"
           />
         )
       }
@@ -139,7 +139,7 @@ const { text, step, angle, formattedScore } = makeScoreInfo(score, total)
         step === 2 && (
           <path
             d="M33.3538 8.55389C32.9417 7.55882 31.8133 7.06445 30.8219 7.48539C23.7527 10.4869 17.6304 15.2843 13.0275 21.3051C12.2575 22.3122 12.689 23.7526 13.8603 24.2378L20.9906 27.1912C21.9721 27.5978 23.0937 27.1616 23.6168 26.237C26.1243 21.8048 29.805 18.1241 34.2373 15.6167C35.1619 15.0936 35.5981 13.972 35.1915 12.9904L33.3538 8.55389Z"
-            class="text-score-saturate-2 drop-shadow-glow fill-current"
+            class="fill-current text-score-saturate-2 drop-shadow-glow"
           />
         )
       }
@@ -147,7 +147,7 @@ const { text, step, angle, formattedScore } = makeScoreInfo(score, total)
         step === 3 && (
           <path
             d="M40.4948 13.0224C39.4706 13.3068 38.3684 12.8222 37.9616 11.8402L36.316 7.86723C35.8618 6.77068 36.4564 5.51825 37.6099 5.23888C40.9424 4.43183 44.423 4.00415 48.0035 4.00415C51.5842 4.00415 55.0651 4.43188 58.3977 5.23902C59.5512 5.5184 60.1458 6.77082 59.6916 7.86736L58.046 11.8403C57.6392 12.8224 56.537 13.307 55.5128 13.0225C53.123 12.3588 50.6047 12.0042 48.0035 12.0042C45.4025 12.0042 42.8844 12.3588 40.4948 13.0224Z"
-            class="text-score-saturate-3 drop-shadow-glow fill-current"
+            class="fill-current text-score-saturate-3 drop-shadow-glow"
           />
         )
       }
@@ -155,7 +155,7 @@ const { text, step, angle, formattedScore } = makeScoreInfo(score, total)
         step === 4 && (
           <path
             d="M75.017 27.1913C74.0355 27.5979 72.9139 27.1617 72.3908 26.2371C69.8834 21.805 66.2028 18.1244 61.7708 15.617C60.8461 15.0938 60.41 13.9723 60.8166 12.9907L62.6542 8.55414C63.0664 7.55905 64.1948 7.06469 65.1862 7.48564C72.2552 10.4871 78.3773 15.2845 82.9801 21.3051C83.75 22.3123 83.3186 23.7527 82.1473 24.2378L75.017 27.1913Z"
-            class="text-score-saturate-4 drop-shadow-glow fill-current"
+            class="fill-current text-score-saturate-4 drop-shadow-glow"
           />
         )
       }
@@ -163,7 +163,7 @@ const { text, step, angle, formattedScore } = makeScoreInfo(score, total)
         step === 5 && (
           <path
             d="M76.1682 50.0463C75.1862 49.6395 74.7016 48.5373 74.986 47.5131C75.6496 45.1235 76.0043 42.6053 76.0043 40.0042C76.0043 37.4031 75.6496 34.8849 74.986 32.4952C74.7016 31.471 75.1861 30.3688 76.1682 29.962L84.4279 26.5407C85.3521 26.1579 86.4216 26.5145 86.8908 27.3981C90.155 33.5454 92.0043 40.5588 92.0043 48.0042C92.0043 49.9889 91.8729 51.9429 91.6183 53.8579C91.4512 55.1148 90.1275 55.8284 88.9561 55.3432L76.1682 50.0463Z"
-            class="text-score-saturate-5 drop-shadow-glow fill-current"
+            class="fill-current text-score-saturate-5 drop-shadow-glow"
           />
         )
       }

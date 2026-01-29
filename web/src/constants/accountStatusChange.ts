@@ -1,7 +1,9 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import type { Assert } from '../lib/assert'
 import type { AccountStatusChange } from '@prisma/client'
+import type { Equals } from 'ts-toolbelt/out/Any/Equals'
 
 type AccountStatusChangeInfo<T extends string | null | undefined = string> = {
   value: T
@@ -66,3 +68,7 @@ export const {
 )
 
 export type AccountStatusChangeType = (typeof accountStatusChanges)[number]['value']
+
+type _ExpectToHaveAllValues = Assert<
+  Equals<(typeof accountStatusChanges)[number]['value'], AccountStatusChange>
+>

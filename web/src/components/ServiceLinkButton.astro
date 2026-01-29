@@ -141,8 +141,8 @@ const Tag = isScam ? 'span' : 'a'
   target={isScam ? undefined : '_blank'}
   rel={isScam ? undefined : 'noopener noreferrer'}
   class={cn(
-    '2xs:text-sm 2xs:h-8 2xs:gap-2 focus-visible:ring-offset-night-700 inline-flex h-6 items-center gap-1 rounded-full bg-white text-xs whitespace-nowrap text-black focus-visible:ring-4 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:outline-none',
-    isScam && 'bg-day-800 cursor-not-allowed text-red-300',
+    'inline-flex h-6 items-center gap-1 rounded-full bg-white text-xs whitespace-nowrap text-black focus-visible:ring-4 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-night-700 focus-visible:outline-none 2xs:h-8 2xs:gap-2 2xs:text-sm',
+    isScam && 'cursor-not-allowed bg-day-800 text-red-300',
     className
   )}
   title={link.url}
@@ -150,7 +150,7 @@ const Tag = isScam ? 'span' : 'a'
 >
   <Icon
     name={isScam ? 'ri:alert-line' : link.icon}
-    class={cn('2xs:ml-2 2xs:size-5 2xs:-mr-0.5 -mr-0.25 ml-1 size-4', isScam && 'text-red-400')}
+    class={cn('-mr-0.25 ml-1 size-4 2xs:-mr-0.5 2xs:ml-2 2xs:size-5', isScam && 'text-red-400')}
   />
   <span class={cn('font-title font-bold', { 'min-w-[29ch]': enableMinWidth })}>
     {
@@ -163,7 +163,7 @@ const Tag = isScam ? 'span' : 'a'
     !isScam && (
       <Icon
         name="ri:arrow-right-line"
-        class="2xs:size-6 mr-1 size-4 rounded-full bg-orange-500 p-0.5 text-white"
+        class="mr-1 size-4 rounded-full bg-orange-500 p-0.5 text-white 2xs:size-6"
       />
     )
   }

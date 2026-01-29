@@ -1,6 +1,9 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import type { Assert } from '../lib/assert'
+import type { Equals } from 'ts-toolbelt/out/Any/Equals'
+
 type TosHighlightRatingInfo<T extends string | null | undefined = string> = {
   id: T
   icon: string
@@ -59,5 +62,9 @@ export const {
       },
       order: 3,
     },
-  ] as const satisfies TosHighlightRatingInfo[]
+  ] as const satisfies TosHighlightRatingInfo<PrismaJson.TosReview['highlights'][number]['rating']>[]
 )
+
+type _ExpectToHaveAllValues = Assert<
+  Equals<(typeof tosHighlightRatings)[number]['id'], PrismaJson.TosReview['highlights'][number]['rating']>
+>

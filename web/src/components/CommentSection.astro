@@ -180,7 +180,7 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
     activeRatingComment={activeRatingComment}
     strictCommentingEnabled={service.strictCommentingEnabled}
     commentSectionMessage={service.commentSectionMessage}
-    class="xs:mb-4 mb-2"
+    class="mb-2 xs:mb-4"
   />
 
   <div class="mb-6 flex flex-wrap items-center justify-between gap-2">
@@ -195,7 +195,7 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
               : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300',
           ])}
         >
-          <Icon name="ri:time-line" class="mr-1 inline h-3.5 w-3.5" />
+          <Icon name="ri:time-line" class="mr-1 inline size-3.5" />
           Newest
         </a>
         <a
@@ -207,7 +207,7 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
               : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300',
           ])}
         >
-          <Icon name="ri:arrow-up-line" class="mr-1 inline h-3.5 w-3.5" />
+          <Icon name="ri:arrow-up-line" class="mr-1 inline size-3.5" />
           Most Upvotes
         </a>
         {
@@ -221,7 +221,7 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
                   : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300',
               ])}
             >
-              <Icon name="ri:filter-line" class="mr-1 inline h-3.5 w-3.5" />
+              <Icon name="ri:filter-line" class="mr-1 inline size-3.5" />
               Status
             </a>
           )
@@ -243,7 +243,7 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
               <div class="relative flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full bg-zinc-700 p-1 transition-colors duration-200 ease-in-out focus:outline-hidden">
                 <span
                   class={cn([
-                    'absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-zinc-400 shadow-sm transition-transform duration-200 ease-in-out',
+                    'absolute top-0.5 left-0.5 size-4 rounded-full bg-zinc-400 shadow-sm transition-transform duration-200 ease-in-out',
                     params.showPending && 'translate-x-4 bg-yellow-500',
                   ])}
                 />
@@ -270,7 +270,7 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
           />
         ))
       ) : (
-        <div class="text-day-400 my-16 text-center">
+        <div class="my-16 text-center text-day-400">
           {pendingCommentsCount > 0 ? (
             <span>
               No approved comments, but there are

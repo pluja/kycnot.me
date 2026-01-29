@@ -1,8 +1,10 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import type { Assert } from '../lib/assert'
 import type { MarkdownString } from '../lib/markdown'
 import type { VerificationStatus } from '@prisma/client'
+import type { Equals } from 'ts-toolbelt/out/Any/Equals'
 
 type VerificationStatusInfo<T extends string | null | undefined = string> = {
   value: T
@@ -41,7 +43,7 @@ export const {
   'value',
   (value): VerificationStatusInfo<typeof value> => ({
     value,
-    slug: value ? value.toLowerCase() : '',
+    slug: value ? value.toLowerCase().replace('_', '-') : '',
     labelShort: value ? transformCase(value, 'title') : String(value),
     label: value ? transformCase(value, 'title') : String(value),
     icon: 'ri:loader-line',
@@ -144,3 +146,7 @@ export const {
     },
   ] as const satisfies VerificationStatusInfo<VerificationStatus>[]
 )
+
+type _ExpectToHaveAllValues = Assert<
+  Equals<(typeof verificationStatuses)[number]['value'], VerificationStatus>
+>

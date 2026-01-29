@@ -28,20 +28,20 @@ const {
 >
   <Icon
     name="ri:bug-line"
-    class="text-night-800 absolute top-0 right-8 -z-50 size-32 -rotate-45 sm:top-12 md:right-16"
+    class="absolute top-0 right-8 -z-50 size-32 -rotate-45 text-night-800 sm:top-12 md:right-16"
   />
-  <p class="text-primary text-day-700 text-9xl font-black">500</p>
-  <h1 class="font-title mt-8 text-3xl font-bold tracking-tight text-white sm:mt-12 sm:text-5xl">
+  <p class="text-9xl font-black text-day-700">500</p>
+  <h1 class="mt-8 font-title text-3xl font-bold tracking-tight text-white sm:mt-12 sm:text-5xl">
     Server Error
   </h1>
-  <p class="text-day-400 mt-6 text-base leading-7 text-balance">
+  <p class="mt-6 text-base/7 text-balance text-day-400">
     {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
     {message || 'Sorry, something crashed on the server.'}
   </p>
   {
     (DEPLOYMENT_MODE !== 'production' || Astro.locals.user?.admin) && (
       <div
-        class="bg-night-800 mt-4 block max-h-96 min-h-32 w-full max-w-4xl overflow-auto rounded-lg p-4 text-left text-sm wrap-anywhere whitespace-pre-wrap"
+        class="mt-4 block max-h-96 min-h-32 w-full max-w-4xl overflow-auto rounded-lg bg-night-800 p-4 text-left text-sm wrap-anywhere whitespace-pre-wrap"
         set:text={
           error instanceof Error
             ? error.message
@@ -57,37 +57,28 @@ const {
   }
 
   <div class="mt-10 flex flex-wrap items-center justify-center">
-    <button
-      data-reload-button
-      class="focus-visible:outline-primary group no-js:hidden flex items-center gap-2 px-3.5 py-2.5 text-white"
-    >
+    <button data-reload-button class="group flex items-center gap-2 px-3.5 py-2.5 text-white no-js:hidden">
       <Icon
         name="ri:refresh-line"
         class="size-5 transition-transform duration-300 group-hover:rotate-90 group-active:rotate-180"
       />
       Try again
     </button>
-    <a
-      href={Astro.url}
-      class="focus-visible:outline-primary group js:hidden flex items-center gap-2 px-3.5 py-2.5 text-white"
-    >
+    <a href={Astro.url} class="group flex items-center gap-2 px-3.5 py-2.5 text-white js:hidden">
       <Icon
         name="ri:refresh-line"
         class="size-5 transition-transform duration-300 group-hover:rotate-90 group-active:rotate-180"
       />
       Try again
     </a>
-    <a href="/" class="focus-visible:outline-primary group flex items-center gap-2 px-3.5 py-2.5 text-white">
+    <a href="/" class="group flex items-center gap-2 px-3.5 py-2.5 text-white">
       <Icon
         name="ri:arrow-left-line"
         class="size-5 transition-transform group-hover:-translate-x-1 group-active:translate-x-0"
       />
       Go back home
     </a>
-    <a
-      href="/about#contact"
-      class="focus-visible:outline-primary group flex items-center gap-2 px-3.5 py-2.5 text-white"
-    >
+    <a href="/about#contact" class="group flex items-center gap-2 px-3.5 py-2.5 text-white">
       <Icon
         name="ri:mail-line"
         class="size-5 transition-transform group-hover:-translate-y-1 group-active:translate-y-0"
@@ -96,10 +87,7 @@ const {
     </a>
     {
       Astro.locals.user?.admin && !!LOGS_UI_URL && (
-        <a
-          href={LOGS_UI_URL}
-          class="focus-visible:outline-primary group flex items-center gap-2 px-3.5 py-2.5 text-white"
-        >
+        <a href={LOGS_UI_URL} class="group flex items-center gap-2 px-3.5 py-2.5 text-white">
           <Icon
             name="ri:menu-search-line"
             class="size-5 transition-transform group-hover:-translate-y-1 group-active:translate-y-0"

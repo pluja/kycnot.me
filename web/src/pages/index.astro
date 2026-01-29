@@ -436,7 +436,7 @@ const showFiltersId = 'show-filters'
 >
   <div class="flex flex-col gap-4 sm:flex-row sm:gap-8">
     <div
-      class='[&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-offset-night-700 flex items-stretch sm:hidden [&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-2 [&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-green-500 [&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-offset-2'
+      class='flex items-stretch sm:hidden [&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-2 [&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-green-500 [&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-offset-2 [&:has(~_#show-filters:focus-visible)_[for="show-filters"]]:ring-offset-night-700'
     >
       {
         hasDefaultFilters || hasDefaultFiltersIgnoringQ ? (
@@ -498,7 +498,7 @@ const showFiltersId = 'show-filters'
       checked={Astro.url.searchParams.has('show-filters')}
     />
     <div
-      class="bg-night-700 fixed top-0 left-0 z-50 hidden h-dvh w-dvw shrink-0 translate-y-full overflow-y-auto overscroll-contain border-t border-green-500/30 px-8 pt-4 transition-transform peer-checked:translate-y-0 max-sm:peer-checked:block sm:relative sm:z-auto sm:block sm:h-auto sm:w-64 sm:translate-y-0 sm:overflow-visible sm:border-none sm:bg-none sm:p-0"
+      class="fixed top-0 left-0 z-50 hidden h-dvh w-dvw shrink-0 translate-y-full overflow-y-auto overscroll-contain border-t border-green-500/30 bg-night-700 px-8 pt-4 transition-transform peer-checked:translate-y-0 max-sm:peer-checked:block sm:relative sm:z-auto sm:block sm:h-auto sm:w-64 sm:translate-y-0 sm:overflow-visible sm:border-none sm:bg-none sm:p-0"
       aria-label="Search filters"
     >
       <ServicesFilters
@@ -536,7 +536,7 @@ const showFiltersId = 'show-filters'
         currentPage={filters.page}
         totalPages={Math.ceil(totalServices / PAGE_SIZE)}
         sortSeed={filters['sort-seed']}
-        class="js:hidden mt-8"
+        class="mt-8 js:hidden"
       />
     )
   }

@@ -34,7 +34,7 @@ const { class: className, dismissable = false, pushSubscriptions, hideIfEnabled,
     | undefined /* Updated by client script */}
   data-vapid-public-key={VAPID_PUBLIC_KEY}
   class={cn(
-    'no-js:hidden xs:grid-cols-[auto_auto] xs:justify-between relative isolate grid items-center justify-stretch gap-4 overflow-hidden rounded-xl bg-gradient-to-r from-blue-950/80 to-blue-900/60 p-4 not-data-loaded:hidden',
+    'relative isolate grid items-center justify-stretch gap-4 overflow-hidden rounded-xl bg-linear-to-r from-blue-950/80 to-blue-900/60 p-4 not-data-loaded:hidden xs:grid-cols-[auto_auto] xs:justify-between no-js:hidden',
     'data-dismissed:hidden',
     hideIfEnabled && 'data-is-enabled:hidden',
     'not-data-notification-supported:hidden',
@@ -45,11 +45,11 @@ const { class: className, dismissable = false, pushSubscriptions, hideIfEnabled,
 >
   <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
     <div
-      class="absolute top-0 -left-16 h-full w-1/3 bg-gradient-to-r from-blue-500/20 to-transparent opacity-50 blur-xl"
+      class="absolute top-0 -left-16 h-full w-1/3 bg-linear-to-r from-blue-500/20 to-transparent opacity-50 blur-xl"
     >
     </div>
     <div
-      class="absolute top-0 -right-16 h-full w-1/3 bg-gradient-to-l from-blue-500/20 to-transparent opacity-50 blur-xl"
+      class="absolute top-0 -right-16 h-full w-1/3 bg-linear-to-l from-blue-500/20 to-transparent opacity-50 blur-xl"
     >
     </div>
   </div>
@@ -64,7 +64,7 @@ const { class: className, dismissable = false, pushSubscriptions, hideIfEnabled,
     </div>
   </div>
 
-  <div class="xs:justify-end flex shrink flex-wrap items-center justify-center gap-2">
+  <div class="flex shrink flex-wrap items-center justify-center gap-2 xs:justify-end">
     {dismissable && <Button as="span" label="Skip" variant="faded" data-dismiss-button />}
     <Button
       as="span"

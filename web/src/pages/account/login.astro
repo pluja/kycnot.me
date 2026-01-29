@@ -67,12 +67,12 @@ const message = Astro.url.searchParams.get('message')
   </form>
 
   <div
-    class="before:bg-day-500/30 after:bg-day-500/30 xs:my-8 my-6 flex items-center gap-2 before:h-px before:w-full after:h-px after:w-full"
+    class="my-6 flex items-center gap-2 before:h-px before:w-full before:bg-day-500/30 after:h-px after:w-full after:bg-day-500/30 xs:my-8"
   >
-    <span class="text-day-400 leading-none">or</span>
+    <span class="leading-none text-day-400">or</span>
   </div>
 
-  <p class="text-day-500 -mt-2 mb-1 text-center">Don't have an anonymous account?</p>
+  <p class="-mt-2 mb-1 text-center text-day-500">Don't have an anonymous account?</p>
 
   <Button
     as="a"

@@ -239,8 +239,8 @@ const notifications = dbNotifications.map((notification) => ({
       )
     }
 
-    <div class="xs:flex-row xs:flex-wrap mb-4 flex flex-col items-center justify-between gap-2">
-      <h1 class="font-title flex items-center text-2xl leading-tight font-bold tracking-wider">
+    <div class="mb-4 flex flex-col items-center justify-between gap-2 xs:flex-row xs:flex-wrap">
+      <h1 class="flex items-center font-title text-2xl/tight font-bold tracking-wider">
         <Icon name="ri:notification-line" class="mr-2 size-6 text-zinc-400" />
 
         {transformCase(`${readStatusInfo?.label ?? ''} notifications`.trim(), 'sentence')}
@@ -249,7 +249,7 @@ const notifications = dbNotifications.map((notification) => ({
       <form
         method="POST"
         action={actions.notification.updateReadStatus}
-        class="xs:justify-start flex flex-1 flex-row-reverse flex-wrap items-center justify-center gap-2"
+        class="flex flex-1 flex-row-reverse flex-wrap items-center justify-center gap-2 xs:justify-start"
       >
         <input type="hidden" name="notificationId" value="all" />
         <input type="hidden" name="read" value="true" />
@@ -293,7 +293,7 @@ const notifications = dbNotifications.map((notification) => ({
         label="Reload"
         icon="ri:refresh-line"
         color="white"
-        class="no-js:hidden ml-auto"
+        class="ml-auto no-js:hidden"
         onclick="window.location.reload()"
       />
     </div>
@@ -302,7 +302,7 @@ const notifications = dbNotifications.map((notification) => ({
       notifications.length === 0 ? (
         <div class="flex flex-col items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 p-10 text-center shadow-sm">
           <Icon name="material-symbols:notifications-outline" class="size-16 text-zinc-600" />
-          <h3 class="font-title mt-2 text-zinc-400">No notifications</h3>
+          <h3 class="mt-2 font-title text-zinc-400">No notifications</h3>
         </div>
       ) : (
         <div class="space-y-2">
@@ -370,7 +370,7 @@ const notifications = dbNotifications.map((notification) => ({
       )
     }
 
-    <h2 class="font-title mt-8 mb-3 flex items-center border-b border-zinc-800 text-lg font-bold">
+    <h2 class="mt-8 mb-3 flex items-center border-b border-zinc-800 font-title text-lg font-bold">
       <Icon name="ri:settings-3-line" class="mr-2 size-5 text-zinc-400" />
       Notification Settings
     </h2>
@@ -393,7 +393,7 @@ const notifications = dbNotifications.map((notification) => ({
               type="checkbox"
               name={field.id}
               checked={notificationPreferences?.[field.id]}
-              class="size-4 rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-blue-600"
+              class="size-4 rounded-sm border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-blue-600"
             />
           </label>
         ))
@@ -412,7 +412,7 @@ const notifications = dbNotifications.map((notification) => ({
             name="karmaNotificationThreshold"
             value={notificationPreferences?.karmaNotificationThreshold}
             min="1"
-            class="w-20 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-200 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 focus:outline-none"
+            class="w-20 rounded-sm border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-200 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 focus:outline-none"
           />
           <span class="text-zinc-400">points</span>
         </div>
@@ -428,11 +428,11 @@ const notifications = dbNotifications.map((notification) => ({
     >
       <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div
-          class="absolute top-0 -left-16 h-full w-1/3 bg-gradient-to-r from-zinc-500/20 to-transparent opacity-50 blur-xl"
+          class="absolute top-0 -left-16 h-full w-1/3 bg-linear-to-r from-zinc-500/20 to-transparent opacity-50 blur-xl"
         >
         </div>
         <div
-          class="absolute top-0 -right-16 h-full w-1/3 bg-gradient-to-l from-zinc-500/20 to-transparent opacity-50 blur-xl"
+          class="absolute top-0 -right-16 h-full w-1/3 bg-linear-to-l from-zinc-500/20 to-transparent opacity-50 blur-xl"
         >
         </div>
       </div>
@@ -454,7 +454,7 @@ const notifications = dbNotifications.map((notification) => ({
               type="text"
               readonly
               value={`${Astro.url.origin}/feeds/user/${user.feedId}/notifications.xml`}
-              class="flex-1 rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 select-all"
+              class="flex-1 rounded-sm border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 select-all"
             />
             <CopyButton
               copyText={`${Astro.url.origin}/feeds/user/${user.feedId}/notifications.xml`}

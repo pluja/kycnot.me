@@ -226,7 +226,7 @@ if (toggleResult?.error) {
       id="new-announcement-form"
       class="hidden rounded-lg border border-zinc-700 bg-zinc-800/50 p-4 shadow-lg"
     >
-      <h2 class="font-title mb-4 text-lg font-semibold text-blue-400">Create New Announcement</h2>
+      <h2 class="mb-4 font-title text-lg font-semibold text-blue-400">Create New Announcement</h2>
       <form method="POST" action={actions.admin.announcement.create} class="grid gap-4 md:grid-cols-2">
         <div class="space-y-3 md:col-span-2">
           <InputTextArea
@@ -338,8 +338,8 @@ if (toggleResult?.error) {
     <div class="p-4">
       <div class="mb-4 flex items-center justify-between border-b border-zinc-700 pb-3">
         <h3 class="font-title text-lg font-semibold text-red-400">Confirm Deletion</h3>
-        <button type="button" class="close-modal text-zinc-400 hover:text-zinc-200">
-          <Icon name="ri:close-line" class="h-6 w-6" />
+        <button type="button" data-close-modal class="text-zinc-400 hover:text-zinc-200">
+          <Icon name="ri:close-line" class="size-6" />
         </button>
       </div>
 
@@ -353,7 +353,7 @@ if (toggleResult?.error) {
           <Button
             as="button"
             type="button"
-            class="close-modal"
+            data-close-modal
             color="gray"
             variant="faded"
             size="md"
@@ -381,7 +381,7 @@ if (toggleResult?.error) {
         <span>Scroll horizontally to see more →</span>
       </div>
     </div>
-    <div class="scrollbar-thin max-w-full overflow-x-auto">
+    <div class="max-w-full overflow-x-auto">
       <div class="min-w-[1200px]">
         <table class="w-full divide-y divide-zinc-700">
           <thead class="bg-zinc-900/30">
@@ -518,7 +518,6 @@ if (toggleResult?.error) {
                               as="button"
                               type="button"
                               data-id={announcement.id}
-                              class="edit-button"
                               color="info"
                               variant="faded"
                               size="sm"
@@ -576,7 +575,7 @@ if (toggleResult?.error) {
                     </tr>
                     <tr id={`edit-announcement-form-${announcement.id}`} class="hidden bg-zinc-700/20">
                       <td colspan="7" class="p-4">
-                        <h3 class="font-title text-md mb-3 font-semibold text-blue-300">
+                        <h3 class="mb-3 font-title font-semibold text-blue-300">
                           Edit: {announcement.content}
                         </h3>
                         <form
@@ -698,28 +697,6 @@ if (toggleResult?.error) {
     font-size: 0.6875rem;
     line-height: 1rem;
   }
-  .scrollbar-thin::-webkit-scrollbar {
-    height: 6px;
-    width: 6px;
-  }
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: rgba(30, 41, 59, 0.2);
-    border-radius: 3px;
-  }
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: rgba(75, 85, 99, 0.5);
-    border-radius: 3px;
-  }
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: rgba(100, 116, 139, 0.6);
-  }
-  @media (max-width: 768px) {
-    .scrollbar-thin {
-      scrollbar-width: thin;
-      scrollbar-color: rgba(75, 85, 99, 0.5) rgba(30, 41, 59, 0.2);
-      -webkit-overflow-scrolling: touch;
-    }
-  }
 
   /* Fix for date input appearance in dark mode */
   input[type='date'] {
@@ -761,7 +738,7 @@ if (toggleResult?.error) {
   })
 
   // Close Modal buttons
-  const closeModalButtons = document.querySelectorAll('.close-modal')
+  const closeModalButtons = document.querySelectorAll('[data-close-modal]')
   closeModalButtons.forEach((button) => {
     button.addEventListener('click', () => {
       const modal = button.closest('dialog')

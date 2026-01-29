@@ -120,7 +120,7 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
     icon: 'ri:list-radio',
   }}
 >
-  <h1 class="font-title mb-2 text-center text-3xl font-bold text-white">Service attributes</h1>
+  <h1 class="mb-2 text-center font-title text-3xl font-bold text-white">Service attributes</h1>
 
   <p class="text-center text-balance text-zinc-300">
     Characteristics or features of services that affect their scores.
@@ -160,7 +160,7 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
 
           <div
             class={cn(
-              'prose prose-sm prose-invert mx-auto max-w-lg text-sm',
+              'mx-auto prose prose-sm max-w-lg text-sm prose-invert',
               attribute.typeInfo.classNames.text
             )}
           >
@@ -209,7 +209,7 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
                 Show services
                 <Icon name="ri:arrow-down-s-line" class="ml-1 size-4" />
               </summary>
-              <ul class="mt-2 grid max-h-64 grid-cols-1 overflow-y-auto rounded bg-zinc-700">
+              <ul class="mt-2 grid max-h-64 grid-cols-1 overflow-y-auto rounded-sm bg-zinc-700">
                 {attribute.services.map((service) => (
                   <li>
                     <a
@@ -251,7 +251,7 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
 
                       <span
                         class={cn(
-                          'inline-flex h-5 w-5 items-center justify-center rounded-xs text-xs font-bold',
+                          'inline-flex size-5 items-center justify-center rounded-xs text-xs font-bold',
                           service.overallScoreInfo.classNameBg
                         )}
                       >
@@ -303,7 +303,7 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
           <label
             for={`show-services-${attribute.id}`}
             class={cn(
-              'col-span-full grid cursor-pointer list-none grid-cols-subgrid items-center rounded-sm p-2 peer-checked/show-services:[&_[data-expand-icon]]:rotate-180',
+              'col-span-full grid cursor-pointer list-none grid-cols-subgrid items-center rounded-sm p-2 peer-checked/show-services:**:data-expand-icon:rotate-180',
               attribute.services.length === 0 && 'cursor-default'
             )}
             aria-label={`Show services for ${attribute.title}`}
@@ -324,7 +324,7 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
 
             <div
               class={cn(
-                'prose prose-sm prose-invert text-sm text-pretty',
+                'prose prose-sm text-sm text-pretty prose-invert',
                 attribute.typeInfo.classNames.text
               )}
             >
@@ -359,8 +359,8 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
           </label>
 
           {attribute.services.length > 0 && (
-            <div class="col-span-full hidden rounded bg-zinc-700/80 peer-checked/show-services:block">
-              <ul class="grid max-h-64 grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*64),1fr))] gap-x-4 overflow-y-auto mask-y-from-[calc(100%-var(--spacing)*8)] px-3 py-3">
+            <div class="col-span-full hidden rounded-sm bg-zinc-700/80 peer-checked/show-services:block">
+              <ul class="grid max-h-64 grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*64),1fr))] gap-x-4 overflow-y-auto mask-y-from-[calc(100%-var(--spacing)*8)] p-3">
                 {attribute.services.map((service) => (
                   <li>
                     <a
@@ -402,7 +402,7 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
 
                       <span
                         class={cn(
-                          'inline-flex h-5 w-5 items-center justify-center rounded-xs text-xs font-bold',
+                          'inline-flex size-5 items-center justify-center rounded-xs text-xs font-bold',
                           service.overallScoreInfo.classNameBg
                         )}
                       >

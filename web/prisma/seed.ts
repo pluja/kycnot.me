@@ -901,13 +901,15 @@ const commentReplyList = [
   'same experience here man',
 ]
 
-const generateFakeComment = (userId: number, serviceId: number, parentId?: number) =>
-  ({
+const generateFakeComment = (userId: number, serviceId: number, parentId?: number) => {
+  const status =
+    Math.random() > 0.1
+      ? faker.helpers.arrayElement([CommentStatus.APPROVED, CommentStatus.REJECTED, CommentStatus.VERIFIED])
+      : CommentStatus.PENDING
+
+  return {
     upvotes: faker.number.int({ min: 0, max: 100 }),
-    status:
-      Math.random() > 0.1
-        ? faker.helpers.arrayElement([CommentStatus.APPROVED, CommentStatus.REJECTED, CommentStatus.VERIFIED])
-        : CommentStatus.PENDING,
+    status,
     suspicious: Math.random() > 0.2 ? false : faker.datatype.boolean(),
     communityNote: Math.random() > 0.2 ? '' : faker.lorem.paragraph(),
     internalNote: Math.random() > 0.2 ? '' : faker.lorem.paragraph(),
@@ -921,7 +923,12 @@ const generateFakeComment = (userId: number, serviceId: number, parentId?: numbe
     authorId: userId,
     serviceId,
     parentId,
-  }) satisfies Prisma.CommentCreateManyInput
+    approvedAt:
+      status === CommentStatus.APPROVED || status === CommentStatus.VERIFIED
+        ? faker.date.recent({ days: 30 })
+        : null,
+  } satisfies Prisma.CommentCreateManyInput
+}
 
 const generateFakeServiceContactMethod = (serviceId: number) => {
   const types = [

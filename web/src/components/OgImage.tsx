@@ -89,15 +89,13 @@ const defaultOptions = {
 export const ogImageTemplates = {
   default: (_props: Record<never, never> = {}, context) => {
     return new ImageResponse(
-      (
-        <img
-          src={absoluteUrl(defaultOGImage.src, context)}
-          style={{
-            width: '100%',
-            height: '100%',
-          }}
-        />
-      ),
+      <img
+        src={absoluteUrl(defaultOGImage.src, context)}
+        style={{
+          width: '100%',
+          height: '100%',
+        }}
+      />,
       defaultOptions
     )
   },
@@ -137,219 +135,39 @@ export const ogImageTemplates = {
     const PADING = 80
 
     return new ImageResponse(
-      (
+      <div
+        style={{
+          color: 'white',
+          backgroundImage: `url(${absoluteUrl(defaultOGImageBg.src, context)})`,
+          width: '100%',
+          height: '100%',
+          padding: PADING,
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          gap: 20,
+        }}
+      >
         <div
           style={{
-            color: 'white',
-            backgroundImage: `url(${absoluteUrl(defaultOGImageBg.src, context)})`,
-            width: '100%',
-            height: '100%',
-            padding: PADING,
             display: 'flex',
             flexDirection: 'column',
-            position: 'relative',
-            gap: 20,
+            justifyContent: 'flex-end',
+            gap: 10,
+            flex: 1,
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'flex-end',
-              gap: 10,
-              flex: 1,
-            }}
-          >
-            {!!imageUrl && (
-              <img
-                src={absoluteUrl(imageUrl, context)}
-                style={{
-                  width: 140,
-                  height: 140,
-                  borderRadius: 20,
-                  objectFit: 'contain',
-                }}
-              />
-            )}
-            <div style={{ display: 'flex', paddingTop: 20 }}>
-              <span
-                style={{
-                  fontSize: 100,
-                  fontWeight: 'bold',
-                  color: '#3bdb78',
-                  fontFamily: 'Space Grotesk',
-                  lineHeight: 1.2,
-                  height: 120,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  marginTop: -20,
-                }}
-              >
-                {title}
-              </span>
-            </div>
-          </div>
-
-          <div
-            style={{
-              alignItems: 'flex-end',
-              display: 'flex',
-              gap: 50,
-              position: 'relative',
-            }}
-          >
-            <div
+          {!!imageUrl && (
+            <img
+              src={absoluteUrl(imageUrl, context)}
               style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 10,
-                flex: 1,
-                justifyContent: 'space-between',
-                alignSelf: 'stretch',
+                width: 140,
+                height: 140,
+                borderRadius: 20,
+                objectFit: 'contain',
               }}
-            >
-              <span
-                style={{
-                  fontSize: 30,
-                  color: 'white',
-                  flex: 1,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  maxHeight: 115,
-                }}
-              >
-                {description}
-              </span>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 40,
-                  flexWrap: 'wrap',
-                  fontWeight: 'bold',
-                  fontSize: 50,
-                  marginTop: 10,
-                  color: 'white',
-                }}
-              >
-                {await Promise.all(
-                  categories.map(async (category) => (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap' }}>
-                      <img
-                        src={await iconUrl(category.icon, 50)}
-                        width={50}
-                        height={50}
-                        style={{ width: 50, height: 50 }}
-                      />
-                      {category.name}
-                    </span>
-                  ))
-                )}
-              </div>
-            </div>
-            <div style={{ display: 'flex' }}>
-              <div
-                style={{
-                  fontSize: 150,
-                  color: 'black',
-                  height: 200,
-                  width: 200,
-                  borderRadius: 30,
-                  backgroundColor: scoreColor,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 'bold',
-                }}
-              >
-                {score}
-              </div>
-            </div>
-          </div>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="white"
-            width={400}
-            viewBox="0 0 204 28"
-            style={{ position: 'absolute', top: PADING, right: PADING }}
-          >
-            <path d="M1 0a1 1 0 0 0-1 1v26a1 1 0 0 0 1 1h74a1 1 0 0 0 1-1V1a1 1 0 0 0-1-1Zm4 4h2a1 1 0 0 1 1 1v6a1 1 0 0 0 1 1h6a1 1 0 0 1 1 1v3h3a1 1 0 0 1 1 1v3h3a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3h-3a1 1 0 0 1-1-1v-3H9a1 1 0 0 0-1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm12 0h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm12.82 0h2.37a1 1 0 0 1 .85.46L38 12.27l4.97-7.8A1 1 0 0 1 43.8 4h2.37a1 1 0 0 1 .85 1.54l-6.87 10.8a1 1 0 0 0-.16.53V23a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-6.13a1 1 0 0 0-.15-.53l-6.87-10.8A1 1 0 0 1 29.82 4ZM57 4h14a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H56v12h15a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H57a1 1 0 0 1-1-1v-3h-3a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h3V5a1 1 0 0 1 1-1zm24 0a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V7.6l9.18 15.9c.18.3.5.5.86.5H99a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v15.4L86.83 4.5a1 1 0 0 0-.87-.5Zm29 0a1 1 0 0 0-1 1v3h12V5a1 1 0 0 0-1-1zm11 4v12h3a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1zm0 12h-12v3a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1zm-12 0V8h-3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1zm21-16a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V8h4v15a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V8h4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1zm27 0a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V11.4l5.53 12.02a1 1 0 0 0 .91.58h3.12a1 1 0 0 0 .91-.58L176 11.4V23a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-3.36a1 1 0 0 0-.9.58L168 19.21l-6.73-14.63a1 1 0 0 0-.9-.58Zm32 0a1 1 0 0 0-1 1v3h15a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1zm-1 4h-3a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-14a1 1 0 0 1-1-1v-3h7a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-7zm-38 12a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1z" />
-          </svg>
-          {verificationStatus === 'VERIFICATION_FAILED' && (
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <div
-                style={{
-                  transform: 'rotate(-20deg)',
-                  fontSize: 200,
-                  fontWeight: 'bold',
-                  color: 'red',
-                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                  boxShadow: '0 0 15px 30px rgba(0, 0, 0, 0.5)',
-                  border: '15px solid red',
-                  borderRadius: 15,
-                  padding: '10px 50px',
-                  textAlign: 'center',
-                }}
-              >
-                SCAM
-              </div>
-            </div>
+            />
           )}
-        </div>
-      ),
-      defaultOptions
-    )
-  },
-  generic: async (
-    {
-      title,
-      description,
-      icon,
-    }: {
-      title: string
-      description?: string | null
-      icon?: string | null
-    },
-    context
-  ) => {
-    const PADING = 80
-
-    return new ImageResponse(
-      (
-        <div
-          style={{
-            color: 'white',
-            backgroundImage: `url(${absoluteUrl(defaultOGImageBg.src, context)})`,
-            width: '100%',
-            height: '100%',
-            padding: PADING,
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'relative',
-            gap: 20,
-          }}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="white"
-            width={400}
-            viewBox="0 0 204 28"
-            style={{ marginBottom: 'auto' }}
-          >
-            <path d="M1 0a1 1 0 0 0-1 1v26a1 1 0 0 0 1 1h74a1 1 0 0 0 1-1V1a1 1 0 0 0-1-1Zm4 4h2a1 1 0 0 1 1 1v6a1 1 0 0 0 1 1h6a1 1 0 0 1 1 1v3h3a1 1 0 0 1 1 1v3h3a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3h-3a1 1 0 0 1-1-1v-3H9a1 1 0 0 0-1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm12 0h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm12.82 0h2.37a1 1 0 0 1 .85.46L38 12.27l4.97-7.8A1 1 0 0 1 43.8 4h2.37a1 1 0 0 1 .85 1.54l-6.87 10.8a1 1 0 0 0-.16.53V23a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-6.13a1 1 0 0 0-.15-.53l-6.87-10.8A1 1 0 0 1 29.82 4ZM57 4h14a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H56v12h15a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H57a1 1 0 0 1-1-1v-3h-3a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h3V5a1 1 0 0 1 1-1zm24 0a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V7.6l9.18 15.9c.18.3.5.5.86.5H99a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v15.4L86.83 4.5a1 1 0 0 0-.87-.5Zm29 0a1 1 0 0 0-1 1v3h12V5a1 1 0 0 0-1-1zm11 4v12h3a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1zm0 12h-12v3a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1zm-12 0V8h-3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1zm21-16a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V8h4v15a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V8h4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1zm27 0a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V11.4l5.53 12.02a1 1 0 0 0 .91.58h3.12a1 1 0 0 0 .91-.58L176 11.4V23a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-3.36a1 1 0 0 0-.9.58L168 19.21l-6.73-14.63a1 1 0 0 0-.9-.58Zm32 0a1 1 0 0 0-1 1v3h15a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1zm-1 4h-3a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-14a1 1 0 0 1-1-1v-3h7a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-7zm-38 12a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1z" />
-          </svg>
-
           <div style={{ display: 'flex', paddingTop: 20 }}>
             <span
               style={{
@@ -368,33 +186,209 @@ export const ogImageTemplates = {
               {title}
             </span>
           </div>
+        </div>
 
-          <span
+        <div
+          style={{
+            alignItems: 'flex-end',
+            display: 'flex',
+            gap: 50,
+            position: 'relative',
+          }}
+        >
+          <div
             style={{
-              fontSize: 40,
-              color: 'white',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              maxHeight: 200,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+              flex: 1,
+              justifyContent: 'space-between',
+              alignSelf: 'stretch',
             }}
           >
-            {description}
-          </span>
-
-          {!!icon && (
-            <img
-              src={await iconUrl(icon, 200)}
-              width={200}
-              height={200}
+            <span
               style={{
-                position: 'absolute',
-                top: PADING,
-                right: PADING,
+                fontSize: 30,
+                color: 'white',
+                flex: 1,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxHeight: 115,
               }}
-            />
-          )}
+            >
+              {description}
+            </span>
+            <div
+              style={{
+                display: 'flex',
+                gap: 40,
+                flexWrap: 'wrap',
+                fontWeight: 'bold',
+                fontSize: 50,
+                marginTop: 10,
+                color: 'white',
+              }}
+            >
+              {await Promise.all(
+                categories.map(async (category) => (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap' }}>
+                    <img
+                      src={await iconUrl(category.icon, 50)}
+                      width={50}
+                      height={50}
+                      style={{ width: 50, height: 50 }}
+                    />
+                    {category.name}
+                  </span>
+                ))
+              )}
+            </div>
+          </div>
+          <div style={{ display: 'flex' }}>
+            <div
+              style={{
+                fontSize: 150,
+                color: 'black',
+                height: 200,
+                width: 200,
+                borderRadius: 30,
+                backgroundColor: scoreColor,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 'bold',
+              }}
+            >
+              {score}
+            </div>
+          </div>
         </div>
-      ),
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="white"
+          width={400}
+          viewBox="0 0 204 28"
+          style={{ position: 'absolute', top: PADING, right: PADING }}
+        >
+          <path d="M1 0a1 1 0 0 0-1 1v26a1 1 0 0 0 1 1h74a1 1 0 0 0 1-1V1a1 1 0 0 0-1-1Zm4 4h2a1 1 0 0 1 1 1v6a1 1 0 0 0 1 1h6a1 1 0 0 1 1 1v3h3a1 1 0 0 1 1 1v3h3a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3h-3a1 1 0 0 1-1-1v-3H9a1 1 0 0 0-1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm12 0h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm12.82 0h2.37a1 1 0 0 1 .85.46L38 12.27l4.97-7.8A1 1 0 0 1 43.8 4h2.37a1 1 0 0 1 .85 1.54l-6.87 10.8a1 1 0 0 0-.16.53V23a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-6.13a1 1 0 0 0-.15-.53l-6.87-10.8A1 1 0 0 1 29.82 4ZM57 4h14a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H56v12h15a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H57a1 1 0 0 1-1-1v-3h-3a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h3V5a1 1 0 0 1 1-1zm24 0a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V7.6l9.18 15.9c.18.3.5.5.86.5H99a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v15.4L86.83 4.5a1 1 0 0 0-.87-.5Zm29 0a1 1 0 0 0-1 1v3h12V5a1 1 0 0 0-1-1zm11 4v12h3a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1zm0 12h-12v3a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1zm-12 0V8h-3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1zm21-16a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V8h4v15a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V8h4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1zm27 0a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V11.4l5.53 12.02a1 1 0 0 0 .91.58h3.12a1 1 0 0 0 .91-.58L176 11.4V23a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-3.36a1 1 0 0 0-.9.58L168 19.21l-6.73-14.63a1 1 0 0 0-.9-.58Zm32 0a1 1 0 0 0-1 1v3h15a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1zm-1 4h-3a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-14a1 1 0 0 1-1-1v-3h7a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-7zm-38 12a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1z" />
+        </svg>
+        {verificationStatus === 'VERIFICATION_FAILED' && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <div
+              style={{
+                transform: 'rotate(-20deg)',
+                fontSize: 200,
+                fontWeight: 'bold',
+                color: 'red',
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                boxShadow: '0 0 15px 30px rgba(0, 0, 0, 0.5)',
+                border: '15px solid red',
+                borderRadius: 15,
+                padding: '10px 50px',
+                textAlign: 'center',
+              }}
+            >
+              SCAM
+            </div>
+          </div>
+        )}
+      </div>,
+      defaultOptions
+    )
+  },
+  generic: async (
+    {
+      title,
+      description,
+      icon,
+    }: {
+      title: string
+      description?: string | null
+      icon?: string | null
+    },
+    context
+  ) => {
+    const PADING = 80
+
+    return new ImageResponse(
+      <div
+        style={{
+          color: 'white',
+          backgroundImage: `url(${absoluteUrl(defaultOGImageBg.src, context)})`,
+          width: '100%',
+          height: '100%',
+          padding: PADING,
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          gap: 20,
+        }}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="white"
+          width={400}
+          viewBox="0 0 204 28"
+          style={{ marginBottom: 'auto' }}
+        >
+          <path d="M1 0a1 1 0 0 0-1 1v26a1 1 0 0 0 1 1h74a1 1 0 0 0 1-1V1a1 1 0 0 0-1-1Zm4 4h2a1 1 0 0 1 1 1v6a1 1 0 0 0 1 1h6a1 1 0 0 1 1 1v3h3a1 1 0 0 1 1 1v3h3a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3h-3a1 1 0 0 1-1-1v-3H9a1 1 0 0 0-1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm12 0h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm12.82 0h2.37a1 1 0 0 1 .85.46L38 12.27l4.97-7.8A1 1 0 0 1 43.8 4h2.37a1 1 0 0 1 .85 1.54l-6.87 10.8a1 1 0 0 0-.16.53V23a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-6.13a1 1 0 0 0-.15-.53l-6.87-10.8A1 1 0 0 1 29.82 4ZM57 4h14a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H56v12h15a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H57a1 1 0 0 1-1-1v-3h-3a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h3V5a1 1 0 0 1 1-1zm24 0a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V7.6l9.18 15.9c.18.3.5.5.86.5H99a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v15.4L86.83 4.5a1 1 0 0 0-.87-.5Zm29 0a1 1 0 0 0-1 1v3h12V5a1 1 0 0 0-1-1zm11 4v12h3a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1zm0 12h-12v3a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1zm-12 0V8h-3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1zm21-16a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V8h4v15a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V8h4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1zm27 0a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V11.4l5.53 12.02a1 1 0 0 0 .91.58h3.12a1 1 0 0 0 .91-.58L176 11.4V23a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-3.36a1 1 0 0 0-.9.58L168 19.21l-6.73-14.63a1 1 0 0 0-.9-.58Zm32 0a1 1 0 0 0-1 1v3h15a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1zm-1 4h-3a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-14a1 1 0 0 1-1-1v-3h7a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-7zm-38 12a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1z" />
+        </svg>
+
+        <div style={{ display: 'flex', paddingTop: 20 }}>
+          <span
+            style={{
+              fontSize: 100,
+              fontWeight: 'bold',
+              color: '#3bdb78',
+              fontFamily: 'Space Grotesk',
+              lineHeight: 1.2,
+              height: 120,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              marginTop: -20,
+            }}
+          >
+            {title}
+          </span>
+        </div>
+
+        <span
+          style={{
+            fontSize: 40,
+            color: 'white',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxHeight: 200,
+          }}
+        >
+          {description}
+        </span>
+
+        {!!icon && (
+          <img
+            src={await iconUrl(icon, 200)}
+            width={200}
+            height={200}
+            style={{
+              position: 'absolute',
+              top: PADING,
+              right: PADING,
+            }}
+          />
+        )}
+      </div>,
       defaultOptions
     )
   },

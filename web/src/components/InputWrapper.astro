@@ -47,7 +47,7 @@ const hasError = !!error && error.length > 0
   {
     !hideLabel && (
       <div class={cn('contents', !!descriptionLabel && 'flex flex-wrap items-center gap-x-4')}>
-        <legend class={cn('font-title block text-sm font-medium', hasError && 'text-red-500')}>
+        <legend class={cn('block font-title text-sm font-medium', hasError && 'text-red-500')}>
           {icon && <Icon name={icon} class="inline-block size-4 align-[-0.2em]" />}
           <label for={inputId} transition:persist>
             {label}
@@ -55,7 +55,7 @@ const hasError = !!error && error.length > 0
           {required && '*'}
         </legend>
         {!!descriptionLabel && (
-          <span class="text-day-400 flex-1 basis-24 text-xs text-pretty">{descriptionLabel}</span>
+          <span class="flex-1 basis-24 text-xs text-pretty text-day-400">{descriptionLabel}</span>
         )}
       </div>
     )
@@ -80,7 +80,7 @@ const hasError = !!error && error.length > 0
     !!description && (
       <div
         class={cn(
-          'prose prose-sm prose-invert prose-a:text-current prose-a:font-normal hover:prose-a:text-day-300 prose-a:transition-colors text-day-400 max-w-none text-xs text-pretty',
+          'prose prose-sm max-w-none text-xs text-pretty text-day-400 prose-invert prose-a:font-normal prose-a:text-current prose-a:transition-colors hover:prose-a:text-day-300',
           classNames?.description
         )}
       >

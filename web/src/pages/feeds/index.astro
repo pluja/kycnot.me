@@ -68,17 +68,17 @@ const feeds = [
         <div>
           <div class="flex flex-row items-center justify-center gap-2">
             <Icon name={feed.icon} class="inline-block size-6 shrink-0 text-white" />
-            <h2 class="text-left text-lg leading-tight font-bold text-white">{feed.title}</h2>
+            <h2 class="text-left text-lg/tight font-bold text-white">{feed.title}</h2>
           </div>
 
-          <p class="text-day-300 mt-1 text-center text-sm text-balance">{feed.description}</p>
+          <p class="mt-1 text-center text-sm text-balance text-day-300">{feed.description}</p>
 
           <div
-            class="border-night-500 bg-night-600 relative mt-2 rounded-lg border px-4 py-2 font-mono break-all text-white"
+            class="relative mt-2 rounded-lg border border-night-500 bg-night-600 px-4 py-2 font-mono break-all text-white"
             set:text={`${Astro.url.origin}${feed.rss}`}
           />
           {!!feed.replacementDescription && (
-            <p class="text-day-500 mt-1 text-center text-xs italic">{feed.replacementDescription}</p>
+            <p class="mt-1 text-center text-xs text-day-500 italic">{feed.replacementDescription}</p>
           )}
         </div>
       ))

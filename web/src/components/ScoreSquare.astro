@@ -35,7 +35,7 @@ const { text, classNameBg, formattedScore } = makeOverallScoreInfo(score, total)
 <Tag
   {...htmlProps}
   class={cn(
-    '2xs:size-24 relative flex aspect-square size-18 flex-col items-center justify-start text-white',
+    'relative flex aspect-square size-18 flex-col items-center justify-start text-white 2xs:size-24',
     className
   )}
   role={htmlProps.role ?? 'group'}
@@ -74,19 +74,19 @@ const { text, classNameBg, formattedScore } = makeOverallScoreInfo(score, total)
 
   <div
     class={cn(
-      '2xs:mt-2 2xs:size-12 mt-0.5 mb-1 flex size-10 shrink-0 items-center justify-center rounded-md leading-none font-bold tracking-tight text-black',
+      'mt-0.5 mb-1 flex size-10 shrink-0 items-center justify-center rounded-md leading-none font-bold tracking-tight text-black 2xs:mt-2 2xs:size-12',
       classNameBg,
       {
         'text-[1.75rem] leading-[calc(2/1.75)] tracking-tighter': formattedScore.length > 2,
       }
     )}
   >
-    <span class="2xs:text-[2rem] text-[1.5rem] leading-none font-bold tracking-tight text-black">
+    <span class="text-[1.5rem] leading-none font-bold tracking-tight text-black 2xs:text-[2rem]">
       {formattedScore}
     </span>
   </div>
 
-  <div class="2xs:mb-0.5 text-base leading-none font-bold tracking-wide uppercase">
+  <div class="text-base leading-none font-bold tracking-wide uppercase 2xs:mb-0.5">
     {label}
   </div>
 

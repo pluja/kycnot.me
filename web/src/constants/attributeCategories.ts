@@ -1,7 +1,9 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import type { Assert } from '../lib/assert'
 import type { AttributeCategory } from '@prisma/client'
+import type { Equals } from 'ts-toolbelt/out/Any/Equals'
 
 type AttributeCategoryInfo<T extends string | null | undefined = string> = {
   value: T
@@ -27,7 +29,7 @@ export const {
   'value',
   (value): AttributeCategoryInfo<typeof value> => ({
     value,
-    slug: value ? value.toLowerCase() : '',
+    slug: value ? value.toLowerCase().replace('_', '-') : '',
     label: value ? transformCase(value, 'title') : String(value),
     icon: 'ri:shield-fill',
     classNames: {
@@ -58,3 +60,5 @@ export const {
     },
   ] as const satisfies AttributeCategoryInfo<AttributeCategory>[]
 )
+
+type _ExpectToHaveAllValues = Assert<Equals<(typeof attributeCategories)[number]['value'], AttributeCategory>>

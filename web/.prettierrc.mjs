@@ -2,7 +2,7 @@
 
 /** @type {import("prettier").Config} */
 export default {
-  plugins: ['prettier-plugin-astro', 'prettier-plugin-tailwindcss'],
+  plugins: ['prettier-plugin-astro'],
   overrides: [
     {
       files: '*.astro',
@@ -11,7 +11,6 @@ export default {
       },
     },
   ],
-  tailwindFunctions: ['cn', 'clsx', 'tv'],
   singleQuote: true,
   semi: false,
   tabWidth: 2,

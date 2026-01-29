@@ -88,7 +88,7 @@ const NextTag = nextPage ? 'a' : 'span'
     <span class="text-green-500">Prev</span>
   </PrevTag>
 
-  <div class="order-first flex w-full items-center justify-center gap-4 sm:order-none sm:w-auto">
+  <div class="order-first flex w-full items-center justify-center gap-4 sm:order-0 sm:w-auto">
     {
       getVisiblePages().map((page) => {
         if (page === '...') {
@@ -98,7 +98,7 @@ const NextTag = nextPage ? 'a' : 'span'
         const isCurrentPage = page === currentPage
         return isCurrentPage ? (
           <button
-            class="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500 text-white"
+            class="flex size-10 items-center justify-center rounded-lg bg-green-500 text-white"
             aria-current="page"
             aria-label={`Page ${page.toLocaleString()}`}
             disabled

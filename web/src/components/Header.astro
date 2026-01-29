@@ -31,7 +31,7 @@ const splashText = showSplashText ? sample(splashTexts) : null
 
 <header
   class={cn(
-    'bg-night-900/80 sticky inset-x-0 top-0 z-50 h-16 border-b border-zinc-800 backdrop-blur-sm [&_~_*_[id]]:scroll-mt-18',
+    'sticky inset-x-0 top-0 z-50 h-16 border-b border-zinc-800 bg-night-900/80 backdrop-blur-sm [&_~_*_[id]]:scroll-mt-18',
     {
       'border-red-900 bg-red-500/60': !!actualUser,
     }
@@ -39,9 +39,9 @@ const splashText = showSplashText ? sample(splashTexts) : null
   transition:name="header-container"
   aria-label="Header"
 >
-  <nav class={cn('container mx-auto flex h-full w-full items-stretch justify-between px-4', classNames?.nav)}>
+  <nav class={cn('container mx-auto flex size-full items-stretch justify-between px-4', classNames?.nav)}>
     <div class="@container -ml-4 flex max-w-[192px] grow-99999 items-center">
-      <a href="/" class="relative inline-flex h-full items-center pr-4 pl-4 @[2rem]:pr-0">
+      <a href="/" class="relative inline-flex h-full items-center px-4 @[2rem]:pr-0">
         <Logo
           class={cn(
             'h-6 text-green-500 transition-colors hover:text-green-400',
@@ -56,7 +56,7 @@ const splashText = showSplashText ? sample(splashTexts) : null
         <Logo
           variant="small"
           class={cn(
-            'font-title h-8 text-green-500 transition-colors hover:text-green-400',
+            'h-8 font-title text-green-500 transition-colors hover:text-green-400',
             {
               'hue-rotate-227 saturate-800': DEPLOYMENT_MODE === 'development',
               'hue-rotate-60 saturate-800': DEPLOYMENT_MODE === 'staging',
@@ -68,7 +68,7 @@ const splashText = showSplashText ? sample(splashTexts) : null
         <Logo
           variant="mini"
           class={cn(
-            'font-title h-8 text-green-500 transition-colors hover:text-green-400',
+            'h-8 font-title text-green-500 transition-colors hover:text-green-400',
             {
               'hue-rotate-227 saturate-800': DEPLOYMENT_MODE === 'development',
               'hue-rotate-60 saturate-800': DEPLOYMENT_MODE === 'staging',
@@ -82,7 +82,7 @@ const splashText = showSplashText ? sample(splashTexts) : null
             <span
               class={cn(
                 'absolute bottom-1 left-9.5 -translate-x-1/2 @[192px]:left-12.5',
-                'text-2xs pointer-events-none hidden rounded-full bg-zinc-800 px-1.25 py-0.75 leading-none font-semibold tracking-wide text-white @[63px]:block',
+                'pointer-events-none hidden rounded-full bg-zinc-800 px-1.25 py-0.75 text-2xs leading-none font-semibold tracking-wide text-white @[63px]:block',
                 {
                   'border border-red-800 bg-red-950 text-red-400': DEPLOYMENT_MODE === 'development',
                   'border border-cyan-800 bg-cyan-950 text-cyan-400': DEPLOYMENT_MODE === 'staging',
@@ -100,12 +100,12 @@ const splashText = showSplashText ? sample(splashTexts) : null
     {
       !!splashText && (
         <div
-          class="js:cursor-pointer @container flex min-w-0 flex-1 items-center justify-center"
+          class="@container flex min-w-0 flex-1 items-center justify-center js:cursor-pointer"
           data-splash-text-container
           aria-hidden="true"
         >
           <span
-            class="font-title line-clamp-2 hidden shrink text-center text-xs text-balance text-lime-500 @[6rem]:inline @4xl:ml-0"
+            class="line-clamp-2 hidden shrink text-center font-title text-xs text-balance text-lime-500 @[6rem]:inline @4xl:ml-0"
             data-splash-text
           >
             {splashText}
@@ -143,7 +143,7 @@ const splashText = showSplashText ? sample(splashTexts) : null
             )}
 
             <HeaderNotificationIndicator
-              class="xs:px-3 2xs:px-2 h-full px-1"
+              class="h-full px-1 2xs:px-2 xs:px-3"
               transition:name="header-notification-indicator"
             />
 
@@ -151,7 +151,7 @@ const splashText = showSplashText ? sample(splashTexts) : null
               href="/account"
               user={user}
               size="md"
-              class="xs:px-3 2xs:px-2 last:xs:-mr-3 last:2xs:-mr-2 h-full px-1 text-zinc-400 transition-colors last:-mr-1 hover:text-zinc-300"
+              class="h-full px-1 text-zinc-400 transition-colors last:-mr-1 hover:text-zinc-300 2xs:px-2 last:2xs:-mr-2 xs:px-3 last:xs:-mr-3"
               classNames={{
                 image: 'max-2xs:hidden',
               }}
@@ -163,7 +163,7 @@ const splashText = showSplashText ? sample(splashTexts) : null
                 href={makeUnimpersonateUrl(Astro.url)}
                 data-astro-reload
                 data-astro-prefetch="tap"
-                class="xs:px-3 2xs:px-2 last:xs:-mr-3 last:2xs:-mr-2 flex h-full items-center px-1 text-sm text-stone-100 transition-colors last:-mr-1 hover:text-stone-200"
+                class="flex h-full items-center px-1 text-sm text-stone-100 transition-colors last:-mr-1 hover:text-stone-200 2xs:px-2 last:2xs:-mr-2 xs:px-3 last:xs:-mr-3"
                 transition:name="header-unimpersonate-link"
                 aria-label="Unimpersonate"
               >
@@ -173,7 +173,7 @@ const splashText = showSplashText ? sample(splashTexts) : null
               <a
                 href="/account/logout"
                 data-astro-prefetch="tap"
-                class="xs:px-3 2xs:px-2 last:xs:-mr-3 last:2xs:-mr-2 flex h-full items-center px-1 text-sm text-stone-100 transition-colors last:-mr-1 hover:text-stone-200"
+                class="flex h-full items-center px-1 text-sm text-stone-100 transition-colors last:-mr-1 hover:text-stone-200 2xs:px-2 last:2xs:-mr-2 xs:px-3 last:xs:-mr-3"
                 transition:name="header-logout-link"
                 aria-label="Logout"
               >
@@ -185,7 +185,7 @@ const splashText = showSplashText ? sample(splashTexts) : null
           <a
             href={makeLoginUrl(Astro.url)}
             data-astro-reload
-            class="xs:px-3 2xs:px-2 last:xs:-mr-3 last:2xs:-mr-2 flex h-full items-center px-1 text-sm text-green-500 transition-colors last:-mr-1 hover:text-green-400"
+            class="flex h-full items-center px-1 text-sm text-green-500 transition-colors last:-mr-1 hover:text-green-400 2xs:px-2 last:2xs:-mr-2 xs:px-3 last:xs:-mr-3"
             transition:name="header-login-link"
           >
             Login

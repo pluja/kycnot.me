@@ -47,6 +47,16 @@ export const transformCase = <T extends string, C extends TransformCaseType>(
         : C extends 'first-upper'
           ? Capitalize<T>
           : T => {
+  // TODO: Remove this defensive if-statement once we figure out where this is coming from
+  if (typeof str !== 'string') {
+    console.error(
+      `[transformCase] Expected string, got ${typeof str}. str=${String(str)} caseType='${caseType}'`
+    )
+    console.trace()
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return ((str as unknown) === null || (str as unknown) === undefined ? '' : String(str as unknown)) as any
+  }
+
   switch (caseType) {
     case 'lower':
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return

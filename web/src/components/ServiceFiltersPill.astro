@@ -36,12 +36,12 @@ const makeUrlWithoutFilter = (filter: string, value?: string) => {
   href={makeUrlWithoutFilter(searchParamName, searchParamValue)}
   {...aProps}
   class={cn(
-    'bg-night-800 hover:bg-night-900 border-night-400 flex h-8 shrink-0 items-center gap-2 rounded-full border px-3 text-sm text-white',
+    'flex h-8 shrink-0 items-center gap-2 rounded-full border border-night-400 bg-night-800 px-3 text-sm text-white hover:bg-night-900',
     className
   )}
   aria-label={`Remove filter: ${text}`}
 >
   {icon && <Icon name={icon} class={cn('size-4', iconClass)} is:inline={inlineIcons} />}
   {text}
-  <Icon name="ri:close-large-line" class="text-day-400 size-4" is:inline={inlineIcons} />
+  <Icon name="ri:close-large-line" class="size-4 text-day-400" is:inline={inlineIcons} />
 </a>

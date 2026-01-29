@@ -135,7 +135,7 @@ if (!user) return Astro.rewrite('/404')
       )
     }
     <h1
-      class="font-title mb-2 flex items-center justify-center gap-2 text-center text-3xl leading-none font-bold"
+      class="mb-2 flex items-center justify-center gap-2 text-center font-title text-3xl leading-none font-bold"
     >
       {user.displayName ? `${user.displayName} (${user.name})` : user.name}
     </h1>
@@ -268,11 +268,11 @@ if (!user) return Astro.rewrite('/404')
   <FormSection title="Internal Notes">
     {
       user.internalNotes.length === 0 ? (
-        <p class="text-day-300 text-center">No internal notes yet.</p>
+        <p class="text-center text-day-300">No internal notes yet.</p>
       ) : (
         <div class="space-y-4">
           {user.internalNotes.map((note) => (
-            <div data-note-id={note.id} class="border-night-400 bg-night-600 rounded-lg border p-4 shadow-sm">
+            <div data-note-id={note.id} class="rounded-lg border border-night-400 bg-night-600 p-4 shadow-sm">
               <div class="mb-1 flex items-center justify-between gap-4">
                 <div class="flex items-center gap-1">
                   {!!note.addedByUser?.picture && (
@@ -284,15 +284,15 @@ if (!user) return Astro.rewrite('/404')
                       class="size-6 rounded-full object-cover"
                     />
                   )}
-                  <span class="text-day-100 font-medium">
+                  <span class="font-medium text-day-100">
                     {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
                     {note.addedByUser ? note.addedByUser.displayName || note.addedByUser.name : 'System'}
                   </span>
-                  <TimeFormatted date={note.createdAt} hourPrecision class="text-day-300 ms-1 text-sm" />
+                  <TimeFormatted date={note.createdAt} hourPrecision class="ms-1 text-sm text-day-300" />
                 </div>
 
                 <div class="flex items-center">
-                  <label class="text-day-300 hover:text-day-100 cursor-pointer p-1 transition-colors">
+                  <label class="cursor-pointer p-1 text-day-300 transition-colors hover:text-day-100">
                     <input
                       type="checkbox"
                       class="peer sr-only"
@@ -309,14 +309,14 @@ if (!user) return Astro.rewrite('/404')
                     data-astro-reload
                   >
                     <input type="hidden" name="noteId" value={note.id} />
-                    <button type="submit" class="text-day-300 p-1 transition-colors hover:text-red-400">
+                    <button type="submit" class="p-1 text-day-300 transition-colors hover:text-red-400">
                       <Icon name="ri:delete-bin-line" class="size-5" />
                     </button>
                   </form>
                 </div>
               </div>
 
-              <div data-note-content class="prose prose-sm text-day-200 prose-invert max-w-none text-pretty">
+              <div data-note-content class="prose prose-sm max-w-none text-pretty text-day-200 prose-invert">
                 <Markdown content={note.content} />
               </div>
 
@@ -348,7 +348,7 @@ if (!user) return Astro.rewrite('/404')
       class="mt-10 space-y-2"
       data-astro-reload
     >
-      <h3 class="font-title mb-0 text-center text-xl leading-none font-bold">Add Note</h3>
+      <h3 class="mb-0 text-center font-title text-xl leading-none font-bold">Add Note</h3>
 
       <input type="hidden" name="userId" value={user.id} />
       <InputTextArea
@@ -363,26 +363,26 @@ if (!user) return Astro.rewrite('/404')
   <FormSection title="Service Affiliations">
     {
       user.serviceAffiliations.length === 0 ? (
-        <p class="text-day-200 text-center">No service affiliations yet.</p>
+        <p class="text-center text-day-200">No service affiliations yet.</p>
       ) : (
         <div class="grid grid-cols-2 gap-x-4">
           {user.serviceAffiliations.map((affiliation) => {
             const roleInfo = getServiceUserRoleInfo(affiliation.role)
             return (
-              <div class="bg-night-600 border-night-400 flex items-center justify-start gap-2 rounded-lg border px-3 py-2">
+              <div class="flex items-center justify-start gap-2 rounded-lg border border-night-400 bg-night-600 px-3 py-2">
                 <BadgeSmall color={roleInfo.color} text={roleInfo.label} icon={roleInfo.icon} />
-                <span class="text-day-400 text-sm">at</span>
+                <span class="text-sm text-day-400">at</span>
                 <a
                   href={`/service/${affiliation.service.slug}`}
-                  class="text-day-100 hover:text-day-50 flex items-center gap-1 leading-none font-medium hover:underline"
+                  class="flex items-center gap-1 leading-none font-medium text-day-100 hover:text-day-50 hover:underline"
                 >
                   <span>{affiliation.service.name}</span>
-                  <Icon name="ri:external-link-line" class="text-day-400 size-3.5" />
+                  <Icon name="ri:external-link-line" class="size-3.5 text-day-400" />
                 </a>
                 <TimeFormatted
                   date={affiliation.createdAt}
                   hourPrecision
-                  class="text-day-400 ms-auto me-2 text-sm"
+                  class="ms-auto me-2 text-sm text-day-400"
                 />
 
                 <form
@@ -409,7 +409,7 @@ if (!user) return Astro.rewrite('/404')
       data-astro-reload
       class="mt-10 space-y-2"
     >
-      <h3 class="font-title mb-0 text-center text-xl leading-none font-bold">Add Affiliation</h3>
+      <h3 class="mb-0 text-center font-title text-xl leading-none font-bold">Add Affiliation</h3>
 
       <input type="hidden" name="userId" value={user.id} />
 

@@ -1,6 +1,8 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 
+import type { Assert } from '../lib/assert'
 import type { NotificationType } from '@prisma/client'
+import type { Equals } from 'ts-toolbelt/out/Any/Equals'
 
 type NotificationTypeInfo<T extends string | null | undefined = string> = {
   id: T
@@ -98,3 +100,5 @@ export const {
     },
   ] as const satisfies NotificationTypeInfo<NotificationType>[]
 )
+
+type _ExpectToHaveAllValues = Assert<Equals<(typeof notificationTypes)[number]['id'], NotificationType>>

@@ -69,7 +69,7 @@ if (!user) return Astro.rewrite('/404')
     },
   ]}
 >
-  <h2 class="font-title text-day-200 mb-2 text-lg font-semibold">What will be deleted:</h2>
+  <h2 class="mb-2 font-title text-lg font-semibold text-day-200">What will be deleted:</h2>
 
   <a
     href="/account"
@@ -78,53 +78,53 @@ if (!user) return Astro.rewrite('/404')
     <UserBadge user={user} size="lg" noLink classNames={{ text: 'group-hover:underline' }} />
     <Icon
       name="ri:forbid-line"
-      class="2xs:block absolute top-1/2 left-3 hidden size-8 -translate-y-1/2 text-red-300/10"
+      class="absolute top-1/2 left-3 hidden size-8 -translate-y-1/2 text-red-300/10 2xs:block"
     />
     <Icon
       name="ri:forbid-2-line"
-      class="2xs:block absolute top-1/2 right-3 hidden size-8 -translate-y-1/2 text-red-300/10"
+      class="absolute top-1/2 right-3 hidden size-8 -translate-y-1/2 text-red-300/10 2xs:block"
     />
   </a>
 
-  <ul class="2xs:grid-cols-2 mb-8 grid grid-cols-1 gap-x-1 gap-y-0">
+  <ul class="mb-8 grid grid-cols-1 gap-x-1 gap-y-0 2xs:grid-cols-2">
     <li>
-      <span class="text-day-200 me-1 align-[-0.1em] text-2xl font-bold">1</span>
-      <span class="text-day-400 text-sm">User</span>
+      <span class="me-1 align-[-0.1em] text-2xl font-bold text-day-200">1</span>
+      <span class="text-sm text-day-400">User</span>
     </li>
 
     <li>
-      <span class="text-day-200 me-1 align-[-0.1em] text-2xl font-bold"
+      <span class="me-1 align-[-0.1em] text-2xl font-bold text-day-200"
         >{user._count.comments.toLocaleString()}</span
       >
-      <span class="text-day-400 text-sm">Comments <span class="text-xs">(+ their replies)</span></span>
+      <span class="text-sm text-day-400">Comments <span class="text-xs">(+ their replies)</span></span>
     </li>
 
     <li>
-      <span class="text-day-200 me-1 align-[-0.1em] text-2xl font-bold"
+      <span class="me-1 align-[-0.1em] text-2xl font-bold text-day-200"
         >{user._count.commentVotes.toLocaleString()}</span
       >
-      <span class="text-day-400 text-sm">Comment Votes</span>
+      <span class="text-sm text-day-400">Comment Votes</span>
     </li>
 
     <li>
-      <span class="text-day-200 me-1 align-[-0.1em] text-2xl font-bold"
+      <span class="me-1 align-[-0.1em] text-2xl font-bold text-day-200"
         >{user._count.suggestions.toLocaleString()}</span
       >
-      <span class="text-day-400 text-sm">Service Suggestions</span>
+      <span class="text-sm text-day-400">Service Suggestions</span>
     </li>
 
     <li>
-      <span class="text-day-200 me-1 align-[-0.1em] text-2xl font-bold"
+      <span class="me-1 align-[-0.1em] text-2xl font-bold text-day-200"
         >{user._count.suggestionMessages.toLocaleString()}</span
       >
-      <span class="text-day-400 text-sm">Suggestion Messages</span>
+      <span class="text-sm text-day-400">Suggestion Messages</span>
     </li>
 
     <li>
-      <span class="text-day-200 me-1 align-[-0.1em] text-2xl font-bold"
+      <span class="me-1 align-[-0.1em] text-2xl font-bold text-day-200"
         >{user._count.verificationRequests.toLocaleString()}</span
       >
-      <span class="text-day-400 text-sm">Verification Requests</span>
+      <span class="text-sm text-day-400">Verification Requests</span>
     </li>
   </ul>
 

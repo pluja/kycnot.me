@@ -1,8 +1,10 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import type { Assert } from '../lib/assert'
 import type { TailwindColor } from '../lib/colors'
 import type { CommentStatus } from '@prisma/client'
+import type { Equals } from 'ts-toolbelt/out/Any/Equals'
 
 type CommentStatusInfo<T extends string | null | undefined = string> = {
   id: T
@@ -63,3 +65,5 @@ export const {
     },
   ] as const satisfies CommentStatusInfo<CommentStatus>[]
 )
+
+type _ExpectToHaveAllValues = Assert<Equals<(typeof commentStatus)[number]['id'], CommentStatus>>

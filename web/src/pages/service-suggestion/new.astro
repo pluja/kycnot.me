@@ -92,9 +92,9 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
     },
   ]}
 >
-  <h1 class="font-title mt-12 text-center text-3xl font-bold">Service suggestion</h1>
+  <h1 class="mt-12 text-center font-title text-3xl font-bold">Service suggestion</h1>
 
-  <p class="text-day-400 mb-6 text-center text-sm">
+  <p class="mb-6 text-center text-sm text-day-400">
     Suggestions are reviewed by moderators before being public.
   </p>
 
@@ -107,14 +107,14 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
     {
       result?.data?.hasDuplicates && (
         <>
-          <div class="sm:border-night-300 sm:bg-night-500 mb-16 sm:rounded-lg sm:border sm:p-2 md:p-4">
+          <div class="mb-16 sm:rounded-lg sm:border sm:border-night-300 sm:bg-night-500 sm:p-2 md:p-4">
             <input type="hidden" name="skipDuplicateCheck" value="true" />
 
-            <h2 class="font-title flex items-center justify-center gap-2 text-2xl font-semibold text-red-500">
+            <h2 class="flex items-center justify-center gap-2 font-title text-2xl font-semibold text-red-500">
               Possible duplicates found
             </h2>
 
-            <p class="text-day-400 text-center">Is your service already listed below?</p>
+            <p class="text-center text-day-400">Is your service already listed below?</p>
 
             <div class="mt-4 space-y-2">
               {result.data.possibleDuplicates.map((duplicate) => {
@@ -125,16 +125,16 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
                 }
 
                 return (
-                  <div class="border-night-400 bg-night-600 flex gap-4 rounded-lg border p-4 shadow-sm">
+                  <div class="flex gap-4 rounded-lg border border-night-400 bg-night-600 p-4 shadow-sm">
                     <div class="grow">
-                      <p class="text-day-100 mb-1 text-lg font-medium">{duplicate.name}</p>
-                      <p class="text-day-300 mb-3 line-clamp-2 text-sm">{duplicate.description}</p>
+                      <p class="mb-1 text-lg font-medium text-day-100">{duplicate.name}</p>
+                      <p class="mb-3 line-clamp-2 text-sm text-day-300">{duplicate.description}</p>
                     </div>
                     <div class="flex shrink-0 flex-col justify-center gap-2">
                       <a
                         href={`/service/${duplicate.slug}`}
                         target="_blank"
-                        class="text-day-300 bg-night-300 hover:bg-night-400 flex items-center gap-1 rounded px-2.5 py-1.5 text-sm font-medium transition-colors"
+                        class="flex items-center gap-1 rounded-sm bg-night-300 px-2.5 py-1.5 text-sm font-medium text-day-300 transition-colors hover:bg-night-400"
                       >
                         <Icon name="ri:external-link-line" class="size-4 shrink-0" />
                         View
@@ -143,7 +143,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
                       <a
                         href={editServiceUrl.toString()}
                         target="_blank"
-                        class="flex items-center gap-1 rounded bg-green-600 px-2.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-green-700"
+                        class="flex items-center gap-1 rounded-sm bg-green-600 px-2.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-green-700"
                       >
                         <Icon name="ri:edit-line" class="size-4 shrink-0" />
                         Submit as edit
@@ -154,20 +154,20 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
               })}
             </div>
 
-            <div class="bg-night-400 mt-4 hidden h-px w-full sm:block" />
+            <div class="mt-4 hidden h-px w-full bg-night-400 sm:block" />
 
             <div class="mt-4 flex items-center gap-2 px-4">
-              <p class="text-day-200 flex-1">None of these match?</p>
+              <p class="flex-1 text-day-200">None of these match?</p>
               <button
                 type="submit"
-                class="bg-day-700 text-day-100 hover:bg-day-600 flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium"
+                class="flex items-center gap-2 rounded-md bg-day-700 px-4 py-2 text-sm font-medium text-day-100 hover:bg-day-600"
               >
                 <Icon name="ri:send-plane-2-line" class="size-4" />
                 Submit anyway
               </button>
             </div>
           </div>
-          <h1 class="font-title mt-12 mb-6 block text-center text-3xl font-bold sm:hidden">
+          <h1 class="mt-12 mb-6 block text-center font-title text-3xl font-bold sm:hidden">
             Review your suggestion
           </h1>
         </>
@@ -321,7 +321,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       error={inputErrors.kycLevelClarification}
     />
 
-    <div class="xs:grid-cols-[1fr_2fr] grid grid-cols-1 items-stretch gap-x-4 gap-y-6">
+    <div class="grid grid-cols-1 items-stretch gap-x-4 gap-y-6 xs:grid-cols-[1fr_2fr]">
       <InputCheckboxGroup
         name="categories"
         label="Categories"

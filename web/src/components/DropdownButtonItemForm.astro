@@ -19,7 +19,7 @@ const { label, icon, action, data, class: className, ...htmlProps } = Astro.prop
 <form action={action} class={cn('contents', className)} {...htmlProps}>
   {Object.entries(data).map(([key, value]) => <input type="hidden" name={key} value={String(value)} />)}
   <button
-    class="text-day-300 hover:bg-night-800 flex w-full items-center px-4 py-2 text-left text-sm hover:text-white"
+    class="flex w-full items-center px-4 py-2 text-left text-sm text-day-300 hover:bg-night-800 hover:text-white"
     type="submit"
   >
     {icon && <Icon name={icon} class="mr-2 size-4" />}

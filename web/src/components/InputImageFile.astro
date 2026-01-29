@@ -32,9 +32,9 @@ function makeDownloadFilename(value: string) {
     src={value}
     alt="Preview"
     class={cn(
-      'block h-24 rounded object-contain',
+      'block h-24 rounded-sm object-contain',
       square && 'aspect-square',
-      'no-js:hidden not-[[src]]:hidden [&[src=""]]:hidden',
+      'not-[[src]]:hidden no-js:hidden [&[src=""]]:hidden',
       '[&:is(:has([data-remove-checkbox]:checked)_~_*)]:hidden'
     )}
   />
@@ -54,7 +54,7 @@ function makeDownloadFilename(value: string) {
           size="sm"
           label="Download"
           class={cn(
-            'bg-night-600 border-night-400 text-day-200 2xs:[&:is(:has([data-remove-checkbox]:not(:checked))_~_*_*)]:h-24 2xs:[&:is(:has([data-remove-checkbox]:not(:checked))_~_*_*)]:px-0 2xs:[&:is(:has([data-remove-checkbox]:not(:checked))_~_*_*)]:w-8 shrink-0 rounded-md border'
+            'shrink-0 rounded-md border border-night-400 bg-night-600 text-day-200 2xs:[&:is(:has([data-remove-checkbox]:not(:checked))_~_*_*)]:h-24 2xs:[&:is(:has([data-remove-checkbox]:not(:checked))_~_*_*)]:w-8 2xs:[&:is(:has([data-remove-checkbox]:not(:checked))_~_*_*)]:px-0'
           )}
           classNames={{
             label: '2xs:[&:is(:has([data-remove-checkbox]:not(:checked))_~_*_*)]:hidden block ',

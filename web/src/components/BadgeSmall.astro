@@ -9,7 +9,7 @@ const badge = tv({
   slots: {
     base: 'inline-flex h-4 items-center justify-center gap-0.75 rounded-full px-1.25 text-[10px] font-medium',
     icon: 'size-3 shrink-0',
-    text: 'mx-0.25 overflow-hidden text-ellipsis whitespace-nowrap [&>a]:hover:underline [&>a]:focus-visible:underline',
+    text: 'mx-0.25 truncate [&>a]:hover:underline [&>a]:focus-visible:underline',
   },
   variants: {
     color: {
@@ -112,10 +112,10 @@ const badge = tv({
     { color: 'stone', variant: 'faded', class: { base: 'bg-stone-500/30 text-stone-300' } },
     // White
     { color: 'white', variant: 'solid', class: { base: 'bg-white text-black' } },
-    { color: 'white', variant: 'faded', class: { base: 'bg-white-500/30 text-white-300' } },
+    { color: 'white', variant: 'faded', class: { base: 'bg-white/30 text-white' } },
     // Black
     { color: 'black', variant: 'solid', class: { base: 'bg-black text-white' } },
-    { color: 'black', variant: 'faded', class: { base: 'bg-black-500/30 text-black-300' } },
+    { color: 'black', variant: 'faded', class: { base: 'bg-black/30 text-white' } },
   ],
   defaultVariants: {
     color: 'gray',

@@ -78,7 +78,7 @@ const kycLevelInfo = getKycLevelInfo(`${kycLevel}`)
     href={Element === 'a' ? `/service/${slug}` : undefined}
     aria-label={Element === 'a' ? name : undefined}
     class={cn(
-      'border-night-600 group/card bg-night-800 flex flex-col gap-(--gap) rounded-xl border p-(--gap) [--gap:calc(var(--spacing)*3)]',
+      'group/card flex flex-col gap-(--gap) rounded-xl border border-night-600 bg-night-800 p-(--gap) [--gap:calc(var(--spacing)*3)]',
       (serviceVisibility === 'ARCHIVED' || verificationStatus === 'VERIFICATION_FAILED') &&
         'opacity-75 transition-opacity hover:opacity-100 focus-visible:opacity-100',
       className
@@ -148,7 +148,7 @@ const kycLevelInfo = getKycLevelInfo(`${kycLevel}`)
         <div class="flex items-center gap-4 overflow-hidden mask-r-from-[calc(100%-var(--spacing)*4)]">
           {
             categories.map((category) => (
-              <span class="text-day-300 inline-flex shrink-0 items-center gap-1 text-sm leading-none">
+              <span class="inline-flex shrink-0 items-center gap-1 text-sm leading-none text-day-300">
                 <Icon name={category.icon} class="size-4" is:inline={inlineIcons} />
                 <span>{category.name}</span>
               </span>
@@ -159,7 +159,7 @@ const kycLevelInfo = getKycLevelInfo(`${kycLevel}`)
     </div>
 
     <div class="flex-1">
-      <p class="text-day-400 line-clamp-3 text-sm leading-tight">
+      <p class="line-clamp-3 text-sm/tight text-day-400">
         {description}
       </p>
     </div>
@@ -176,7 +176,7 @@ const kycLevelInfo = getKycLevelInfo(`${kycLevel}`)
       </Tooltip>
 
       <Tooltip
-        class="text-day-300 ml-3 inline-flex items-center gap-1 text-sm font-bold whitespace-nowrap"
+        class="ml-3 inline-flex items-center gap-1 text-sm font-bold whitespace-nowrap text-day-300"
         text={kycLevelInfo.description}
       >
         <Icon name={kycLevelInfo.icon} class="size-4" />
@@ -193,7 +193,7 @@ const kycLevelInfo = getKycLevelInfo(`${kycLevel}`)
                 <Icon
                   is:inline={inlineIcons}
                   name={currency.icon}
-                  class={cn('text-day-600 box-content size-4 p-1', { 'text-white': isAccepted })}
+                  class={cn('box-content size-4 p-1 text-day-600', { 'text-white': isAccepted })}
                 />
               </Tooltip>
             )

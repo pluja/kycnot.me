@@ -103,7 +103,7 @@ const actualSuccess = [...success, ...Astro.locals.banners.successes]
     <BaseHead {...baseHeadProps} />
   </head>
   <body
-    class={cn('bg-night-700 text-day-300 flex min-h-dvh flex-col *:shrink-0', classNames?.body)}
+    class={cn('flex min-h-dvh flex-col bg-night-700 text-day-300 *:shrink-0', classNames?.body)}
     data-is-error-page={isErrorPage ? '' : undefined}
     data-is-logged-in={Astro.locals.user !== null ? '' : undefined}
   >
@@ -130,7 +130,7 @@ const actualSuccess = [...success, ...Astro.locals.banners.successes]
       actualSuccess.length > 0 && (
         <ul class="container mx-auto my-4 space-y-4 px-4">
           {actualSuccess.map((message) => (
-            <li class="font-title rounded-lg border border-green-500/30 bg-green-500/20 px-4 py-3 text-green-400">
+            <li class="rounded-lg border border-green-500/30 bg-green-500/20 px-4 py-3 font-title text-green-400">
               {message}
             </li>
           ))}
@@ -142,7 +142,7 @@ const actualSuccess = [...success, ...Astro.locals.banners.successes]
       actualErrors.length > 0 && (
         <ul class="container mx-auto my-4 space-y-4 px-4">
           {actualErrors.map((error) => (
-            <li class="font-title rounded-lg border border-red-500/30 bg-red-500/20 px-4 py-3 text-red-400">
+            <li class="rounded-lg border border-red-500/30 bg-red-500/20 px-4 py-3 font-title text-red-400">
               {error}
             </li>
           ))}

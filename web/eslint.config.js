@@ -1,12 +1,14 @@
 // @ts-check
 import eslint from '@eslint/js'
 import stylistic from '@stylistic/eslint-plugin'
+import eslintParserAstro from 'astro-eslint-parser'
 import { defineConfig } from 'eslint/config'
 import eslintPluginAstro from 'eslint-plugin-astro'
+import eslintPluginBetterTailwindcss from 'eslint-plugin-better-tailwindcss'
 import importPlugin from 'eslint-plugin-import'
 import globals from 'globals'
 import { without } from 'lodash-es'
-import tseslint from 'typescript-eslint'
+import tseslint, { parser as eslintParserTypeScript } from 'typescript-eslint'
 
 export default defineConfig(
   {
@@ -46,6 +48,7 @@ export default defineConfig(
   eslintPluginAstro.configs['flat/recommended'],
   // eslint-disable-next-line import/no-named-as-default-member
   eslintPluginAstro.configs['flat/jsx-a11y-strict'],
+  eslintPluginBetterTailwindcss.configs.recommended,
   [
     // These rules don't work with Astro and produce false positives
     {
@@ -67,6 +70,20 @@ export default defineConfig(
       },
     },
   ],
+  {
+    files: ['**/*.astro'],
+    languageOptions: {
+      parser: eslintParserAstro,
+      parserOptions: {
+        parser: eslintParserTypeScript,
+      },
+    },
+    settings: {
+      'better-tailwindcss': {
+        entryPoint: 'src/styles/global.css',
+      },
+    },
+  },
   {
     languageOptions: {
       globals: {
@@ -141,6 +158,9 @@ export default defineConfig(
           allowTemplateLiterals: 'never',
         },
       ],
+      'better-tailwindcss/enforce-consistent-line-wrapping': 'off',
+      'better-tailwindcss/enforce-canonical-classes': 'off',
+      'better-tailwindcss/no-unknown-classes': ['error', { ignore: ['custom-.*', 'not-prose'] }],
     },
   },
   {

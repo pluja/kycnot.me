@@ -41,25 +41,25 @@ const prettyToken = result ? prettifyUserSecretToken(result.data.token) : null
     prettyToken ? (
       <>
         <div class="mb-2 flex items-center gap-3 rounded-md bg-red-900/80 p-2 text-red-200">
-          <Icon name="ri:delete-bin-line" class="size-5 flex-shrink-0" />
+          <Icon name="ri:delete-bin-line" class="size-5 shrink-0" />
           <p class="text-sm text-pretty">Won't show again and can't be recovered!</p>
         </div>
-        <div class="border-day-800 js:pr-24 bg-night-800 relative rounded-md border p-3 font-mono break-all text-white">
+        <div class="relative rounded-md border border-day-800 bg-night-800 p-3 font-mono break-all text-white js:pr-24">
           {prettyToken}
           <div class="absolute inset-y-0 right-2 flex items-center">
             <CopyButton copyText={prettyToken} size="sm" color="success" />
           </div>
         </div>
 
-        <p class="text-day-500 mt-1 text-center text-sm text-balance">
-          Save it in a <span class="text-day-200 font-medium">password manager</span>
-          or <span class="text-day-200 font-medium">secure location</span>
+        <p class="mt-1 text-center text-sm text-balance text-day-500">
+          Save it in a <span class="font-medium text-day-200">password manager</span>
+          or <span class="font-medium text-day-200">secure location</span>
         </p>
 
         <form method="GET" action="/" class="mt-8 space-y-4">
           <div class="flex items-center gap-4">
             <input type="checkbox" id="confirm-saved" required />
-            <label for="confirm-saved" class="text-day-400 text-sm text-pretty">
+            <label for="confirm-saved" class="text-sm text-pretty text-day-400">
               I saved my Login Key
             </label>
           </div>
@@ -70,11 +70,11 @@ const prettyToken = result ? prettifyUserSecretToken(result.data.token) : null
     ) : (
       <>
         <div class="mt-12 flex items-center justify-center gap-3 rounded-md bg-red-900/80 p-3 text-red-200">
-          <Icon name="ri:alert-line" class="size-5 flex-shrink-0" />
+          <Icon name="ri:alert-line" class="size-5 shrink-0" />
           <p class="text-sm text-pretty">Your Login Key can't be shown again</p>
         </div>
 
-        <p class="text-day-300 mt-2 text-center text-sm text-balance">
+        <p class="mt-2 text-center text-sm text-balance text-day-300">
           If you lost it,
           <a href="/about#contact" class="text-green-400 hover:underline focus-visible:underline">
             contact us

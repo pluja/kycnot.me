@@ -1,7 +1,9 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import type { Assert } from '../lib/assert'
 import type { AttributeType, KycLevelClarification } from '@prisma/client'
+import type { Equals } from 'ts-toolbelt/out/Any/Equals'
 
 type KycLevelClarificationInfo<T extends string | null | undefined = string> = {
   value: T
@@ -49,3 +51,7 @@ export const {
     },
   ] as const satisfies KycLevelClarificationInfo<KycLevelClarification>[]
 )
+
+type _ExpectToHaveAllValues = Assert<
+  Equals<(typeof kycLevelClarifications)[number]['value'], KycLevelClarification>
+>

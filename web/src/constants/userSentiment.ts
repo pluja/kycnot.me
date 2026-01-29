@@ -1,6 +1,9 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import type { Assert } from '../lib/assert'
+import type { Equals } from 'ts-toolbelt/out/Any/Equals'
+
 type UserSentimentInfo<T extends string | null | undefined = string> = {
   id: T
   icon: string
@@ -59,5 +62,9 @@ export const {
         background: 'bg-red-950/20',
       },
     },
-  ] as const satisfies UserSentimentInfo[]
+  ] as const satisfies UserSentimentInfo<PrismaJson.UserSentiment['sentiment']>[]
 )
+
+type _ExpectToHaveAllValues = Assert<
+  Equals<(typeof userSentiments)[number]['id'], PrismaJson.UserSentiment['sentiment']>
+>

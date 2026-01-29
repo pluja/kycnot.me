@@ -1,7 +1,9 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import type { Assert } from '../lib/assert'
 import type { ServiceSuggestionStatus } from '@prisma/client'
+import type { Equals } from 'ts-toolbelt/out/Any/Equals'
 
 type ServiceSuggestionStatusInfo<T extends string | null | undefined = string> = {
   value: T
@@ -25,7 +27,7 @@ export const {
   'value',
   (value): ServiceSuggestionStatusInfo<typeof value> => ({
     value,
-    slug: value ? value.toLowerCase() : '',
+    slug: value ? value.toLowerCase().replace('_', '-') : '',
     label: value ? transformCase(value, 'title') : String(value),
     icon: 'ri:question-line',
     color: 'gray',
@@ -74,3 +76,7 @@ export const {
     },
   ] as const satisfies ServiceSuggestionStatusInfo<ServiceSuggestionStatus>[]
 )
+
+type _ExpectToHaveAllValues = Assert<
+  Equals<(typeof serviceSuggestionStatuses)[number]['value'], ServiceSuggestionStatus>
+>

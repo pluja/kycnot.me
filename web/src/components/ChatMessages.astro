@@ -37,7 +37,7 @@ const { messages, userId, class: className, ...htmlProps } = Astro.props
   {...htmlProps}
 >
   <p
-    class="js:hidden sticky bottom-0 -z-1 flex min-h-7 w-full items-end justify-center text-center text-xs text-balance text-gray-500"
+    class="sticky bottom-0 -z-1 flex min-h-7 w-full items-end justify-center text-center text-xs text-balance text-gray-500 js:hidden"
   >
     Refresh the page to see new messages
   </p>
@@ -71,7 +71,7 @@ const { messages, userId, class: className, ...htmlProps } = Astro.props
               )}
             >
               {!isCurrentUser && !isNextFromSameUser && (
-                <UserBadge user={message.user} size="sm" class="text-day-500 mb-0.5 text-xs" />
+                <UserBadge user={message.user} size="sm" class="mb-0.5 text-xs text-day-500" />
               )}
               <p
                 class={cn(
@@ -85,13 +85,13 @@ const { messages, userId, class: className, ...htmlProps } = Astro.props
                 set:text={message.content}
               />
               {(!isPrevFromSameUser || !isPrevSameDate) && (
-                <p class="text-day-500 mt-0.5 mb-2 text-xs">{message.formattedCreatedAt}</p>
+                <p class="mt-0.5 mb-2 text-xs text-day-500">{message.formattedCreatedAt}</p>
               )}
             </div>
           )
         })
     ) : (
-      <div class="text-day-500 my-16 text-center text-sm italic">No messages yet</div>
+      <div class="my-16 text-center text-sm text-day-500 italic">No messages yet</div>
     )
   }
 </div>

@@ -81,12 +81,12 @@ const categories: {
     categories.map((category) => {
       return (
         <>
-          <h3 class="font-title mb-2 text-center text-xl font-semibold text-white">{category.title}</h3>
-          <ul class="xs:grid-cols-2 grid grid-cols-1 gap-6">
+          <h3 class="mb-2 text-center font-title text-xl font-semibold text-white">{category.title}</h3>
+          <ul class="grid grid-cols-1 gap-6 xs:grid-cols-2">
             {category.assets.map((asset) => (
               <li>
                 <div
-                  class="bg-transparency-grid relative mx-auto flex aspect-3/1 max-w-sm items-center justify-center rounded-lg p-4"
+                  class="custom-bg-transparency-grid relative mx-auto flex aspect-3/1 max-w-sm items-center justify-center rounded-lg p-4"
                   style={{
                     '--transparency-grid-color-1': 'var(--color-night-600)',
                     '--transparency-grid-color-2': 'var(--color-night-500)',
@@ -130,7 +130,7 @@ const categories: {
 </div>
 
 <style>
-  .bg-transparency-grid {
+  .custom-bg-transparency-grid {
     --transparency-grid-color-1: #fff;
     --transparency-grid-color-2: #ccc;
     --transparency-grid-size: calc(var(--spacing) * 8);

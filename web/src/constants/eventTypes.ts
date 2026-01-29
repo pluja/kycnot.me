@@ -1,8 +1,10 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 import { transformCase } from '../lib/strings'
 
+import type { Assert } from '../lib/assert'
 import type { TailwindColor } from '../lib/colors'
 import type { EventType } from '@prisma/client'
+import type { Equals } from 'ts-toolbelt/out/Any/Equals'
 
 type EventTypeInfo<T extends string | null | undefined = string> = {
   id: T
@@ -143,3 +145,5 @@ export const {
     },
   ] as const satisfies EventTypeInfo<EventType>[]
 )
+
+type _ExpectToHaveAllValues = Assert<Equals<(typeof eventTypes)[number]['id'], EventType>>

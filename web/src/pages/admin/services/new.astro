@@ -65,7 +65,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
   description="Create a new service for KYCnot.me"
   widthClassName="max-w-3xl"
 >
-  <h1 class="font-title mt-12 mb-6 text-center text-3xl font-bold">Create Service</h1>
+  <h1 class="mt-12 mb-6 text-center font-title text-3xl font-bold">Create Service</h1>
 
   <form method="POST" action={actions.admin.service.create} enctype="multipart/form-data" class="space-y-6">
     <InputText
@@ -198,7 +198,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
       error={inputErrors.kycLevelClarification}
     />
 
-    <div class="xs:grid-cols-[1fr_2fr] grid grid-cols-1 items-stretch gap-x-4 gap-y-6">
+    <div class="grid grid-cols-1 items-stretch gap-x-4 gap-y-6 xs:grid-cols-[1fr_2fr]">
       <InputCheckboxGroup
         name="categories"
         label="Categories"

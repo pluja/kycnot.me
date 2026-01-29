@@ -76,5 +76,5 @@ export const {
       privacyPoints: -25,
       attributeType: 'BAD',
     },
-  ] as const satisfies KycLevelInfo<'0' | '1' | '2' | '3' | '4'>[]
+  ] as const satisfies KycLevelInfo<`${number}`>[]
 )

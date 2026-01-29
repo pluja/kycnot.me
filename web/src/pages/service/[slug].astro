@@ -37,6 +37,7 @@ import { getServiceVisibilityInfo } from '../../constants/serviceVisibility'
 import { getTosHighlightRatingInfo } from '../../constants/tosHighlightRating'
 import { getUserSentimentInfo } from '../../constants/userSentiment'
 import { getVerificationStatusInfo, verificationStatusesByValue } from '../../constants/verificationStatus'
+import { getVerificationStepStatusInfo } from '../../constants/verificationStepStatus'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { someButNotAll, undefinedIfEmpty } from '../../lib/arrays'
 import { makeNonDbAttributes, sortAttributes } from '../../lib/attributes'
@@ -359,52 +360,6 @@ const hasRequestedVerification =
 
 const VerificationRequestElement = user ? 'button' : 'a'
 
-const getVerificationStepStatusInfo = (status: VerificationStepStatus) => {
-  switch (status) {
-    case VerificationStepStatus.PENDING:
-      return {
-        text: 'Pending',
-        icon: 'ri:loader-2-line',
-        color: 'gray',
-        timelineIconClass: 'text-gray-400',
-      } as const
-    case VerificationStepStatus.IN_PROGRESS:
-      return {
-        text: 'In Progress',
-        icon: 'ri:loader-4-line',
-        color: 'blue',
-        timelineIconClass: 'text-blue-400 animate-spin',
-      } as const
-    case VerificationStepStatus.PASSED:
-      return {
-        text: 'Passed',
-        icon: 'ri:check-line',
-        color: 'green',
-        timelineIconClass: 'text-green-400',
-      } as const
-    case VerificationStepStatus.FAILED:
-      return {
-        text: 'Failed',
-        icon: 'ri:close-line',
-        color: 'red',
-        timelineIconClass: 'text-red-400',
-      } as const
-    case VerificationStepStatus.WARNING:
-      return {
-        text: 'Warning',
-        icon: 'ri:alert-line',
-        color: 'yellow',
-        timelineIconClass: 'text-yellow-400',
-      } as const
-    default:
-      return {
-        text: 'Unknown',
-        icon: 'ri:question-mark',
-        color: 'gray',
-        timelineIconClass: 'text-gray-500',
-      } as const
-  }
-}
 const itemReviewedId = new URL(`/service/${service.slug}`, Astro.url).href
 
 const ogImageTemplateData = {
@@ -594,7 +549,7 @@ const sortedVerificationSteps = orderBy(
         />
       )
     }
-    <h1 class="font-title flex-1 text-2xl leading-tight font-bold tracking-wider text-white">
+    <h1 class="flex-1 font-title text-2xl/tight font-bold tracking-wider text-white">
       {service.name}{
         !!statusIcon && (
           <Tooltip text={statusIcon.label} position="right">
@@ -705,7 +660,7 @@ const sortedVerificationSteps = orderBy(
           <a
             href={makeLoginUrl(Astro.url)}
             data-astro-reload
-            class="border-night-500 bg-night-800 hover:bg-night-900 focus-visible:bg-night-900 focus-visible:text-day-200 hover:text-day-200 inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm shadow-sm transition-colors duration-200"
+            class="inline-flex items-center gap-2 rounded-lg border border-night-500 bg-night-800 px-4 py-2 text-sm shadow-sm transition-colors duration-200 hover:bg-night-900 hover:text-day-200 focus-visible:bg-night-900 focus-visible:text-day-200"
             aria-haspopup="true"
           >
             <Icon name="ri:eye-line" class="size-4" />
@@ -717,7 +672,7 @@ const sortedVerificationSteps = orderBy(
       <DropdownButton
         label="Contribute"
         icon="ri:edit-line"
-        class="2xs:block hidden"
+        class="hidden 2xs:block"
         classNames={{
           label: 'hidden md:inline-block',
           arrow: 'hidden md:inline-block',
@@ -747,13 +702,13 @@ const sortedVerificationSteps = orderBy(
 
   <div
     class={cn('mt-2 flex flex-row items-start gap-2', {
-      'xs:flex-row xs:items-start flex-col-reverse items-center': service.categories.length >= 3,
+      'flex-col-reverse items-center xs:flex-row xs:items-start': service.categories.length >= 3,
     })}
     aria-label="Categories"
   >
     <ul
       class={cn('flex flex-1 flex-wrap justify-start gap-2', {
-        'xs:justify-start justify-center': service.categories.length >= 3,
+        'justify-center xs:justify-start': service.categories.length >= 3,
       })}
       aria-label="Categories"
     >
@@ -780,7 +735,7 @@ const sortedVerificationSteps = orderBy(
             <Tooltip text={currency.name}>
               <Icon
                 name={currency.icon}
-                class={cn('text-day-600 box-content size-4 p-1', {
+                class={cn('box-content size-4 p-1 text-day-600', {
                   'text-white': isAccepted,
                 })}
               />
@@ -791,13 +746,13 @@ const sortedVerificationSteps = orderBy(
     </div>
   </div>
 
-  <div class="prose prose-sm prose-invert text-day-400 mt-2 text-pretty">
+  <div class="prose prose-sm mt-2 text-pretty text-day-400 prose-invert">
     <Markdown content={service.description} />
   </div>
 
   {
     shownLinks.length + hiddenLinks.length > 0 && (
-      <ul aria-label="Service links" class="xs:justify-start mt-4 flex flex-wrap justify-center gap-2">
+      <ul aria-label="Service links" class="mt-4 flex flex-wrap justify-center gap-2 xs:justify-start">
         {shownLinks.map((url) => (
           <li>
             <ServiceLinkButton
@@ -817,10 +772,10 @@ const sortedVerificationSteps = orderBy(
         />
 
         {hiddenLinks.length > 0 && (
-          <li class="peer-focus-visible:ring-offset-night-700 rounded-full peer-checked:hidden peer-focus-visible:ring-4 peer-focus-visible:ring-orange-500 peer-focus-visible:ring-offset-2">
+          <li class="rounded-full peer-checked:hidden peer-focus-visible:ring-4 peer-focus-visible:ring-orange-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-night-700">
             <label
               for="show-more-links"
-              class="2xs:text-sm 2xs:h-8 2xs:gap-2 2xs:px-4 text-day-100 bg-day-800 hover:bg-day-900 inline-flex h-6 cursor-pointer items-center gap-1 rounded-full px-2 text-xs whitespace-nowrap transition-colors duration-200"
+              class="inline-flex h-6 cursor-pointer items-center gap-1 rounded-full bg-day-800 px-2 text-xs whitespace-nowrap text-day-100 transition-colors duration-200 hover:bg-day-900 2xs:h-8 2xs:gap-2 2xs:px-4 2xs:text-sm"
             >
               +{hiddenLinks.length.toLocaleString()} more
             </label>
@@ -843,7 +798,7 @@ const sortedVerificationSteps = orderBy(
 
   {
     service.contactMethods.length > 0 && (
-      <ul class="xs:justify-start mt-4 inline-flex flex-wrap justify-center">
+      <ul class="mt-4 inline-flex flex-wrap justify-center xs:justify-start">
         {service.contactMethods.map((method) => {
           const methodInfo = formatContactMethod(method.value)
 
@@ -853,9 +808,9 @@ const sortedVerificationSteps = orderBy(
                 href={method.value}
                 target="_blank"
                 rel="noopener noreferrer"
-                class="text-day-300 hover:text-day-200 flex items-center gap-1 px-2 py-1 hover:underline"
+                class="flex items-center gap-1 px-2 py-1 text-day-300 hover:text-day-200 hover:underline"
               >
-                <Icon name={methodInfo.icon} class="text-day-200 h-5 w-5" />
+                <Icon name={methodInfo.icon} class="size-5 text-day-200" />
                 <span>{method.label ?? methodInfo.formattedValue}</span>
               </a>
             </li>
@@ -866,11 +821,11 @@ const sortedVerificationSteps = orderBy(
   }
 
   <AdminOnly>
-    <div class="border-day-500 mt-6 mb-3 flex items-center justify-between border-b">
-      <h2 class="font-title text-day-100 text-lg font-bold">Internal Notes</h2>
+    <div class="mt-6 mb-3 flex items-center justify-between border-b border-day-500">
+      <h2 class="font-title text-lg font-bold text-day-100">Internal Notes</h2>
       <a
         href={`/admin/services/${service.slug}/edit#internal-notes`}
-        class="text-day-500 hover:text-day-200 inline-flex items-center gap-1 text-xs leading-none transition-colors hover:underline"
+        class="inline-flex items-center gap-1 text-xs leading-none text-day-500 transition-colors hover:text-day-200 hover:underline"
       >
         Manage
         <Icon name="ri:arrow-right-s-line" class="size-4" />
@@ -879,7 +834,7 @@ const sortedVerificationSteps = orderBy(
 
     {
       service.internalNotes.length === 0 ? (
-        <p class="text-day-400 mt-2 text-center text-xs">No internal notes yet.</p>
+        <p class="mt-2 text-center text-xs text-day-400">No internal notes yet.</p>
       ) : (
         <div
           class={cn(
@@ -888,12 +843,12 @@ const sortedVerificationSteps = orderBy(
           )}
         >
           {service.internalNotes.map((note) => (
-            <div class="border-night-600 bg-night-800 rounded-lg border p-3">
-              <div class="prose text-day-200 prose-sm prose-invert max-w-none text-pretty">
+            <div class="rounded-lg border border-night-600 bg-night-800 p-3">
+              <div class="prose prose-sm max-w-none text-pretty text-day-200 prose-invert">
                 <Markdown content={note.content} />
               </div>
 
-              <div class="text-day-500 mt-2 flex items-center gap-1 text-xs">
+              <div class="mt-2 flex items-center gap-1 text-xs text-day-500">
                 <TimeFormatted date={note.createdAt} hourPrecision />
                 {note.addedByUser && (
                   <span class="flex items-center gap-1">
@@ -920,11 +875,11 @@ const sortedVerificationSteps = orderBy(
     </form>
   </AdminOnly>
 
-  <h2 class="font-title border-day-500 text-day-200 mt-6 mb-3 border-b text-lg font-bold" id="scores">
+  <h2 class="mt-6 mb-3 border-b border-day-500 font-title text-lg font-bold text-day-200" id="scores">
     Scores
   </h2>
-  <div class="xs:gap-8 flex flex-row flex-wrap items-stretch justify-center gap-4 sm:justify-between">
-    <div class="flex max-w-84 flex-grow flex-row items-center justify-evenly gap-4">
+  <div class="flex flex-row flex-wrap items-stretch justify-center gap-4 xs:gap-8 sm:justify-between">
+    <div class="flex max-w-84 grow flex-row items-center justify-evenly gap-4">
       <ScoreSquare
         as="a"
         href="/about#service-scores"
@@ -934,7 +889,7 @@ const sortedVerificationSteps = orderBy(
         showInfo
       />
 
-      <div class="bg-day-800 h-12 w-px flex-shrink-0 self-center"></div>
+      <div class="h-12 w-px shrink-0 self-center bg-day-800"></div>
 
       <ScoreGauge
         as="a"
@@ -955,7 +910,7 @@ const sortedVerificationSteps = orderBy(
       />
     </div>
     <div
-      class="@container flex max-w-112 flex-shrink-0 flex-grow-100 basis-64 flex-row items-start rounded-lg bg-white px-3 py-2 text-black"
+      class="@container flex max-w-md shrink-0 grow-100 basis-64 flex-row items-start rounded-lg bg-white px-3 py-2 text-black"
     >
       <Schema
         item={{
@@ -980,27 +935,27 @@ const sortedVerificationSteps = orderBy(
       />
       <div class="mr-2 flex h-full flex-col items-center justify-around @sm:mr-4">
         <Icon name={kycLevelInfo.icon} class="block size-13 @sm:size-16" />
-        <div class="text-day-600 h-4 text-center text-xs leading-none whitespace-nowrap @sm:text-sm">
+        <div class="h-4 text-center text-xs leading-none whitespace-nowrap text-day-600 @sm:text-sm">
           <span class="font-title">lvl.</span>
-          <span class="text-day-700 text-base leading-none font-bold tracking-wider @sm:text-lg"
+          <span class="text-base leading-none font-bold tracking-wider text-day-700 @sm:text-lg"
             >{kycLevelInfo.value}</span
-          ><span class="text-day-500 tracking-wider">/<span>{kycLevels.length - 1}</span></span>
+          ><span class="tracking-wider text-day-500">/<span>{kycLevels.length - 1}</span></span>
         </div>
       </div>
 
-      <dl class="flex-grow-5 basis-0">
+      <dl class="grow-5 basis-0">
         <dt class="text-base font-bold text-pretty">
           {kycLevelInfo.name}
           {
             kycLevelClarificationInfo.value !== 'NONE' && (
               <>
-                <span class="text-day-400 mx-1">•</span>
+                <span class="mx-1 text-day-400">•</span>
                 <span class="text-blue-500">{kycLevelClarificationInfo.label}</span>
               </>
             )
           }
         </dt>
-        <dd class="text-day-700 mt-1 font-sans text-sm text-pretty">
+        <dd class="mt-1 font-sans text-sm text-pretty text-day-700">
           {kycLevelInfo.description}
           <span class="font-medium text-blue-600">
             {kycLevelClarificationInfo.value !== 'NONE' && ` ${kycLevelClarificationInfo.description}`}
@@ -1044,7 +999,7 @@ const sortedVerificationSteps = orderBy(
               <details class="group/attribute">
                 <summary
                   class={cn(
-                    'bg-night-400 font-title flex cursor-pointer items-center rounded-md p-2 text-sm text-pretty select-none',
+                    'flex cursor-pointer items-center rounded-md bg-night-400 p-2 font-title text-sm text-pretty select-none',
                     attribute.typeInfo.classNames.container,
                     attribute.typeInfo.classNames.text
                   )}
@@ -1073,18 +1028,18 @@ const sortedVerificationSteps = orderBy(
 
                 <div
                   class={cn(
-                    'text-day-300 border-night-400 bg-night-400/20 mx-2 rounded-b-lg border-2 border-t-0 p-3 pt-2 text-xs',
+                    'mx-2 rounded-b-lg border-2 border-t-0 border-night-400 bg-night-400/20 p-3 pt-2 text-xs text-day-300',
                     attribute.typeInfo.classNames.subcontainer,
                     attribute.typeInfo.classNames.text
                   )}
                 >
-                  <div class="prose prose-sm prose-invert prose-p:my-1 prose-p:last:mb-0 prose-p:first:mt-0 text-xs leading-normal text-pretty text-current">
+                  <div class="prose prose-sm text-xs/normal text-pretty text-current prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
                     <Markdown content={attribute.description} />
                   </div>
 
                   <div class="mt-1 flex justify-evenly gap-4">
                     {weights.map((w) => (
-                      <div class="text-day-200 inline-flex basis-12 flex-col items-center">
+                      <div class="inline-flex basis-12 flex-col items-center text-day-200">
                         <span
                           class={cn('text-base', attribute.typeInfo.classNames.textLight, {
                             'text-red-400': w.value < 0,
@@ -1111,7 +1066,7 @@ const sortedVerificationSteps = orderBy(
                       <a
                         href={link.url}
                         class={cn(
-                          'flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 font-semibold whitespace-nowrap transition-colors',
+                          'flex flex-1 items-center justify-center gap-1 rounded-sm px-2 py-1 font-semibold whitespace-nowrap transition-colors',
                           attribute.typeInfo.classNames.button
                         )}
                       >
@@ -1127,12 +1082,12 @@ const sortedVerificationSteps = orderBy(
         })}
         <li
           class={cn(
-            'bg-night-400 flex items-center self-start rounded-md p-2 text-sm text-pretty select-none',
+            'flex items-center self-start rounded-md bg-night-400 p-2 text-sm text-pretty select-none',
             baseScoreType.classNames.container,
             baseScoreType.classNames.text
           )}
         >
-          <span class="font-title mr-auto ml-1">{baseScoreType.label}</span>
+          <span class="mr-auto ml-1 font-title">{baseScoreType.label}</span>
           <span class="mr-2 text-current/60">+50</span>
           <span class="mr-1 text-current/60">+50</span>
         </li>
@@ -1140,27 +1095,27 @@ const sortedVerificationSteps = orderBy(
     )
   }
 
-  <p class="text-day-400 mt-3 text-center text-xs">
-    <span class="hover:text-day-200 transition-colors">Overall = 60% Privacy + 40% Trust (Truncated)</span>
+  <p class="mt-3 text-center text-xs text-day-400">
+    <span class="transition-colors hover:text-day-200">Overall = 60% Privacy + 40% Trust (Truncated)</span>
   </p>
-  <div class="xs:gap-x-6 mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs">
+  <div class="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs xs:gap-x-6">
     <a
       href="/about#service-scores"
-      class="text-day-400 hover:text-day-200 inline-flex items-center gap-1 transition-colors hover:underline"
+      class="inline-flex items-center gap-1 text-day-400 transition-colors hover:text-day-200 hover:underline"
     >
       <Icon name="ri:information-line" class="size-3" />
       Learn about scores
     </a>
     <a
       href="/attributes"
-      class="text-day-400 hover:text-day-200 inline-flex items-center gap-1 transition-colors hover:underline"
+      class="inline-flex items-center gap-1 text-day-400 transition-colors hover:text-day-200 hover:underline"
     >
       <Icon name="ri:information-line" class="size-3" />
       All attributes list
     </a>
   </div>
 
-  <h2 class="font-title border-day-500 text-day-200 mt-6 mb-3 border-b text-lg font-bold">
+  <h2 class="mt-6 mb-3 border-b border-day-500 font-title text-lg font-bold text-day-200">
     Terms of Service Review
   </h2>
   {
@@ -1206,7 +1161,7 @@ const sortedVerificationSteps = orderBy(
             />
 
             <div class="flex flex-col sm:flex-row sm:gap-6">
-              <div class="prose prose-invert prose-sm bg-night-800 max-w-none flex-1 rounded-lg px-4 py-2 text-pretty sm:px-6 sm:py-4">
+              <div class="prose prose-sm max-w-none flex-1 rounded-lg bg-night-800 px-4 py-2 text-pretty prose-invert sm:px-6 sm:py-4">
                 {service.tosReview.summary ? (
                   <Markdown content={service.tosReview.summary} />
                 ) : (
@@ -1240,7 +1195,7 @@ const sortedVerificationSteps = orderBy(
                     <span>{highlight.title}</span>
                   </h3>
                   {!!highlight.content && (
-                    <div class="prose prose-invert prose-sm">
+                    <div class="prose prose-sm prose-invert">
                       <Markdown content={highlight.content} />
                     </div>
                   )}
@@ -1248,7 +1203,7 @@ const sortedVerificationSteps = orderBy(
               ))}
             </div>
 
-            <p class="text-day-400 mt-4 text-center text-xs">
+            <p class="mt-4 text-center text-xs text-day-400">
               Reviewed <TimeFormatted date={service.tosReviewAt} hourPrecision />
               {service.tosUrls.length > 0 && 'from'}
               {service.tosUrls.map((url) => (
@@ -1257,14 +1212,14 @@ const sortedVerificationSteps = orderBy(
                 </a>
               ))}
             </p>
-            <p class="text-day-600 hover:text-day-400 mb-2 text-center text-xs duration-400">
+            <p class="mb-2 text-center text-xs text-day-600 duration-400 hover:text-day-400">
               ToS reviews are AI-generated and should be used as a reference only.
             </p>
           </>
         ) : (
-          <div class="text-day-400 my-12 text-center">
+          <div class="my-12 text-center text-day-400">
             <p>Can't analyze ToS with AI</p>
-            <p class="text-day-500 mt-1 text-sm text-balance">
+            <p class="mt-1 text-sm text-balance text-day-500">
               Maybe due to captchas, client side rendering, DDoS protections, or non-text format.
             </p>
             <p class="mt-2 text-xs">
@@ -1279,7 +1234,7 @@ const sortedVerificationSteps = orderBy(
           </div>
         )
       ) : (
-        <div class="text-day-400 my-12 text-center">
+        <div class="my-12 text-center text-day-400">
           <p>Not reviewed yet</p>
           {service.tosUrls.length > 0 && (
             <p class="mt-2 text-xs">
@@ -1293,7 +1248,7 @@ const sortedVerificationSteps = orderBy(
         </div>
       )
     ) : (
-      <div class="text-day-400 my-8 text-center">
+      <div class="my-8 text-center text-day-400">
         <p class="mb-4">Not available on {transformCase(statusInfo.label, 'lower')} services</p>
         {service.tosUrls.length > 0 && (
           <p class="mt-2 text-xs">
@@ -1308,11 +1263,11 @@ const sortedVerificationSteps = orderBy(
     )
   }
 
-  <div class="border-day-500 mt-6 mb-3 flex items-center justify-between border-b" id="events">
-    <h2 class="font-title text-day-100 text-lg font-bold">Events</h2>
+  <div class="mt-6 mb-3 flex items-center justify-between border-b border-day-500" id="events">
+    <h2 class="font-title text-lg font-bold text-day-100">Events</h2>
     <a
       href="/events"
-      class="text-day-500 hover:text-day-200 inline-flex items-center gap-1 text-xs leading-none transition-colors hover:underline"
+      class="inline-flex items-center gap-1 text-xs leading-none text-day-500 transition-colors hover:text-day-200 hover:underline"
     >
       View all
       <Icon name="ri:arrow-right-s-line" class="size-4" />
@@ -1332,11 +1287,11 @@ const sortedVerificationSteps = orderBy(
           const typeInfo = getEventTypeInfo(event.type)
 
           return (
-            <li class="relative w-xs max-w-[calc(100vw-3rem)] flex-shrink-0">
+            <li class="relative w-xs max-w-[calc(100vw-3rem)] shrink-0">
               <div class="flex items-center gap-2">
                 <div
                   class={cn(
-                    'bg-night-400 ring-night-400/50 z-10 flex size-5 shrink-0 items-center justify-center rounded-full ring-3',
+                    'z-10 flex size-5 shrink-0 items-center justify-center rounded-full bg-night-400 ring-3 ring-night-400/50',
                     typeInfo.classNames.dot
                   )}
                 >
@@ -1347,18 +1302,18 @@ const sortedVerificationSteps = orderBy(
                   start={event.startedAt}
                   end={event.endedAt}
                   now={now}
-                  class="text-day-300 text-sm leading-none font-normal text-balance"
+                  class="text-sm leading-none font-normal text-balance text-day-300"
                 />
-                <div class="bg-day-700 mr-2 flex h-0.5 flex-1" />
+                <div class="mr-2 flex h-0.5 flex-1 bg-day-700" />
               </div>
 
               <div class="mt-3 max-w-md pe-8">
-                <h3 class="font-title text-lg leading-tight font-semibold text-pretty text-white">
+                <h3 class="font-title text-lg/tight font-semibold text-pretty text-white">
                   {typeInfo.isSolved && <BadgeSmall text="Solved" icon="ri:check-line" color="green" />}
                   {event.title}
                 </h3>
 
-                <p class="text-day-400 text-base font-normal text-pretty">{event.content}</p>
+                <p class="text-base font-normal text-pretty text-day-400">{event.content}</p>
                 {event.source && (
                   <a
                     href={event.source}
@@ -1379,25 +1334,25 @@ const sortedVerificationSteps = orderBy(
         />
       </ol>
     ) : (
-      <p class="text-day-400 my-12 text-center">No events reported</p>
+      <p class="my-12 text-center text-day-400">No events reported</p>
     )
   }
 
-  <div class="xs:gap-x-6 mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs">
+  <div class="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs xs:gap-x-6">
     <a
       href="/about#events"
-      class="text-day-400 hover:text-day-200 inline-flex items-center gap-1 transition-colors hover:underline"
+      class="inline-flex items-center gap-1 text-day-400 transition-colors hover:text-day-200 hover:underline"
     >
       <Icon name="ri:information-line" class="size-3" />
       Learn about events
     </a>
   </div>
 
-  <div class="border-day-500 mt-6 mb-3 flex items-center justify-between border-b" id="verification">
-    <h2 class="font-title text-day-100 text-lg font-bold">Verification</h2>
+  <div class="mt-6 mb-3 flex items-center justify-between border-b border-day-500" id="verification">
+    <h2 class="font-title text-lg font-bold text-day-100">Verification</h2>
     <a
       href="/about#suggestion-review-process"
-      class="text-day-500 hover:text-day-200 inline-flex items-center gap-1 text-xs leading-none transition-colors hover:underline"
+      class="inline-flex items-center gap-1 text-xs leading-none text-day-500 transition-colors hover:text-day-200 hover:underline"
     >
       Learn more
       <Icon name="ri:arrow-right-s-line" class="size-4" />
@@ -1425,7 +1380,7 @@ const sortedVerificationSteps = orderBy(
 
         {
           !!service.verificationSummary && (
-            <div class="prose prose-invert prose-sm max-w-none">
+            <div class="prose prose-sm max-w-none prose-invert">
               <Markdown content={service.verificationSummary} />
             </div>
           )
@@ -1465,17 +1420,17 @@ const sortedVerificationSteps = orderBy(
                         )
                       : undefined
                   }
-                  class="border-night-400 bg-night-800 hover:bg-night-900 flex w-full items-center gap-2 rounded-lg border px-4 py-2 text-sm shadow-sm transition-colors duration-200"
+                  class="flex w-full items-center gap-2 rounded-lg border border-night-400 bg-night-800 px-4 py-2 text-sm shadow-sm transition-colors duration-200 hover:bg-night-900"
                 >
                   <Icon
                     name={hasRequestedVerification ? 'ri:chat-delete-line' : 'ri:chat-check-line'}
-                    class="htmx-request:hidden size-4"
+                    class="size-4 htmx-request:hidden"
                   />
-                  <Icon name="ri:loader-4-line" class="htmx-request:block hidden size-4 animate-spin" />
+                  <Icon name="ri:loader-4-line" class="hidden size-4 animate-spin htmx-request:block" />
                   <span>{hasRequestedVerification ? 'Withdraw request' : 'Request verification'}</span>
                 </VerificationRequestElement>
 
-                <p class="text-day-500 mt-1 text-center text-xs">
+                <p class="mt-1 text-center text-xs text-day-500">
                   {service.verificationRequests.length.toLocaleString()}{' '}
                   {pluralize('request', service.verificationRequests.length)}
                 </p>
@@ -1489,8 +1444,8 @@ const sortedVerificationSteps = orderBy(
   {
     service.verificationProofMd && (
       <>
-        <h3 class="font-title mt-4 text-lg font-semibold">Verification proof</h3>
-        <div class="prose prose-invert prose-sm max-w-none">
+        <h3 class="mt-4 font-title text-lg font-semibold">Verification proof</h3>
+        <div class="prose prose-sm max-w-none prose-invert">
           <Markdown content={service.verificationProofMd} />
         </div>
       </>
@@ -1499,38 +1454,38 @@ const sortedVerificationSteps = orderBy(
   {
     sortedVerificationSteps.length > 0 && (
       <>
-        <h3 class="font-title text-md mt-6 mb-2 font-semibold">Verification Steps</h3>
+        <h3 class="mt-6 mb-2 font-title font-semibold">Verification Steps</h3>
         <ul class="mb-8 space-y-2">
           {sortedVerificationSteps.map((step) => {
             const statusInfo = getVerificationStepStatusInfo(step.status)
 
             return (
-              <li class="border-night-500 bg-night-700/50 flex-grow rounded-md border p-2.5 shadow-sm">
+              <li class="grow rounded-md border border-night-500 bg-night-700/50 p-2.5 shadow-sm">
                 <div class="flex items-start justify-between gap-2">
                   <div class="flex flex-col">
-                    <div class="text-sm leading-tight font-semibold text-white">
+                    <div class="text-sm/tight font-semibold text-white">
                       <BadgeSmall
-                        text={statusInfo.text}
+                        text={statusInfo.label}
                         icon={statusInfo.icon}
                         color={statusInfo.color}
-                        inlineIcon={statusInfo.icon === 'ri:loader-4-line'}
+                        inlineIcon={statusInfo.iconSpin}
                         classNames={{
-                          icon: cn(statusInfo.icon === 'ri:loader-4-line' && 'animate-spin'),
+                          icon: cn(statusInfo.iconSpin && 'animate-spin'),
                         }}
                         class="me-1"
                       />
 
                       {step.title}
                     </div>
-                    <p class="text-day-300 mt-1.5 text-xs">{step.description}</p>
+                    <p class="mt-1.5 text-xs text-day-300">{step.description}</p>
                   </div>
-                  <p class="text-2xs text-day-400 shrink-0 pt-0.5 whitespace-nowrap">
+                  <p class="shrink-0 pt-0.5 text-2xs whitespace-nowrap text-day-400">
                     <TimeFormatted date={step.updatedAt} prefix={false} />
                   </p>
                 </div>
 
                 {step.evidenceMd && (
-                  <div class="prose prose-invert prose-xs mt-2 block max-w-none text-xs leading-relaxed">
+                  <div class="prose prose-sm mt-2 block max-w-none text-xs/relaxed prose-invert">
                     <Markdown content={step.evidenceMd} />
                   </div>
                 )}
@@ -1542,7 +1497,7 @@ const sortedVerificationSteps = orderBy(
     )
   }
 
-  <h2 class="font-title border-day-500 text-day-200 mt-2 mb-3 border-b text-lg font-bold" id="comments">
+  <h2 class="mt-2 mb-3 border-b border-day-500 font-title text-lg font-bold text-day-200" id="comments">
     Comments
   </h2>
   <div
@@ -1571,13 +1526,13 @@ const sortedVerificationSteps = orderBy(
       }
 
       <div class="absolute inset-y-2 right-2 flex flex-col justify-center">
-        <Icon name="ri:alert-line" class="xs:opacity-20 h-full max-h-16 w-auto opacity-10" />
+        <Icon name="ri:alert-line" class="h-full max-h-16 w-auto opacity-10 xs:opacity-20" />
       </div>
     </div>
     <CommentSummary
       serviceId={service.id}
       averageUserRating={service.averageUserRating}
-      class="flex-grow [grid-area:rating]"
+      class="grow [grid-area:rating]"
       itemReviewedId={itemReviewedId}
     />
 
@@ -1625,14 +1580,14 @@ const sortedVerificationSteps = orderBy(
       )
     }
 
-    <div class="bg-night-800 flex flex-1 flex-grow-3 basis-64 flex-col gap-2 rounded-lg p-3 [grid-area:ai]">
+    <div class="flex flex-1 grow-3 basis-64 flex-col gap-2 rounded-lg bg-night-800 p-3 [grid-area:ai]">
       <div class="flex flex-row justify-between">
         <h3 class="font-title leading-none font-bold">
           <Icon name="ri:sparkling-2-line" class="me-1 inline-block size-4 align-[-0.1em]" />AI Summary
         </h3>
         {
           service.userSentimentAt && (
-            <div class="text-day-500 text-right text-xs">
+            <div class="text-right text-xs text-day-500">
               Updated
               <TimeFormatted date={service.userSentimentAt} hourPrecision />
             </div>
@@ -1643,12 +1598,12 @@ const sortedVerificationSteps = orderBy(
       {
         userSentiment ? (
           <>
-            <div class="prose prose-invert prose-sm max-w-none text-sm">
+            <div class="prose prose-sm max-w-none text-sm prose-invert">
               <Markdown content={userSentiment.summary} />
             </div>
 
-            <div class="flex flex-grow items-center justify-evenly">
-              <ul class="text-day-300 inline-grid list-inside list-disc place-items-center text-sm marker:text-green-400 marker:content-['+_']">
+            <div class="flex grow items-center justify-evenly">
+              <ul class="inline-grid list-inside list-disc place-items-center text-sm text-day-300 marker:text-green-400 marker:content-['+_']">
                 {userSentiment.whatUsersLike.map((item) => (
                   <li class="w-full">
                     <span>{item}</span>
@@ -1656,7 +1611,7 @@ const sortedVerificationSteps = orderBy(
                 ))}
               </ul>
 
-              <ul class="text-day-300 inline-grid list-inside list-disc place-items-center text-sm marker:text-red-400 marker:content-['-_']">
+              <ul class="inline-grid list-inside list-disc place-items-center text-sm text-day-300 marker:text-red-400 marker:content-['-_']">
                 {userSentiment.whatUsersDislike.map((item) => (
                   <li class="w-full">
                     <span>{item}</span>
@@ -1666,7 +1621,7 @@ const sortedVerificationSteps = orderBy(
             </div>
           </>
         ) : (
-          <p class="text-day-400 my-2 flex flex-1 items-center justify-center text-center text-xs">
+          <p class="my-2 flex flex-1 items-center justify-center text-center text-xs text-day-400">
             Not reviewed yet
           </p>
         )

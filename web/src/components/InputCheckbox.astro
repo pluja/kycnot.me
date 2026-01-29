@@ -45,7 +45,7 @@ const hasError = !!error && error.length > 0
       class={cn(disabled && 'opacity-50')}
     />
     <span class="text-sm leading-none text-pretty">{label ?? <slot />}</span>
-    {descriptionInline && <p class="text-day-400 text-xs">{descriptionInline}</p>}
+    {descriptionInline && <p class="text-xs text-day-400">{descriptionInline}</p>}
   </label>
 
   {
