@@ -12,6 +12,7 @@ import { makeKarmaUnlockMessage, makeUserWithKarmaUnlocks } from '../lib/karmaUn
 import { prisma } from '../lib/prisma'
 import { redisPreGeneratedSecretTokens } from '../lib/redis/redisPreGeneratedSecretTokens'
 import { handleHoneypotTrap } from '../lib/spamDetection'
+import { makeSafeRedirectUrl } from '../lib/redirectUrls'
 import { login, logout, setUserSessionIdCookie } from '../lib/userCookies'
 import {
   generateUserSecretToken,
@@ -48,10 +49,10 @@ export const accountActions = {
 
       await login(context, makeUserWithKarmaUnlocks(matchedUser))
 
+      const origin = new URL(context.request.url).origin
       return {
         user: matchedUser,
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        redirect: input.redirect || context.request.headers.get('referer') || '/',
+        redirect: makeSafeRedirectUrl(input.redirect ?? context.request.headers.get('referer'), origin),
       }
     },
   }),
@@ -138,11 +139,11 @@ export const accountActions = {
 
       await startImpersonating(context, adminUser, makeUserWithKarmaUnlocks(targetUser))
 
+      const origin = new URL(context.request.url).origin
       return {
         adminUser,
         impersonatedUser: targetUser,
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        redirect: input.redirect || context.request.headers.get('referer') || '/',
+        redirect: makeSafeRedirectUrl(input.redirect ?? context.request.headers.get('referer'), origin),
       }
     },
   }),

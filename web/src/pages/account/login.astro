@@ -4,6 +4,7 @@ import { actions } from 'astro:actions'
 import Button from '../../components/Button.astro'
 import InputLoginToken from '../../components/InputLoginToken.astro'
 import MiniLayout from '../../layouts/MiniLayout.astro'
+import { makeSafeRedirectUrl } from '../../lib/redirectUrls'
 import { logout } from '../../lib/userCookies'
 
 const result = Astro.getActionResult(actions.account.login)
@@ -20,8 +21,7 @@ if (Astro.url.searchParams.get('logout')) {
 
 // Redirect if already logged in
 if (Astro.locals.user) {
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  return Astro.redirect(Astro.url.searchParams.get('redirect') || '/')
+  return Astro.redirect(makeSafeRedirectUrl(Astro.url.searchParams.get('redirect'), Astro.url.origin))
 }
 
 const message = Astro.url.searchParams.get('message')

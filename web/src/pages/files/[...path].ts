@@ -6,39 +6,50 @@ import { lookup } from 'mime-types'
 
 import type { APIRoute } from 'astro'
 
+const ALLOWED_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/avif',
+  'image/webp',
+  'image/gif',
+  'image/svg+xml',
+])
+
 export const GET: APIRoute = async ({ params }) => {
-  // Get the file path from the URL
   const filePath = params.path
   if (!filePath) {
     return new Response('File not found', { status: 404 })
   }
 
-  // Get the base upload directory from environment variable
   const uploadPath = path.isAbsolute(UPLOAD_DIR) ? UPLOAD_DIR : path.join(process.cwd(), UPLOAD_DIR)
+  const fullPath = path.normalize(path.join(uploadPath, filePath))
 
-  // Full path to the requested file
-  const fullPath = path.join(uploadPath, filePath)
+  // Prevent path traversal — resolved path must stay within the upload directory
+  if (!fullPath.startsWith(uploadPath + path.sep) && fullPath !== uploadPath) {
+    return new Response('File not found', { status: 404 })
+  }
+
+  const contentType = lookup(fullPath) || 'application/octet-stream'
+
+  // Only serve image files
+  if (!ALLOWED_MIME_TYPES.has(contentType)) {
+    return new Response('File not found', { status: 404 })
+  }
 
   try {
-    // Check if file exists
     await fs.access(fullPath)
-
-    // Read file
     const file = await fs.readFile(fullPath)
 
-    // Determine content type based on file extension using mime-types library
-    const contentType = lookup(fullPath) || 'application/octet-stream'
-
-    // Return the file with proper content type
     return new Response(file, {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000', // Cache for 1 year
+        'Cache-Control': 'public, max-age=31536000',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'",
       },
     })
-  } catch (error) {
-    console.error('Error serving file:', error)
+  } catch {
     return new Response('File not found', { status: 404 })
   }
 }

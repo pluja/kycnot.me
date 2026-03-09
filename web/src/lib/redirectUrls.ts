@@ -1,3 +1,18 @@
+/**
+ * Validates that a redirect URL is same-origin, returning '/' if not.
+ * Prevents open redirect attacks via user-controlled Referer/redirect inputs.
+ */
+export function makeSafeRedirectUrl(url: string | null | undefined, origin: string): string {
+  if (!url) return '/'
+  try {
+    const parsed = new URL(url, origin)
+    if (parsed.origin !== origin) return '/'
+    return parsed.pathname + parsed.search + parsed.hash
+  } catch {
+    return '/'
+  }
+}
+
 export function makeLoginUrl(
   currentUrl: URL,
   {

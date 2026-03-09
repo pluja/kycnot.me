@@ -115,8 +115,13 @@ export default defineConfig({
     },
   },
   image: {
-    domains: [new URL(SITE_URL).hostname],
-    remotePatterns: [{ protocol: 'https' }],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: new URL(SITE_URL).hostname,
+        pathname: '/files/**',
+      },
+    ],
     service: {
       entrypoint: './src/lib/imageService.ts',
     },

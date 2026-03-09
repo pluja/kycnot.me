@@ -1,16 +1,21 @@
 import sharpService from 'astro/assets/services/sharp'
 
-// XML/SVG magic byte patterns — reject these early before passing to Sharp.
-// Sharp uses libvips + glib's XML parser for SVG, which is vulnerable to
-// deeply nested XML bombs sent to the /_image endpoint.
-const XML_SIGNATURES = [
-  [0x3c, 0x3f, 0x78, 0x6d, 0x6c], // <?xml
-  [0x3c, 0x73, 0x76, 0x67], //       <svg
-  [0xef, 0xbb, 0xbf, 0x3c], //       UTF-8 BOM + <
-]
+function isMarkup(buffer: Uint8Array): boolean {
+  let i = 0
+  if (buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) i = 3
+  while (i < buffer.length && (buffer[i] === 0x09 || buffer[i] === 0x0a || buffer[i] === 0x0d || buffer[i] === 0x20))
+    i++
 
-function isXmlOrSvg(buffer: Uint8Array): boolean {
-  return XML_SIGNATURES.some((sig) => sig.every((byte, i) => buffer[i] === byte))
+  if (buffer[i] !== 0x3c) return false
+
+  const tag = String.fromCharCode(...buffer.slice(i + 1, i + 10)).toLowerCase()
+  return (
+    tag.startsWith('!doctype') ||
+    tag.startsWith('html') ||
+    tag.startsWith('head') ||
+    tag.startsWith('svg') ||
+    tag.startsWith('?xml')
+  )
 }
 
 const imageService: typeof sharpService = {
@@ -21,8 +26,13 @@ const imageService: typeof sharpService = {
         ? transform.src
         : (transform.src as { src?: string })?.src ?? 'unknown'
 
-    if (isXmlOrSvg(inputBuffer)) {
-      return { data: inputBuffer, format: 'svg' }
+    if (isMarkup(inputBuffer)) {
+      const tag = String.fromCharCode(...inputBuffer.slice(0, 10)).trim().toLowerCase()
+      if (tag.startsWith('<svg') || tag.startsWith('<?xml')) {
+        return { data: inputBuffer, format: 'svg' }
+      }
+      console.warn(`[imageService] Rejected non-image markup input for: ${src}`)
+      throw new Error('Input buffer contains unsupported image format')
     }
 
     try {

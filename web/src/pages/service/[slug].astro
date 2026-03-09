@@ -63,6 +63,11 @@ const result = Astro.getActionResult(actions.service.requestVerification)
 
 const now = new Date()
 
+const canSeeHidden = user?.admin || user?.moderator
+const visibleStatuses = canSeeHidden
+  ? (['PUBLIC', 'UNLISTED', 'ARCHIVED', 'HIDDEN'] as const)
+  : (['PUBLIC', 'UNLISTED', 'ARCHIVED'] as const)
+
 const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany([
   [
     'Error fetching service',
@@ -70,7 +75,7 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
       prisma.service.findUnique({
         where: {
           slug,
-          serviceVisibility: { in: ['PUBLIC', 'UNLISTED', 'ARCHIVED'] },
+          serviceVisibility: { in: visibleStatuses },
         },
         select: {
           id: true,
@@ -235,7 +240,7 @@ if (!service) {
     const serviceWithOldSlug = await prisma.service.findFirst({
       where: {
         previousSlugs: { has: slug },
-        serviceVisibility: { in: ['PUBLIC', 'UNLISTED', 'ARCHIVED'] },
+        serviceVisibility: { in: visibleStatuses },
       },
       select: { slug: true },
     })
@@ -249,11 +254,7 @@ if (!service) {
   return Astro.rewrite('/404')
 }
 
-if (
-  service.serviceVisibility !== 'PUBLIC' &&
-  service.serviceVisibility !== 'UNLISTED' &&
-  service.serviceVisibility !== 'ARCHIVED'
-) {
+if (!visibleStatuses.includes(service.serviceVisibility as typeof visibleStatuses[number])) {
   return Astro.rewrite('/404')
 }
 

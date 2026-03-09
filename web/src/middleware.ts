@@ -5,7 +5,7 @@ import { ErrorBanners, getMessagesFromUrl } from './lib/errorBanners'
 import { getImpersonationInfo } from './lib/impersonation'
 import { makeUserWithKarmaUnlocks } from './lib/karmaUnlocks'
 import { prisma } from './lib/prisma'
-import { makeLoginUrl } from './lib/redirectUrls'
+import { makeLoginUrl, makeSafeRedirectUrl } from './lib/redirectUrls'
 import { redisActionsSessions } from './lib/redis/redisActionsSessions'
 import { getUserFromCookies } from './lib/userCookies'
 
@@ -67,7 +67,7 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
         if (!referer) {
           throw new Error('Internal: Referer unexpectedly missing from Action POST request.')
         }
-        return context.redirect(referer)
+        return context.redirect(makeSafeRedirectUrl(referer, context.url.origin))
       }
       return context.redirect(context.originPathname)
     }
