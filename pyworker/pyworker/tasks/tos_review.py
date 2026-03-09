@@ -3,6 +3,7 @@ Task for retrieving Terms of Service (TOS) text.
 """
 
 import hashlib
+import os
 from typing import Any, Dict, Optional
 
 import requests
@@ -79,9 +80,10 @@ class TosReviewTask(Task):
 
                 # Send notification via ntfy
                 try:
-                    requests.post(
-                        "https://ntfy.sh/knm-kyc-lvl-changes-knm", data=msg.encode()
+                    ntfy_url = os.environ.get(
+                        "NTFY_KYC_CHANGES_URL", "https://ntfy.sh/knm-kyc-lvl-changes-knm"
                     )
+                    requests.post(ntfy_url, data=msg.encode())
                 except requests.RequestException as e:
                     self.logger.error(
                         f"Failed to send ntfy notification for KYC level change: {e}"

@@ -3,7 +3,7 @@ Task for handling inactive users - sending deletion warnings and cleaning up acc
 """
 
 from datetime import datetime, timedelta, date
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from pyworker.database import execute_db_command, run_db_query
 from pyworker.tasks.base import Task

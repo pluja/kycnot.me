@@ -90,7 +90,7 @@ class CommentModerationTask(Task):
                     comment["status"] = "APPROVED"
                     modstring += " marked as APPROVED"
 
-            if moderation.get("moderationNote"):  # Check if key exists
+            if moderation.get("contextNote"):  # Check if key exists
                 comment["communityNote"] = moderation["contextNote"]
                 modstring += " with moderation note: " + moderation["contextNote"]
             else:

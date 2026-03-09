@@ -1216,15 +1216,17 @@ const sortedVerificationSteps = orderBy(
             <div class="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-6">
               {sortBy(
                 service.tosReview.highlights.map((highlight) => {
-                  if (typeof highlight.rating !== 'string') {
-                    // TODO: Remove this once we figure out where this is coming from
-                    console.error(
-                      `[transformCase] Error is here: getTosHighlightRatingInfo ${JSON.stringify(service)}`
-                    )
-                  }
+                  // Legacy data has numeric ratings (0=neutral, 1/2=negative).
+                  // Normalize to string for display.
+                  const rating =
+                    typeof highlight.rating === 'number'
+                      ? highlight.rating === 0
+                        ? 'neutral'
+                        : 'negative'
+                      : highlight.rating
                   return {
                     ...highlight,
-                    ratingInfo: getTosHighlightRatingInfo(highlight.rating),
+                    ratingInfo: getTosHighlightRatingInfo(rating),
                   }
                 }),
                 'ratingInfo.order'

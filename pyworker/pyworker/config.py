@@ -33,6 +33,12 @@ class Config:
     # API settings
     TOS_API_BASE_URL: str = os.getenv("TOS_API_BASE_URL", "https://r.jina.ai")
 
+    # Crawl4AI settings
+    CRAWL4AI_BASE_URL: str = os.getenv("CRAWL4AI_BASE_URL", "http://crawl4ai:11235")
+    CRAWL4AI_API_TOKEN: str = os.getenv("CRAWL4AI_API_TOKEN", "")
+    CRAWL4AI_TIMEOUT: int = int(os.getenv("CRAWL4AI_TIMEOUT", "300"))
+    CRAWL4AI_POLL_INTERVAL: int = int(os.getenv("CRAWL4AI_POLL_INTERVAL", "2"))
+
     # Logging settings
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     LOG_FORMAT: str = os.getenv(

@@ -12,8 +12,8 @@ services:
     healthcheck:
       test:
         [
-          'CMD-SHELL',
-          'pg_isready -U ${POSTGRES_USER:-kycnot} -d ${POSTGRES_DATABASE:-kycnot}',
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-kycnot} -d ${POSTGRES_DATABASE:-kycnot}",
         ]
       interval: 10s
       timeout: 5s
@@ -28,9 +28,9 @@ services:
       - .env
 
   crawl4ai:
-    image: unclecode/crawl4ai:basic-amd64
+    image: unclecode/crawl4ai:0.8.0
     expose:
-      - '11235'
+      - "11235"
     env_file:
       - .env
     volumes:
@@ -46,7 +46,7 @@ services:
     image: redis:latest
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -68,12 +68,12 @@ services:
     healthcheck:
       test:
         [
-          'CMD',
-          'curl',
-          '-k',
-          '--silent',
-          '--fail',
-          'http://localhost:4321/internal-api/healthcheck',
+          "CMD",
+          "curl",
+          "-k",
+          "--silent",
+          "--fail",
+          "http://localhost:4321/internal-api/healthcheck",
         ]
       interval: 10s
       timeout: 5s
