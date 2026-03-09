@@ -11,6 +11,7 @@ export const GET: APIRoute = ({ request, locals }) => {
   const user = locals.user
 
   let cleanup: (() => Promise<void>) | null = null
+  let closed = false
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -31,12 +32,12 @@ export const GET: APIRoute = ({ request, locals }) => {
             })
           : null
 
-        let closed = false
         async function abort() {
           if (closed) return
           closed = true
           try {
             await cleanup?.()
+            cleanup = null
             controller.close()
           } catch (error) {
             console.error('Failed to cleanup SSE connection:', error)
@@ -53,6 +54,7 @@ export const GET: APIRoute = ({ request, locals }) => {
     },
 
     async cancel() {
+      closed = true
       try {
         await cleanup?.()
         cleanup = null

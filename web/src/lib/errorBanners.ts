@@ -157,7 +157,13 @@ export class ErrorBanners {
       .forEach((message) => {
         this._messages.push(message)
         if (message.type === 'error') {
-          console.error(`[ErrorBanners] ${message.uiMessage}`, message.error)
+          const isClientError =
+            message.origin === 'action' &&
+            typeof (message.error as { status?: number } | undefined)?.status === 'number' &&
+            (message.error as { status: number }).status < 500
+          if (!isClientError) {
+            console.error(`[ErrorBanners] ${message.uiMessage}`, message.error)
+          }
         }
       })
   }

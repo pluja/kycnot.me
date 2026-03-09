@@ -117,6 +117,9 @@ export default defineConfig({
   image: {
     domains: [new URL(SITE_URL).hostname],
     remotePatterns: [{ protocol: 'https' }],
+    service: {
+      entrypoint: './src/lib/imageService.ts',
+    },
   },
   redirects: {
     // #region Redirects from old website
