@@ -24,7 +24,7 @@ export const {
   (id): TosHighlightRatingInfo<typeof id> => ({
     id,
     icon: 'ri:question-line',
-    name: id ? transformCase(id, 'title') : String(id),
+    name: typeof id === 'string' ? transformCase(id, 'title') : String(id),
     classNames: {
       icon: 'text-yellow-400',
       borderColor: 'border-yellow-500/40',
