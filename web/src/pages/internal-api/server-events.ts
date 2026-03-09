@@ -31,7 +31,10 @@ export const GET: APIRoute = ({ request, locals }) => {
             })
           : null
 
+        let closed = false
         async function abort() {
+          if (closed) return
+          closed = true
           try {
             await cleanup?.()
             controller.close()
@@ -52,6 +55,7 @@ export const GET: APIRoute = ({ request, locals }) => {
     async cancel() {
       try {
         await cleanup?.()
+        cleanup = null
       } catch (error) {
         console.error('Failed to cleanup on cancel:', error)
       }

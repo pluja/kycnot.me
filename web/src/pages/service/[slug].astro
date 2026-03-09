@@ -313,12 +313,26 @@ const hiddenLinks = [
   ...tail(shuffledLinks.i2p),
 ]
 
+if (typeof `${service.kycLevel}` !== 'string') {
+  // TODO: Remove this once we figure out where this is coming from
+  console.error(`[transformCase] Error is here: getKycLevelInfo ${JSON.stringify(service)}`)
+}
 const kycLevelInfo = getKycLevelInfo(`${service.kycLevel}`)
 
+if (typeof service.kycLevelClarification !== 'string') {
+  // TODO: Remove this once we figure out where this is coming from
+  console.error(`[transformCase] Error is here: getKycLevelClarificationInfo ${JSON.stringify(service)}`)
+}
 const kycLevelClarificationInfo = getKycLevelClarificationInfo(service.kycLevelClarification)
 
 const userSentiment = service.userSentiment
-  ? { ...service.userSentiment, info: getUserSentimentInfo(service.userSentiment.sentiment) }
+  ? (() => {
+      if (typeof service.userSentiment.sentiment !== 'string') {
+        // TODO: Remove this once we figure out where this is coming from
+        console.error(`[transformCase] Error is here: getUserSentimentInfo ${JSON.stringify(service)}`)
+      }
+      return { ...service.userSentiment, info: getUserSentimentInfo(service.userSentiment.sentiment) }
+    })()
   : null
 
 const attributes = sortAttributes([
@@ -347,12 +361,26 @@ const attributes = sortAttributes([
             },
           ],
   })),
-]).map((attribute) => ({
-  ...attribute,
-  categoryInfo: getAttributeCategoryInfo(attribute.category),
-  typeInfo: getAttributeTypeInfo(attribute.type),
-}))
+]).map((attribute) => {
+  if (typeof attribute.category !== 'string') {
+    // TODO: Remove this once we figure out where this is coming from
+    console.error(`[transformCase] Error is here: getAttributeCategoryInfo ${JSON.stringify(service)}`)
+  }
+  if (typeof attribute.type !== 'string') {
+    // TODO: Remove this once we figure out where this is coming from
+    console.error(`[transformCase] Error is here: getAttributeTypeInfo ${JSON.stringify(service)}`)
+  }
+  return {
+    ...attribute,
+    categoryInfo: getAttributeCategoryInfo(attribute.category),
+    typeInfo: getAttributeTypeInfo(attribute.type),
+  }
+})
 
+if (typeof service.verificationStatus !== 'string') {
+  // TODO: Remove this once we figure out where this is coming from
+  console.error(`[transformCase] Error is here: getVerificationStatusInfo ${JSON.stringify(service)}`)
+}
 const statusInfo = getVerificationStatusInfo(service.verificationStatus)
 
 const hasRequestedVerification =
@@ -372,13 +400,23 @@ const ogImageTemplateData = {
   verificationStatus: service.verificationStatus,
 } satisfies OgImageAllTemplatesWithProps
 
+if (typeof service.serviceVisibility !== 'string') {
+  // TODO: Remove this once we figure out where this is coming from
+  console.error(`[transformCase] Error is here: getServiceVisibilityInfo ${JSON.stringify(service)}`)
+}
 const serviceVisibilityInfo = getServiceVisibilityInfo(service.serviceVisibility)
 
 const activeAlertOrWarningEvents = service.events
-  .map((event) => ({
-    ...event,
-    typeInfo: getEventTypeInfo(event.type),
-  }))
+  .map((event) => {
+    if (typeof event.type !== 'string') {
+      // TODO: Remove this once we figure out where this is coming from
+      console.error(`[transformCase] Error is here: getEventTypeInfo ${JSON.stringify(service)}`)
+    }
+    return {
+      ...event,
+      typeInfo: getEventTypeInfo(event.type),
+    }
+  })
   .filter((event) => event.typeInfo.showBanner && (event.endedAt === null || event.endedAt >= now))
 const activeEventToShow =
   activeAlertOrWarningEvents.find((event) => event.type === EventType.ALERT) ?? activeAlertOrWarningEvents[0]
@@ -488,6 +526,10 @@ const sortedVerificationSteps = orderBy(
         ] satisfies BreadcrumArray
     ),
     ...service.acceptedCurrencies.map((currency) => {
+      if (typeof currency !== 'string') {
+        // TODO: Remove this once we figure out where this is coming from
+        console.error(`[transformCase] Error is here: getCurrencyInfo ${JSON.stringify(service)}`)
+      }
       const currencyInfo = getCurrencyInfo(currency)
       return [
         {
@@ -1172,10 +1214,18 @@ const sortedVerificationSteps = orderBy(
 
             <div class="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-6">
               {sortBy(
-                service.tosReview.highlights.map((highlight) => ({
-                  ...highlight,
-                  ratingInfo: getTosHighlightRatingInfo(highlight.rating),
-                })),
+                service.tosReview.highlights.map((highlight) => {
+                  if (typeof highlight.rating !== 'string') {
+                    // TODO: Remove this once we figure out where this is coming from
+                    console.error(
+                      `[transformCase] Error is here: getTosHighlightRatingInfo ${JSON.stringify(service)}`
+                    )
+                  }
+                  return {
+                    ...highlight,
+                    ratingInfo: getTosHighlightRatingInfo(highlight.rating),
+                  }
+                }),
                 'ratingInfo.order'
               ).map((highlight) => (
                 <div
@@ -1284,6 +1334,10 @@ const sortedVerificationSteps = orderBy(
           ['actualEndedAt', 'startedAt'],
           'desc'
         ).map((event) => {
+          if (typeof event.type !== 'string') {
+            // TODO: Remove this once we figure out where this is coming from
+            console.error(`[transformCase] Error is here: getEventTypeInfo ${JSON.stringify(service)}`)
+          }
           const typeInfo = getEventTypeInfo(event.type)
 
           return (
@@ -1457,6 +1511,12 @@ const sortedVerificationSteps = orderBy(
         <h3 class="mt-6 mb-2 font-title font-semibold">Verification Steps</h3>
         <ul class="mb-8 space-y-2">
           {sortedVerificationSteps.map((step) => {
+            if (typeof step.status !== 'string') {
+              // TODO: Remove this once we figure out where this is coming from
+              console.error(
+                `[transformCase] Error is here: getVerificationStepStatusInfo ${JSON.stringify(service)}`
+              )
+            }
             const statusInfo = getVerificationStepStatusInfo(step.status)
 
             return (
@@ -1558,7 +1618,7 @@ const sortedVerificationSteps = orderBy(
                 worstRating: 1,
                 bestRating: 5,
               },
-              positiveNotes: userSentiment.whatUsersLike.map(
+              positiveNotes: (userSentiment.whatUsersLike ?? []).map(
                 (item, index) =>
                   ({
                     '@type': 'ListItem',
@@ -1566,7 +1626,7 @@ const sortedVerificationSteps = orderBy(
                     name: item,
                   }) satisfies ListItem
               ),
-              negativeNotes: userSentiment.whatUsersDislike.map(
+              negativeNotes: (userSentiment.whatUsersDislike ?? []).map(
                 (item, index) =>
                   ({
                     '@type': 'ListItem',
@@ -1604,7 +1664,7 @@ const sortedVerificationSteps = orderBy(
 
             <div class="flex grow items-center justify-evenly">
               <ul class="inline-grid list-inside list-disc place-items-center text-sm text-day-300 marker:text-green-400 marker:content-['+_']">
-                {userSentiment.whatUsersLike.map((item) => (
+                {(userSentiment.whatUsersLike ?? []).map((item) => (
                   <li class="w-full">
                     <span>{item}</span>
                   </li>
@@ -1612,7 +1672,7 @@ const sortedVerificationSteps = orderBy(
               </ul>
 
               <ul class="inline-grid list-inside list-disc place-items-center text-sm text-day-300 marker:text-red-400 marker:content-['-_']">
-                {userSentiment.whatUsersDislike.map((item) => (
+                {(userSentiment.whatUsersDislike ?? []).map((item) => (
                   <li class="w-full">
                     <span>{item}</span>
                   </li>
