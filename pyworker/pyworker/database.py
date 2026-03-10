@@ -14,9 +14,9 @@ from psycopg.sql import SQL, Composed, Literal
 from psycopg_pool import ConnectionPool  # Proper import for the connection pool
 
 from pyworker.config import config
-from pyworker.utils.app_logging import setup_logging
+import logging
 
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 # --- Type Definitions ---
 

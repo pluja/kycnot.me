@@ -7,9 +7,9 @@ from contextlib import AbstractContextManager
 from typing import Any, Optional, Type
 
 from pyworker.database import get_db_connection
-from pyworker.utils.app_logging import setup_logging
+import logging
 
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 
 class Task(ABC):
@@ -23,7 +23,7 @@ class Task(ABC):
             name: The name of the task.
         """
         self.name = name
-        self.logger = setup_logging(f"pyworker.task.{name}")
+        self.logger = logging.getLogger(f"pyworker.task.{name}")
         self.conn: Optional[Any] = None
         self._context: Optional[AbstractContextManager[Any]] = None
 

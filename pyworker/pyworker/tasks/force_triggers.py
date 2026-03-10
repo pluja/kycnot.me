@@ -1,7 +1,7 @@
 from pyworker.tasks.base import Task
-from pyworker.utils.app_logging import setup_logging
+import logging
 
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 
 class ForceTriggersTask(Task):

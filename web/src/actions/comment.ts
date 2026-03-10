@@ -180,7 +180,7 @@ export const commentActions = {
           throw new Error('Invalid submission timing.')
         }
       } catch (err) {
-        console.error('Time trap validation failed:', err instanceof Error ? err.message : 'Unknown error')
+        console.warn('Time trap validation failed:', err instanceof Error ? err.message : 'Unknown error')
         throw new ActionError({
           code: 'BAD_REQUEST',
           message: 'Invalid request',

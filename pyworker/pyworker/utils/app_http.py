@@ -6,9 +6,9 @@ from typing import Optional
 
 import requests
 
-from pyworker.utils.app_logging import setup_logging
+import logging
 
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 
 def fetch_url(url: str, timeout: int = 30) -> Optional[str]:

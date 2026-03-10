@@ -3,6 +3,7 @@ Command line interface for the pyworker package.
 """
 
 import argparse
+import logging
 import sys
 import time
 from functools import partial
@@ -23,9 +24,10 @@ from .tasks import (
     TosReviewTask,
     UserSentimentTask,
 )
-from pyworker.utils.app_logging import setup_logging
+from pyworker.utils.app_logging import configure_logging
 
-logger = setup_logging(__name__)
+configure_logging()
+logger = logging.getLogger(__name__)
 
 
 def parse_args(args: List[str]) -> argparse.Namespace:

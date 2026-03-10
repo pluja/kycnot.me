@@ -17,9 +17,9 @@ from pyworker.database import (
     TosReviewType,
 )
 from pyworker.utils import schemas
-from pyworker.utils.app_logging import setup_logging
+import logging
 
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 
 def _load_prompt(name: str, **static_vars: str) -> str:

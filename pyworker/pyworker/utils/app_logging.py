@@ -1,36 +1,29 @@
 """
-Logging utilities for the pyworker package.
+Logging configuration for the pyworker package.
+
+Call ``configure_logging()`` once from the CLI entry point.
+All other modules should simply use ``logging.getLogger(__name__)``.
 """
 
 import logging
 import sys
+
 from pyworker.config import config
 
-def setup_logging(name: str = "pyworker") -> logging.Logger:
+
+def configure_logging() -> None:
+    """Configure the root ``pyworker`` logger once.
+
+    Child loggers (``pyworker.database``, ``pyworker.task.comment_moderation``,
+    etc.) inherit this configuration via propagation — no per-module setup needed.
     """
-    Set up logging for the application.
-    
-    Args:
-        name: The name of the logger.
-        
-    Returns:
-        A configured logger instance.
-    """
-    logger = logging.getLogger(name)
-    
-    # Set log level from configuration
     log_level = getattr(logging, config.LOG_LEVEL.upper(), logging.INFO)
-    logger.setLevel(log_level)
-    
-    # Create console handler
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(log_level)
-    
-    # Create formatter
-    formatter = logging.Formatter(config.LOG_FORMAT)
-    handler.setFormatter(formatter)
-    
-    # Add handler to logger
-    logger.addHandler(handler)
-    
-    return logger 
+
+    root = logging.getLogger("pyworker")
+    root.setLevel(log_level)
+
+    if not root.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(log_level)
+        handler.setFormatter(logging.Formatter(config.LOG_FORMAT))
+        root.addHandler(handler)

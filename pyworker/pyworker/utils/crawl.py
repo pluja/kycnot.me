@@ -10,9 +10,9 @@ from typing import Any
 import requests
 
 from pyworker.config import config
-from pyworker.utils.app_logging import setup_logging
+import logging
 
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 _CRAWL4AI_HEADERS = (
     {"Authorization": f"Bearer {config.CRAWL4AI_API_TOKEN}"}
