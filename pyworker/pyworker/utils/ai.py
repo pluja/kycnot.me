@@ -39,12 +39,13 @@ def _strip_thinking(content: str) -> str:
     return content.strip()
 
 
-_today = f"Today's date: {date.today().isoformat()}\n\n"
+def _today() -> str:
+    return f"Today's date: {date.today().isoformat()}\n\n"
 
 PROMPT_CHECK_TOS_REVIEW = _load_prompt("tos_check.md", schema=schemas.TOS_CHECK.ts_type)
-PROMPT_TOS_REVIEW = _today + _load_prompt("tos_review.md", schema=schemas.TOS_REVIEW.ts_type)
+_PROMPT_TOS_REVIEW = _load_prompt("tos_review.md", schema=schemas.TOS_REVIEW.ts_type)
 PROMPT_COMMENT_SENTIMENT_SUMMARY = _load_prompt("comment_sentiment.md", schema=schemas.COMMENT_SEN.ts_type)
-PROMPT_COMMENT_MODERATION = _today + _load_prompt("comment_moderation.md", schema=schemas.COMMENT_MOD.ts_type)
+_PROMPT_COMMENT_MODERATION = _load_prompt("comment_moderation.md", schema=schemas.COMMENT_MOD.ts_type)
 
 
 client = OpenAI(
@@ -136,7 +137,7 @@ def prompt_check_tos_review(content: str) -> TosReviewCheck:
 
 def prompt_tos_review(content: str) -> TosReviewType:
     messages: List[ChatCompletionMessageParam] = [
-        {"role": "system", "content": PROMPT_TOS_REVIEW},
+        {"role": "system", "content": _today() + _PROMPT_TOS_REVIEW},
         {"role": "user", "content": content},
     ]
 
@@ -159,7 +160,7 @@ def prompt_comment_sentiment_summary(content: str) -> CommentSentimentSummaryTyp
 
 def prompt_comment_moderation(content: str) -> CommentModerationType:
     messages: List[ChatCompletionMessageParam] = [
-        {"role": "system", "content": PROMPT_COMMENT_MODERATION},
+        {"role": "system", "content": _today() + _PROMPT_COMMENT_MODERATION},
         {"role": "user", "content": content},
     ]
 

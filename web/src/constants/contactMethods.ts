@@ -48,7 +48,7 @@ export const {
         try {
           return value ? parsePhoneNumberWithError(value).formatInternational() : 'Telephone'
         } catch (_error) {
-          console.error(`Invalid telephone number: ${value ?? 'undefined'}`, _error)
+          console.warn(`Invalid telephone number: ${value ?? 'undefined'}`)
           return value ?? 'Telephone'
         }
       },
@@ -63,7 +63,7 @@ export const {
         try {
           return value ? parsePhoneNumberWithError(value).formatInternational() : 'WhatsApp'
         } catch (_error) {
-          console.error(`Invalid WhatsApp number: ${value ?? 'undefined'}`, _error)
+          console.warn(`Invalid WhatsApp number: ${value ?? 'undefined'}`)
           return value ?? 'WhatsApp'
         }
       },

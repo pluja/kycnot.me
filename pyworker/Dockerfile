@@ -7,4 +7,4 @@ COPY . .
 RUN uv sync --frozen --no-dev
 
 EXPOSE 8000
-CMD ["uv", "run", "-m", "pyworker", "--worker"]
+CMD ["uv", "run", "--no-dev", "-m", "pyworker", "--worker"]

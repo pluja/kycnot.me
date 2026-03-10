@@ -158,9 +158,10 @@ export class ErrorBanners {
         this._messages.push(message)
         if (message.type === 'error') {
           const isClientError =
-            message.origin === 'action' &&
-            typeof (message.error as { status?: number } | undefined)?.status === 'number' &&
-            (message.error as { status: number }).status < 500
+            message.origin.startsWith('custom_') ||
+            (message.origin === 'action' &&
+              typeof (message.error as { status?: number } | undefined)?.status === 'number' &&
+              (message.error as { status: number }).status < 500)
           if (!isClientError) {
             console.error(`[ErrorBanners] ${message.uiMessage}`, message.error)
           }

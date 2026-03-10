@@ -9,7 +9,10 @@ from typing import Any, Dict, List
 # Import types from database.py
 from pyworker.database import (  # type: ignore
     CommentType,
-    get_comments,
+    get_comment_by_id,
+    get_pending_comments,
+    get_recent_approved_comments,
+    get_recent_approved_order_ids,
     update_comment_moderation,
 )
 from pyworker.tasks.base import Task  # type: ignore
@@ -38,9 +41,7 @@ class CommentModerationTask(Task):
         service_id = service["id"]
         service_name = service["name"]
 
-        # Query the approved comments for the service
-        # get_comments is type ignored, so we assume it returns List[Dict[str, Any]]
-        comments: List[Dict[str, Any]] = get_comments(service_id, status="PENDING")
+        comments: List[Dict[str, Any]] = get_pending_comments(service_id)
 
         if not comments:
             self.logger.info(
@@ -52,14 +53,34 @@ class CommentModerationTask(Task):
             f"Found {len(comments)} pending comments for service {service_name} (ID: {service_id}). Starting processing."
         )
 
+        # Fetch context once per service run
+        approved_comments = get_recent_approved_comments(service_id)
+        approved_order_ids = get_recent_approved_order_ids(service_id)
+
         processed_at_least_one = False
         for comment_data in comments:
-            # Assert the type for the individual dictionary for type checking within the loop
             comment: CommentType = comment_data  # type: ignore
 
-            # Query OpenAI to get the sentiment summary
+            # Fetch parent comment if this is a reply
+            parent_comment = None
+            parent_id = comment.get("parentId")
+            if parent_id:
+                parent_comment = get_comment_by_id(parent_id)
+
+            context = {
+                "service": {
+                    "name": service["name"],
+                    "description": service["description"],
+                    "kycLevel": service["kycLevel"],
+                },
+                "comment": comment,
+                "parentComment": parent_comment,
+                "recentApprovedComments": approved_comments,
+                "recentApprovedOrderIds": approved_order_ids if comment.get("orderId") else None,
+            }
+
             moderation = prompt_comment_moderation(
-                f"Information about the service: {service}\\nCurrent time: {datetime.now()}\\n\\nComment to moderate: {json.dumps(comment, cls=DateTimeEncoder)}"
+                json.dumps(context, cls=DateTimeEncoder)
             )
 
             modstring = f"Comment {comment['id']} "
@@ -105,7 +126,7 @@ class CommentModerationTask(Task):
                 comment["internalNote"] = None
 
             # Save the sentiment summary to the database
-            self.logger.info(f"{modstring}")
+            self.logger.info(modstring)
             update_comment_moderation(comment)
             processed_at_least_one = True
 

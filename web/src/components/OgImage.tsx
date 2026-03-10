@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+import { SITE_URL } from 'astro:env/client'
 import { ImageResponse } from '@vercel/og'
 import sharp from 'sharp'
 
@@ -12,6 +13,9 @@ import { urlWithParams } from '../lib/urls'
 import type { VerificationStatus } from '@prisma/client'
 import type { APIContext } from 'astro'
 import type { Prettify } from 'ts-essentials'
+
+/** Canonical origin for self-fetches — avoids .onion/i2p resolution failures. */
+const CANONICAL_ORIGIN = new URL(SITE_URL).origin
 
 //////////////////////////////////////////////////////
 //                    NOTE                          //
@@ -134,6 +138,27 @@ export const ogImageTemplates = {
 
     const PADING = 80
 
+    // satori only supports PNG/JPEG/SVG — convert webp/avif via sharp
+    let resolvedImageSrc: string | null = null
+    if (imageUrl) {
+      try {
+        const imgUrl = absoluteUrl(imageUrl, context)
+        const ext = imageUrl.split('.').pop()?.toLowerCase()
+        if (ext === 'webp' || ext === 'avif') {
+          const res = await fetch(imgUrl)
+          if (res.ok) {
+            const buf = await res.arrayBuffer()
+            const pngBuf = await sharp(buf).png().resize(140, 140, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).toBuffer()
+            resolvedImageSrc = `data:image/png;base64,${pngBuf.toString('base64')}`
+          }
+        } else {
+          resolvedImageSrc = imgUrl
+        }
+      } catch {
+        // OG image will render without the service icon
+      }
+    }
+
     return new ImageResponse(
       <div
         style={{
@@ -157,9 +182,9 @@ export const ogImageTemplates = {
             flex: 1,
           }}
         >
-          {!!imageUrl && (
+          {!!resolvedImageSrc && (
             <img
-              src={absoluteUrl(imageUrl, context)}
+              src={resolvedImageSrc}
               style={{
                 width: 140,
                 height: 140,
@@ -419,8 +444,8 @@ export function makeOgImageUrl(
 
 // Utilities ------------------------------------------------------------
 
-function absoluteUrl(url: string, context: Pick<APIContext, 'url'>) {
-  return new URL(url, context.url.origin).href
+function absoluteUrl(url: string, _context: Pick<APIContext, 'url'>) {
+  return new URL(url, CANONICAL_ORIGIN).href
 }
 
 async function svgUrlToBase64Png(svgUrl: string, width?: number, height?: number): Promise<string> {

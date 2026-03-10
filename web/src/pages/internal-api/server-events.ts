@@ -75,6 +75,7 @@ export const GET: APIRoute = ({ request, locals }) => {
   })
 }
 
+const encoder = new TextEncoder()
 function encodeSSE(event: ServerEventsEvent) {
-  return new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`)
+  return encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
 }

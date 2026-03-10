@@ -481,6 +481,114 @@ def get_comments(service_id: int, status: str = "APPROVED") -> List[Dict[str, An
     return comments
 
 
+def get_pending_comments(service_id: int) -> List[Dict[str, Any]]:
+    """
+    Get all PENDING comments for a specific service using a flat SELECT.
+    Unlike get_comments(), this does NOT use a recursive CTE, so PENDING replies
+    whose parent is APPROVED are correctly included.
+    """
+    comments = []
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        c.id, c.content, c.rating, c.upvotes, c."createdAt", c."parentId",
+                        c."orderId", c."privateContext", c.status,
+                        u.id AS "authorId", u.name AS "authorName",
+                        u."displayName" AS "authorDisplayName", u.verified AS "authorVerified"
+                    FROM "Comment" c
+                    JOIN "User" u ON c."authorId" = u.id
+                    WHERE c."serviceId" = %s AND c.status = 'PENDING'
+                    ORDER BY c."createdAt" ASC
+                    """,
+                    (service_id,),
+                )
+                comments = cursor.fetchall()
+    except Exception as e:
+        logger.error(f"Error fetching pending comments for service {service_id}: {e}")
+    return comments
+
+
+def get_comment_by_id(comment_id: int) -> Optional[Dict[str, Any]]:
+    """Fetch a single comment by ID."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    SELECT c.id, c.content, c.status,
+                           u.name AS "authorName", u."displayName" AS "authorDisplayName"
+                    FROM "Comment" c
+                    JOIN "User" u ON c."authorId" = u.id
+                    WHERE c.id = %s
+                    """,
+                    (comment_id,),
+                )
+                return cursor.fetchone()
+    except Exception as e:
+        logger.error(f"Error fetching comment {comment_id}: {e}")
+    return None
+
+
+def get_recent_approved_comments(
+    service_id: int, limit: int = 10
+) -> List[Dict[str, Any]]:
+    """Fetch recent APPROVED/VERIFIED comments for a service (for AI context)."""
+    comments = []
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    SELECT c.id, c.content, c.rating, c.upvotes, c."createdAt", c."parentId",
+                           u."displayName" AS "authorDisplayName"
+                    FROM "Comment" c
+                    JOIN "User" u ON c."authorId" = u.id
+                    WHERE c."serviceId" = %s AND c.status IN ('APPROVED', 'VERIFIED')
+                    ORDER BY c."createdAt" DESC
+                    LIMIT %s
+                    """,
+                    (service_id, limit),
+                )
+                comments = cursor.fetchall()
+    except Exception as e:
+        logger.error(
+            f"Error fetching recent approved comments for service {service_id}: {e}"
+        )
+    return comments
+
+
+def get_recent_approved_order_ids(
+    service_id: int, limit: int = 5
+) -> List[str]:
+    """Fetch recent non-null orderIds from APPROVED/VERIFIED comments for a service."""
+    order_ids = []
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    SELECT c."orderId"
+                    FROM "Comment" c
+                    WHERE c."serviceId" = %s
+                      AND c."orderId" IS NOT NULL
+                      AND c.status IN ('APPROVED', 'VERIFIED')
+                    ORDER BY COALESCE(c."approvedAt", c."updatedAt") DESC
+                    LIMIT %s
+                    """,
+                    (service_id, limit),
+                )
+                rows = cursor.fetchall()
+                order_ids = [row["orderId"] for row in rows]
+    except Exception as e:
+        logger.error(
+            f"Error fetching recent approved order IDs for service {service_id}: {e}"
+        )
+    return order_ids
+
+
 def get_max_comment_updated_at(
     service_id: int, status: str = "APPROVED"
 ) -> Optional[datetime]:

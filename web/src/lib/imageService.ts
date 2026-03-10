@@ -27,7 +27,11 @@ const imageService: typeof sharpService = {
         : (transform.src as { src?: string })?.src ?? 'unknown'
 
     if (isMarkup(inputBuffer)) {
-      const tag = String.fromCharCode(...inputBuffer.slice(0, 10)).trim().toLowerCase()
+      let offset = 0
+      if (inputBuffer[0] === 0xef && inputBuffer[1] === 0xbb && inputBuffer[2] === 0xbf) offset = 3
+      while (offset < inputBuffer.length && (inputBuffer[offset] === 0x09 || inputBuffer[offset] === 0x0a || inputBuffer[offset] === 0x0d || inputBuffer[offset] === 0x20))
+        offset++
+      const tag = String.fromCharCode(...inputBuffer.slice(offset, offset + 10)).toLowerCase()
       if (tag.startsWith('<svg') || tag.startsWith('<?xml')) {
         return { data: inputBuffer, format: 'svg' }
       }
