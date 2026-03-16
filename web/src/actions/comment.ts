@@ -17,7 +17,7 @@ import type { CommentStatus, Prisma } from '@prisma/client'
 const COMMENT_RATE_LIMIT_WINDOW_MINUTES = 2
 const MAX_COMMENTS_PER_WINDOW = 1
 const MAX_COMMENTS_PER_WINDOW_VERIFIED_USER = 10
-export const COMMENT_ORDER_ID_MAX_LENGTH = 600
+export const COMMENT_ORDER_ID_MAX_LENGTH = 100
 
 export const commentActions = {
   vote: defineProtectedAction({
