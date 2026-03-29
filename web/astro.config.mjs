@@ -29,12 +29,7 @@ export default defineConfig({
   integrations: [
     postgresListener(),
     icon(),
-    mdx({
-      gfm: false,
-      remarkRehype: {
-        allowDangerousHtml: true,
-      },
-    }),
+    mdx(),
     AstroPWA({
       base: '/',
       scope: '/',
