@@ -26,15 +26,15 @@ const {
 
 const fallbackImage = fallback ? fallbackImages[fallback] : undefined
 
-const finalSrc = typeof src === 'string' ? new URL(src, Astro.url).href : (src ?? fallbackImage)
+const finalSrc = typeof src === 'string' ? src : (src ?? fallbackImage)
 
 const isSvg =
-  (typeof finalSrc === 'string' && new URL(finalSrc, Astro.url).href.toLowerCase().endsWith('.svg')) ||
+  (typeof finalSrc === 'string' && finalSrc.toLowerCase().endsWith('.svg')) ||
   (typeof finalSrc === 'object' &&
     finalSrc !== null &&
     'src' in finalSrc &&
     typeof finalSrc.src === 'string' &&
-    new URL(finalSrc.src, Astro.url).href.toLowerCase().endsWith('.svg'))
+    finalSrc.src.toLowerCase().endsWith('.svg'))
 ---
 
 {/* eslint-disable @typescript-eslint/no-explicit-any */}
