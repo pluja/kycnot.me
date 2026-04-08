@@ -32,7 +32,7 @@ for (const value of valuesToSet) {
 
 <BadgeStandard
   as="a"
-  href={url.href}
+  href={url.pathname + url.search}
   class={cn(isSelected && 'bg-green-950 text-green-500')}
   text={label}
   icon={icon}

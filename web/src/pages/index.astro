@@ -119,7 +119,7 @@ const hasDefaultFiltersIgnoringQ = areEqualObjectsWithoutOrder(
   omit(defaultFilters, [...ignoredKeysForDefaultData, 'q'])
 )
 
-if (redirectUrl) return Astro.redirect(redirectUrl.toString())
+if (redirectUrl) return Astro.redirect(redirectUrl)
 
 const includeScams =
   !!filters.q &&

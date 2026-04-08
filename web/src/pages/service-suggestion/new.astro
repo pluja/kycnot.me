@@ -123,6 +123,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
                 if (result.data.extraNotes) {
                   editServiceUrl.searchParams.set('notes', result.data.extraNotes)
                 }
+                const editServiceHref = editServiceUrl.pathname + editServiceUrl.search
 
                 return (
                   <div class="flex gap-4 rounded-lg border border-night-400 bg-night-600 p-4 shadow-sm">
@@ -141,7 +142,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
                       </a>
 
                       <a
-                        href={editServiceUrl.toString()}
+                        href={editServiceHref}
                         target="_blank"
                         class="flex items-center gap-1 rounded-sm bg-green-600 px-2.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-green-700"
                       >

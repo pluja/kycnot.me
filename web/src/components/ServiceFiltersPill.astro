@@ -28,7 +28,7 @@ const {
 const makeUrlWithoutFilter = (filter: string, value?: string) => {
   const url = new URL(Astro.url)
   url.searchParams.delete(filter, value)
-  return url.toString()
+  return url.pathname + url.search
 }
 ---
 

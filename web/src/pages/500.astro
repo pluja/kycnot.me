@@ -64,7 +64,7 @@ const {
       />
       Try again
     </button>
-    <a href={Astro.url} class="group flex items-center gap-2 px-3.5 py-2.5 text-white js:hidden">
+    <a href={Astro.url.pathname + Astro.url.search} class="group flex items-center gap-2 px-3.5 py-2.5 text-white js:hidden">
       <Icon
         name="ri:refresh-line"
         class="size-5 transition-transform duration-300 group-hover:rotate-90 group-active:rotate-180"

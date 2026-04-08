@@ -161,7 +161,7 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort']>) => {
 const getPaginationUrl = (pageNum: number) => {
   const url = new URL(Astro.url)
   url.searchParams.set('page', pageNum.toString())
-  return url.toString()
+  return url.pathname + url.search
 }
 
 const truncate = (text: string, length: number) => {

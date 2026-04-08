@@ -112,6 +112,9 @@ export default defineConfig({
         SITE_URL === 'http://localhost:4321' ? undefined : 'max-age=31536000; includeSubdomains; preload;',
     },
   },
+  security: {
+    allowedDomains: [{ hostname: new URL(SITE_URL).hostname, protocol: 'https' }],
+  },
   image: {
     remotePatterns: [
       {

@@ -147,7 +147,7 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
       url.searchParams.delete(key)
     }
   })
-  return url.toString()
+  return url.pathname + url.search
 }
 ---
 

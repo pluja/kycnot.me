@@ -251,7 +251,7 @@ function makeCleanUrl<K extends string, T extends Record<K, MyZodUnknown>>(
   paramsToRemove.forEach(([key, value]) => {
     cleanUrl.searchParams.delete(key, value)
   })
-  return cleanUrl
+  return cleanUrl.pathname + cleanUrl.search
 }
 
 function getUneededObjectParams<T extends Record<string, MyZodUnknown>>(shape: T, url: URL) {

@@ -7,6 +7,7 @@ import { getKycLevelInfo } from '../../constants/kycLevels'
 import { getVerificationStatusInfo } from '../../constants/verificationStatus'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { prisma } from '../../lib/prisma'
+import { absoluteSiteUrl } from '../../lib/urls'
 import { zodUrlOptionalProtocol } from '../../lib/zodUtils'
 
 import type { Prisma } from '@prisma/client'
@@ -142,7 +143,7 @@ export const apiServiceActions = {
           (url) => url + (service.referral ?? '')
         ),
         tosUrls: service.tosUrls,
-        kycnotmeUrl: new URL(`/service/${service.slug}`, context.url).href,
+        kycnotmeUrl: absoluteSiteUrl(`/service/${service.slug}`),
       }
     },
   }),
