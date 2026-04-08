@@ -1,8 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { SITE_URL } from 'astro:env/client'
 import { ImageResponse } from '@vercel/og'
+import { SITE_URL } from 'astro:env/client'
 import sharp from 'sharp'
 
 import defaultOGImageBg from '../assets/ogimage-bg.png'

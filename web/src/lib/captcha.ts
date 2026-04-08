@@ -1,6 +1,6 @@
 import { createHash } from 'crypto'
 
-import { createCanvas } from 'canvas'
+import { createCanvas } from '@napi-rs/canvas'
 
 export const CAPTCHA_LENGTH = 6
 const CAPTCHA_CHARS = 'ABCDEFGHIJKMNOPRSTUVWXYZ123456789' // Notice that ambiguous characters are removed

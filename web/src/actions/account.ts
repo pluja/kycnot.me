@@ -10,9 +10,9 @@ import { saveFileLocally } from '../lib/fileStorage'
 import { startImpersonating, stopImpersonating } from '../lib/impersonation'
 import { makeKarmaUnlockMessage, makeUserWithKarmaUnlocks } from '../lib/karmaUnlocks'
 import { prisma } from '../lib/prisma'
+import { makeSafeRedirectUrl } from '../lib/redirectUrls'
 import { redisPreGeneratedSecretTokens } from '../lib/redis/redisPreGeneratedSecretTokens'
 import { handleHoneypotTrap } from '../lib/spamDetection'
-import { makeSafeRedirectUrl } from '../lib/redirectUrls'
 import { login, logout, setUserSessionIdCookie } from '../lib/userCookies'
 import {
   generateUserSecretToken,

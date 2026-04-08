@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 
 import { ActionError } from 'astro:actions'
-import { z } from 'astro:schema'
+import { z } from 'astro/zod'
 import { formatDistanceStrict } from 'date-fns'
 
 import { karmaUnlocksById } from '../constants/karmaUnlocks'

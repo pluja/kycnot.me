@@ -4,7 +4,7 @@ import { urlParamsToFormData, urlParamsToObject } from './urls'
 
 import type { AstroGlobal } from 'astro'
 import type { ActionAccept, ActionClient, SafeResult } from 'astro:actions'
-import type { z } from 'astro:schema'
+import type { z } from 'astro/zod'
 
 /**
  * Call an Action directly from an Astro page or API endpoint.
