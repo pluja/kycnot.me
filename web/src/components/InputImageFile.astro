@@ -17,8 +17,7 @@ type Props = Omit<ComponentProps<typeof InputFile>, 'accept'> & {
 const { class: className, square, value, downloadButton, ...inputFileProps } = Astro.props
 
 function makeDownloadFilename(value: string) {
-  const url = new URL(value, Astro.url.origin)
-  return url.pathname.split('/').pop() ?? 'service-image'
+  return value.split('/').pop()?.split('?')[0] ?? 'service-image'
 }
 ---
 

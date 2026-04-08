@@ -20,6 +20,8 @@ import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
 
+import { absoluteSiteUrl, siteOrigin } from '../lib/urls'
+
 import { makeOgImageUrl } from './OgImage'
 
 import type { Prisma } from '@prisma/client'
@@ -136,7 +138,7 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
     author: {
       '@type': 'Person',
       name: comment.author.displayName ?? comment.author.name,
-      url: new URL(`/u/${comment.author.name}`, Astro.url).href,
+      url: absoluteSiteUrl(`/u/${comment.author.name}`),
       image: comment.author.picture ?? undefined,
     },
     interactionStatistic: [
@@ -162,14 +164,14 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
     item={{
       '@context': 'https://schema.org',
       '@type': 'DiscussionForumPosting',
-      url: new URL(`/service/${service.slug}#comments`, Astro.url).href,
-      mainEntityOfPage: new URL(`/service/${service.slug}#comments`, Astro.url).href,
+      url: absoluteSiteUrl(`/service/${service.slug}#comments`),
+      mainEntityOfPage: absoluteSiteUrl(`/service/${service.slug}#comments`),
       datePublished: service.listedAt?.toISOString(),
       dateCreated: service.createdAt.toISOString(),
       headline: `${service.name} comments on KYCnot.me`,
       text: service.description,
       author: KYCNOTME_SCHEMA_MINI,
-      image: makeOgImageUrl({ template: 'generic', title: `${service.name} comments` }, Astro.url),
+      image: makeOgImageUrl({ template: 'generic', title: `${service.name} comments` }, siteOrigin),
 
       commentCount: comments.length,
       comment: comments.map(makeReplySchema),

@@ -14,7 +14,7 @@ import {
 } from '../lib/commentsWithReplies'
 import { computeKarmaUnlocks } from '../lib/karmaUnlocks'
 import { formatDateShort } from '../lib/timeAgo'
-import { urlDomain } from '../lib/urls'
+import { absoluteSiteUrl, siteOrigin, urlDomain } from '../lib/urls'
 
 import BadgeSmall from './BadgeSmall.astro'
 import CommentModeration from './CommentModeration.astro'
@@ -88,7 +88,7 @@ const shouldShow =
   isAuthorOrPrivileged
 if (!shouldShow) return null
 
-const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: Astro.url.origin })
+const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: siteOrigin })
 ---
 
 <div
@@ -118,7 +118,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
             '@type': 'Person',
             name: comment.author.displayName ?? comment.author.name,
             image: comment.author.picture ?? undefined,
-            url: new URL(`/u/${comment.author.name}`, Astro.url).href,
+            url: absoluteSiteUrl(`/u/${comment.author.name}`),
           },
           datePublished: comment.createdAt.toISOString(),
           reviewBody: comment.content,

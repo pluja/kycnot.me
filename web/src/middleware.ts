@@ -6,6 +6,7 @@ import { getImpersonationInfo } from './lib/impersonation'
 import { makeUserWithKarmaUnlocks } from './lib/karmaUnlocks'
 import { prisma } from './lib/prisma'
 import { makeLoginUrl, makeSafeRedirectUrl } from './lib/redirectUrls'
+import { siteOrigin } from './lib/urls'
 import { redisActionsSessions } from './lib/redis/redisActionsSessions'
 import { getUserFromCookies } from './lib/userCookies'
 
@@ -67,7 +68,7 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
         if (!referer) {
           throw new Error('Internal: Referer unexpectedly missing from Action POST request.')
         }
-        return context.redirect(makeSafeRedirectUrl(referer, context.url.origin))
+        return context.redirect(makeSafeRedirectUrl(referer, siteOrigin))
       }
       return context.redirect(context.originPathname)
     }
@@ -110,14 +111,14 @@ const protectRoutes = defineMiddleware(async (context, next) => {
 
   if (context.url.pathname.startsWith('/admin')) {
     if (!user) {
-      return Response.redirect(makeLoginUrl(context.url, { message: 'Login as admin to access this page' }))
+      const canonicalUrl = new URL(context.url.pathname + context.url.search, siteOrigin)
+      return Response.redirect(makeLoginUrl(canonicalUrl, { message: 'Login as admin to access this page' }))
     }
 
     if (!user.admin) {
-      const accessDeniedUrl = new URL(context.url.origin)
-      accessDeniedUrl.pathname = '/access-denied'
+      const accessDeniedUrl = new URL('/access-denied', siteOrigin)
       accessDeniedUrl.searchParams.set('reasonType', 'admin-required')
-      accessDeniedUrl.searchParams.set('redirect', context.url.toString())
+      accessDeniedUrl.searchParams.set('redirect', siteOrigin + context.url.pathname + context.url.search)
       return Response.redirect(accessDeniedUrl.toString())
     }
   }

@@ -1,5 +1,4 @@
 import rss from '@astrojs/rss'
-import { SITE_URL } from 'astro:env/client'
 
 import { getNotificationTypeInfo } from '../../../../constants/notificationTypes'
 import { getUserNotifications } from '../../../../lib/feeds'
@@ -8,12 +7,13 @@ import {
   makeNotificationContent,
   makeNotificationTitle,
 } from '../../../../lib/notifications'
+import { absoluteSiteUrl, siteOrigin } from '../../../../lib/urls'
 
 import type { APIRoute } from 'astro'
 
 export const GET: APIRoute = async (context) => {
   try {
-    const origin = context.site?.origin ?? new URL(SITE_URL).origin
+    const origin = siteOrigin
     const feedId = context.params.feedId
 
     const result = await getUserNotifications(feedId)
@@ -43,7 +43,7 @@ export const GET: APIRoute = async (context) => {
           categories: [typeInfo.label],
         }
       }),
-      customData: `<language>en-us</language><atom:link href="${context.url.href}" rel="self" type="application/rss+xml"/>`,
+      customData: `<language>en-us</language><atom:link href="${absoluteSiteUrl(context.url.pathname)}" rel="self" type="application/rss+xml"/>`,
     })
   } catch (error) {
     console.error('Error generating user notifications RSS feed:', error)

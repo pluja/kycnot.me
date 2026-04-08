@@ -1,3 +1,5 @@
+import { siteOrigin } from './urls'
+
 /**
  * Validates that a redirect URL is same-origin, returning '/' if not.
  * Prevents open redirect attacks via user-controlled Referer/redirect inputs.
@@ -27,8 +29,7 @@ export function makeLoginUrl(
     message?: string | null
   } = {}
 ) {
-  const loginUrl = new URL(currentUrl.origin)
-  loginUrl.pathname = '/account/login'
+  const loginUrl = new URL('/account/login', siteOrigin)
 
   if (error) {
     loginUrl.searchParams.set('error', error)
@@ -50,7 +51,7 @@ export function makeLoginUrl(
       loginUrl.searchParams.set('redirect', redirectUrlRedirectParam)
     }
   } else {
-    loginUrl.searchParams.set('redirect', redirectUrl.toString())
+    loginUrl.searchParams.set('redirect', redirectUrl.pathname + redirectUrl.search)
   }
 
   return loginUrl.toString()
@@ -64,13 +65,12 @@ export function makeUnimpersonateUrl(
     redirect?: URL | string | null
   } = {}
 ) {
-  const url = new URL(currentUrl.origin)
-  url.pathname = '/account/impersonate'
+  const url = new URL('/account/impersonate', siteOrigin)
   url.searchParams.set('stop', 'true')
 
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   const redirectUrl = new URL(redirect || currentUrl)
-  url.searchParams.set('redirect', redirectUrl.toString())
+  url.searchParams.set('redirect', redirectUrl.pathname + redirectUrl.search)
 
   return url.toString()
 }

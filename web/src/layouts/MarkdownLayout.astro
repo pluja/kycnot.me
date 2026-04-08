@@ -2,6 +2,7 @@
 import { makeOgImageUrl, type OgImageAllTemplatesWithProps } from '../components/OgImage'
 import TimeFormatted from '../components/TimeFormatted.astro'
 import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
+import { absoluteSiteUrl, siteOrigin } from '../lib/urls'
 
 import BaseLayout from './BaseLayout.astro'
 
@@ -42,12 +43,12 @@ const ogImageTemplateData = {
       description: frontmatter.description,
       datePublished: publishDate?.toISOString(),
       dateModified: publishDate?.toISOString(),
-      image: makeOgImageUrl(ogImageTemplateData, Astro.url),
+      image: makeOgImageUrl(ogImageTemplateData, siteOrigin),
       author: KYCNOTME_SCHEMA_MINI,
       publisher: KYCNOTME_SCHEMA_MINI,
       mainEntityOfPage: {
         '@type': 'WebPage',
-        url: Astro.url.href,
+        url: absoluteSiteUrl(Astro.url.pathname),
       },
     } satisfies WithContext<Article>,
     ...(schemas ?? []),

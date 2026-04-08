@@ -3,6 +3,7 @@ import { Icon } from 'astro-icon/components'
 
 import { getAnnouncementTypeInfo } from '../constants/announcementTypes'
 import { cn } from '../lib/cn'
+import { siteOrigin } from '../lib/urls'
 
 import type { Prisma } from '@prisma/client'
 import type { HTMLAttributes } from 'astro/types'
@@ -35,7 +36,7 @@ const Tag = announcement.link ? 'a' : 'div'
 
 <Tag
   href={announcement.link}
-  target={announcement.link && new URL(announcement.link, Astro.url.origin).origin !== Astro.url.origin
+  target={announcement.link && new URL(announcement.link, siteOrigin).origin !== siteOrigin
     ? '_blank'
     : undefined}
   rel="noopener noreferrer"

@@ -2,20 +2,16 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { ImageResponse } from '@vercel/og'
-import { SITE_URL } from 'astro:env/client'
 import sharp from 'sharp'
 
 import defaultOGImageBg from '../assets/ogimage-bg.png'
 import defaultOGImage from '../assets/ogimage.png'
 import { makeOverallScoreInfo } from '../lib/overallScore'
-import { urlWithParams } from '../lib/urls'
+import { siteOrigin, urlWithParams } from '../lib/urls'
 
 import type { VerificationStatus } from '@prisma/client'
 import type { APIContext } from 'astro'
 import type { Prettify } from 'ts-essentials'
-
-/** Canonical origin for self-fetches — avoids .onion/i2p resolution failures. */
-const CANONICAL_ORIGIN = new URL(SITE_URL).origin
 
 //////////////////////////////////////////////////////
 //                    NOTE                          //
@@ -94,7 +90,7 @@ export const ogImageTemplates = {
   default: (_props: Record<never, never> = {}, context) => {
     return new ImageResponse(
       <img
-        src={absoluteUrl(defaultOGImage.src, context)}
+        src={absoluteUrl(defaultOGImage.src)}
         style={{
           width: '100%',
           height: '100%',
@@ -142,7 +138,7 @@ export const ogImageTemplates = {
     let resolvedImageSrc: string | null = null
     if (imageUrl) {
       try {
-        const imgUrl = absoluteUrl(imageUrl, context)
+        const imgUrl = absoluteUrl(imageUrl)
         const ext = imageUrl.split('.').pop()?.toLowerCase()
         if (ext === 'webp' || ext === 'avif') {
           const res = await fetch(imgUrl)
@@ -163,7 +159,7 @@ export const ogImageTemplates = {
       <div
         style={{
           color: 'white',
-          backgroundImage: `url(${absoluteUrl(defaultOGImageBg.src, context)})`,
+          backgroundImage: `url(${absoluteUrl(defaultOGImageBg.src)})`,
           width: '100%',
           height: '100%',
           padding: PADING,
@@ -350,7 +346,7 @@ export const ogImageTemplates = {
       <div
         style={{
           color: 'white',
-          backgroundImage: `url(${absoluteUrl(defaultOGImageBg.src, context)})`,
+          backgroundImage: `url(${absoluteUrl(defaultOGImageBg.src)})`,
           width: '100%',
           height: '100%',
           padding: PADING,
@@ -437,15 +433,17 @@ export function makeOgImageUrl(
   ogImage: OgImageAllTemplatesWithProps | string | undefined,
   baseUrl: URL | string
 ) {
-  return typeof ogImage === 'string'
-    ? new URL(ogImage, baseUrl).href
-    : urlWithParams(new URL('/ogimage.png', baseUrl), { data: JSON.stringify(ogImage ?? {}) })
+  if (typeof ogImage === 'string') {
+    return new URL(ogImage, baseUrl).href
+  }
+  const ogPath = urlWithParams(new URL('/ogimage.png', baseUrl), { data: JSON.stringify(ogImage ?? {}) })
+  return new URL(ogPath, baseUrl).href
 }
 
 // Utilities ------------------------------------------------------------
 
-function absoluteUrl(url: string, _context: Pick<APIContext, 'url'>) {
-  return new URL(url, CANONICAL_ORIGIN).href
+function absoluteUrl(url: string) {
+  return new URL(url, siteOrigin).href
 }
 
 async function svgUrlToBase64Png(svgUrl: string, width?: number, height?: number): Promise<string> {

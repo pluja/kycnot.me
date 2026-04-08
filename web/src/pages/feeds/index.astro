@@ -3,6 +3,7 @@ import { Icon } from 'astro-icon/components'
 
 import MiniLayout from '../../layouts/MiniLayout.astro'
 import { takeCounts } from '../../lib/feeds'
+import { siteOrigin } from '../../lib/urls'
 
 const user = Astro.locals.user
 
@@ -75,7 +76,7 @@ const feeds = [
 
           <div
             class="relative mt-2 rounded-lg border border-night-500 bg-night-600 px-4 py-2 font-mono break-all text-white"
-            set:text={`${Astro.url.origin}${feed.rss}`}
+            set:text={`${siteOrigin}${feed.rss}`}
           />
           {!!feed.replacementDescription && (
             <p class="mt-1 text-center text-xs text-day-500 italic">{feed.replacementDescription}</p>

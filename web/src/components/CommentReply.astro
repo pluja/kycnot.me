@@ -5,6 +5,7 @@ import { actions } from 'astro:actions'
 import { COMMENT_ORDER_ID_MAX_LENGTH } from '../actions/comment'
 import { cn } from '../lib/cn'
 import { makeLoginUrl } from '../lib/redirectUrls'
+import { siteOrigin } from '../lib/urls'
 
 import Button from './Button.astro'
 import FormTimeTrap from './FormTimeTrap.astro'
@@ -146,7 +147,7 @@ const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
                       >
                         <Icon name="ri:information-line" class="mr-1 inline size-3.5" />
                         <a
-                          href={`${Astro.url.origin}${Astro.url.pathname}#comment-${activeRatingComment.id}`}
+                          href={`${siteOrigin}${Astro.url.pathname}#comment-${activeRatingComment.id}`}
                           class="inline-flex items-center gap-1 underline"
                           target="_blank"
                           rel="noopener noreferrer"

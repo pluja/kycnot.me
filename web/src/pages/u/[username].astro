@@ -24,7 +24,7 @@ import { makeUserWithKarmaUnlocks } from '../../lib/karmaUnlocks'
 import { prisma } from '../../lib/prisma'
 import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
 import { formatDateShort } from '../../lib/timeAgo'
-import { urlDomain } from '../../lib/urls'
+import { absoluteSiteUrl, urlDomain } from '../../lib/urls'
 
 import type { ProfilePage, WithContext } from 'schema-dts'
 
@@ -220,7 +220,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
     {
       '@context': 'https://schema.org',
       '@type': 'ProfilePage',
-      url: new URL(`/u/${user.name}`, Astro.url).href,
+      url: absoluteSiteUrl(`/u/${user.name}`),
       name: `${user.displayName ?? user.name}'s Profile`,
       dateCreated: user.createdAt.toISOString(),
 
@@ -229,7 +229,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
         name: user.displayName ?? user.name,
         alternateName: user.displayName ? user.name : undefined,
         image: user.picture ?? undefined,
-        url: new URL(`/u/${user.name}`, Astro.url).href,
+        url: absoluteSiteUrl(`/u/${user.name}`),
         sameAs: user.link ? [user.link] : undefined,
         description: `User profile page for ${user.displayName ?? user.name} on KYCnot.me`,
         identifier: [user.name, user.id.toString()],
@@ -319,7 +319,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
         <AdminOnly>
           <Tooltip
             as="a"
-            href={`/account/impersonate?targetUserId=${user.id}&redirect=${encodeURIComponent(Astro.url.href)}`}
+            href={`/account/impersonate?targetUserId=${user.id}&redirect=${encodeURIComponent(absoluteSiteUrl(Astro.url.pathname))}`}
             data-astro-prefetch="tap"
             class="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-sm text-amber-400 shadow-xs transition-colors duration-200 hover:bg-amber-500/20 focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-black focus:outline-hidden"
             text="Impersonate (admin)"

@@ -5,6 +5,7 @@ import Button from '../../components/Button.astro'
 import InputLoginToken from '../../components/InputLoginToken.astro'
 import MiniLayout from '../../layouts/MiniLayout.astro'
 import { makeSafeRedirectUrl } from '../../lib/redirectUrls'
+import { siteOrigin } from '../../lib/urls'
 import { logout } from '../../lib/userCookies'
 
 const result = Astro.getActionResult(actions.account.login)
@@ -16,12 +17,12 @@ if (Astro.url.searchParams.get('logout')) {
   await logout(Astro)
   const url = new URL(Astro.url)
   url.searchParams.delete('logout')
-  return Astro.redirect(url.toString())
+  return Astro.redirect(url.pathname + url.search)
 }
 
 // Redirect if already logged in
 if (Astro.locals.user) {
-  return Astro.redirect(makeSafeRedirectUrl(Astro.url.searchParams.get('redirect'), Astro.url.origin))
+  return Astro.redirect(makeSafeRedirectUrl(Astro.url.searchParams.get('redirect'), siteOrigin))
 }
 
 const message = Astro.url.searchParams.get('message')

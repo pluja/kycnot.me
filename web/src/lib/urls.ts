@@ -1,4 +1,17 @@
+import { SITE_URL } from 'astro:env/client'
 import { escapeRegExp } from 'lodash-es'
+
+/**
+ * Canonical site origin derived from the SITE_URL env variable.
+ * Use instead of `Astro.url.origin` / `context.url.origin` which resolve to
+ * the Docker-internal address (e.g. `http://localhost:4321`) when running
+ * behind a reverse proxy.
+ */
+export const siteOrigin: string = new URL(SITE_URL).origin
+
+export function absoluteSiteUrl(path: string): string {
+  return new URL(path, siteOrigin).href
+}
 
 export const createPageUrl = (
   page: number,
@@ -21,7 +34,7 @@ export const createPageUrl = (
   }
   url.searchParams.set('page', page.toString())
 
-  return url.toString()
+  return url.pathname + url.search
 }
 
 export function urlParamsToFormData(params: URLSearchParams) {
@@ -59,7 +72,7 @@ export function urlWithParams(
       urlObj.searchParams.set(key, String(value))
     }
   })
-  return urlObj.toString()
+  return urlObj.pathname + urlObj.search
 }
 
 export function makeObjectSearchParamKeyRegex(key: string) {

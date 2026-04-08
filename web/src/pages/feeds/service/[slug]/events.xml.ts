@@ -1,14 +1,14 @@
 import rss from '@astrojs/rss'
-import { SITE_URL } from 'astro:env/client'
 
 import { getEventTypeInfo } from '../../../../constants/eventTypes'
 import { getEventsForService } from '../../../../lib/feeds'
+import { absoluteSiteUrl, siteOrigin } from '../../../../lib/urls'
 
 import type { APIRoute } from 'astro'
 
 export const GET: APIRoute = async (context) => {
   try {
-    const origin = context.site?.origin ?? new URL(SITE_URL).origin
+    const origin = siteOrigin
 
     const result = await getEventsForService(context.params.slug)
     if (!result.success) return new Response(result.error.message, result.error.responseInit)
@@ -32,7 +32,7 @@ export const GET: APIRoute = async (context) => {
           categories: [eventTypeInfo.label, statusText],
         }
       }),
-      customData: `<language>en-us</language><atom:link href="${context.url.href}" rel="self" type="application/rss+xml"/>`,
+      customData: `<language>en-us</language><atom:link href="${absoluteSiteUrl(context.url.pathname)}" rel="self" type="application/rss+xml"/>`,
     })
   } catch (error) {
     console.error('Error generating service events RSS feed:', error)

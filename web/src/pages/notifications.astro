@@ -18,6 +18,7 @@ import { makeNotificationActions, makeNotificationContent, makeNotificationTitle
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { makeLoginUrl } from '../lib/redirectUrls'
+import { siteOrigin } from '../lib/urls'
 import { transformCase } from '../lib/strings'
 import { urlWithParams } from '../lib/urls'
 
@@ -212,7 +213,7 @@ const notifications = dbNotifications.map((notification) => ({
   typeInfo: getNotificationTypeInfo(notification.type),
   title: makeNotificationTitle(notification, user),
   content: makeNotificationContent(notification),
-  actions: makeNotificationActions(notification, Astro.url.origin),
+  actions: makeNotificationActions(notification, siteOrigin),
 }))
 ---
 
@@ -453,11 +454,11 @@ const notifications = dbNotifications.map((notification) => ({
             <input
               type="text"
               readonly
-              value={`${Astro.url.origin}/feeds/user/${user.feedId}/notifications.xml`}
+              value={`${siteOrigin}/feeds/user/${user.feedId}/notifications.xml`}
               class="flex-1 rounded-sm border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 select-all"
             />
             <CopyButton
-              copyText={`${Astro.url.origin}/feeds/user/${user.feedId}/notifications.xml`}
+              copyText={`${siteOrigin}/feeds/user/${user.feedId}/notifications.xml`}
               color="white"
             />
           </div>
