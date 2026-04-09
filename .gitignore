@@ -16,3 +16,6 @@ migrate.py
 sync-all.sh
 .DS_Store
 /*.sh
+
+*codex*
+*omx*

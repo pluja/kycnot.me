@@ -88,6 +88,47 @@ export async function listFiles(subDir: string): Promise<string[]> {
   }
 }
 
+export type ImageFileInfo = {
+  url: string
+  date: Date
+}
+
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.avif', '.webp'])
+
+/**
+ * List image files in a subdirectory, sorted by modification date (newest first).
+ * Filters out non-image files (e.g. .watermark).
+ */
+export async function listImageFiles(subDir: string): Promise<ImageFileInfo[]> {
+  const { fsPath: uploadDir, webPath: webUploadPath } = getUploadDir(subDir)
+  try {
+    const entries = await fs.readdir(uploadDir)
+    const imageEntries = entries.filter((file) => {
+      const ext = path.extname(file).toLowerCase()
+      return IMAGE_EXTENSIONS.has(ext)
+    })
+
+    const results = await Promise.all(
+      imageEntries.map(async (file) => {
+        const stat = await fs.stat(path.join(uploadDir, file))
+        return {
+          url: sanitizePath(`${webUploadPath}/${file}`),
+          date: stat.mtime,
+        }
+      })
+    )
+
+    return results.sort((a, b) => b.date.getTime() - a.date.getTime())
+  } catch (error: unknown) {
+    const err = error as NodeJS.ErrnoException
+    if (err.code === 'ENOENT') {
+      return []
+    }
+    console.error(`Error listing image files in ${uploadDir}:`, error)
+    throw error
+  }
+}
+
 /**
  * Delete a file locally given its web-accessible URL path
  */

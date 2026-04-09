@@ -38,7 +38,7 @@ import {
 } from '../../../../constants/verificationStepStatus'
 import BaseLayout from '../../../../layouts/BaseLayout.astro'
 import { DEPLOYMENT_MODE } from '../../../../lib/client/envVariables'
-import { listFiles } from '../../../../lib/fileStorage'
+import { listImageFiles } from '../../../../lib/fileStorage'
 import { makeAdminApiCallInfo } from '../../../../lib/makeAdminApiCallInfo'
 import { pluralize } from '../../../../lib/pluralize'
 import { prisma } from '../../../../lib/prisma'
@@ -230,10 +230,10 @@ if (!service) {
   return Astro.rewrite('/404')
 }
 
-const evidenceImageUrls = await Astro.locals.banners.try(
+const evidenceImages = await Astro.locals.banners.try(
   'Error listing evidence files',
-  () => listFiles(`evidence/${service.slug}`),
-  [] as string[]
+  () => listImageFiles(`evidence/${service.slug}`),
+  []
 )
 
 const apiCalls = await Astro.locals.banners.try(
@@ -1290,29 +1290,36 @@ const apiCalls = await Astro.locals.banners.try(
     </FormSection>
 
     <FormSection title="Evidence Images" id="evidence-images">
-      <FormSubSection title="Existing Evidence Images">
+      <FormSubSection title={`Existing Evidence Images (${evidenceImages.length})`}>
         {
-          evidenceImageUrls.length === 0 ? (
+          evidenceImages.length === 0 ? (
             <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
               No evidence images yet.
             </p>
           ) : (
             <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-              {evidenceImageUrls.map((imageUrl: string) => (
+              {evidenceImages.map((image) => (
                 <div class="group relative rounded-md border border-night-600 bg-night-800 p-2">
-                  <MyPicture
-                    src={imageUrl}
-                    alt="Evidence image"
-                    class="aspect-square w-full rounded-sm object-cover"
-                    width={200}
-                    height={200}
-                  />
+                  <button
+                    type="button"
+                    class="block w-full cursor-zoom-in"
+                    data-lightbox-trigger
+                    data-lightbox-src={image.url}
+                  >
+                    <MyPicture
+                      src={image.url}
+                      alt="Evidence image"
+                      class="aspect-square w-full rounded-sm object-cover"
+                      width={200}
+                      height={200}
+                    />
+                  </button>
                   <form
                     method="POST"
                     action={actions.admin.service.evidenceImage.delete}
                     class="absolute top-1 right-1"
                   >
-                    <input type="hidden" name="fileUrl" value={imageUrl} />
+                    <input type="hidden" name="fileUrl" value={image.url} />
                     <Button
                       type="submit"
                       variant="faded"
@@ -1325,12 +1332,17 @@ const apiCalls = await Astro.locals.banners.try(
                     />
                   </form>
 
-                  <input
-                    type="text"
-                    readonly
-                    value={`![Evidence](${imageUrl})`}
-                    class="mt-2 w-full cursor-text rounded-sm border bg-night-700 p-2 font-mono text-xs text-day-200 select-all"
-                  />
+                  <div class="mt-2 space-y-1">
+                    <p class="text-xs text-day-500">
+                      <TimeFormatted date={image.date} hourPrecision />
+                    </p>
+                    <input
+                      type="text"
+                      readonly
+                      value={`![Evidence](${image.url})`}
+                      class="w-full cursor-text rounded-sm border bg-night-700 p-1.5 font-mono text-xs text-day-200 select-all"
+                    />
+                  </div>
                 </div>
               ))}
             </div>
@@ -1356,5 +1368,66 @@ const apiCalls = await Astro.locals.banners.try(
         </form>
       </FormSubSection>
     </FormSection>
+
   </div>
+
+  <div
+    id="evidence-lightbox"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm"
+    data-lightbox-overlay
+  >
+    <button
+      type="button"
+      class="absolute inset-0 cursor-default"
+      data-lightbox-close
+      aria-label="Close"
+    />
+    <button
+      type="button"
+      class="absolute top-4 right-4 z-10 flex size-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+      data-lightbox-close
+      aria-label="Close"
+    >
+      <Icon name="ri:close-line" class="size-6" />
+    </button>
+    <img
+      src=""
+      alt="Evidence image full size"
+      class="relative max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
+      data-lightbox-img
+    />
+  </div>
+
+  <script>
+    document.addEventListener('astro:page-load', () => {
+      const overlay = document.querySelector<HTMLDivElement>('[data-lightbox-overlay]')
+      const img = document.querySelector<HTMLImageElement>('[data-lightbox-img]')
+      if (!overlay || !img) return
+
+      document.querySelectorAll<HTMLButtonElement>('[data-lightbox-trigger]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const src = btn.dataset.lightboxSrc
+          if (!src) return
+          img.src = src
+          overlay.classList.remove('hidden')
+          overlay.classList.add('flex')
+          document.body.style.overflow = 'hidden'
+        })
+      })
+
+      const close = () => {
+        overlay.classList.add('hidden')
+        overlay.classList.remove('flex')
+        img.src = ''
+        document.body.style.overflow = ''
+      }
+
+      overlay.querySelectorAll('[data-lightbox-close]').forEach((el) =>
+        el.addEventListener('click', close)
+      )
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !overlay.classList.contains('hidden')) close()
+      })
+    })
+  </script>
 </BaseLayout>
