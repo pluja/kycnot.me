@@ -24,6 +24,8 @@ services:
       context: ./pyworker
     image: kycnotme/pyworker:${PYWORKER_IMAGE_TAG:-latest}
     restart: always
+    init: true
+    stop_grace_period: 30s
     env_file:
       - .env
 

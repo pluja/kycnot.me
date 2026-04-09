@@ -42,10 +42,15 @@ def _strip_thinking(content: str) -> str:
 def _today() -> str:
     return f"Today's date: {date.today().isoformat()}\n\n"
 
+
 PROMPT_CHECK_TOS_REVIEW = _load_prompt("tos_check.md", schema=schemas.TOS_CHECK.ts_type)
 _PROMPT_TOS_REVIEW = _load_prompt("tos_review.md", schema=schemas.TOS_REVIEW.ts_type)
-PROMPT_COMMENT_SENTIMENT_SUMMARY = _load_prompt("comment_sentiment.md", schema=schemas.COMMENT_SEN.ts_type)
-_PROMPT_COMMENT_MODERATION = _load_prompt("comment_moderation.md", schema=schemas.COMMENT_MOD.ts_type)
+PROMPT_COMMENT_SENTIMENT_SUMMARY = _load_prompt(
+    "comment_sentiment.md", schema=schemas.COMMENT_SEN.ts_type
+)
+_PROMPT_COMMENT_MODERATION = _load_prompt(
+    "comment_moderation.md", schema=schemas.COMMENT_MOD.ts_type
+)
 
 
 client = OpenAI(
@@ -106,7 +111,9 @@ def query_openai_json(
             logger.warning(
                 f"Attempt {attempt + 1} failed: {e}. Retrying in {retry_delay} seconds..."
             )
-            time.sleep(retry_delay)
+            # Sleep in small increments so daemon thread can be joined promptly on shutdown
+            for _ in range(int(retry_delay)):
+                time.sleep(1)
             retry_delay *= 2  # Exponential backoff
 
     # This line should never be reached due to the raise in the last attempt
@@ -128,7 +135,9 @@ def prompt_check_tos_review(content: str) -> TosReviewCheck:
 
     result_dict = query_openai_json(
         messages,
-        model=os.environ.get("OPENAI_MODEL_FAST", "openai/gemini-2.5-flash-preview-05-20"),
+        model=os.environ.get(
+            "OPENAI_MODEL_FAST", "openai/gemini-2.5-flash-preview-05-20"
+        ),
     )
 
     schemas.TOS_CHECK.validate(result_dict)
