@@ -1,13 +1,11 @@
 ---
 import { Icon } from 'astro-icon/components'
-import { uniq, orderBy } from 'lodash-es'
+import { uniq } from 'lodash-es'
 
-import { getCurrencyInfo } from '../constants/currencies'
-import { verificationStatusesByValue, getVerificationStatusInfo } from '../constants/verificationStatus'
-import { areEqualArraysWithoutOrder } from '../lib/arrays'
+import { verificationStatusesByValue } from '../constants/verificationStatus'
 import { cn } from '../lib/cn'
 import { pluralize } from '../lib/pluralize'
-import { transformCase } from '../lib/strings'
+import { makeSearchTitle } from '../lib/searchSeo'
 import { createPageUrl, urlWithParams } from '../lib/urls'
 
 import Button from './Button.astro'
@@ -82,100 +80,13 @@ const urlIfIncludingCommunity = urlWithParams(Astro.url, {
   ]),
 })
 
-// NOTE: If you make changes to this function, remember to update the sitemap: src/pages/sitemaps/search.xml.ts
-const searchTitle = (() => {
-  if (filters.q) {
-    return `Search results for “${filters.q}”`
-  }
-  const listOrformatter = new Intl.ListFormat('en', { style: 'long', type: 'disjunction' })
-  const listAndformatter = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' })
-
-  let [prefix, base, attributesPart, currencies, kycLevel, score] = ['', 'services', '', '', '', '']
-
-  if (!hasDefaultFilters) {
-    prefix = 'filtered'
-  }
-
-  const attributesFilters = Object.entries(filters.attr ?? {})
-    .filter((entry): entry is [string, 'no' | 'yes'] => entry[1] === 'yes' || entry[1] === 'no')
-    .map(([attributeId, attributeValue]) => {
-      const attribute = attributes.find((attr) => String(attr.id) === attributeId)
-      if (!attribute) return null
-      const valueInfo = attributeOptions.find((option) => option.value === attributeValue)
-      const prefix = valueInfo?.prefix ?? transformCase(attributeValue, 'title')
-      const prefixWith = valueInfo?.prefixWith ?? transformCase(attributeValue, 'title')
-      return {
-        prefix,
-        prefixWith,
-        attribute,
-        valueInfo,
-        value: attributeValue,
-      }
-    })
-    .filter((attr) => !!attr)
-
-  if (attributesFilters.length === 1 || attributesFilters.length === 2) {
-    const formatter = filters['attribute-mode'] === 'and' ? listAndformatter : listOrformatter
-    attributesPart = formatter.format(
-      attributesFilters.map((attr) => `${attr.prefixWith} ${attr.attribute.title}`)
-    )
-    prefix = ''
-  }
-
-  if (
-    filters.verification.length === 1 ||
-    (!attributesFilters.length &&
-      !filters.currencies.length &&
-      !(filters['max-kyc'] <= 3) &&
-      !(filters['min-score'] >= 1) &&
-      areEqualArraysWithoutOrder(filters.verification, ['APPROVED', 'VERIFICATION_SUCCESS']))
-  ) {
-    base = `${listAndformatter.format(
-      orderBy(
-        filters.verification.map((v) => getVerificationStatusInfo(v)),
-        'order',
-        'desc'
-      ).map((v) => v.label)
-    )} services`
-    prefix = ''
-  }
-
-  if (filters.categories.length >= 1) {
-    base = listAndformatter.format(
-      filters.categories.map((c) => {
-        const cat = categories.find((cat) => cat.slug === c)
-        if (!cat) return c
-        return cat.namePluralLong ?? cat.name
-      })
-    )
-    prefix = ''
-  }
-
-  if (filters.currencies.length >= 1) {
-    const currenciesList = filters.currencies.map((c) => getCurrencyInfo(c).name)
-    const formatter = filters['currency-mode'] === 'and' ? listAndformatter : listOrformatter
-    currencies = `that accept ${formatter.format(currenciesList)}`
-    prefix = ''
-  }
-
-  if (filters['max-kyc'] === 0) {
-    kycLevel = 'without KYC'
-    prefix = ''
-  } else if (filters['max-kyc'] <= 3) {
-    kycLevel = `with KYC level ${filters['max-kyc']} or better`
-    prefix = ''
-  }
-
-  if (filters['min-score'] >= 1) {
-    score = `with score ${filters['min-score'].toLocaleString()} or more`
-    prefix = ''
-  }
-
-  const finalArray = [attributesPart, currencies, kycLevel, score].filter((str) => !!str)
-  const title = transformCase(`${prefix} ${base} ${finalArray.join('; ')}`.trim(), 'first-upper')
-
-  return title.length > 60 ? 'Filtered Services' : title
-})()
+const searchTitle = makeSearchTitle({
+  filters,
+  hasDefaultFilters,
+  categories,
+  attributes,
+  attributeOptions,
+})
 ---
 
 <div {...divProps} class={cn('min-w-0 flex-1', className)}>

@@ -169,6 +169,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
 <BaseLayout
   pageTitle={`${user.displayName ?? user.name} - Account`}
   description="Manage your user profile"
+  noindex
   ogImage={{
     template: 'generic',
     title: `${user.displayName ?? user.name} | Account`,
@@ -323,7 +324,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                       <a
                         href={user.link}
                         target="_blank"
-                        rel="noopener noreferrer"
+                        rel="noopener"
                         class="text-blue-400 hover:underline"
                       >
                         {user.link}
@@ -462,7 +463,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                     <a
                       href={user.verifiedLink}
                       target="_blank"
-                      rel="noopener noreferrer"
+                      rel="noopener"
                       class="text-blue-400 hover:underline"
                     >
                       {urlDomain(user.verifiedLink)}

@@ -23,6 +23,7 @@ import { parseIntWithFallback } from '../lib/numbers'
 import { areEqualObjectsWithoutOrder } from '../lib/objects'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
+import { makeSearchMetaDescription, makeSearchTitle } from '../lib/searchSeo'
 import {
   defaultSortOption,
   makeSearchFiltersOptions,
@@ -30,6 +31,7 @@ import {
   sortOptions,
 } from '../lib/searchFiltersOptions'
 import { makeSortSeed } from '../lib/sortSeed'
+import { siteOrigin } from '../lib/urls'
 
 import type { Prisma } from '@prisma/client'
 
@@ -417,16 +419,70 @@ const filtersOptions = makeSearchFiltersOptions({
   attributes,
 })
 
+const canonicalSearchParams = new URLSearchParams()
+const canonicalSearchParamAllowlist = new Set([
+  'categories',
+  'verification',
+  'currencies',
+  'currency-mode',
+  'max-kyc',
+  'attribute-mode',
+])
+
+const canonicalEntries = Array.from(Astro.url.searchParams.entries())
+  .filter(([key]) => canonicalSearchParamAllowlist.has(key) || /^attr-\d+$/.test(key))
+  .sort(([firstKey, firstValue], [secondKey, secondValue]) =>
+    firstKey === secondKey ? firstValue.localeCompare(secondValue) : firstKey.localeCompare(secondKey)
+  )
+
+canonicalEntries.forEach(([key, value]) => {
+  canonicalSearchParams.append(key, value)
+})
+
+const canonicalUrl = `${Astro.url.pathname}${
+  canonicalSearchParams.size > 0 ? `?${canonicalSearchParams.toString()}` : ''
+}`
+const searchPageTitle = makeSearchTitle({
+  filters,
+  hasDefaultFilters,
+  categories,
+  attributes,
+  attributeOptions,
+})
+const searchPageDescription = makeSearchMetaDescription({
+  title: searchPageTitle,
+  total: totalServices,
+  filters,
+  hasDefaultFilters,
+})
+
 const searchResultsId = 'search-results'
 const showFiltersId = 'show-filters'
 ---
 
 <BaseLayout
-  pageTitle="Find KYC-free Services"
-  description="Find services that don't require KYC (Know Your Customer) verification for better privacy and control over your data."
+  pageTitle={searchPageTitle}
+  canonical={canonicalUrl}
+  description={searchPageDescription}
   widthClassName="max-w-none"
   htmx
   showSplashText
+  schemas={[
+    {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      'name': 'KYCnot.me',
+      'url': siteOrigin,
+      'potentialAction': {
+        '@type': 'SearchAction',
+        'target': {
+          '@type': 'EntryPoint',
+          'urlTemplate': `${siteOrigin}/?q={search_term_string}`,
+        },
+        'query-input': 'required name=search_term_string',
+      },
+    },
+  ]}
   breadcrumbs={[
     {
       name: 'Services',

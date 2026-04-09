@@ -257,10 +257,6 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
   ]}
   breadcrumbs={[
     {
-      name: 'Users',
-      url: '/u',
-    },
-    {
       name: user.displayName ?? user.name,
       url: `/u/${user.name}`,
     },
@@ -395,7 +391,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                     <a
                       href={user.link}
                       target="_blank"
-                      rel="noopener noreferrer"
+                      rel="nofollow noopener"
                       class="text-blue-400 hover:underline"
                     >
                       {user.link}
@@ -524,7 +520,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                     <a
                       href={user.verifiedLink}
                       target="_blank"
-                      rel="noopener noreferrer"
+                      rel="nofollow noopener"
                       class="text-blue-400 hover:underline"
                     >
                       {urlDomain(user.verifiedLink)}

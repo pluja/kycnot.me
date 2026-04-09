@@ -37,6 +37,12 @@ export type BreadcrumArray = [
 type Props = {
   pageTitle: string
   /**
+   * Canonical URL path, optionally with a query string.
+   *
+   * @default Astro.url.pathname
+   */
+  canonical?: string
+  /**
    * Whether to enable htmx.
    *
    * @default false
@@ -69,6 +75,7 @@ type Props = {
 
 const {
   pageTitle,
+  canonical = Astro.url.pathname,
   htmx = false,
   description = 'KYCnot.me helps you find services without KYC for better privacy and control over your data.',
   ogImage,
@@ -92,14 +99,14 @@ const ogImageUrl = makeOgImageUrl(ogImage, siteOrigin)
 <meta name="generator" content={Astro.generator} />
 <meta name="description" content={description} />
 <title>{fullTitle}</title>
-<link rel="canonical" href={absoluteSiteUrl(Astro.url.pathname)} />
+<link rel="canonical" href={absoluteSiteUrl(canonical)} />
 {noindex && <meta name="robots" content="noindex, nofollow" />}
 <meta http-equiv="onion-location" content={ONION_ADDRESS} />
 
 {/* Open Graph / Facebook */}
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="KYCnot.me" />
-<meta property="og:url" content={absoluteSiteUrl(Astro.url.pathname)} />
+<meta property="og:url" content={absoluteSiteUrl(canonical)} />
 <meta property="og:title" content={fullTitle} />
 <meta property="og:description" content={description} />
 {!!ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
@@ -108,13 +115,14 @@ const ogImageUrl = makeOgImageUrl(ogImage, siteOrigin)
 
 {/* Twitter */}
 <meta property="twitter:card" content="summary_large_image" />
-<meta property="twitter:url" content={absoluteSiteUrl(Astro.url.pathname)} />
+<meta property="twitter:url" content={absoluteSiteUrl(canonical)} />
 <meta property="twitter:title" content={fullTitle} />
 <meta property="twitter:description" content={description} />
 {!!ogImageUrl && <meta property="twitter:image" content={ogImageUrl} />}
 
 {/* Other */}
 <link rel="sitemap" href="/sitemaps/index.xml" />
+<link rel="alternate" type="application/rss+xml" title="KYCnot.me Events" href="/feeds/events.xml" />
 
 {/* PWA */}
 {pwaAssetsHead.themeColor && <meta name="theme-color" content={pwaAssetsHead.themeColor.content} />}

@@ -12,13 +12,9 @@ User-agent: PerplexityBot
 User-agent: Claude-SearchBot
 Allow: /
 Disallow: /admin/
-Disallow: /account/
 Disallow: /internal-api/
 Disallow: /api/
-Disallow: /notifications
-Disallow: /service-suggestion/
 Disallow: /feeds/user/
-Disallow: /access-denied
 
 # AI training/scraping bots (blocked per license)
 User-agent: GPTBot
@@ -34,13 +30,9 @@ Disallow: /
 User-agent: *
 Allow: /
 Disallow: /admin/
-Disallow: /account/
 Disallow: /internal-api/
 Disallow: /api/
-Disallow: /notifications
-Disallow: /service-suggestion/
 Disallow: /feeds/user/
-Disallow: /access-denied
 
 Sitemap: ${sitemapUrl}
 `

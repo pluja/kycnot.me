@@ -89,7 +89,7 @@ const kycLevelInfo = getKycLevelInfo(`${kycLevel}`)
       <MyPicture
         src={imageUrl}
         fallback="service"
-        alt="Logo"
+        alt={`${name} logo`}
         class={cn(
           'size-12 shrink-0 rounded-sm object-contain text-white',
           (serviceVisibility === 'ARCHIVED' || verificationStatus === 'VERIFICATION_FAILED') &&

@@ -366,7 +366,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
       {
         !!comment.content && (
           <div class="prose prose-sm max-w-none overflow-auto prose-invert">
-            <Markdown content={comment.content} />
+            <Markdown content={comment.content} linkRel={['ugc', 'nofollow']} />
           </div>
         )
       }
@@ -378,7 +378,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
       <div class="mt-2 peer-checked/collapse:hidden">
         <div class="border-l-2 border-zinc-600 bg-zinc-900/30 py-0.5 pl-2 text-xs">
           <span class="prose prose-sm text-xs text-zinc-300 prose-invert prose-strong:text-zinc-300/90">
-            <Markdown content={`**Added context:** ${comment.communityNote}`} />
+            <Markdown content={`**Added context:** ${comment.communityNote}`} linkRel={['ugc', 'nofollow']} />
           </span>
         </div>
       </div>

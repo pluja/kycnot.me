@@ -15,11 +15,15 @@ export const GET: APIRoute = async ({ site }) => {
     })
 
     const origin = site.origin
+    const now = Date.now()
     const urls = services
       .map((service) => {
         const loc = he.encode(`${origin}/service/${service.slug}`)
         const lastmod = service.updatedAt.toISOString().split('T')[0]
-        return `<url><loc>${loc}</loc><lastmod>${lastmod}</lastmod></url>`
+        const daysSinceUpdate = (now - service.updatedAt.getTime()) / (1000 * 60 * 60 * 24)
+        const changefreq = daysSinceUpdate < 7 ? 'daily' : daysSinceUpdate < 30 ? 'weekly' : 'monthly'
+        const priority = daysSinceUpdate < 30 ? '0.8' : '0.6'
+        return `<url><loc>${loc}</loc><lastmod>${lastmod}</lastmod><changefreq>${changefreq}</changefreq><priority>${priority}</priority></url>`
       })
       .join('\n  ')
 

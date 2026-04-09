@@ -85,7 +85,8 @@ export default defineConfig({
       filter: (page) => {
         const url = new URL(page)
         const noIndexPrefixes = ['/admin', '/account', '/service-suggestion', '/notifications', '/access-denied']
-        return !noIndexPrefixes.some((prefix) => url.pathname.startsWith(prefix))
+        const excludedPaths = ['/downloads']
+        return !noIndexPrefixes.some((prefix) => url.pathname.startsWith(prefix)) && !excludedPaths.includes(url.pathname)
       },
     }),
   ],
@@ -93,6 +94,7 @@ export default defineConfig({
     mode: 'standalone',
   }),
   output: 'server',
+  trailingSlash: 'never',
   devToolbar: {
     enabled: false,
   },

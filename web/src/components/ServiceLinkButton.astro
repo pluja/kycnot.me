@@ -139,7 +139,7 @@ const Tag = isScam ? 'span' : 'a'
 <Tag
   href={isScam ? undefined : link.url}
   target={isScam ? undefined : '_blank'}
-  rel={isScam ? undefined : 'noopener noreferrer'}
+  rel={isScam ? undefined : 'nofollow noopener'}
   class={cn(
     'inline-flex h-6 items-center gap-1 rounded-full bg-white text-xs whitespace-nowrap text-black focus-visible:ring-4 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-night-700 focus-visible:outline-none 2xs:h-8 2xs:gap-2 2xs:text-sm',
     isScam && 'cursor-not-allowed bg-day-800 text-red-300',

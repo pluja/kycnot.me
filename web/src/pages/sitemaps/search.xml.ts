@@ -1,10 +1,14 @@
 /* eslint-disable import/no-named-as-default-member */
 import he from 'he'
 
+import { getCurrencyInfo } from '../../constants/currencies'
 import { prisma } from '../../lib/prisma'
-import { makeSearchFiltersOptions } from '../../lib/searchFiltersOptions'
 
 import type { APIRoute } from 'astro'
+
+const CURATED_CATEGORY_CURRENCY_SLUGS = ['btc', 'xmr', 'cash', 'fiat'] as const
+const CURATED_MULTI_CURRENCY_COMBINATIONS = [['btc', 'xmr']] as const
+const MIN_RESULTS_FOR_CURATED_COMBINATION = 3
 
 export const GET: APIRoute = async ({ site }) => {
   if (!site) return new Response('Site URL not configured', { status: 500 })
@@ -31,13 +35,10 @@ export const GET: APIRoute = async ({ site }) => {
 }
 
 async function generateSEOSitemapUrls(siteUrl: string) {
-  const [categories, attributes] = await Promise.all([
+  const [categories, services] = await Promise.all([
     prisma.category.findMany({
       select: {
-        name: true,
-        namePluralLong: true,
         slug: true,
-        icon: true,
         _count: {
           select: {
             services: {
@@ -49,142 +50,102 @@ async function generateSEOSitemapUrls(siteUrl: string) {
         },
       },
     }),
-    prisma.attribute.findMany({
+    prisma.service.findMany({
+      where: {
+        serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
+      },
       select: {
-        id: true,
-        slug: true,
-        title: true,
-        category: true,
-        type: true,
-        _count: {
+        acceptedCurrencies: true,
+        categories: {
           select: {
-            services: {
-              where: {
-                service: {
-                  serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
-                },
-              },
-            },
+            slug: true,
           },
         },
       },
-      orderBy: [{ category: 'asc' }, { type: 'asc' }, { title: 'asc' }],
     }),
   ])
 
-  const filtersOptions = makeSearchFiltersOptions({
-    filters: null,
-    categories,
-    attributes,
-  })
+  const visibleCategories = categories.filter((category) => category._count.services > 0)
+  const currencyCounts = new Map<string, number>()
+  const categoryCurrencyCounts = new Map<string, number>()
+  const categoryDualCurrencyCounts = new Map<string, number>()
 
-  const byCategory = filtersOptions.categories.map(
-    (category) =>
-      new URLSearchParams({
-        categories: category.slug,
-      })
-  )
+  for (const service of services) {
+    const currencySlugs = Array.from(
+      new Set(service.acceptedCurrencies.map((currency) => getCurrencyInfo(currency).slug))
+    ).sort()
 
-  const byVerificationStatus = filtersOptions.verification.map(
-    (status) =>
-      new URLSearchParams({
-        verification: status.slug,
-      })
-  )
+    for (const currencySlug of currencySlugs) {
+      currencyCounts.set(currencySlug, (currencyCounts.get(currencySlug) ?? 0) + 1)
+    }
 
-  const byKycLevel = filtersOptions.kycLevels.map(
-    (level) =>
-      new URLSearchParams({
-        'max-kyc': level.id,
-      })
-  )
+    for (const category of service.categories) {
+      for (const currencySlug of currencySlugs) {
+        const key = `${category.slug}:${currencySlug}`
+        categoryCurrencyCounts.set(key, (categoryCurrencyCounts.get(key) ?? 0) + 1)
+      }
 
-  const byCurrency = filtersOptions.currencies.map(
-    (currency) =>
-      new URLSearchParams({
-        currencies: currency.slug,
-      })
-  )
+      for (const currencyCombination of CURATED_MULTI_CURRENCY_COMBINATIONS) {
+        if (!currencyCombination.every((currencySlug) => currencySlugs.includes(currencySlug))) continue
 
-  const withOneAttribute = filtersOptions.attributesByCategory
-    .flatMap(({ attributes }) => attributes)
-    .map(
-      (attribute) =>
-        new URLSearchParams({
-          [`attr-${attribute.id.toString()}`]: 'yes',
-        })
-    )
-  const withoutOneAttribute = filtersOptions.attributesByCategory
-    .flatMap(({ attributes }) => attributes)
-    .map(
-      (attribute) =>
-        new URLSearchParams({
-          [`attr-${attribute.id.toString()}`]: 'no',
-        })
-    )
+        const key = `${category.slug}:${currencyCombination.join('+')}`
+        categoryDualCurrencyCounts.set(key, (categoryDualCurrencyCounts.get(key) ?? 0) + 1)
+      }
+    }
+  }
 
-  const byCategoryAndCurrency = filtersOptions.categories.flatMap((category) =>
-    filtersOptions.currencies.map(
-      (currency) =>
-        new URLSearchParams({
-          categories: category.slug,
-          currencies: currency.slug,
-        })
-    )
-  )
+  const searchUrls = new Set<string>()
 
-  const byCategoryAndAttributes = filtersOptions.categories.flatMap((category) =>
-    filtersOptions.attributesByCategory
-      .flatMap(({ attributes }) => attributes)
-      .flatMap((attribute) => [
-        new URLSearchParams({
-          categories: category.slug,
-          [`attr-${attribute.id.toString()}`]: 'yes',
-        }),
-        new URLSearchParams({
-          categories: category.slug,
-          [`attr-${attribute.id.toString()}`]: 'no',
-        }),
-      ])
-  )
+  for (const category of visibleCategories) {
+    searchUrls.add(makeSearchUrl(siteUrl, [['categories', category.slug]]))
+  }
 
-  const relevantCurrencies = [
-    'xmr',
-    'btc',
-  ] as const satisfies (typeof filtersOptions.currencies)[number]['slug'][]
+  for (const currencySlug of Array.from(currencyCounts.keys()).sort()) {
+    searchUrls.add(makeSearchUrl(siteUrl, [['currencies', currencySlug]]))
+  }
 
-  const byCategoryAndAttributesAndRelevantCurrency = filtersOptions.categories.flatMap((category) =>
-    filtersOptions.attributesByCategory
-      .flatMap(({ attributes }) => attributes)
-      .flatMap((attribute) =>
-        relevantCurrencies.map(
-          (currency) =>
-            new URLSearchParams({
-              categories: category.slug,
-              currencies: currency,
-              [`attr-${attribute.id.toString()}`]:
-                attribute.type === 'GOOD' || attribute.type === 'INFO' ? 'yes' : 'no',
-            })
-        )
+  for (const category of visibleCategories) {
+    for (const currencySlug of CURATED_CATEGORY_CURRENCY_SLUGS) {
+      const count = categoryCurrencyCounts.get(`${category.slug}:${currencySlug}`) ?? 0
+      if (count < MIN_RESULTS_FOR_CURATED_COMBINATION) continue
+
+      searchUrls.add(
+        makeSearchUrl(siteUrl, [
+          ['categories', category.slug],
+          ['currencies', currencySlug],
+        ])
       )
+    }
+
+    for (const currencyCombination of CURATED_MULTI_CURRENCY_COMBINATIONS) {
+      const key = `${category.slug}:${currencyCombination.join('+')}`
+      const count = categoryDualCurrencyCounts.get(key) ?? 0
+      if (count < MIN_RESULTS_FOR_CURATED_COMBINATION) continue
+
+      searchUrls.add(
+        makeSearchUrl(siteUrl, [
+          ['categories', category.slug],
+          ...currencyCombination.map((currencySlug) => ['currencies', currencySlug] as [string, string]),
+          ['currency-mode', 'and'],
+        ])
+      )
+    }
+  }
+
+  return Array.from(searchUrls)
+}
+
+function makeSearchUrl(siteUrl: string, entries: [string, string][]) {
+  const url = new URL(siteUrl)
+  const searchParams = new URLSearchParams()
+  const sortedEntries = [...entries].sort(([firstKey, firstValue], [secondKey, secondValue]) =>
+    firstKey === secondKey ? firstValue.localeCompare(secondValue) : firstKey.localeCompare(secondKey)
   )
 
-  const allQueryParams = [
-    ...byCategory,
-    ...byVerificationStatus,
-    ...byKycLevel,
-    ...byCurrency,
-    ...withOneAttribute,
-    ...withoutOneAttribute,
+  for (const [key, value] of sortedEntries) {
+    searchParams.append(key, value)
+  }
 
-    ...byCategoryAndCurrency,
-    ...byCategoryAndAttributes,
-    ...byCategoryAndAttributesAndRelevantCurrency,
-  ] satisfies URLSearchParams[]
-
-  return allQueryParams.map((queryParams) => {
-    const url = new URL(siteUrl)
-    url.search = queryParams.toString()
-    return url.href
-  })
+  url.search = searchParams.toString()
+  return url.href
 }

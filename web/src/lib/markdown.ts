@@ -13,7 +13,29 @@ export type MarkdownString = string
 /** A string containing HTML. */
 export type HtmlString = string
 
-export async function markdownToHtml(md: string, options: { allowImages?: boolean }) {
+function rehypeLinkRelPlugin(linkRel: string[]) {
+  return () => (tree: {
+    type: string
+    tagName?: string
+    properties?: Record<string, unknown>
+    children?: unknown[]
+  }) => {
+    if (linkRel.length === 0) return
+
+    visit(tree, 'element', (node: { tagName?: string; properties?: Record<string, unknown> }) => {
+      if (node.tagName !== 'a') return
+      node.properties = {
+        ...node.properties,
+        rel: linkRel.join(' '),
+      }
+    })
+  }
+}
+
+export async function markdownToHtml(
+  md: string,
+  options: { allowImages?: boolean; linkRel?: string[] } = {}
+) {
   try {
     return String(
       await remark()
@@ -25,6 +47,7 @@ export async function markdownToHtml(md: string, options: { allowImages?: boolea
             ? defaultSchema.tagNames
             : defaultSchema.tagNames?.filter((t) => t !== 'img'),
         })
+        .use(rehypeLinkRelPlugin(options.linkRel ?? []))
         .use(rehypeStringify)
         .process(md)
     )

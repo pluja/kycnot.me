@@ -518,7 +518,7 @@ const sortedVerificationSteps = orderBy(
           },
           {
             name: category.name,
-            url: `/service/?categories=${category.slug}`,
+            url: `/?categories=${category.slug}`,
           },
           {
             name: service.name,
@@ -539,7 +539,7 @@ const sortedVerificationSteps = orderBy(
         },
         {
           name: currencyInfo.name,
-          url: `/service/?currencies=${currencyInfo.slug}`,
+          url: `/?currencies=${currencyInfo.slug}`,
         },
         {
           name: service.name,
@@ -850,7 +850,7 @@ const sortedVerificationSteps = orderBy(
               <a
                 href={method.value}
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="nofollow noopener"
                 class="flex items-center gap-1 px-2 py-1 text-day-300 hover:text-day-200 hover:underline"
               >
                 <Icon name={methodInfo.icon} class="size-5 text-day-200" />
@@ -1375,7 +1375,7 @@ const sortedVerificationSteps = orderBy(
                   <a
                     href={event.source}
                     target="_blank"
-                    rel="noopener noreferrer"
+                    rel="nofollow noopener"
                     class="mt-1 inline-block text-xs text-blue-400 hover:underline"
                   >
                     Source

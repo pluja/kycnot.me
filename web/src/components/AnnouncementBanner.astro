@@ -39,7 +39,7 @@ const Tag = announcement.link ? 'a' : 'div'
   target={announcement.link && new URL(announcement.link, siteOrigin).origin !== siteOrigin
     ? '_blank'
     : undefined}
-  rel="noopener noreferrer"
+  rel="noopener"
   class={cn(
     'group relative isolate z-50 flex items-center justify-center gap-x-2 overflow-hidden border-b border-zinc-800 bg-black p-2 focus-visible:outline-none 2xs:px-4 xs:px-6 sm:gap-x-6 sm:px-3.5',
     className

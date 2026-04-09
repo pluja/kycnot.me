@@ -67,7 +67,7 @@ const { class: className, ...htmlProps } = Astro.props
           <a
             href={href}
             target={external ? '_blank' : undefined}
-            rel={external ? 'noopener noreferrer' : undefined}
+            rel={external ? 'noopener' : undefined}
             class="flex items-center gap-0.5 text-sm text-day-500 transition-colors hover:text-gray-200 hover:underline xs:gap-1"
           >
             <Icon name={icon} class="size-4 opacity-40 xs:opacity-100" />
