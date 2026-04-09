@@ -1,0 +1,36 @@
+import he from 'he'
+
+import { prisma } from '../../lib/prisma'
+
+import type { APIRoute } from 'astro'
+
+export const GET: APIRoute = async ({ site }) => {
+  if (!site) return new Response('Site URL not configured', { status: 500 })
+
+  try {
+    const services = await prisma.service.findMany({
+      where: { serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] } },
+      select: { slug: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+    })
+
+    const origin = site.origin
+    const urls = services
+      .map((service) => {
+        const loc = he.encode(`${origin}/service/${service.slug}`)
+        const lastmod = service.updatedAt.toISOString().split('T')[0]
+        return `<url><loc>${loc}</loc><lastmod>${lastmod}</lastmod></url>`
+      })
+      .join('\n  ')
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  ${urls}
+</urlset>`
+
+    return new Response(xml, { headers: { 'Content-Type': 'application/xml' } })
+  } catch (error) {
+    console.error('Failed to generate services sitemap:', error)
+    return new Response('Failed to generate services sitemap', { status: 500 })
+  }
+}

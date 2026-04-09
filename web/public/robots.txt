@@ -1,8 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /admin/
-Disallow: /account/
-Disallow: /internal-api/
-Disallow: /api/
-
-Sitemap: https://kycnot.me/sitemap-index.xml

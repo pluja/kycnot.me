@@ -58,6 +58,13 @@ type Props = {
   schemas?: ComponentProps<typeof Schema>['item'][]
 
   breadcrumbs?: BreadcrumArray | BreadcrumArray[]
+
+  /**
+   * Whether search engines should not index this page.
+   *
+   * @default false
+   */
+  noindex?: boolean
 }
 
 const {
@@ -67,6 +74,7 @@ const {
   ogImage,
   schemas,
   breadcrumbs,
+  noindex = false,
 } = Astro.props
 
 const breadcrumbLists = breadcrumbs?.every(Array.isArray)
@@ -84,15 +92,19 @@ const ogImageUrl = makeOgImageUrl(ogImage, siteOrigin)
 <meta name="generator" content={Astro.generator} />
 <meta name="description" content={description} />
 <title>{fullTitle}</title>
-{/* canonicalUrl && <link rel="canonical" href={canonicalUrl} /> */}
+<link rel="canonical" href={absoluteSiteUrl(Astro.url.pathname)} />
+{noindex && <meta name="robots" content="noindex, nofollow" />}
 <meta http-equiv="onion-location" content={ONION_ADDRESS} />
 
 {/* Open Graph / Facebook */}
 <meta property="og:type" content="website" />
+<meta property="og:site_name" content="KYCnot.me" />
 <meta property="og:url" content={absoluteSiteUrl(Astro.url.pathname)} />
 <meta property="og:title" content={fullTitle} />
 <meta property="og:description" content={description} />
 {!!ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
+{!!ogImageUrl && <meta property="og:image:width" content="1200" />}
+{!!ogImageUrl && <meta property="og:image:height" content="630" />}
 
 {/* Twitter */}
 <meta property="twitter:card" content="summary_large_image" />
@@ -102,8 +114,7 @@ const ogImageUrl = makeOgImageUrl(ogImage, siteOrigin)
 {!!ogImageUrl && <meta property="twitter:image" content={ogImageUrl} />}
 
 {/* Other */}
-<link rel="sitemap" href="/sitemap-index.xml" />
-<link rel="sitemap" href="/sitemaps/search.xml" />
+<link rel="sitemap" href="/sitemaps/index.xml" />
 
 {/* PWA */}
 {pwaAssetsHead.themeColor && <meta name="theme-color" content={pwaAssetsHead.themeColor.content} />}

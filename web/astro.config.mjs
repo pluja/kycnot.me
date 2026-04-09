@@ -84,7 +84,8 @@ export default defineConfig({
     sitemap({
       filter: (page) => {
         const url = new URL(page)
-        return !url.pathname.startsWith('/admin') && !url.pathname.startsWith('/account/impersonate')
+        const noIndexPrefixes = ['/admin', '/account', '/service-suggestion', '/notifications', '/access-denied']
+        return !noIndexPrefixes.some((prefix) => url.pathname.startsWith(prefix))
       },
     }),
   ],
