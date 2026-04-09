@@ -113,6 +113,7 @@ export default defineConfig({
     },
   },
   security: {
+    checkOrigin: false,
     allowedDomains: [{ hostname: new URL(SITE_URL).hostname, protocol: 'https' }],
   },
   image: {
