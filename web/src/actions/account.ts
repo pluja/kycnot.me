@@ -2,6 +2,7 @@ import { ActionError } from 'astro:actions'
 import { z } from 'astro:content'
 import { pick } from 'lodash-es'
 
+import { generateApiKey, getApiKeyPrefix, hashApiKey } from '../lib/apiKey'
 import { karmaUnlocksById } from '../constants/karmaUnlocks'
 import { createAccount } from '../lib/accountCreate'
 import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../lib/captchaValidation'
@@ -257,6 +258,78 @@ export const accountActions = {
       }
 
       return { deletedUser }
+    },
+  }),
+
+  apiKeyCreate: defineProtectedAction({
+    accept: 'form',
+    permissions: 'user',
+    input: z.object({
+      name: z.string().min(1, 'Name is required').max(100, 'Name must be 100 characters or less'),
+    }),
+    handler: async (input, context) => {
+      const user = context.locals.user
+
+      if (!user.canCreateApiKeys) {
+        throw new ActionError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to create API keys. Contact an admin.',
+        })
+      }
+
+      const hasAffiliation = await prisma.serviceUser.count({ where: { userId: user.id } })
+      if (!user.verified && hasAffiliation === 0) {
+        throw new ActionError({
+          code: 'FORBIDDEN',
+          message: 'You must be verified or affiliated with a service to create API keys.',
+        })
+      }
+
+      const existingCount = await prisma.apiKey.count({ where: { userId: user.id } })
+      if (existingCount >= 1) {
+        throw new ActionError({
+          code: 'BAD_REQUEST',
+          message: 'You already have an API key. Delete the existing one to create a new one.',
+        })
+      }
+
+      const rawKey = generateApiKey()
+      const apiKey = await prisma.apiKey.create({
+        data: {
+          name: input.name,
+          keyHash: hashApiKey(rawKey),
+          keyPrefix: getApiKeyPrefix(rawKey),
+          userId: user.id,
+        },
+        select: { id: true, name: true, keyPrefix: true, createdAt: true },
+      })
+
+      return { rawKey, apiKey }
+    },
+  }),
+
+  apiKeyDelete: defineProtectedAction({
+    accept: 'form',
+    permissions: 'user',
+    input: z.object({
+      id: z.coerce.number().int().positive(),
+    }),
+    handler: async (input, context) => {
+      const apiKey = await prisma.apiKey.findUnique({
+        where: { id: input.id },
+        select: { userId: true },
+      })
+
+      if (!apiKey || apiKey.userId !== context.locals.user.id) {
+        throw new ActionError({
+          code: 'NOT_FOUND',
+          message: 'API key not found',
+        })
+      }
+
+      await prisma.apiKey.delete({ where: { id: input.id } })
+
+      return { success: true }
     },
   }),
 }

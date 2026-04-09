@@ -10,6 +10,7 @@ declare global {
     interface Locals {
       user: (Prisma.UserGetPayload<true> & { karmaUnlocks: KarmaUnlocks }) | null
       actualUser: (Prisma.UserGetPayload<true> & { karmaUnlocks: KarmaUnlocks }) | null
+      apiKeyAuthenticated: boolean
       banners: ErrorBanners
       makeId: <T extends string>(prefix: T) => `${T}-${number}-${string}`
     }

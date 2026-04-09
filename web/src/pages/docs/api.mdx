@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/MarkdownLayout.astro
 title: API
-updatedAt: 2025-05-31
+updatedAt: 2026-04-09
 description: 'Access basic service data via our public API.'
 icon: 'ri:plug-line'
 ---
@@ -12,13 +12,37 @@ import { verificationStatuses } from '../../constants/verificationStatus'
 import { serviceVisibilities } from '../../constants/serviceVisibility'
 import { kycLevelClarifications } from '../../constants/kycLevelClarifications'
 
-Access basic service data via our public API.
+Access service data via our API.
 
 All endpoints should be prefixed with `/api/v1/`.
 
 The endpoints <a href={SOURCE_CODE_URL}>source code</a> is available on the `/web/src/actions/api/index.ts` file.
 
 **Attribution:** Please credit **KYCnot.me** if you use data from this API.
+
+## Authentication
+
+All API requests require an API key. Include it in one of these headers:
+
+```
+Authorization: Bearer kycnot_your_key_here
+```
+
+or
+
+```
+X-Api-Key: kycnot_your_key_here
+```
+
+To get an API key, an admin must first grant you access. Once enabled, you can create a key from your [account settings](/account/api-keys).
+
+Requests without a valid key receive a `401` response:
+
+```json
+{"{"}
+  "error": "API key required"
+{"}"}
+```
 
 ## `QUERY` `/service/get`
 
@@ -127,6 +151,7 @@ type ServiceResponse = {
 
 ```zsh
 curl -X QUERY https://kycnot.me/api/v1/service/get \
+  -H "Authorization: Bearer kycnot_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{"slug": "my-example-service"}'
 ```

@@ -15,6 +15,7 @@ const selectUserReturnFields = {
   admin: true,
   verified: true,
   moderator: true,
+  canCreateApiKeys: true,
   verifiedLink: true,
   secretTokenHash: true,
   totalKarma: true,
@@ -54,6 +55,7 @@ export const adminUserActions = {
         .transform((val) => val || null),
       pictureFile: z.instanceof(File).optional(),
       type: z.array(z.enum(['admin', 'moderator', 'spammer'])),
+      canCreateApiKeys: z.coerce.boolean().default(false),
       verifiedLink: z
         .string()
         .url('Invalid URL')
@@ -67,7 +69,7 @@ export const adminUserActions = {
         .default(null) // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         .transform((val) => val || null),
     }),
-    handler: async ({ id, pictureFile, type, ...valuesToUpdate }) => {
+    handler: async ({ id, pictureFile, type, canCreateApiKeys, ...valuesToUpdate }) => {
       const user = await prisma.user.findUnique({
         where: {
           id,
@@ -101,6 +103,7 @@ export const adminUserActions = {
           admin: type.includes('admin'),
           moderator: type.includes('moderator'),
           spammer: type.includes('spammer'),
+          canCreateApiKeys,
         },
         select: selectUserReturnFields,
       })

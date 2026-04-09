@@ -1,0 +1,149 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import Button from '../../components/Button.astro'
+import CopyButton from '../../components/CopyButton.astro'
+import InputText from '../../components/InputText.astro'
+import TimeFormatted from '../../components/TimeFormatted.astro'
+import MiniLayout from '../../layouts/MiniLayout.astro'
+import { prisma } from '../../lib/prisma'
+import { makeLoginUrl } from '../../lib/redirectUrls'
+
+const user = Astro.locals.user
+if (!user) {
+  return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Login to manage API keys' }))
+}
+
+const createResult = Astro.getActionResult(actions.account.apiKeyCreate)
+Astro.locals.banners.addIfSuccess(createResult, 'API key created')
+
+const deleteResult = Astro.getActionResult(actions.account.apiKeyDelete)
+Astro.locals.banners.addIfSuccess(deleteResult, 'API key deleted')
+
+const apiKeys = await prisma.apiKey.findMany({
+  where: { userId: user.id },
+  select: {
+    id: true,
+    name: true,
+    keyPrefix: true,
+    isActive: true,
+    lastUsedAt: true,
+    createdAt: true,
+  },
+  orderBy: { createdAt: 'desc' },
+})
+
+const hasAffiliation = await prisma.serviceUser.count({ where: { userId: user.id } })
+const canCreate = user.canCreateApiKeys && (user.verified || hasAffiliation > 0)
+const rawKey = createResult && !createResult.error ? createResult.data.rawKey : null
+---
+
+<MiniLayout
+  pageTitle="API Keys"
+  description="Manage your API keys"
+  ogImage={{ template: 'generic', title: 'API Keys', icon: 'ri:key-2-line' }}
+  layoutHeader={{
+    icon: 'ri:key-2-line',
+    title: 'API Keys',
+    subtitle: 'Create and manage API keys for programmatic access',
+  }}
+  breadcrumbs={[
+    {
+      name: 'Account',
+      url: '/account',
+    },
+    {
+      name: 'API Keys',
+    },
+  ]}
+>
+  {
+    rawKey && (
+      <div class="mb-6 space-y-2">
+        <div class="flex items-center gap-3 rounded-md bg-red-900/80 p-2 text-red-200">
+          <Icon name="ri:delete-bin-line" class="size-5 shrink-0" />
+          <p class="text-sm text-pretty">Save this key now — it won't be shown again!</p>
+        </div>
+        <div class="relative rounded-md border border-day-800 bg-night-800 p-3 font-mono text-sm break-all text-white js:pr-24">
+          {rawKey}
+          <div class="absolute inset-y-0 right-2 flex items-center">
+            <CopyButton copyText={rawKey} size="sm" color="success" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  {
+    apiKeys.length > 0 && (
+      <div class="mb-6 space-y-3">
+        {apiKeys.map((key) => (
+          <div class="flex items-center justify-between rounded-lg border border-night-400 bg-night-600 p-4">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <Icon name="ri:key-2-line" class="size-4 shrink-0 text-day-400" />
+                <span class="font-medium text-white">{key.name}</span>
+                {!key.isActive && (
+                  <span class="rounded-full bg-red-500/20 px-2 py-0.5 text-xs text-red-400">Disabled</span>
+                )}
+              </div>
+              <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-day-400">
+                <span class="font-mono">{key.keyPrefix}…</span>
+                <span>
+                  Created <TimeFormatted date={key.createdAt} hourPrecision />
+                </span>
+                {key.lastUsedAt ? (
+                  <span>
+                    Last used <TimeFormatted date={key.lastUsedAt} hourPrecision />
+                  </span>
+                ) : (
+                  <span>Never used</span>
+                )}
+              </div>
+            </div>
+            <form method="POST" action={actions.account.apiKeyDelete}>
+              <input type="hidden" name="id" value={key.id} />
+              <Button
+                type="submit"
+                icon="ri:delete-bin-line"
+                label="Delete"
+                color="danger"
+                size="sm"
+                data-confirm="Are you sure you want to delete this API key? Any applications using it will stop working."
+              />
+            </form>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  {
+    canCreate && apiKeys.length === 0 ? (
+      <form method="POST" action={actions.account.apiKeyCreate} class="space-y-4">
+        <InputText
+          label="Key Name"
+          name="name"
+          inputProps={{ required: true, maxlength: 100, placeholder: 'e.g. My Application' }}
+        />
+        <Button type="submit" icon="ri:add-line" label="Create API Key" color="success" shadow class="w-full" />
+      </form>
+    ) : canCreate && apiKeys.length > 0 ? (
+      <p class="text-center text-sm text-day-400">
+        You already have an API key. Delete it to create a new one.
+      </p>
+    ) : !user.canCreateApiKeys ? (
+      <div class="rounded-lg border border-night-400 bg-night-600 p-6 text-center">
+        <Icon name="ri:lock-line" class="mx-auto mb-2 size-8 text-day-500" />
+        <p class="text-day-300">API key creation is not enabled for your account.</p>
+        <p class="mt-1 text-sm text-day-500">Contact an admin to request access.</p>
+      </div>
+    ) : (
+      <div class="rounded-lg border border-night-400 bg-night-600 p-6 text-center">
+        <Icon name="ri:lock-line" class="mx-auto mb-2 size-8 text-day-500" />
+        <p class="text-day-300">You must be verified or affiliated with a service to create API keys.</p>
+      </div>
+    )
+  }
+</MiniLayout>

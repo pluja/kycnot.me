@@ -1,6 +1,7 @@
 import { getActionContext } from 'astro:actions'
 import { defineMiddleware, sequence } from 'astro:middleware'
 
+import { hashApiKey } from './lib/apiKey'
 import { ErrorBanners, getMessagesFromUrl } from './lib/errorBanners'
 import { getImpersonationInfo } from './lib/impersonation'
 import { makeUserWithKarmaUnlocks } from './lib/karmaUnlocks'
@@ -84,6 +85,42 @@ const authenticate = defineMiddleware(async (context, next) => {
   return next()
 })
 
+const apiKeyAuth = defineMiddleware(async (context, next) => {
+  context.locals.apiKeyAuthenticated = false
+
+  if (!context.url.pathname.startsWith('/api/')) return next()
+
+  const authHeader = context.request.headers.get('Authorization')
+  const apiKeyHeader = context.request.headers.get('X-Api-Key')
+  const rawKey = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : apiKeyHeader
+
+  if (!rawKey) {
+    return new Response(JSON.stringify({ error: 'API key required' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const keyHash = hashApiKey(rawKey)
+  const apiKey = await prisma.apiKey.findUnique({
+    where: { keyHash, isActive: true },
+  })
+
+  if (!apiKey) {
+    return new Response(JSON.stringify({ error: 'Invalid API key' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  context.locals.apiKeyAuthenticated = true
+
+  // Fire-and-forget lastUsedAt update
+  prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } }).catch(() => {})
+
+  return next()
+})
+
 const impersonate = defineMiddleware(async (context, next) => {
   context.locals.actualUser = null
 
@@ -149,6 +186,7 @@ const errors = defineMiddleware(async (context, next) => {
 export const onRequest = sequence(
   errors,
   authenticate,
+  apiKeyAuth,
   impersonate,
   protectRoutes,
   preventFormResubmitAndStoreActionErrors,

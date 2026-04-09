@@ -523,6 +523,7 @@ model User {
   verified            Boolean   @default(false)
   admin               Boolean   @default(false)
   moderator           Boolean   @default(false)
+  canCreateApiKeys    Boolean   @default(false)
   verifiedLink        String?
   secretTokenHash     String    @unique
   feedId              String    @unique @default(cuid(2))
@@ -548,9 +549,27 @@ model User {
   notificationPreferences  NotificationPreferences?
   serviceAffiliations      ServiceUser[]                @relation("UserServices")
   pushSubscriptions        PushSubscription[]
+  apiKeys                  ApiKey[]
 
   @@index([createdAt])
   @@index([totalKarma])
+}
+
+model ApiKey {
+  id         Int       @id @default(autoincrement())
+  name       String
+  keyHash    String    @unique
+  keyPrefix  String
+  isActive   Boolean   @default(true)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
+
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
+
+  @@index([userId])
+  @@index([keyHash])
 }
 
 model CommentVote {

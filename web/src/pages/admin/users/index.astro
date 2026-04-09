@@ -22,7 +22,7 @@ const { data: filters } = zodParseQueryParamsStoringErrors(
     'sort-by': z.enum(['name', 'role', 'lastLoginAt', 'karma', 'createdAt']).default('createdAt'),
     'sort-order': z.enum(['asc', 'desc']).default('desc'),
     search: z.string().optional(),
-    role: z.enum(['user', 'admin', 'moderator', 'verified', 'spammer']).optional(),
+    role: z.enum(['user', 'admin', 'moderator', 'verified', 'spammer', 'has-api-key']).optional(),
     page: z.coerce.number().int().positive().default(1),
     'page-size': z.enum(['25', '50', '100']).default('25'),
   },
@@ -73,6 +73,10 @@ if (filters.role) {
       whereClause.spammer = true
       break
     }
+    case 'has-api-key': {
+      whereClause.apiKeys = { some: {} }
+      break
+    }
   }
 }
 
@@ -103,6 +107,7 @@ const dbUsers = await prisma.user.findMany({
       select: {
         suggestions: true,
         comments: true,
+        apiKeys: true,
       },
     },
   },
@@ -181,6 +186,7 @@ const makePageSizeUrl = (size: string) => {
             <option value="moderator" selected={filters.role === 'moderator'}>Moderators</option>
             <option value="verified" selected={filters.role === 'verified'}>Verified Users</option>
             <option value="spammer" selected={filters.role === 'spammer'}>Spammers</option>
+            <option value="has-api-key" selected={filters.role === 'has-api-key'}>Has API Key</option>
           </select>
           <Button
             as="button"
@@ -400,6 +406,14 @@ const makePageSizeUrl = (size: string) => {
                           {user._count.comments}
                         </span>
                       </div>
+                      {user._count.apiKeys > 0 && (
+                        <div class="flex flex-col items-center" title="API Keys">
+                          <span class="text-2xs text-zinc-400">API Keys</span>
+                          <span class="inline-flex items-center rounded-full bg-amber-900/30 px-2.5 py-0.5 text-xs font-medium text-amber-300">
+                            {user._count.apiKeys}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td class="px-4 py-3">

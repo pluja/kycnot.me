@@ -56,6 +56,7 @@ const [user, allServices] = await Astro.locals.banners.tryMany([
           verified: true,
           moderator: true,
           spammer: true,
+          canCreateApiKeys: true,
           verifiedLink: true,
           internalNotes: {
             select: {
@@ -260,6 +261,21 @@ if (!user) return Astro.rewrite('/404')
         multiple
         error={updateInputErrors.type}
       />
+
+      <div class="flex items-center gap-3 rounded-lg border border-night-400 bg-night-600 p-3">
+        <input
+          type="checkbox"
+          id="canCreateApiKeys"
+          name="canCreateApiKeys"
+          value="true"
+          checked={user.canCreateApiKeys}
+          class="size-4 rounded border-zinc-600 bg-zinc-800 text-blue-500 focus:ring-blue-500"
+        />
+        <label for="canCreateApiKeys" class="flex items-center gap-2 text-sm text-day-200">
+          <Icon name="ri:key-2-line" class="size-4 text-day-400" />
+          Allow API key creation
+        </label>
+      </div>
 
       <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
     </form>
