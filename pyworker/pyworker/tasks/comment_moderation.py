@@ -76,56 +76,38 @@ class CommentModerationTask(Task):
                 "comment": comment,
                 "parentComment": parent_comment,
                 "recentApprovedComments": approved_comments,
-                "recentApprovedOrderIds": approved_order_ids if comment.get("orderId") else None,
+                "recentApprovedOrderIds": approved_order_ids
+                if comment.get("orderId")
+                else None,
             }
 
             moderation = prompt_comment_moderation(
                 json.dumps(context, cls=DateTimeEncoder)
             )
 
-            modstring = f"Comment {comment['id']} "
+            quality = moderation["commentQuality"]
+            is_spam = moderation["isSpam"]
 
-            if moderation["isSpam"] and moderation["commentQuality"] > 5:
-                comment["status"] = "HUMAN_PENDING"
-                modstring += " marked as HUMAN_PENDING"
-            elif moderation["isSpam"] and moderation["commentQuality"] <= 5:
-                comment["status"] = "REJECTED"
-                modstring += " marked as REJECTED"
+            # AI never sets status — it only writes its assessment for human review.
+            # Status stays PENDING so the comment appears in the admin queue.
+            comment["requiresAdminReview"] = bool(moderation["requiresAdminReview"])
 
-            if moderation["requiresAdminReview"]:
-                comment["requiresAdminReview"] = True
-                modstring += " requires admin review"
-                # Ensure status is HUMAN_PENDING if admin review is required, unless already REJECTED
-                if comment.get("status") != "REJECTED":
-                    comment["status"] = "HUMAN_PENDING"
-                    if (
-                        "marked as HUMAN_PENDING" not in modstring
-                    ):  # Avoid duplicate message
-                        modstring += " marked as HUMAN_PENDING"
-            else:
-                comment["requiresAdminReview"] = False
-                if (
-                    comment.get("status") != "HUMAN_PENDING"
-                    and comment.get("status") != "REJECTED"
-                ):
-                    comment["status"] = "APPROVED"
-                    modstring += " marked as APPROVED"
+            ai_notes: List[str] = []
+            ai_notes.append(f"AI quality: {quality}/10 | spam: {is_spam}")
+            if moderation.get("internalNote"):
+                ai_notes.append(moderation["internalNote"])
+            comment["internalNote"] = " — ".join(ai_notes)
 
-            if moderation.get("contextNote"):  # Check if key exists
-                comment["communityNote"] = moderation["contextNote"]
-                modstring += " with moderation note: " + moderation["contextNote"]
-            else:
-                comment["communityNote"] = None
+            comment["communityNote"] = moderation.get("contextNote") or None
 
-            if moderation.get("internalNote"):  # Check if key exists
-                comment["internalNote"] = moderation["internalNote"]
-                modstring += (
-                    " with internal note: " + moderation["internalNote"]
-                )  # Changed from spam reason for clarity
-            else:
-                comment["internalNote"] = None
+            modstring = (
+                f"Comment {comment['id']} triaged: "
+                f"quality={quality}, spam={is_spam}, "
+                f"adminReview={comment['requiresAdminReview']}"
+            )
+            if comment["communityNote"]:
+                modstring += f", note: {comment['communityNote']}"
 
-            # Save the sentiment summary to the database
             self.logger.info(modstring)
             update_comment_moderation(comment)
             processed_at_least_one = True

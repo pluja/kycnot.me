@@ -2,7 +2,9 @@
 Database operations for the pyworker package.
 """
 
+import hashlib
 import json
+import secrets
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Dict, Generator, List, Optional, TypedDict, Union
@@ -155,6 +157,127 @@ def get_db_connection() -> Generator[psycopg.Connection, None, None]:
     except Exception as e:
         logger.error(f"Error connecting to the database: {e}")
         raise
+
+
+# --- Bot User ---
+
+_bot_user_id: Optional[int] = None
+
+
+def ensure_bot_user() -> int:
+    """
+    Get or create the bot user that PyWorker uses to author edit suggestions.
+
+    The user is looked up by name (from config.BOT_USERNAME). If it doesn't
+    exist, a new row is inserted with a random secret token hash (the token
+    itself is discarded — bot accounts don't log in through the web UI).
+
+    Returns:
+        The bot user's database ID.
+    """
+    global _bot_user_id
+    if _bot_user_id is not None:
+        return _bot_user_id
+
+    username = config.BOT_USERNAME
+
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                # Try to find existing bot user
+                cursor.execute(
+                    'SELECT id FROM "User" WHERE name = %s',
+                    (username,),
+                )
+                row = cursor.fetchone()
+
+                if row is not None:
+                    _bot_user_id = int(row["id"])
+                    logger.info(
+                        f"Found existing bot user '{username}' (ID: {_bot_user_id})"
+                    )
+                    return _bot_user_id
+
+                # Create a new bot user with a random, unusable secret token
+                random_token = secrets.token_hex(32)
+                token_hash = hashlib.sha512(random_token.encode()).hexdigest()
+
+                cursor.execute(
+                    """
+                    INSERT INTO "User" (name, "secretTokenHash", "createdAt", "updatedAt", "lastLoginAt")
+                    VALUES (%s, %s, NOW(), NOW(), NOW())
+                    RETURNING id
+                    """,
+                    (username, token_hash),
+                )
+                conn.commit()
+                row = cursor.fetchone()
+                assert row is not None, "INSERT RETURNING should always return a row"
+                _bot_user_id = int(row["id"])
+                logger.info(f"Created bot user '{username}' (ID: {_bot_user_id})")
+                return _bot_user_id
+    except Exception as e:
+        logger.error(f"Error ensuring bot user '{username}': {e}")
+        raise
+
+
+# --- Edit Suggestions ---
+
+
+def create_kyc_edit_suggestion(
+    service_id: int,
+    old_level: Optional[int],
+    new_level: int,
+    review_summary: Optional[str] = None,
+) -> Optional[int]:
+    """
+    Create a ServiceSuggestion proposing a KYC level change, authored by the bot user.
+
+    Returns:
+        The suggestion ID, or None on failure.
+    """
+    bot_user_id = ensure_bot_user()
+
+    lines = [
+        "⚠️ AI-Generated Suggestion — Requires human review",
+        "",
+        f"Proposed KYC level change: {old_level} → {new_level}",
+    ]
+
+    if review_summary:
+        lines += [
+            "",
+            "AI reasoning (from TOS review):",
+            review_summary,
+        ]
+
+    notes = "\n".join(lines)
+
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO "ServiceSuggestion" (type, status, notes, "userId", "serviceId", "createdAt", "updatedAt")
+                    VALUES ('EDIT_SERVICE', 'PENDING', %s, %s, %s, NOW(), NOW())
+                    RETURNING id
+                    """,
+                    (notes, bot_user_id, service_id),
+                )
+                conn.commit()
+                row = cursor.fetchone()
+                suggestion_id = row["id"] if row else None
+                if suggestion_id:
+                    logger.info(
+                        f"Created KYC edit suggestion #{suggestion_id} for service {service_id} "
+                        f"(level {old_level} → {new_level})"
+                    )
+                return suggestion_id
+    except Exception as e:
+        logger.error(
+            f"Error creating KYC edit suggestion for service {service_id}: {e}"
+        )
+        return None
 
 
 # --- Database Functions ---
@@ -363,45 +486,6 @@ def save_tos_review(service_id: int, review: Optional[TosReviewType]):
         logger.error(f"Error saving TOS review for service {service_id}: {e}")
 
 
-def update_kyc_level(service_id: int, kyc_level: int) -> bool:
-    """
-    Update the KYC level for a specific service.
-
-    Args:
-        service_id: The ID of the service.
-        kyc_level: The new KYC level (0-4).
-
-    Returns:
-        bool: True if the update was successful, False otherwise.
-    """
-    try:
-        # Ensure the kyc_level is within the valid range
-        if not 0 <= kyc_level <= 4:
-            logger.error(
-                f"Invalid KYC level ({kyc_level}) for service {service_id}. Must be between 0 and 4."
-            )
-            return False
-
-        with get_db_connection() as conn:
-            with conn.cursor(row_factory=dict_row) as cursor:
-                cursor.execute(
-                    """
-                    UPDATE "Service" 
-                    SET "kycLevel" = %s, "updatedAt" = NOW()
-                    WHERE id = %s
-                """,
-                    (kyc_level, service_id),
-                )
-                conn.commit()
-                logger.info(
-                    f"Successfully updated KYC level to {kyc_level} for service {service_id}"
-                )
-                return True
-    except Exception as e:
-        logger.error(f"Error updating KYC level for service {service_id}: {e}")
-        return False
-
-
 def get_comments(service_id: int, status: str = "APPROVED") -> List[Dict[str, Any]]:
     """
     Get all comments for a specific service with the specified status.
@@ -560,9 +644,7 @@ def get_recent_approved_comments(
     return comments
 
 
-def get_recent_approved_order_ids(
-    service_id: int, limit: int = 5
-) -> List[str]:
+def get_recent_approved_order_ids(service_id: int, limit: int = 5) -> List[str]:
     """Fetch recent non-null orderIds from APPROVED/VERIFIED comments for a service."""
     order_ids = []
     try:
@@ -666,12 +748,12 @@ def save_user_sentiment(
 
 
 def update_comment_moderation(comment_data: CommentType):
-    """
-    Update an existing comment in the database based on moderation results.
+    """Write AI triage assessment to a comment without changing its status.
 
-    Args:
-        comment_data: A TypedDict representing the comment data to update.
-                    Expected keys are defined in CommentType.
+    The AI worker populates requiresAdminReview, communityNote, and
+    internalNote so human moderators can make informed approve/reject
+    decisions.  Status is intentionally NOT written here — only humans
+    change comment status.
     """
     comment_id = comment_data.get("id")
     if not comment_id:
@@ -685,7 +767,6 @@ def update_comment_moderation(comment_data: CommentType):
                     """
                     UPDATE "Comment"
                     SET 
-                        status = %(status)s,
                         "requiresAdminReview" = %(requiresAdminReview)s,
                         "communityNote" = %(communityNote)s,
                         "internalNote" = %(internalNote)s,

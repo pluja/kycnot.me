@@ -39,6 +39,9 @@ class Config:
     CRAWL4AI_TIMEOUT: int = int(os.getenv("CRAWL4AI_TIMEOUT", "300"))
     CRAWL4AI_POLL_INTERVAL: int = int(os.getenv("CRAWL4AI_POLL_INTERVAL", "2"))
 
+    # Bot user settings
+    BOT_USERNAME: str = os.getenv("PYWORKER_BOT_USERNAME", "pyworker-bot")
+
     # Logging settings
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     LOG_FORMAT: str = os.getenv(

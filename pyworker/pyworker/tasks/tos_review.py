@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 import requests
 
-from pyworker.database import TosReviewType, save_tos_review, update_kyc_level
+from pyworker.database import TosReviewType, create_kyc_edit_suggestion, save_tos_review
 from pyworker.tasks.base import Task
 from pyworker.utils.ai import prompt_check_tos_review, prompt_tos_review
 from pyworker.utils.crawl import fetch_markdown
@@ -36,7 +36,11 @@ class TosReviewTask(Task):
         verification_status = service.get("verificationStatus")
 
         # Only process verified, approved, or community contributed services
-        if verification_status not in ["VERIFICATION_SUCCESS", "APPROVED", "COMMUNITY_CONTRIBUTED"]:
+        if verification_status not in [
+            "VERIFICATION_SUCCESS",
+            "APPROVED",
+            "COMMUNITY_CONTRIBUTED",
+        ]:
             self.logger.info(
                 f"Skipping TOS review for service: {service_name} (ID: {service_id}) - Status: {verification_status}"
             )
@@ -66,28 +70,39 @@ class TosReviewTask(Task):
             )
             return None
 
-        # Update the KYC level based on the review, when present
         if "kycLevel" in review:
             new_level = review["kycLevel"]
             old_level = service.get("kycLevel")
 
-            # Update DB
-            if update_kyc_level(service_id, new_level):
-                msg = f"{service.get('slug', service_name)}: kycLevel {old_level} -> {new_level}"
+            if old_level == new_level:
+                self.logger.info(
+                    f"KYC level unchanged for {service_name} (ID: {service_id}), skipping suggestion"
+                )
+            else:
+                suggestion_id = create_kyc_edit_suggestion(
+                    service_id=service_id,
+                    old_level=old_level,
+                    new_level=new_level,
+                    review_summary=review.get("summary"),
+                )
 
-                # Log to console
-                self.logger.info(msg)
+                if suggestion_id:
+                    msg = (
+                        f"{service.get('slug', service_name)}: "
+                        f"KYC level suggestion #{suggestion_id} created ({old_level} → {new_level})"
+                    )
+                    self.logger.info(msg)
 
-                # Send notification via ntfy
-                try:
-                    ntfy_url = os.environ.get(
-                        "NTFY_KYC_CHANGES_URL", "https://ntfy.sh/knm-kyc-lvl-changes-knm"
-                    )
-                    requests.post(ntfy_url, data=msg.encode())
-                except requests.RequestException as e:
-                    self.logger.error(
-                        f"Failed to send ntfy notification for KYC level change: {e}"
-                    )
+                    try:
+                        ntfy_url = os.environ.get(
+                            "NTFY_KYC_CHANGES_URL",
+                            "https://ntfy.sh/knm-kyc-lvl-changes-knm",
+                        )
+                        requests.post(ntfy_url, data=msg.encode())
+                    except requests.RequestException as e:
+                        self.logger.error(
+                            f"Failed to send ntfy notification for KYC suggestion: {e}"
+                        )
 
         return review
 
