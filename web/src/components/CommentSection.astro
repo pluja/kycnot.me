@@ -70,6 +70,13 @@ const getSortUrl = (sortOption: CommentSortOption) => {
 
 const user = Astro.locals.user
 
+const viewerIsAffiliated = user
+  ? !!(await prisma.serviceUser.findUnique({
+      where: { userId_serviceId: { userId: user.id, serviceId: service.id } },
+      select: { id: true },
+    }))
+  : false
+
 const [dbComments, pendingCommentsCount, activeRatingComment] = await Astro.locals.banners.tryMany([
   [
     'Failed to fetch comments',
@@ -269,6 +276,7 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
             serviceSlug={service.slug}
             itemReviewedId={itemReviewedId}
             strictCommentingEnabled={service.strictCommentingEnabled}
+            viewerIsAffiliated={viewerIsAffiliated}
           />
         ))
       ) : (
