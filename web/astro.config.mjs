@@ -118,6 +118,9 @@ export default defineConfig({
   security: {
     checkOrigin: false,
     allowedDomains: [{ hostname: new URL(SITE_URL).hostname, protocol: 'https' }],
+    // Must stay above MAX_IMAGE_SIZE (5MB, see src/lib/zodUtils.ts) to allow image uploads
+    // through Astro Actions, accounting for multipart/form-data overhead.
+    actionBodySizeLimit: 6 * 1024 * 1024,
   },
   image: {
     remotePatterns: [

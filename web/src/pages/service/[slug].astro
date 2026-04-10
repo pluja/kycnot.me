@@ -25,6 +25,7 @@ import ServiceLinkButton from '../../components/ServiceLinkButton.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import Tooltip from '../../components/Tooltip.astro'
 import UserBadge from '../../components/UserBadge.astro'
+import VerificationSnapshot from '../../components/VerificationSnapshot.astro'
 import VerificationWarningBanner from '../../components/VerificationWarningBanner.astro'
 import { getAttributeCategoryInfo } from '../../constants/attributeCategories'
 import { baseScoreType, getAttributeTypeInfo } from '../../constants/attributeTypes'
@@ -48,7 +49,9 @@ import { pluralize } from '../../lib/pluralize'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
 import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
+import { getServiceVerificationOverview } from '../../lib/serviceVerification'
 import { transformCase } from '../../lib/strings'
+import { formatDateShort } from '../../lib/timeAgo'
 import { absoluteSiteUrl, siteOrigin, urlDomain, urlWithParams } from '../../lib/urls'
 
 import type { BreadcrumArray } from '../../components/BaseHead.astro'
@@ -63,7 +66,7 @@ const result = Astro.getActionResult(actions.service.requestVerification)
 
 const now = new Date()
 
-const canSeeHidden = user?.admin || user?.moderator
+const canSeeHidden = (user?.admin ?? false) || (user?.moderator ?? false)
 const visibleStatuses = canSeeHidden
   ? (['PUBLIC', 'UNLISTED', 'ARCHIVED', 'HIDDEN'] as const)
   : (['PUBLIC', 'UNLISTED', 'ARCHIVED'] as const)
@@ -99,6 +102,7 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
           imageUrl: true,
           listedAt: true,
           approvedAt: true,
+          verifiedAt: true,
           createdAt: true,
           acceptedCurrencies: true,
           operatingSince: true,
@@ -254,7 +258,7 @@ if (!service) {
   return Astro.rewrite('/404')
 }
 
-if (!visibleStatuses.includes(service.serviceVisibility as typeof visibleStatuses[number])) {
+if (!visibleStatuses.includes(service.serviceVisibility as (typeof visibleStatuses)[number])) {
   return Astro.rewrite('/404')
 }
 
@@ -332,7 +336,16 @@ const userSentiment = service.userSentiment
         // TODO: Remove this once we figure out where this is coming from
         console.error(`[transformCase] Error is here: getUserSentimentInfo ${JSON.stringify(service)}`)
       }
-      return { ...service.userSentiment, info: getUserSentimentInfo(service.userSentiment.sentiment) }
+      return {
+        ...service.userSentiment,
+        whatUsersLike: Array.isArray(service.userSentiment.whatUsersLike)
+          ? service.userSentiment.whatUsersLike
+          : [],
+        whatUsersDislike: Array.isArray(service.userSentiment.whatUsersDislike)
+          ? service.userSentiment.whatUsersDislike
+          : [],
+        info: getUserSentimentInfo(service.userSentiment.sentiment),
+      }
     })()
   : null
 
@@ -445,6 +458,21 @@ const sortedVerificationSteps = orderBy(
   [(step) => getVerificationStepPriority(step.status), (step) => step.updatedAt],
   ['asc', 'desc'] // Priority ascending (failed first), date descending (newest first)
 )
+
+const verificationOverview = getServiceVerificationOverview(service)
+const verificationStatusDateLabel =
+  service.verificationStatus === 'VERIFICATION_SUCCESS'
+    ? 'Verified'
+    : service.verificationStatus === 'APPROVED'
+      ? 'Approved'
+      : 'Listed'
+
+const verificationStatusDate =
+  service.verificationStatus === 'VERIFICATION_SUCCESS'
+    ? service.verifiedAt
+    : service.verificationStatus === 'APPROVED'
+      ? service.approvedAt
+      : service.listedAt
 ---
 
 <BaseLayout
@@ -579,6 +607,8 @@ const sortedVerificationSteps = orderBy(
   }
 
   <VerificationWarningBanner service={service} />
+
+  <VerificationSnapshot service={service} />
 
   <div class="flex items-center gap-4">
     {
@@ -1405,103 +1435,162 @@ const sortedVerificationSteps = orderBy(
     </a>
   </div>
 
-  <div class="mt-6 mb-3 flex items-center justify-between border-b border-day-500" id="verification">
-    <h2 class="font-title text-lg font-bold text-day-100">Verification</h2>
-    <a
-      href="/about#suggestion-review-process"
-      class="inline-flex items-center gap-1 text-xs leading-none text-day-500 transition-colors hover:text-day-200 hover:underline"
-    >
-      Learn more
-      <Icon name="ri:arrow-right-s-line" class="size-4" />
-    </a>
+  <div class="mt-6 mb-3 flex items-center justify-between gap-3 border-b border-day-500 pb-1" id="verification">
+    <h2 class="font-title text-lg font-bold text-day-100">Evidence and Review History</h2>
+    <div class="flex items-center gap-2 text-xs leading-none">
+      <a
+        href="/about#listing-statuses"
+        class="inline-flex items-center gap-1 rounded-full border border-day-500/20 px-2 py-1 text-day-400 transition-colors hover:border-day-500/40 hover:text-day-100"
+      >
+        <Icon name="ri:information-line" class="size-3.5" />
+        How statuses work
+      </a>
+      <a
+        href="/about#suggestion-review-process"
+        class="inline-flex items-center gap-0.5 text-day-500 transition-colors hover:text-day-200 hover:underline"
+      >
+        Our review process
+        <Icon name="ri:arrow-right-s-line" class="size-4" />
+      </a>
+    </div>
   </div>
 
-  <div class={cn('mb-6 rounded-lg p-4', statusInfo.classNames.containerBg)}>
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div class="flex-1">
-        <div class="mb-2 flex items-center gap-2">
-          <div
-            class={cn(
-              'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm',
-              statusInfo.classNames.badgeBig
-            )}
-          >
-            <Icon name={statusInfo.icon} class="size-4" />
-            <span>{statusInfo.label}</span>
-          </div>
-
-          <p class="text-sm text-current/60">
-            {statusInfo.description}
-          </p>
+  <div
+    class={cn(
+      'mb-6 flex flex-col gap-3 rounded-lg border border-day-500/10 px-4 py-3 sm:flex-row sm:items-start sm:justify-between',
+      statusInfo.classNames.containerBg
+    )}
+  >
+    <div class="min-w-0 flex-1">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <div
+          class={cn(
+            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-medium',
+            statusInfo.classNames.badgeBig
+          )}
+        >
+          <Icon name={statusInfo.icon} class="size-4" />
+          <span>{statusInfo.label}</span>
         </div>
+        <p class="text-sm text-current/70">{statusInfo.description}</p>
+      </div>
 
+      {
+        service.verificationSummary && (
+          <div class="prose prose-sm mt-2 max-w-none prose-invert">
+            <Markdown content={service.verificationSummary} />
+          </div>
+        )
+      }
+
+      <ul class="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-day-300">
+        <li class="inline-flex items-center gap-1.5">
+          <Icon name="ri:check-double-line" class="size-3.5 text-day-500" />
+          <span>{verificationOverview.checksSummary}</span>
+        </li>
+        <li class="inline-flex items-center gap-1.5">
+          <Icon name="ri:history-line" class="size-3.5 text-day-500" />
+          <span class="text-day-500">Last review</span>
+          <span class="text-day-200">
+            {
+              verificationOverview.lastReviewAt
+                ? formatDateShort(verificationOverview.lastReviewAt, {
+                    prefix: false,
+                    hourPrecision: false,
+                  })
+                : 'Unknown'
+            }
+          </span>
+        </li>
+        <li class="inline-flex items-center gap-1.5">
+          <Icon name="ri:calendar-check-line" class="size-3.5 text-day-500" />
+          <span class="text-day-500">{verificationStatusDateLabel}</span>
+          <span class="text-day-200">
+            {
+              verificationStatusDate
+                ? formatDateShort(verificationStatusDate, {
+                    prefix: false,
+                    hourPrecision: false,
+                  })
+                : 'Unknown'
+            }
+          </span>
+        </li>
         {
-          !!service.verificationSummary && (
-            <div class="prose prose-sm max-w-none prose-invert">
-              <Markdown content={service.verificationSummary} />
-            </div>
+          service.operatingSince && (
+            <li class="inline-flex items-center gap-1.5">
+              <Icon name="ri:rocket-2-line" class="size-3.5 text-day-500" />
+              <span class="text-day-500">Operating since</span>
+              <span class="text-day-200">
+                {formatDateShort(service.operatingSince, {
+                  prefix: false,
+                  hourPrecision: false,
+                })}
+              </span>
+            </li>
           )
         }
-      </div>
-
-      <div class="flex flex-col gap-2">
-        {
-          service.verificationStatus !== 'VERIFICATION_SUCCESS' &&
-            service.verificationStatus !== 'VERIFICATION_FAILED' &&
-            service.serviceVisibility !== 'ARCHIVED' && (
-              <form
-                method="POST"
-                action={actions.service.requestVerification}
-                id="request-verification-form"
-                hx-post={`${Astro.url.pathname}${actions.service.requestVerification}`}
-                hx-target="#request-verification-form"
-                hx-select="#request-verification-form"
-                hx-swap="outerHTML"
-              >
-                <input type="hidden" name="serviceId" value={service.id} />
-                <input
-                  type="hidden"
-                  name="action"
-                  value={hasRequestedVerification ? 'withdraw' : 'request'}
-                />
-                <VerificationRequestElement
-                  type={VerificationRequestElement === 'button' ? 'submit' : undefined}
-                  href={
-                    VerificationRequestElement === 'a'
-                      ? makeLoginUrl(
-                          (() => {
-                            const url = new URL(Astro.url)
-                            url.hash = '#request-verification-form'
-                            return url
-                          })()
-                        )
-                      : undefined
-                  }
-                  class="flex w-full items-center gap-2 rounded-lg border border-night-400 bg-night-800 px-4 py-2 text-sm shadow-sm transition-colors duration-200 hover:bg-night-900"
-                >
-                  <Icon
-                    name={hasRequestedVerification ? 'ri:chat-delete-line' : 'ri:chat-check-line'}
-                    class="size-4 htmx-request:hidden"
-                  />
-                  <Icon name="ri:loader-4-line" class="hidden size-4 animate-spin htmx-request:block" />
-                  <span>{hasRequestedVerification ? 'Withdraw request' : 'Request verification'}</span>
-                </VerificationRequestElement>
-
-                <p class="mt-1 text-center text-xs text-day-500">
-                  {service.verificationRequests.length.toLocaleString()}{' '}
-                  {pluralize('request', service.verificationRequests.length)}
-                </p>
-                {result?.error && <p class="mt-1 text-center text-xs text-red-500">{result.error.message}</p>}
-              </form>
-            )
-        }
-      </div>
+      </ul>
     </div>
+
+    {
+      service.verificationStatus !== 'VERIFICATION_SUCCESS' &&
+        service.verificationStatus !== 'VERIFICATION_FAILED' &&
+        service.serviceVisibility !== 'ARCHIVED' && (
+          <form
+            method="POST"
+            action={actions.service.requestVerification}
+            id="request-verification-form"
+            class="shrink-0 sm:w-48"
+            hx-post={`${Astro.url.pathname}${actions.service.requestVerification}`}
+            hx-target="#request-verification-form"
+            hx-select="#request-verification-form"
+            hx-swap="outerHTML"
+          >
+            <input type="hidden" name="serviceId" value={service.id} />
+            <input
+              type="hidden"
+              name="action"
+              value={hasRequestedVerification ? 'withdraw' : 'request'}
+            />
+            <VerificationRequestElement
+              type={VerificationRequestElement === 'button' ? 'submit' : undefined}
+              href={
+                VerificationRequestElement === 'a'
+                  ? makeLoginUrl(
+                      (() => {
+                        const url = new URL(Astro.url)
+                        url.hash = '#request-verification-form'
+                        return url
+                      })()
+                    )
+                  : undefined
+              }
+              class="flex w-full items-center justify-center gap-2 rounded-md border border-night-400 bg-night-800 px-3 py-1.5 text-sm shadow-sm transition-colors duration-200 hover:bg-night-900"
+            >
+              <Icon
+                name={hasRequestedVerification ? 'ri:chat-delete-line' : 'ri:chat-check-line'}
+                class="size-4 htmx-request:hidden"
+              />
+              <Icon name="ri:loader-4-line" class="hidden size-4 animate-spin htmx-request:block" />
+              <span>{hasRequestedVerification ? 'Withdraw request' : 'Request verification'}</span>
+            </VerificationRequestElement>
+
+            <p class="mt-1 text-center text-xs text-day-500">
+              {service.verificationRequests.length.toLocaleString()}{' '}
+              {pluralize('request', service.verificationRequests.length)}
+            </p>
+            {result?.error && <p class="mt-1 text-center text-xs text-red-500">{result.error.message}</p>}
+          </form>
+        )
+    }
   </div>
   {
     service.verificationProofMd && (
       <>
-        <h3 class="mt-4 font-title text-lg font-semibold">Verification proof</h3>
+        <h3 class="mt-4 font-title text-lg font-semibold" id="verification-proof">
+          Verification proof
+        </h3>
         <div class="prose prose-sm max-w-none prose-invert">
           <Markdown content={service.verificationProofMd} />
         </div>
@@ -1511,7 +1600,9 @@ const sortedVerificationSteps = orderBy(
   {
     sortedVerificationSteps.length > 0 && (
       <>
-        <h3 class="mt-6 mb-2 font-title font-semibold">Verification Steps</h3>
+        <h3 class="mt-6 mb-2 font-title font-semibold" id="verification-steps">
+          Verification Steps
+        </h3>
         <ul class="mb-8 space-y-2">
           {sortedVerificationSteps.map((step) => {
             if (typeof step.status !== 'string') {
@@ -1621,7 +1712,7 @@ const sortedVerificationSteps = orderBy(
                 worstRating: 1,
                 bestRating: 5,
               },
-              positiveNotes: (userSentiment.whatUsersLike ?? []).map(
+              positiveNotes: userSentiment.whatUsersLike.map(
                 (item, index) =>
                   ({
                     '@type': 'ListItem',
@@ -1629,7 +1720,7 @@ const sortedVerificationSteps = orderBy(
                     name: item,
                   }) satisfies ListItem
               ),
-              negativeNotes: (userSentiment.whatUsersDislike ?? []).map(
+              negativeNotes: userSentiment.whatUsersDislike.map(
                 (item, index) =>
                   ({
                     '@type': 'ListItem',
@@ -1667,7 +1758,7 @@ const sortedVerificationSteps = orderBy(
 
             <div class="flex grow items-center justify-evenly">
               <ul class="inline-grid list-inside list-disc place-items-center text-sm text-day-300 marker:text-green-400 marker:content-['+_']">
-                {(userSentiment.whatUsersLike ?? []).map((item) => (
+                {userSentiment.whatUsersLike.map((item) => (
                   <li class="w-full">
                     <span>{item}</span>
                   </li>
@@ -1675,7 +1766,7 @@ const sortedVerificationSteps = orderBy(
               </ul>
 
               <ul class="inline-grid list-inside list-disc place-items-center text-sm text-day-300 marker:text-red-400 marker:content-['-_']">
-                {(userSentiment.whatUsersDislike ?? []).map((item) => (
+                {userSentiment.whatUsersDislike.map((item) => (
                   <li class="w-full">
                     <span>{item}</span>
                   </li>

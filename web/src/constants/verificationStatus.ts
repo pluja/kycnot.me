@@ -11,6 +11,10 @@ type VerificationStatusInfo<T extends string | null | undefined = string> = {
   slug: string
   labelShort: string
   label: string
+  headline: string
+  scopeLabel: string
+  reasonHeading: string
+  fallbackReason: string
   icon: string
   default: boolean
   description: string
@@ -46,6 +50,10 @@ export const {
     slug: value ? value.toLowerCase().replace('_', '-') : '',
     labelShort: value ? transformCase(value, 'title') : String(value),
     label: value ? transformCase(value, 'title') : String(value),
+    headline: value ? transformCase(value, 'title') : String(value),
+    scopeLabel: value ? transformCase(value, 'title') : String(value),
+    reasonHeading: value ? transformCase(value, 'title') : String(value),
+    fallbackReason: '',
     icon: 'ri:loader-line',
     default: false,
     description: '',
@@ -67,10 +75,15 @@ export const {
       slug: 'verified',
       labelShort: 'Verified',
       label: 'Verified',
+      headline: 'Repeated checks over time passed',
+      scopeLabel: 'Repeated checks',
+      reasonHeading: 'Why this is verified',
+      fallbackReason:
+        'This service passed repeated checks across time. That is stronger than approval, but it is still not a guarantee against future failure or exit scams.',
       icon: 'ri:verified-badge-fill',
       default: true,
       description:
-        'Thoroughly tested and verified by the team. But things might change, this is not a guarantee.',
+        'Repeated checks passed over time. This is stronger than approval, but still not a guarantee.',
       privacyPoints: 0,
       trustPoints: 10,
       classNames: {
@@ -88,10 +101,15 @@ export const {
       slug: 'approved',
       labelShort: 'Approved',
       label: 'Approved',
+      headline: 'Limited recent checks passed',
+      scopeLabel: 'Limited checks',
+      reasonHeading: 'Why this is approved',
+      fallbackReason:
+        'This service passed a limited set of recent checks. That means the checks below passed on specific dates, not that the service is permanently safe.',
       icon: 'ri:check-line',
       default: true,
       description:
-        'Everything checks out at first glance, but not verified nor thoroughly tested by the team.',
+        'Limited recent checks passed. This means recent spot checks succeeded, not that the service is safe forever.',
       privacyPoints: 0,
       trustPoints: 5,
       classNames: {
@@ -109,9 +127,14 @@ export const {
       slug: 'community',
       labelShort: 'Community',
       label: 'Community Contributed',
+      headline: 'Not reviewed by the team',
+      scopeLabel: 'Not reviewed',
+      reasonHeading: 'Why this is community contributed',
+      fallbackReason:
+        'This service has not gone through the team review process yet. Treat all information as unverified until evidence is added.',
       icon: 'ri:question-line',
       default: false,
-      description: 'Suggested by the community, but not reviewed by the team yet.',
+      description: 'Community-submitted and not reviewed by the team yet.',
       privacyPoints: 0,
       trustPoints: 0,
       classNames: {
@@ -129,6 +152,11 @@ export const {
       slug: 'scam',
       labelShort: 'Scam',
       label: 'Scam',
+      headline: 'Evidence indicates serious risk',
+      scopeLabel: 'Failed review',
+      reasonHeading: 'Why this is marked as scam',
+      fallbackReason:
+        'The review history contains failed checks or other evidence that the service is unsafe or not what it claims to be.',
       icon: 'ri:alert-fill',
       default: false,
       description: 'Confirmed as a SCAM or not what it claims to be.',

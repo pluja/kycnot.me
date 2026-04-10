@@ -112,30 +112,43 @@ When you submit a new service, it gets the `COMMUNITY_CONTRIBUTED` status and th
 
 ##### Second Review (Community Contributed -> Approved)
 
-The service will be tested and investigated more in depth. If:
+`APPROVED` means the service passed a **limited, recent review**. It does **not** mean the service is trusted or future-proof.
 
-- Service information is accurate.
-- Works as described (at the time of the testing).
-- Basic functionality is tested successfully.
-- Communication with service's support was successful.
-- No obvious red flags.
-- Platform user reviews will be taken into account.
-- Terms of Service and other documents are briefly reviewed.
-- Other platforms are checked for the service reputation (Trustpilot, Reddit, Bitcointalk, etc.)
+To be upgraded to `APPROVED`, the service should generally meet these conditions:
 
-The service will be granted the `APPROVED` status.
+- The service is eligible for listing and publicly understandable.
+- It has been operating for at least **6 months**.
+- We completed at least **3 successful core-service tests** on **3 non-consecutive dates**.
+- Those successful tests span at least **14 days**.
+- Support replied satisfactorily at least **once**, when support exists.
+- There are **no unresolved high-severity reports** at review time.
+- Evidence for the checks is logged publicly in the service verification section.
+
+For swap or exchange services, these tests will often be swaps. For VPNs, VPS providers, AI providers, and other categories, the tests should match the core user workflow of that service.
+
+Public wording for `APPROVED`:
+
+> Passed limited checks on specific dates. This does not guarantee future safety.
 
 ##### Final Review (Approved -> Verified)
 
-After a period of no reported issues, we will do a **third review**.
+`VERIFIED` means the service showed **consistent behavior over time**. It does **not** mean the service cannot exit scam in the future.
 
-- The service is tested across different dates and under various conditions.
-- The service administrators and support teams will be contacted for additional verification.
-- User reviews will be checked for any issues and taken into account.
-- Terms of Service and other documents will be reviewed again.
-- Other platforms are checked for the service reputation (Trustpilot, Reddit, Bitcointalk, etc.)
+To be upgraded from `APPROVED` to `VERIFIED`, the service should generally meet these conditions:
 
-If the service meets all requirements, it is granted the **`VERIFIED`** status.
+- It is already `APPROVED`.
+- At least **90 days** passed since the initial approval.
+- We completed at least **6 successful core-service tests** across at least **4 distinct dates**.
+- We had at least **2 successful support interactions** on separated dates, when support exists.
+- There is **no unresolved scam or blocked-funds pattern**.
+- There are **no serious contradictions** in public reports.
+- Review evidence was refreshed recently and is logged publicly.
+
+For swap or exchange services, these tests will often be swaps. For VPNs, VPS providers, AI providers, and other categories, the tests should match the core user workflow of that service.
+
+Public wording for `VERIFIED`:
+
+> Showed consistent behavior over time and passed repeated checks. This is still not a guarantee.
 
 ##### Failed Verifications (Scams)
 
@@ -206,6 +219,8 @@ You can also take a look at the [global timeline](/events) where you will find a
 
 ### Listing Statuses
 
+> **Note on legacy listings**: Some services were listed and granted `Approved` or `Verified` under the site's earlier review standards, before the current check-publishing requirements existed. They remain listed because they have operated for years without scam reports, blocked-funds patterns, or other unresolved red flags, and have a recognized presence in the privacy community (sponsorships, mentions, long-term user base). **Published check history will be backfilled for these services over time.** Until then, treat the absence of evidence as missing information, not endorsement, and do your own research.
+
 #### **Unlisted**
 
 Initial state after the service is submitted. The service will **not appear in the list or search results**. Only accessible with a **direct link**. An **initial review** is done by the team to ensure the service is **not spam or inappropriate**.
@@ -216,11 +231,35 @@ The service is **listed** in the directory, but it has **not been reviewed** by 
 
 #### **Approved**
 
-The service is listed in the directory and has been **reviewed by our team**. The information is **accurate and complete**. Initial tests were **successful**, but there is **not enough trust** to be verified.
+The service passed a **limited, recent review**. Upgrade requirements:
+
+- Meets the [listing requirements](/about#listing-requirements).
+- Operating for at least **6 months**.
+- At least **3 successful core-service tests** on **3 non-consecutive dates**.
+- Those tests span at least **14 days**.
+- Support replied satisfactorily at least **once**, when support exists.
+- No unresolved **high-severity reports** at review time.
+- Evidence logged publicly in the verification section.
+
+For swap or exchange services, these tests will often be swaps. For VPNs, VPS providers, AI providers, and other categories, they should match the core user workflow.
+
+This status reflects **specific checks on specific dates**, not a long-term safety guarantee.
 
 #### **Verified**
 
-The service has been listed for a while and has **not been reported** as a scam, user reviews are **mostly positive**, and the service is **not under any investigation**. Further tests and checks have been **successfully completed**. Contact with support or admins was also successful.
+The service showed **consistent behavior over time** after already being approved. Upgrade requirements:
+
+- Already **Approved**.
+- At least **90 days** since initial approval.
+- At least **6 successful core-service tests** across **4 or more dates**.
+- At least **2 satisfactory support interactions** on separated dates, when support exists.
+- No unresolved **scam** or **blocked-funds** pattern.
+- No serious contradictions in public reports.
+- Review evidence refreshed recently and logged publicly.
+
+For swap or exchange services, these tests will often be swaps. For VPNs, VPS providers, AI providers, and other categories, they should match the core user workflow.
+
+This is **stronger than Approved**, but it is **still not a guarantee** against future problems or exit scams.
 
 #### **Scam**
 

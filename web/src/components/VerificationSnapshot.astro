@@ -1,0 +1,46 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { getVerificationStatusInfo } from '../constants/verificationStatus'
+import { cn } from '../lib/cn'
+
+import type { Prisma } from '@prisma/client'
+
+type Props = {
+  service: Prisma.ServiceGetPayload<{
+    select: {
+      verificationStatus: true
+    }
+  }>
+}
+
+const { service } = Astro.props
+
+const statusInfo = getVerificationStatusInfo(service.verificationStatus)
+---
+
+<a
+  href="#verification"
+  class={cn(
+    'group mb-3 flex items-center gap-2.5 rounded-lg border border-day-500/10 px-3 py-2 transition-colors hover:border-day-500/25',
+    statusInfo.classNames.containerBg
+  )}
+  aria-label={`Verification status: ${statusInfo.label}. Jump to evidence and review history.`}
+>
+  <div class="inline-flex shrink-0 items-center gap-1.5">
+    <Icon name={statusInfo.icon} class={cn('size-4 sm:size-[18px]', statusInfo.classNames.icon)} />
+    <span class={cn('text-xs font-medium sm:text-sm', statusInfo.classNames.description)}>
+      {statusInfo.label}
+    </span>
+  </div>
+
+  <span class="h-3 w-px shrink-0 bg-day-500/20" aria-hidden="true"></span>
+
+  <p class="min-w-0 flex-1 truncate text-xs text-day-400 sm:text-sm">{statusInfo.headline}</p>
+
+  <Icon
+    name="ri:arrow-down-s-line"
+    class="size-4 shrink-0 text-day-500 transition-transform group-hover:translate-y-0.5 group-hover:text-day-200 sm:size-[18px]"
+    aria-hidden="true"
+  />
+</a>

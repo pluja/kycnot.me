@@ -30,38 +30,7 @@ const { service } = Astro.props
 ---
 
 {
-  service.verificationStatus === 'VERIFICATION_FAILED' ? (
-    <div class="mb-4 rounded-md bg-red-900/50 p-2 text-sm text-red-400">
-      <p class="flex items-center gap-2">
-        <Icon
-          name={verificationStatusesByValue.VERIFICATION_FAILED.icon}
-          class={cn('size-5', verificationStatusesByValue.VERIFICATION_FAILED.classNames.icon)}
-        />
-        <span class="font-bold">This service is a SCAM!</span>
-        {!!service.verificationProofMd && (
-          <a href="#verification" class="cursor-pointer text-red-100 underline">
-            Proof
-          </a>
-        )}
-      </p>
-      {!!service.verificationSummary && (
-        <div class="mt-2 wrap-anywhere whitespace-pre-wrap" set:text={service.verificationSummary} />
-      )}
-    </div>
-  ) : service.verificationStatus === 'COMMUNITY_CONTRIBUTED' ? (
-    <div class="mb-3 flex items-center gap-2 rounded-md bg-yellow-600/30 p-2 text-sm text-yellow-200">
-      <Icon name="ri:alert-line" class="size-5 text-yellow-400" />
-      <span>
-        Community contributed. Information not reviewed.
-        <a
-          href="/about#community-contributed"
-          class="text-yellow-100 underline opacity-50 transition-opacity hover:opacity-100 focus-visible:opacity-100"
-        >
-          Learn more
-        </a>
-      </span>
-    </div>
-  ) : service.isRecentlyApproved ? (
+  service.isRecentlyApproved ? (
     <div class="mb-3 rounded-md bg-yellow-900/50 p-2 text-sm text-yellow-400">
       This service was approved
       {service.approvedAt ? formatDaysAgo(service.approvedAt) : 'less than 15 days ago'}
@@ -73,19 +42,6 @@ const { service } = Astro.props
       >
         Learn more
       </a>
-    </div>
-  ) : service.verificationStatus !== 'VERIFICATION_SUCCESS' ? (
-    <div class="mb-3 flex items-center gap-2 rounded-md bg-blue-600/30 p-2 text-sm text-blue-200">
-      <Icon name="ri:information-line" class="size-5 text-blue-400" />
-      <span>
-        Basic checks passed, but service is not verified.
-        <a
-          href="/about#approved"
-          class="text-blue-100 underline opacity-50 transition-opacity hover:opacity-100 focus-visible:opacity-100"
-        >
-          Learn more
-        </a>
-      </span>
     </div>
   ) : null
 }

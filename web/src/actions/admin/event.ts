@@ -5,6 +5,11 @@ import { ActionError } from 'astro:actions'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { prisma } from '../../lib/prisma'
 
+const endedAtSchema = z.preprocess(
+  (val) => (val === '' ? null : val),
+  z.coerce.date().nullable().optional()
+)
+
 export const adminEventActions = {
   create: defineProtectedAction({
     accept: 'form',
@@ -18,7 +23,7 @@ export const adminEventActions = {
         source: z.string().optional(),
         type: z.nativeEnum(EventType).default('NORMAL'),
         startedAt: z.coerce.date(),
-        endedAt: z.coerce.date().optional(),
+        endedAt: endedAtSchema,
       })
       .superRefine((data, ctx) => {
         if (data.endedAt && data.startedAt > data.endedAt) {
@@ -83,7 +88,7 @@ export const adminEventActions = {
         source: z.string().optional(),
         type: z.nativeEnum(EventType).default('NORMAL'),
         startedAt: z.coerce.date(),
-        endedAt: z.coerce.date().optional(),
+        endedAt: endedAtSchema,
       })
       .superRefine((data, ctx) => {
         if (data.endedAt && data.startedAt > data.endedAt) {
