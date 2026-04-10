@@ -823,23 +823,33 @@ const apiCalls = await Astro.locals.banners.try(
                           error={eventUpdateInputErrors.startedAt}
                         />
 
-                        <InputText
-                          label="Ended At"
-                          name="endedAt"
-                          inputProps={{
-                            type: 'datetime-local',
-                            value: event.endedAt
-                              ? new Date(
-                                  new Date(event.endedAt).getTime() -
-                                    new Date(event.endedAt).getTimezoneOffset() * 60000
-                                )
-                                  .toISOString()
-                                  .slice(0, 16)
-                              : '',
-                          }}
-                          error={eventUpdateInputErrors.endedAt}
-                          description="- Empty: Event is ongoing.\n- Filled: Event with specific end date.\n- Same as start date: One-time event."
-                        />
+                        <div>
+                          <InputText
+                            label="Ended At"
+                            name="endedAt"
+                            inputProps={{
+                              type: 'datetime-local',
+                              value: event.endedAt
+                                ? new Date(
+                                    new Date(event.endedAt).getTime() -
+                                      new Date(event.endedAt).getTimezoneOffset() * 60000
+                                  )
+                                    .toISOString()
+                                    .slice(0, 16)
+                                : '',
+                            }}
+                            error={eventUpdateInputErrors.endedAt}
+                            description="- Empty: Event is ongoing.\n- Filled: Event with specific end date.\n- Same as start date: One-time event."
+                          />
+                          <button
+                            type="button"
+                            data-clear-datetime="endedAt"
+                            class="mt-1 inline-flex items-center gap-1 text-xs text-day-500 transition-colors hover:text-day-200"
+                          >
+                            <Icon name="ri:close-circle-line" class="size-3.5" />
+                            Clear (event is ongoing)
+                          </button>
+                        </div>
                       </div>
 
                       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -905,13 +915,23 @@ const apiCalls = await Astro.locals.banners.try(
               error={eventInputErrors.startedAt}
             />
 
-            <InputText
-              label="Ended At"
-              name="endedAt"
-              inputProps={{ type: 'datetime-local' }}
-              error={eventInputErrors.endedAt}
-              description="- Empty: Event is ongoing.\n- Filled: Event with specific end date.\n- Same as start date: One-time event."
-            />
+            <div>
+              <InputText
+                label="Ended At"
+                name="endedAt"
+                inputProps={{ type: 'datetime-local' }}
+                error={eventInputErrors.endedAt}
+                description="- Empty: Event is ongoing.\n- Filled: Event with specific end date.\n- Same as start date: One-time event."
+              />
+              <button
+                type="button"
+                data-clear-datetime="endedAt"
+                class="mt-1 inline-flex items-center gap-1 text-xs text-day-500 transition-colors hover:text-day-200"
+              >
+                <Icon name="ri:close-circle-line" class="size-3.5" />
+                Clear (event is ongoing)
+              </button>
+            </div>
           </div>
 
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1392,6 +1412,35 @@ const apiCalls = await Astro.locals.banners.try(
       data-lightbox-img
     />
   </div>
+
+  <script>
+    ////////////////////////////////////////////////////////////
+    // Optional script for the "Clear" buttons next to        //
+    // datetime-local inputs.                                 //
+    //                                                        //
+    // HTML5 datetime-local inputs can get stuck in a         //
+    // "badInput" state when the user partially deletes the   //
+    // value, blocking form submission even when the field is //
+    // not required. Clicking Clear resets the value and      //
+    // dispatches input/change events so any listeners and    //
+    // the browser's validation state see a clean reset.      //
+    ////////////////////////////////////////////////////////////
+    document.addEventListener('astro:page-load', () => {
+      document.querySelectorAll<HTMLButtonElement>('[data-clear-datetime]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const targetName = btn.dataset.clearDatetime
+          if (!targetName) return
+          const form = btn.closest('form')
+          if (!form) return
+          const input = form.querySelector<HTMLInputElement>(`input[name="${targetName}"]`)
+          if (!input) return
+          input.value = ''
+          input.dispatchEvent(new Event('input', { bubbles: true }))
+          input.dispatchEvent(new Event('change', { bubbles: true }))
+        })
+      })
+    })
+  </script>
 
   <script>
     document.addEventListener('astro:page-load', () => {
