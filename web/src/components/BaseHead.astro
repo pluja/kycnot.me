@@ -71,6 +71,19 @@ type Props = {
    * @default false
    */
   noindex?: boolean
+
+  /**
+   * When set, marks this page as an article in Open Graph and emits the
+   * corresponding `article:*` meta tags. Use for blog posts and similar
+   * long-form content.
+   */
+  articleMeta?: {
+    publishedTime: Date
+    modifiedTime?: Date
+    author: string
+    tags: string[]
+    section?: string
+  }
 }
 
 const {
@@ -82,6 +95,7 @@ const {
   schemas,
   breadcrumbs,
   noindex = false,
+  articleMeta,
 } = Astro.props
 
 const breadcrumbLists = breadcrumbs?.every(Array.isArray)
@@ -104,7 +118,7 @@ const ogImageUrl = makeOgImageUrl(ogImage, siteOrigin)
 <meta http-equiv="onion-location" content={ONION_ADDRESS} />
 
 {/* Open Graph / Facebook */}
-<meta property="og:type" content="website" />
+<meta property="og:type" content={articleMeta ? 'article' : 'website'} />
 <meta property="og:site_name" content="KYCnot.me" />
 <meta property="og:url" content={absoluteSiteUrl(canonical)} />
 <meta property="og:title" content={fullTitle} />
@@ -112,6 +126,22 @@ const ogImageUrl = makeOgImageUrl(ogImage, siteOrigin)
 {!!ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
 {!!ogImageUrl && <meta property="og:image:width" content="1200" />}
 {!!ogImageUrl && <meta property="og:image:height" content="630" />}
+
+{
+  articleMeta && (
+    <>
+      <meta property="article:published_time" content={articleMeta.publishedTime.toISOString()} />
+      {articleMeta.modifiedTime && (
+        <meta property="article:modified_time" content={articleMeta.modifiedTime.toISOString()} />
+      )}
+      <meta property="article:author" content={articleMeta.author} />
+      {articleMeta.section && <meta property="article:section" content={articleMeta.section} />}
+      {articleMeta.tags.map((tag) => (
+        <meta property="article:tag" content={tag} />
+      ))}
+    </>
+  )
+}
 
 {/* Twitter */}
 <meta property="twitter:card" content="summary_large_image" />
@@ -122,6 +152,7 @@ const ogImageUrl = makeOgImageUrl(ogImage, siteOrigin)
 
 {/* Other */}
 <link rel="sitemap" href="/sitemaps/index.xml" />
+<link rel="alternate" type="application/rss+xml" title="KYCnot.me Blog" href="/blog/rss.xml" />
 <link rel="alternate" type="application/rss+xml" title="KYCnot.me Events" href="/feeds/events.xml" />
 
 {/* PWA */}

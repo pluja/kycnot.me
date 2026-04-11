@@ -1,0 +1,204 @@
+---
+import { Icon } from 'astro-icon/components'
+import { render } from 'astro:content'
+
+import { calculateReadingTime, postUrl, tagUrl, type BlogPost } from '../lib/blog'
+import { cn } from '../lib/cn'
+import { formatDateShort } from '../lib/timeAgo'
+
+import MyPicture from './MyPicture.astro'
+
+type Props = {
+  post: BlogPost
+  related: BlogPost[]
+  older: BlogPost | null
+  newer: BlogPost | null
+  showDraftBanner?: boolean
+}
+
+const { post, related, older, newer, showDraftBanner = false } = Astro.props
+const { Content } = await render(post)
+const readingMinutes = calculateReadingTime(post.body ?? '')
+---
+
+<article class="mt-6 mb-12">
+  {
+    showDraftBanner && (
+      <div class="mb-6 rounded-lg border border-yellow-500/40 bg-yellow-900/20 p-4">
+        <div class="flex items-start gap-3">
+          <Icon name="ri:draft-line" class="size-5 shrink-0 text-yellow-400" />
+          <div class="flex-1">
+            <p class="font-semibold text-yellow-200">Draft preview</p>
+            <p class="mt-1 text-sm text-yellow-300/80">
+              This post is unpublished. It is not visible to users or search engines. Set{' '}
+              <code class="rounded-sm bg-yellow-900/40 px-1.5 py-0.5 font-mono text-yellow-200">draft: false</code>{' '}
+              in the frontmatter and redeploy to publish it.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  <header class="mb-8">
+    {
+      post.data.coverImage && (
+        <MyPicture
+          src={post.data.coverImage}
+          alt={`Cover image for ${post.data.title}`}
+          width={1200}
+          height={630}
+          class="mb-6 w-full rounded-lg object-cover"
+        />
+      )
+    }
+
+    <h1 class="font-title text-3xl font-bold text-balance text-white sm:text-4xl">
+      {post.data.title}
+    </h1>
+
+    <p class="mt-3 text-lg text-day-300">{post.data.summary}</p>
+
+    <div class="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-day-400">
+      <span class="inline-flex items-center gap-1.5">
+        <Icon name="ri:user-3-line" class="size-4 text-day-500" />
+        <span>by <span class="text-day-200">{post.data.author}</span></span>
+      </span>
+      <span class="inline-flex items-center gap-1.5">
+        <Icon name="ri:calendar-line" class="size-4 text-day-500" />
+        <time datetime={post.data.publishedAt.toISOString()}>
+          {formatDateShort(post.data.publishedAt, { prefix: false, hourPrecision: false })}
+        </time>
+      </span>
+      {
+        post.data.updatedAt && post.data.updatedAt > post.data.publishedAt && (
+          <span class="inline-flex items-center gap-1.5">
+            <Icon name="ri:edit-2-line" class="size-4 text-day-500" />
+            <span>
+              updated{' '}
+              <time datetime={post.data.updatedAt.toISOString()}>
+                {formatDateShort(post.data.updatedAt, { prefix: false, hourPrecision: false })}
+              </time>
+            </span>
+          </span>
+        )
+      }
+      <span class="inline-flex items-center gap-1.5">
+        <Icon name="ri:time-line" class="size-4 text-day-500" />
+        <span>{readingMinutes} min read</span>
+      </span>
+    </div>
+
+    {
+      post.data.tags.length > 0 && (
+        <ul class="mt-4 flex flex-wrap gap-2">
+          {post.data.tags.map((tag) => (
+            <li>
+              <a
+                href={tagUrl(tag)}
+                class="inline-flex items-center gap-1 rounded-full border border-day-500/20 px-2.5 py-0.5 text-xs text-day-300 transition-colors hover:border-day-500/40 hover:text-day-100"
+              >
+                <Icon name="ri:price-tag-3-line" class="size-3" />
+                {tag}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </header>
+
+  <div
+    class={cn(
+      'prose max-w-none prose-invert',
+      'prose-headings:scroll-mt-24 prose-headings:font-title prose-headings:text-white',
+      'prose-a:text-green-400 prose-a:no-underline [&_a:hover]:underline',
+      'prose-strong:text-day-100',
+      'prose-img:rounded-lg',
+      'prose-hr:border-day-500/20'
+    )}
+  >
+    <Content />
+  </div>
+
+  {
+    (older ?? newer) && (
+      <nav
+        aria-label="Post navigation"
+        class="mt-12 grid gap-3 border-t border-day-500/20 pt-6 sm:grid-cols-2"
+      >
+        {newer && (
+          <a
+            href={postUrl(newer)}
+            class="group flex flex-col gap-1 rounded-lg border border-day-500/15 bg-night-800 p-4 transition-colors hover:border-day-500/35"
+          >
+            <span class="inline-flex items-center gap-1 text-xs text-day-500">
+              <Icon name="ri:arrow-left-s-line" class="size-3.5" />
+              Newer post
+            </span>
+            <span class="text-sm font-semibold text-day-100 transition-colors group-hover:text-white">
+              {newer.data.title}
+            </span>
+          </a>
+        )}
+        {older && (
+          <a
+            href={postUrl(older)}
+            class="group flex flex-col gap-1 rounded-lg border border-day-500/15 bg-night-800 p-4 transition-colors hover:border-day-500/35 sm:col-start-2 sm:items-end sm:text-right"
+          >
+            <span class="inline-flex items-center gap-1 text-xs text-day-500">
+              Older post
+              <Icon name="ri:arrow-right-s-line" class="size-3.5" />
+            </span>
+            <span class="text-sm font-semibold text-day-100 transition-colors group-hover:text-white">
+              {older.data.title}
+            </span>
+          </a>
+        )}
+      </nav>
+    )
+  }
+
+  {
+    related.length > 0 && (
+      <section class="mt-10" aria-label="Related posts">
+        <h2 class="font-title text-xl font-bold text-day-100">Related posts</h2>
+        <ul class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {related.map((relatedPost) => (
+            <li>
+              <a
+                href={postUrl(relatedPost)}
+                class="group flex h-full flex-col overflow-hidden rounded-lg border border-day-500/15 bg-night-800 transition-colors hover:border-day-500/35"
+              >
+                {relatedPost.data.coverImage && (
+                  <MyPicture
+                    src={relatedPost.data.coverImage}
+                    alt=""
+                    width={400}
+                    height={210}
+                    class="aspect-[16/9] w-full object-cover"
+                  />
+                )}
+                <div class="flex flex-1 flex-col gap-1.5 p-3">
+                  <h3 class="font-title text-sm font-semibold text-day-100 transition-colors group-hover:text-white">
+                    {relatedPost.data.title}
+                  </h3>
+                  <p class="line-clamp-2 text-xs text-day-400">{relatedPost.data.summary}</p>
+                  <time
+                    datetime={relatedPost.data.publishedAt.toISOString()}
+                    class="mt-auto text-xs text-day-500"
+                  >
+                    {formatDateShort(relatedPost.data.publishedAt, {
+                      prefix: false,
+                      hourPrecision: false,
+                    })}
+                  </time>
+                </div>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+</article>

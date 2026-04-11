@@ -27,7 +27,7 @@ const dataSchema = z.object({
   ]),
 })
 
-class RedisActionsSessions extends RedisGenericManager {
+export class RedisActionsSessions extends RedisGenericManager {
   private readonly prefix = 'actions_session:'
 
   async store(data: z.input<typeof dataSchema>) {
@@ -65,6 +65,11 @@ class RedisActionsSessions extends RedisGenericManager {
   }
 }
 
-export const redisActionsSessions = await RedisActionsSessions.createAndConnect({
-  expirationTime: 60 * 5, // 5 minutes in seconds
-})
+let redisActionsSessions: RedisActionsSessions | null = null
+
+export async function getRedisActionsSessions() {
+  redisActionsSessions ??= await RedisActionsSessions.createAndConnect({
+    expirationTime: 60 * 5, // 5 minutes in seconds
+  })
+  return redisActionsSessions
+}

@@ -9,7 +9,7 @@ const dataSchema = z.object({
   targetId: z.number(),
 })
 
-class RedisImpersonationSessions extends RedisGenericManager {
+export class RedisImpersonationSessions extends RedisGenericManager {
   private readonly prefix = 'impersonation_session:'
 
   async store(data: z.input<typeof dataSchema>) {
@@ -41,6 +41,11 @@ class RedisImpersonationSessions extends RedisGenericManager {
   }
 }
 
-export const redisImpersonationSessions = await RedisImpersonationSessions.createAndConnect({
-  expirationTime: 60 * 60 * 24, // 24 hours in seconds
-})
+let redisImpersonationSessions: RedisImpersonationSessions | null = null
+
+export async function getRedisImpersonationSessions() {
+  redisImpersonationSessions ??= await RedisImpersonationSessions.createAndConnect({
+    expirationTime: 60 * 60 * 24, // 24 hours in seconds
+  })
+  return redisImpersonationSessions
+}

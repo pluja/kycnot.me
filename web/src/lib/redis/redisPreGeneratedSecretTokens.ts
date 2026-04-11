@@ -1,6 +1,6 @@
 import { RedisGenericManager } from './redisGenericManager'
 
-class RedisPreGeneratedSecretTokens extends RedisGenericManager {
+export class RedisPreGeneratedSecretTokens extends RedisGenericManager {
   private readonly prefix = 'pregenerated_user_secret_token:'
 
   /**
@@ -29,6 +29,11 @@ class RedisPreGeneratedSecretTokens extends RedisGenericManager {
   }
 }
 
-export const redisPreGeneratedSecretTokens = await RedisPreGeneratedSecretTokens.createAndConnect({
-  expirationTime: 60 * 5, // 5 minutes in seconds
-})
+let redisPreGeneratedSecretTokens: RedisPreGeneratedSecretTokens | null = null
+
+export async function getRedisPreGeneratedSecretTokens() {
+  redisPreGeneratedSecretTokens ??= await RedisPreGeneratedSecretTokens.createAndConnect({
+    expirationTime: 60 * 5, // 5 minutes in seconds
+  })
+  return redisPreGeneratedSecretTokens
+}

@@ -38,10 +38,17 @@ const feeds = [
     icon: 'ri:calendar-2-line',
     replacementDescription: null,
   },
+  {
+    title: 'Blog',
+    description: 'Articles, guides, and updates about no-KYC services and privacy',
+    rss: '/blog/rss.xml',
+    icon: 'ri:article-line',
+    replacementDescription: null,
+  },
 ] as const satisfies {
   title: string
   description: string
-  rss: `/feeds/${string}`
+  rss: `/feeds/${string}` | `/blog/${string}`
   icon: string
   replacementDescription: string | null
 }[]

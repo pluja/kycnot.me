@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 
 import { RedisGenericManager } from './redisGenericManager'
 
-class RedisSessions extends RedisGenericManager {
+export class RedisSessions extends RedisGenericManager {
   /**
    * Generates a random session ID
    */
@@ -71,6 +71,11 @@ class RedisSessions extends RedisGenericManager {
   }
 }
 
-export const redisSessions = await RedisSessions.createAndConnect({
-  expirationTime: 60 * 60 * 24, // 24 hours in seconds
-})
+let redisSessions: RedisSessions | null = null
+
+export async function getRedisSessions() {
+  redisSessions ??= await RedisSessions.createAndConnect({
+    expirationTime: 60 * 60 * 24, // 24 hours in seconds
+  })
+  return redisSessions
+}

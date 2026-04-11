@@ -110,4 +110,158 @@ import-db file="":
   echo "Production database import completed successfully!"
   echo "Migration status:"
   cd web && npx prisma migrate status
+
+# Scaffold a new blog post (markdown + image folder co-located in one directory)
+new-blog:
+  #!/bin/bash
+  set -e
+
+  BLOG_DIR="web/src/content/blog"
+
+  if [ ! -d "$BLOG_DIR" ]; then
+    echo "Error: $BLOG_DIR not found. Run from the repository root."
+    exit 1
+  fi
+
+  echo "New blog post"
+  echo ""
+
+  while true; do
+    read -p "Slug (kebab-case, e.g. 'stay-safe-using-services'): " SLUG
+    if [ -z "$SLUG" ]; then
+      echo "  Slug cannot be empty."
+      continue
+    fi
+    if ! echo "$SLUG" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$'; then
+      echo "  Slug must be kebab-case: lowercase letters, digits, hyphens only."
+      continue
+    fi
+    if [ -e "$BLOG_DIR/$SLUG" ]; then
+      echo "  A post with slug '$SLUG' already exists at $BLOG_DIR/$SLUG"
+      continue
+    fi
+    break
+  done
+
+  while true; do
+    read -p "Title: " TITLE
+    if [ -z "$TITLE" ]; then
+      echo "  Title cannot be empty."
+      continue
+    fi
+    if [ ${#TITLE} -gt 120 ]; then
+      echo "  Title is ${#TITLE} chars, schema max is 120."
+      continue
+    fi
+    break
+  done
+
+  while true; do
+    read -p "Summary (used as meta description, max 300 chars): " SUMMARY
+    if [ -z "$SUMMARY" ]; then
+      echo "  Summary cannot be empty."
+      continue
+    fi
+    if [ ${#SUMMARY} -gt 300 ]; then
+      echo "  Summary is ${#SUMMARY} chars, schema max is 300."
+      continue
+    fi
+    break
+  done
+
+  read -p "Author [pluja]: " AUTHOR
+  AUTHOR=${AUTHOR:-pluja}
+
+  read -p "Tags (comma-separated, optional, e.g. 'guide,monero'): " TAGS_INPUT
+
+  read -p "Cover image filename (optional, any format: cover.avif, cover.webp, hero.png, etc.): " COVER
+
+  read -p "Start as draft? [Y/n]: " IS_DRAFT
+  IS_DRAFT=${IS_DRAFT:-Y}
+  case "$IS_DRAFT" in
+    [Yy]*) DRAFT_VALUE="true" ;;
+    *) DRAFT_VALUE="false" ;;
+  esac
+
+  POST_DIR="$BLOG_DIR/$SLUG"
+  POST_FILE="$POST_DIR/index.md"
+  PUBLISHED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  mkdir -p "$POST_DIR"
+
+  ESCAPED_TITLE=$(printf '%s' "$TITLE" | sed 's/\\/\\\\/g; s/"/\\"/g')
+  ESCAPED_SUMMARY=$(printf '%s' "$SUMMARY" | sed 's/\\/\\\\/g; s/"/\\"/g')
+
+  {
+    echo "---"
+    echo "title: \"$ESCAPED_TITLE\""
+    echo "summary: \"$ESCAPED_SUMMARY\""
+    echo "author: $AUTHOR"
+    echo "publishedAt: $PUBLISHED_AT"
+    if [ -n "$TAGS_INPUT" ]; then
+      echo "tags:"
+      echo "$TAGS_INPUT" | tr ',' '\n' | while read -r tag; do
+        trimmed=$(echo "$tag" | sed 's/^ *//;s/ *$//')
+        if [ -n "$trimmed" ]; then
+          echo "  - $trimmed"
+        fi
+      done
+    else
+      echo "tags: []"
+    fi
+    if [ -n "$COVER" ]; then
+      echo "coverImage: ./$COVER"
+    fi
+    echo "draft: $DRAFT_VALUE"
+    echo "---"
+    echo ""
+    echo "## Introduction"
+    echo ""
+    echo "Brief intro to what the post covers and why the reader should care."
+    echo ""
+    echo "## Main content"
+    echo ""
+    echo "Write your content here. Markdown supported (GFM): tables, task lists,"
+    echo "strikethrough, autolinks. Heading IDs are auto-generated, so you can link"
+    echo "within the post like [jump to conclusion](#conclusion)."
+    echo ""
+    echo "Internal links use site-relative paths: [a service](/service/some-slug)"
+    echo "or [another post](/blog/some-other-slug)."
+    echo ""
+    echo "Inline images live alongside this file in $POST_DIR/ and reference"
+    echo "with relative paths so Astro optimizes them automatically:"
+    echo "  ![Alt text describing the image](./screenshot.png)"
+    echo ""
+    echo "Always include meaningful alt text (it matters for SEO and accessibility)."
+    echo ""
+    echo "## Conclusion"
+    echo ""
+    echo "Wrap up. Summarize takeaways and link to related resources or services."
+  } > "$POST_FILE"
+
+  echo ""
+  echo "Created:"
+  echo "  $POST_FILE"
+  echo "  $POST_DIR/  (drop cover and inline images alongside index.md)"
+  echo ""
+  echo "Next steps:"
+  echo "  1. Add cover and inline images to $POST_DIR/ next to index.md"
+  echo "  2. Edit $POST_FILE to write the content"
+  echo "  3. Preview locally: cd web && npm run dev (then visit /blog)"
+  echo "  4. Validate types: cd web && npx astro check"
+  if [ "$DRAFT_VALUE" = "true" ]; then
+    echo "  5. When ready: flip 'draft: false' in the frontmatter"
+    echo "  6. Commit and push"
+  else
+    echo "  5. Commit and push"
+  fi
+
+  if [ -n "${EDITOR:-}" ]; then
+    echo ""
+    read -p "Open in \$EDITOR ($EDITOR) now? [Y/n]: " OPEN
+    OPEN=${OPEN:-Y}
+    case "$OPEN" in
+      [Yy]*) eval "$EDITOR \"$POST_FILE\"" ;;
+    esac
+  fi
   

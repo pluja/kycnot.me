@@ -1,9 +1,12 @@
+import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import rehypeStringify from 'rehype-stringify'
 import { remark } from 'remark'
 import remarkGfm from 'remark-gfm'
 import remarkRehype from 'remark-rehype'
 import { visit, EXIT } from 'unist-util-visit'
+
+import type { Options as SanitizeSchema } from 'rehype-sanitize'
 
 import { DEPLOYMENT_MODE } from '../lib/client/envVariables'
 
@@ -24,9 +27,25 @@ function rehypeLinkRelPlugin(linkRel: string[]) {
 
     visit(tree, 'element', (node: { tagName?: string; properties?: Record<string, unknown> }) => {
       if (node.tagName !== 'a') return
+
+      // Preserve `rel="sponsored"` when authored explicitly (e.g. raw HTML in
+      // a sponsored review post). Trusted markdown sources (like the blog
+      // content collection) can opt into this; user-generated comments are
+      // already sanitized of attributes before reaching this plugin, so they
+      // cannot inject `sponsored` here.
+      const existingRel = node.properties?.rel
+      const existingArray = Array.isArray(existingRel)
+        ? existingRel.map(String)
+        : typeof existingRel === 'string'
+          ? existingRel.split(/\s+/)
+          : []
+      const rel = existingArray.includes('sponsored')
+        ? ['sponsored', 'noopener', 'noreferrer'].join(' ')
+        : linkRel.join(' ')
+
       node.properties = {
         ...node.properties,
-        rel: linkRel.join(' '),
+        rel,
       }
     })
   }
@@ -34,19 +53,43 @@ function rehypeLinkRelPlugin(linkRel: string[]) {
 
 export async function markdownToHtml(
   md: string,
-  options: { allowImages?: boolean; linkRel?: string[] } = {}
+  options: { allowImages?: boolean; allowRawHtml?: boolean; linkRel?: string[] } = {}
 ) {
   try {
+    // `allowRawHtml` is for trusted sources only (e.g. blog posts authored
+    // in-repo). It enables raw HTML so authored anchors with `rel="sponsored"`
+    // survive into the output. NEVER pass this for user-generated content
+    // (comments, suggestions): even with sanitization on top, the looser
+    // parsing surface adds risk.
+    const sanitizeSchema: SanitizeSchema = {
+      ...defaultSchema,
+      tagNames: options.allowImages
+        ? defaultSchema.tagNames
+        : defaultSchema.tagNames?.filter((t) => t !== 'img'),
+      attributes: options.allowRawHtml
+        ? {
+            ...defaultSchema.attributes,
+            a: [
+              ...(defaultSchema.attributes?.a ?? []),
+              ['rel', 'nofollow', 'noopener', 'noreferrer', 'sponsored'],
+            ],
+          }
+        : defaultSchema.attributes,
+    }
+
+    const processor = options.allowRawHtml
+      ? remark()
+          .use(remarkGfm)
+          .use(remarkRehype, { allowDangerousHtml: true })
+          .use(rehypeRaw)
+          .use(rehypeSanitize, sanitizeSchema)
+      : remark()
+          .use(remarkGfm)
+          .use(remarkRehype)
+          .use(rehypeSanitize, sanitizeSchema)
+
     return String(
-      await remark()
-        .use(remarkGfm)
-        .use(remarkRehype)
-        .use(rehypeSanitize, {
-          ...defaultSchema,
-          tagNames: options.allowImages
-            ? defaultSchema.tagNames
-            : defaultSchema.tagNames?.filter((t) => t !== 'img'),
-        })
+      await processor
         .use(rehypeLinkRelPlugin(options.linkRel ?? []))
         .use(rehypeStringify)
         .process(md)

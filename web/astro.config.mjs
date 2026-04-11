@@ -8,6 +8,9 @@ import { minimal2023Preset } from '@vite-pwa/assets-generator/config'
 import AstroPWA from '@vite-pwa/astro'
 import { defineConfig, envField } from 'astro/config'
 import icon from 'astro-icon'
+import rehypeExternalLinks from 'rehype-external-links'
+import rehypeRaw from 'rehype-raw'
+import rehypeSlug from 'rehype-slug'
 import devtoolsJson from 'vite-plugin-devtools-json'
 
 import { postgresListener } from './src/lib/postgresListenerIntegration'
@@ -95,6 +98,38 @@ export default defineConfig({
   }),
   output: 'server',
   trailingSlash: 'never',
+  markdown: {
+    // `allowDangerousHtml` + `rehype-raw` make raw HTML inside markdown
+    // (e.g. `<a rel="sponsored">` for Google-compliant sponsored review
+    // links) become real hast elements, so subsequent rehype plugins like
+    // `rehype-external-links` can process them.
+    remarkRehype: { allowDangerousHtml: true },
+    rehypePlugins: [
+      rehypeRaw,
+      rehypeSlug,
+      [
+        rehypeExternalLinks,
+        {
+          target: '_blank',
+          // Preserve `rel="sponsored"` when authored explicitly in raw HTML
+          // (e.g. for sponsored review links). Otherwise default to the
+          // standard nofollow + security set on every external link.
+          rel: (/** @type {{ properties?: { rel?: string | string[] } }} */ element) => {
+            const existing = element.properties?.rel
+            const existingArray = Array.isArray(existing)
+              ? existing.map(String)
+              : existing
+                ? [String(existing)]
+                : []
+            if (existingArray.includes('sponsored')) {
+              return ['sponsored', 'noopener', 'noreferrer']
+            }
+            return ['nofollow', 'noopener', 'noreferrer']
+          },
+        },
+      ],
+    ],
+  },
   devToolbar: {
     enabled: false,
   },

@@ -1,0 +1,44 @@
+---
+import { cn } from '../lib/cn'
+
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = HTMLAttributes<'nav'> & {
+  items: [
+    ...{
+      name: string
+      url: string
+    }[],
+    {
+      name: string
+      url?: string
+    },
+  ]
+}
+
+const { items, class: className, ...navProps } = Astro.props
+---
+
+<nav aria-label="Breadcrumb" class={cn('text-sm text-day-500', className)} {...navProps}>
+  <ol class="flex flex-wrap items-center gap-1">
+    {
+      items.map((item, index) => {
+        const isLast = index === items.length - 1
+        return (
+          <>
+            {index > 0 && <li aria-hidden="true">/</li>}
+            <li class={cn(isLast && 'truncate text-day-300')} aria-current={isLast ? 'page' : undefined}>
+              {item.url && !isLast ? (
+                <a href={item.url} class="transition-colors hover:text-day-200 hover:underline">
+                  {item.name}
+                </a>
+              ) : (
+                item.name
+              )}
+            </li>
+          </>
+        )
+      })
+    }
+  </ol>
+</nav>

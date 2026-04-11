@@ -1,6 +1,6 @@
 import { stopImpersonating } from './impersonation'
 import { prisma } from './prisma'
-import { redisSessions } from './redis/redisSessions'
+import { getRedisSessions } from './redis/redisSessions'
 
 import type { APIContext, AstroCookies, AstroCookieSetOptions } from 'astro'
 
@@ -23,6 +23,7 @@ export async function getUserFromCookies(cookies: AstroCookies) {
   const userSessionId = getUserSessionIdCookie(cookies)
   if (!userSessionId) return null
 
+  const redisSessions = await getRedisSessions()
   const userSecretTokenHash = await redisSessions.getUserBySessionId(userSessionId)
   if (!userSecretTokenHash) return null
 
@@ -38,6 +39,7 @@ export async function setUserSessionIdCookie(
   userSecretTokenHash: string,
   options: AstroCookieSetOptions = {}
 ) {
+  const redisSessions = await getRedisSessions()
   const sessId = await redisSessions.createSession(userSecretTokenHash)
   cookies.set(COOKIE_NAME, sessId, {
     ...defaultCookieOptions,
@@ -48,6 +50,7 @@ export async function setUserSessionIdCookie(
 export async function removeUserSessionIdCookie(cookies: AstroCookies) {
   const sessionId = cookies.get(COOKIE_NAME)?.value
   if (sessionId) {
+    const redisSessions = await getRedisSessions()
     await redisSessions.deleteSession(sessionId)
   }
   cookies.delete(COOKIE_NAME, { path: '/' })

@@ -1,0 +1,110 @@
+---
+import BlogPostContent from '../../components/BlogPostContent.astro'
+import Breadcrumbs from '../../components/Breadcrumbs.astro'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import {
+  getPrevNextPosts,
+  getPublishedPosts,
+  getRelatedPosts,
+  postUrl,
+  setBlogCacheHeaders,
+} from '../../lib/blog'
+import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
+import { absoluteSiteUrl } from '../../lib/urls'
+
+import type { BreadcrumArray } from '../../components/BaseHead.astro'
+import type { BlogPosting, WithContext } from 'schema-dts'
+
+const isAdmin = Astro.locals.user?.admin ?? false
+
+const { slug } = Astro.params
+if (!slug) return Astro.rewrite('/404')
+
+// Single collection read: admins get drafts inline, everyone else only sees
+// published posts so a draft URL naturally 404s without an explicit check.
+const allPosts = await getPublishedPosts({ includeDrafts: isAdmin })
+const post = allPosts.find((p) => p.id === slug)
+if (!post) return Astro.rewrite('/404')
+
+// Cache headers go AFTER the existence check so 404 rewrites don't inherit
+// the public cache and end up cached at the CDN.
+setBlogCacheHeaders(Astro.response.headers, { isAuthenticated: Astro.locals.user !== null })
+
+// Always use published-only for related and prev/next so drafts never appear
+// in the link graph (even in an admin preview of a draft).
+const publishedPosts = isAdmin ? allPosts.filter((p) => !p.data.draft) : allPosts
+const related = getRelatedPosts(post, publishedPosts, 3)
+const { older, newer } = getPrevNextPosts(post, publishedPosts)
+
+const postPath = postUrl(post)
+const canonicalUrl = absoluteSiteUrl(postPath)
+const coverImageUrl = post.data.coverImage ? absoluteSiteUrl(post.data.coverImage.src) : null
+
+const blogPostingSchema: WithContext<BlogPosting> = {
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  mainEntityOfPage: {
+    '@type': 'WebPage',
+    '@id': canonicalUrl,
+  },
+  headline: post.data.title,
+  description: post.data.summary,
+  image: coverImageUrl ? [coverImageUrl] : undefined,
+  datePublished: post.data.publishedAt.toISOString(),
+  dateModified: (post.data.updatedAt ?? post.data.publishedAt).toISOString(),
+  author: {
+    '@type': 'Person',
+    name: post.data.author,
+  },
+  publisher: {
+    ...KYCNOTME_SCHEMA_MINI,
+    logo: {
+      '@type': 'ImageObject',
+      url: absoluteSiteUrl('/favicon.svg'),
+    },
+  },
+  keywords: post.data.tags.length > 0 ? post.data.tags.join(', ') : undefined,
+  inLanguage: 'en',
+  wordCount: (post.body ?? '').trim().split(/\s+/).filter(Boolean).length,
+}
+
+const breadcrumbs: BreadcrumArray = [
+  { name: 'Home', url: '/' },
+  { name: 'Blog', url: '/blog' },
+  { name: post.data.title },
+]
+---
+
+<BaseLayout
+  pageTitle={post.data.title}
+  description={post.data.summary}
+  canonical={postPath}
+  ogImage={{
+    template: 'blog',
+    title: post.data.title,
+    coverImage: post.data.coverImage?.src,
+    author: post.data.author,
+    publishedAt: post.data.publishedAt.toISOString(),
+  }}
+  schemas={[blogPostingSchema]}
+  breadcrumbs={breadcrumbs}
+  articleMeta={{
+    publishedTime: post.data.publishedAt,
+    modifiedTime: post.data.updatedAt,
+    author: post.data.author,
+    tags: post.data.tags,
+    section: 'Blog',
+  }}
+  noindex={post.data.draft}
+  widthClassName="max-w-3xl"
+>
+  <Breadcrumbs items={breadcrumbs} class="mt-6" />
+
+  <BlogPostContent
+    post={post}
+    related={related}
+    older={older}
+    newer={newer}
+    showDraftBanner={post.data.draft}
+  />
+</BaseLayout>

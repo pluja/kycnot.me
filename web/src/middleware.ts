@@ -8,7 +8,7 @@ import { makeUserWithKarmaUnlocks } from './lib/karmaUnlocks'
 import { prisma } from './lib/prisma'
 import { makeLoginUrl, makeSafeRedirectUrl } from './lib/redirectUrls'
 import { siteOrigin } from './lib/urls'
-import { redisActionsSessions } from './lib/redis/redisActionsSessions'
+import { getRedisActionsSessions } from './lib/redis/redisActionsSessions'
 import { getUserFromCookies } from './lib/userCookies'
 
 const ACTION_SESSION_COOKIE = 'action-session-id'
@@ -19,6 +19,9 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
   const { action, setActionResult, serializeActionResult } = getActionContext(context)
 
   const sessionId = context.cookies.get(ACTION_SESSION_COOKIE)?.value
+  if (!sessionId && !action) return next()
+
+  const redisActionsSessions = await getRedisActionsSessions()
   const session = await redisActionsSessions.get(sessionId)
 
   if (session) {

@@ -12,7 +12,7 @@ import { startImpersonating, stopImpersonating } from '../lib/impersonation'
 import { makeKarmaUnlockMessage, makeUserWithKarmaUnlocks } from '../lib/karmaUnlocks'
 import { prisma } from '../lib/prisma'
 import { makeSafeRedirectUrl } from '../lib/redirectUrls'
-import { redisPreGeneratedSecretTokens } from '../lib/redis/redisPreGeneratedSecretTokens'
+import { getRedisPreGeneratedSecretTokens } from '../lib/redis/redisPreGeneratedSecretTokens'
 import { handleHoneypotTrap } from '../lib/spamDetection'
 import { login, logout, setUserSessionIdCookie } from '../lib/userCookies'
 import {
@@ -63,6 +63,7 @@ export const accountActions = {
     permissions: 'guest',
     handler: async () => {
       const token = generateUserSecretToken()
+      const redisPreGeneratedSecretTokens = await getRedisPreGeneratedSecretTokens()
       await redisPreGeneratedSecretTokens.storePreGeneratedToken(token)
       return {
         token,
@@ -89,9 +90,11 @@ export const accountActions = {
         location: 'account.generate',
       })
 
-      const isValidToken = input.token
-        ? await redisPreGeneratedSecretTokens.validateAndConsumePreGeneratedToken(input.token)
-        : true
+      let isValidToken = true
+      if (input.token) {
+        const redisPreGeneratedSecretTokens = await getRedisPreGeneratedSecretTokens()
+        isValidToken = await redisPreGeneratedSecretTokens.validateAndConsumePreGeneratedToken(input.token)
+      }
       if (!isValidToken) {
         throw new ActionError({
           code: 'BAD_REQUEST',

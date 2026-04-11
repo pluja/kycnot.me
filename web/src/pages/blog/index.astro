@@ -1,0 +1,140 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import BlogPostCard from '../../components/BlogPostCard.astro'
+import Breadcrumbs from '../../components/Breadcrumbs.astro'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { getAllTags, getPublishedPosts, postUrl, setBlogCacheHeaders, tagUrl } from '../../lib/blog'
+import { absoluteSiteUrl } from '../../lib/urls'
+
+import type { BreadcrumArray } from '../../components/BaseHead.astro'
+import type { BlogPosting, ItemList, ListItem, WithContext } from 'schema-dts'
+
+const isAdmin = Astro.locals.user?.admin ?? false
+setBlogCacheHeaders(Astro.response.headers, { isAuthenticated: Astro.locals.user !== null })
+
+// `displayPosts` is what the page actually renders: drafts inline for admins,
+// published-only for everyone else. `publishedPosts` is the canonical
+// machine-readable set used for tags, JSON-LD, and other indexable surfaces,
+// so drafts never leak into them even when an admin is browsing.
+const displayPosts = await getPublishedPosts({ includeDrafts: isAdmin })
+const publishedPosts = isAdmin ? displayPosts.filter((post) => !post.data.draft) : displayPosts
+const allTags = getAllTags(publishedPosts)
+
+const itemListSchema: WithContext<ItemList> = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: 'KYCnot.me Blog',
+  description: 'Articles, guides, and updates about no-KYC services and privacy.',
+  itemListElement: publishedPosts.map(
+    (post, index) =>
+      ({
+        '@type': 'ListItem',
+        position: index + 1,
+        url: absoluteSiteUrl(postUrl(post)),
+        name: post.data.title,
+      }) satisfies ListItem
+  ),
+}
+
+const featuredBlogPostingSchemas = publishedPosts.slice(0, 5).map<WithContext<BlogPosting>>((post) => ({
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  mainEntityOfPage: {
+    '@type': 'WebPage',
+    '@id': absoluteSiteUrl(postUrl(post)),
+  },
+  headline: post.data.title,
+  description: post.data.summary,
+  image: post.data.coverImage ? [absoluteSiteUrl(post.data.coverImage.src)] : undefined,
+  datePublished: post.data.publishedAt.toISOString(),
+  dateModified: (post.data.updatedAt ?? post.data.publishedAt).toISOString(),
+  author: { '@type': 'Person', name: post.data.author },
+  keywords: post.data.tags.length > 0 ? post.data.tags.join(', ') : undefined,
+}))
+
+const breadcrumbs: BreadcrumArray = [{ name: 'Home', url: '/' }, { name: 'Blog' }]
+---
+
+<BaseLayout
+  pageTitle="Blog"
+  description="Articles, guides, and updates about no-KYC services, privacy, cryptocurrency safety, and the KYCnot.me project."
+  canonical="/blog"
+  ogImage={{
+    template: 'generic',
+    title: 'KYCnot.me Blog',
+    description: 'Articles, guides, and updates on privacy and no-KYC services.',
+    icon: 'ri:article-line',
+  }}
+  schemas={[itemListSchema, ...featuredBlogPostingSchemas]}
+  breadcrumbs={breadcrumbs}
+  widthClassName="max-w-5xl"
+>
+  <header class="mt-6 mb-8">
+    <Breadcrumbs items={breadcrumbs} class="mb-3" />
+
+    <h1 class="font-title text-3xl font-bold text-balance text-white sm:text-4xl">
+      KYCnot.me Blog
+    </h1>
+    <p class="mt-3 max-w-2xl text-lg text-day-300">
+      Articles, guides, and updates about no-KYC services, privacy, and cryptocurrency safety.
+    </p>
+
+    <div class="mt-4 flex flex-wrap items-center gap-3 text-sm text-day-500">
+      <a
+        href="/blog/rss.xml"
+        class="inline-flex items-center gap-1 rounded-full border border-day-500/20 px-2.5 py-1 transition-colors hover:border-day-500/40 hover:text-day-100"
+      >
+        <Icon name="ri:rss-line" class="size-3.5" />
+        RSS
+      </a>
+      {
+        allTags.length > 0 && (
+          <span class="inline-flex items-center gap-1">
+            <Icon name="ri:price-tag-3-line" class="size-3.5" />
+            <span>
+              {allTags.length} {allTags.length === 1 ? 'tag' : 'tags'}
+            </span>
+          </span>
+        )
+      }
+    </div>
+  </header>
+
+  {
+    displayPosts.length === 0 ? (
+      <div class="rounded-lg border border-day-500/15 bg-night-800 p-8 text-center text-day-400">
+        No published posts yet.
+      </div>
+    ) : (
+      <ul class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {displayPosts.map((post) => (
+          <li>
+            <BlogPostCard post={post} showTags />
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  {
+    allTags.length > 0 && (
+      <section class="mt-12 border-t border-day-500/15 pt-8" aria-label="Browse by tag">
+        <h2 class="font-title text-lg font-semibold text-day-200">Browse by tag</h2>
+        <ul class="mt-3 flex flex-wrap gap-2">
+          {allTags.map((tag) => (
+            <li>
+              <a
+                href={tagUrl(tag)}
+                class="inline-flex items-center gap-1 rounded-full border border-day-500/20 px-3 py-1 text-sm text-day-300 transition-colors hover:border-day-500/40 hover:text-day-100"
+              >
+                <Icon name="ri:price-tag-3-line" class="size-3.5" />
+                {tag}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+</BaseLayout>

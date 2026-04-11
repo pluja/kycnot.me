@@ -1,4 +1,4 @@
-import { redisImpersonationSessions } from './redis/redisImpersonationSessions'
+import { getRedisImpersonationSessions } from './redis/redisImpersonationSessions'
 
 import type { APIContext, AstroCookies } from 'astro'
 
@@ -9,6 +9,7 @@ export async function startImpersonating(
   adminUser: NonNullable<APIContext['locals']['actualUser']>,
   targetUser: NonNullable<APIContext['locals']['user']>
 ) {
+  const redisImpersonationSessions = await getRedisImpersonationSessions()
   const sessionId = await redisImpersonationSessions.store({
     adminId: adminUser.id,
     targetId: targetUser.id,
@@ -27,7 +28,10 @@ export async function startImpersonating(
 
 export async function stopImpersonating(context: Pick<APIContext, 'cookies' | 'locals'>) {
   const sessionId = context.cookies.get(IMPERSONATION_SESSION_COOKIE)?.value
-  await redisImpersonationSessions.delete(sessionId)
+  if (sessionId) {
+    const redisImpersonationSessions = await getRedisImpersonationSessions()
+    await redisImpersonationSessions.delete(sessionId)
+  }
   context.cookies.delete(IMPERSONATION_SESSION_COOKIE)
   context.locals.user = context.locals.actualUser ?? context.locals.user
   context.locals.actualUser = null
@@ -35,5 +39,7 @@ export async function stopImpersonating(context: Pick<APIContext, 'cookies' | 'l
 
 export async function getImpersonationInfo(cookies: AstroCookies) {
   const sessionId = cookies.get(IMPERSONATION_SESSION_COOKIE)?.value
-  return await redisImpersonationSessions.get(sessionId)
+  if (!sessionId) return null
+  const redisImpersonationSessions = await getRedisImpersonationSessions()
+  return redisImpersonationSessions.get(sessionId)
 }

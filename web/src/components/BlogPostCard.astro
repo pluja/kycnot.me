@@ -1,0 +1,72 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { calculateReadingTime, postUrl, type BlogPost } from '../lib/blog'
+import { cn } from '../lib/cn'
+import { formatDateShort } from '../lib/timeAgo'
+
+import MyPicture from './MyPicture.astro'
+
+type Props = {
+  post: BlogPost
+  showTags?: boolean
+}
+
+const { post, showTags = false } = Astro.props
+const readingMinutes = calculateReadingTime(post.body ?? '')
+---
+
+<a
+  href={postUrl(post)}
+  class={cn(
+    'group relative flex h-full flex-col overflow-hidden rounded-lg border bg-night-800 transition-colors',
+    post.data.draft
+      ? 'border-yellow-500/30 hover:border-yellow-500/55'
+      : 'border-day-500/15 hover:border-day-500/35'
+  )}
+>
+  {
+    post.data.draft && (
+      <span class="absolute top-2 right-2 z-10 inline-flex items-center gap-1 rounded-full bg-yellow-500/90 px-2 py-0.5 text-[10px] font-bold text-night-900 uppercase shadow-sm">
+        <Icon name="ri:draft-line" class="size-3" />
+        Draft (admin only)
+      </span>
+    )
+  }
+  {
+    post.data.coverImage && (
+      <MyPicture
+        src={post.data.coverImage}
+        alt={`Cover image for ${post.data.title}`}
+        width={600}
+        height={315}
+        class="aspect-[16/9] w-full object-cover"
+      />
+    )
+  }
+  <div class="flex flex-1 flex-col gap-2 p-4">
+    <h2 class="font-title text-lg font-bold text-day-100 transition-colors group-hover:text-white">
+      {post.data.title}
+    </h2>
+    <p class="line-clamp-3 text-sm text-day-400">{post.data.summary}</p>
+    <div class="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 text-xs text-day-500">
+      <time datetime={post.data.publishedAt.toISOString()}>
+        {formatDateShort(post.data.publishedAt, { prefix: false, hourPrecision: false })}
+      </time>
+      <span aria-hidden="true">·</span>
+      <span>{readingMinutes} min read</span>
+    </div>
+    {
+      showTags && post.data.tags.length > 0 && (
+        <ul class="flex flex-wrap gap-1.5 pt-1">
+          {post.data.tags.slice(0, 3).map((tag) => (
+            <li class="inline-flex items-center gap-0.5 rounded-full border border-day-500/20 px-2 py-0.5 text-xs text-day-400">
+              <Icon name="ri:price-tag-3-line" class="size-2.5" />
+              {tag}
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</a>
