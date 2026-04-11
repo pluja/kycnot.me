@@ -42,7 +42,7 @@ const isSvg =
   !!finalSrc && (
     <Picture
       src={finalSrc}
-      formats={isSvg ? ['svg'] : ['avif', 'webp']}
+      formats={isSvg ? ['svg'] : ['webp']}
       height={height ? Number(height) * 2 : undefined}
       width={width ? Number(width) * 2 : undefined}
       pictureAttributes={{
