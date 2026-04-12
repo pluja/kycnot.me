@@ -300,6 +300,10 @@ export const adminServiceActions = {
           registrationCountryCode: input.registrationCountryCode ?? null,
           registeredCompanyName: input.registeredCompanyName,
         },
+        select: {
+          id: true,
+          slug: true,
+        },
       })
 
       return { service }

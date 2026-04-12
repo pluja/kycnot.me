@@ -4,6 +4,7 @@ import { Icon } from 'astro-icon/components'
 import { getVerificationStatusInfo } from '../constants/verificationStatus'
 import { cn } from '../lib/cn'
 
+import type { getServiceVerificationOverview } from '../lib/serviceVerification'
 import type { Prisma } from '@prisma/client'
 
 type Props = {
@@ -12,11 +13,14 @@ type Props = {
       verificationStatus: true
     }
   }>
+  verificationOverview?: ReturnType<typeof getServiceVerificationOverview>
 }
 
-const { service } = Astro.props
+const { service, verificationOverview } = Astro.props
 
 const statusInfo = getVerificationStatusInfo(service.verificationStatus)
+const counts = verificationOverview?.counts
+const hasCounts = counts && verificationOverview.totalChecks > 0
 ---
 
 <a
@@ -37,6 +41,31 @@ const statusInfo = getVerificationStatusInfo(service.verificationStatus)
   <span class="h-3 w-px shrink-0 bg-day-500/20" aria-hidden="true"></span>
 
   <p class="min-w-0 flex-1 truncate text-xs text-day-400 sm:text-sm">{statusInfo.headline}</p>
+
+  {
+    hasCounts && (
+      <div class="hidden shrink-0 items-center gap-2 text-xs text-day-400 sm:inline-flex">
+        {counts.PASSED > 0 && (
+          <span class="inline-flex items-center gap-0.5">
+            <Icon name="ri:check-double-line" class="size-3.5 text-green-400" />
+            {counts.PASSED}
+          </span>
+        )}
+        {counts.FAILED > 0 && (
+          <span class="inline-flex items-center gap-0.5">
+            <Icon name="ri:close-line" class="size-3.5 text-red-400" />
+            {counts.FAILED}
+          </span>
+        )}
+        {counts.WARNING > 0 && (
+          <span class="inline-flex items-center gap-0.5">
+            <Icon name="ri:alert-line" class="size-3.5 text-yellow-400" />
+            {counts.WARNING}
+          </span>
+        )}
+      </div>
+    )
+  }
 
   <Icon
     name="ri:arrow-down-s-line"

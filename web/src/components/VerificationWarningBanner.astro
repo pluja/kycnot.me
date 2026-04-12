@@ -31,7 +31,7 @@ const { service } = Astro.props
 
 {
   service.isRecentlyApproved ? (
-    <div class="mb-3 rounded-md bg-yellow-900/50 p-2 text-sm text-yellow-400">
+    <div class="mb-3 rounded-lg border border-day-500/10 bg-yellow-900/50 px-3 py-2 text-sm text-yellow-400">
       This service was approved
       {service.approvedAt ? formatDaysAgo(service.approvedAt) : 'less than 15 days ago'}
       {service.verificationStatus !== 'VERIFICATION_SUCCESS' && ' and it is not verified'}. Proceed with
@@ -51,7 +51,7 @@ const { service } = Astro.props
     service.verificationSteps.some((step) => step.status === 'FAILED') && (
       <a
         href="#verification"
-        class="mb-3 flex items-center gap-2 rounded-md bg-red-900/50 p-2 text-sm text-red-400 transition-colors hover:bg-red-900/60"
+        class="mb-3 flex items-center gap-2 rounded-lg border border-day-500/10 bg-red-900/50 px-3 py-2 text-sm text-red-400 transition-colors hover:border-day-500/25"
       >
         <Icon
           name={verificationStatusesByValue.VERIFICATION_FAILED.icon}
@@ -68,7 +68,7 @@ const { service } = Astro.props
     service.verificationSteps.some((step) => step.status === 'WARNING') && (
       <a
         href="#verification"
-        class="mb-3 flex items-center gap-2 rounded-md bg-yellow-600/30 p-2 text-sm text-yellow-200 transition-colors hover:bg-yellow-600/40"
+        class="mb-3 flex items-center gap-2 rounded-lg border border-day-500/10 bg-yellow-600/30 px-3 py-2 text-sm text-yellow-200 transition-colors hover:border-day-500/25"
       >
         <Icon
           name={verificationStepStatusesByValue.WARNING.icon}

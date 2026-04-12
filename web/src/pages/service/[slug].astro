@@ -460,6 +460,35 @@ const sortedVerificationSteps = orderBy(
 )
 
 const verificationOverview = getServiceVerificationOverview(service)
+
+const checkSegments = [
+  verificationOverview.counts.PASSED > 0 && {
+    text: `${verificationOverview.counts.PASSED} passed`,
+    icon: 'ri:check-double-line' as const,
+    iconClass: 'text-green-400',
+  },
+  verificationOverview.counts.WARNING > 0 && {
+    text: `${verificationOverview.counts.WARNING} warning${verificationOverview.counts.WARNING === 1 ? '' : 's'}`,
+    icon: 'ri:alert-line' as const,
+    iconClass: 'text-yellow-400',
+  },
+  verificationOverview.counts.FAILED > 0 && {
+    text: `${verificationOverview.counts.FAILED} failed`,
+    icon: 'ri:close-line' as const,
+    iconClass: 'text-red-400',
+    textClass: 'text-red-400',
+  },
+  verificationOverview.counts.IN_PROGRESS > 0 && {
+    text: `${verificationOverview.counts.IN_PROGRESS} in progress`,
+    icon: 'ri:hourglass-line' as const,
+    iconClass: 'text-day-500',
+  },
+  verificationOverview.counts.PENDING > 0 && {
+    text: `${verificationOverview.counts.PENDING} pending`,
+    icon: 'ri:hourglass-line' as const,
+    iconClass: 'text-day-500',
+  },
+].filter((s): s is { text: string; icon: string; iconClass: string; textClass?: string } => !!s)
 const verificationStatusDateLabel =
   service.verificationStatus === 'VERIFICATION_SUCCESS'
     ? 'Verified'
@@ -582,7 +611,7 @@ const verificationStatusDate =
       <a
         href="#events"
         class={cn(
-          'group mb-4 block rounded-md px-3 py-2 text-sm transition-colors duration-200',
+          'group mb-3 block rounded-lg border border-day-500/10 px-3 py-2 text-sm transition-colors duration-200 hover:border-day-500/25',
           activeEventToShow.typeInfo.classNames.banner
         )}
       >
@@ -596,7 +625,7 @@ const verificationStatusDate =
 
   {
     (serviceVisibilityInfo.value === 'UNLISTED' || serviceVisibilityInfo.value === 'ARCHIVED') && (
-      <div class={cn('mb-4 rounded-md bg-yellow-900/50 px-3 py-2 text-sm text-yellow-400')}>
+      <div class={cn('mb-3 rounded-lg border border-day-500/10 bg-yellow-900/50 px-3 py-2 text-sm text-yellow-400')}>
         <Icon
           name={serviceVisibilityInfo.icon}
           class="me-1.5 inline-block size-4 align-[-0.15em] text-yellow-500"
@@ -608,7 +637,7 @@ const verificationStatusDate =
 
   <VerificationWarningBanner service={service} />
 
-  <VerificationSnapshot service={service} />
+  <VerificationSnapshot service={service} verificationOverview={verificationOverview} />
 
   <div class="flex items-center gap-4">
     {
@@ -1485,8 +1514,20 @@ const verificationStatusDate =
 
       <ul class="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-day-300">
         <li class="inline-flex items-center gap-1.5">
-          <Icon name="ri:check-double-line" class="size-3.5 text-day-500" />
-          <span>{verificationOverview.checksSummary}</span>
+          {
+            checkSegments.length > 0
+              ? checkSegments.map((seg, i) => (
+                  <>
+                    {i > 0 && <span class="text-day-500">·</span>}
+                    <Icon name={seg.icon} class={cn('size-3.5', seg.iconClass)} />
+                    <span class={seg.textClass ?? ''}>{seg.text}</span>
+                  </>
+                ))
+              : <>
+                  <Icon name="ri:check-double-line" class="size-3.5 text-day-500" />
+                  <span>{verificationOverview.checksSummary}</span>
+                </>
+          }
         </li>
         <li class="inline-flex items-center gap-1.5">
           <Icon name="ri:history-line" class="size-3.5 text-day-500" />

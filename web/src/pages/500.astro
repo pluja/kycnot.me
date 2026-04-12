@@ -1,11 +1,9 @@
 ---
-import { z } from 'astro/zod'
 import { Icon } from 'astro-icon/components'
 import { LOGS_UI_URL } from 'astro:env/server'
 
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { DEPLOYMENT_MODE } from '../lib/client/envVariables'
-import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 
 type Props = {
   error: unknown
@@ -13,9 +11,7 @@ type Props = {
 
 const { error } = Astro.props
 
-const {
-  data: { message },
-} = zodParseQueryParamsStoringErrors({ message: z.string().optional() }, Astro)
+const message = Astro.url.searchParams.get('message') ?? undefined
 ---
 
 <BaseLayout
