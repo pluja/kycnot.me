@@ -26,6 +26,8 @@ The logic behind KYC is: "If we mandate every financial service provider to iden
 
 However, terrorists and criminals are not precisely lining up to be identified. They're crafty. They may adopt false identities or find alternative strategies to continue their operations. Far from being outwitted, many times they're several steps ahead of regulations. Realistically, KYC might deter a small fraction, perhaps 1% of these malefactors. Yet, the cost? All of us are saddled with the inconvenient process of identification just to use a service.
 
+The numbers back this up year after year. Chainalysis found that illicit activity accounted for just 0.34% of crypto transaction volume in 2023[^1]. In 2024, even as illicit volumes grew in absolute terms, they still represented a small fraction of overall activity[^4]. And 2025, which Chainalysis called a record year for illicit flows with increasingly professionalized on-chain crime, *still* saw crypto crime account for less than 1% of all transaction volume[^5]. KYC punishes everyone to maybe inconvenience a few.
+
 Under the rhetoric of "ensuring our safety", governments and institutions enact regulations that seem more out of a dystopian novel, gradually taking away our right to privacy.
 
 To illustrate, consider a city where the mayor has rolled out facial recognition cameras in every nook and cranny. A band of criminals, intent on robbing a local store, rolls in with a stolen car, their faces obscured by masks and their bodies cloaked in all-black clothes. Once they've committed the crime and exited the city's boundaries, they switch vehicles and clothes out of the cameras' watchful eyes. The high-tech surveillance? It didn’t manage to identify or trace them. Yet, for every law-abiding citizen who merely wants to drive through the city or do some shopping, their movements and identities are constantly logged. The irony? This invasive tracking impacts all of us, just to catch the 1% of less-than-careful criminals.
@@ -75,9 +77,14 @@ The threat that KYC poses to individuals in terms of privacy, security and freed
 > KYCnot.me is the practical answer to this critique. See [why this site exists](/blog/four-years), and if you choose to use crypto services, follow the [5 rules to avoid scams and frozen funds](/blog/stay-safe-using-services).
 
 > Edited 20/03/2024
-> * Add reference to the 1% statement on [Rights for Illusions](#rights-for-illusions) section to an article where Chainalysis found that only 0.34%!o(MISSING)f the transaction volume with cryptocurrencies in 2023 was attributable to criminal activity [^1]
+> * Add reference to the 1% statement on [Rights for Illusions](#rights-for-illusions) section to an article where Chainalysis found that only 0.34% of the transaction volume with cryptocurrencies in 2023 was attributable to criminal activity [^1]
+
+> Edited 12/04/2026
+> * Updated [Rights for Illusions](#rights-for-illusions) with 2024 and 2025 Chainalysis data confirming illicit crypto activity remains below 1% of total volume, even as absolute illicit flows hit record highs [^4][^5]
 
 
 [^1]: https://www.chainalysis.com/blog/2024-crypto-crime-report-introduction/
 [^2]: https://old.reddit.com/r/BitcoinBeginners/comments/k2bve1/is_kyc_bad_if_so_why/gdtc8kz
 [^3]: https://www.ccn.com/hacked-customer-data-from-world-leading-cryptocurrency-exchanges-for-sale-on-the-dark-web/
+[^4]: https://www.chainalysis.com/blog/2025-crypto-crime-report-introduction/
+[^5]: https://www.chainalysis.com/blog/2026-crypto-crime-report-introduction/
