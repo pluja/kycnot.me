@@ -1,9 +1,9 @@
-import fs from 'node:fs'
-import path from 'node:path'
-
 import { ImageResponse } from '@vercel/og'
 import sharp from 'sharp'
 
+import faviconSvg from '../../public/favicon.svg?raw'
+import logoNormalSvg from '../assets/logo/logo-normal.svg?raw'
+import logoSmallSvg from '../assets/logo/logo-small.svg?raw'
 import { makeOverallScoreInfo } from '../lib/overallScore'
 import { getBadgeSize, type BadgeTheme } from '../lib/serviceBadges'
 
@@ -131,9 +131,7 @@ async function getLogoPng(size = 24): Promise<string> {
   const cached = logoPngCache.get(key)
   if (cached) return cached
 
-  const svgPath = path.resolve(process.cwd(), 'public', 'favicon.svg')
-  const svgBuffer = fs.readFileSync(svgPath)
-  const pngBuffer = await sharp(svgBuffer).resize(size, size).png().toBuffer()
+  const pngBuffer = await sharp(Buffer.from(faviconSvg)).resize(size, size).png().toBuffer()
   const result = `data:image/png;base64,${pngBuffer.toString('base64')}`
   logoPngCache.set(key, result)
   return result
@@ -144,9 +142,7 @@ async function getLogoTextPng(height = 24): Promise<string> {
   const cached = logoPngCache.get(key)
   if (cached) return cached
 
-  const svgPath = path.resolve(process.cwd(), 'src', 'assets', 'logo', 'logo-normal.svg')
-  const svgBuffer = fs.readFileSync(svgPath)
-  const pngBuffer = await sharp(svgBuffer).resize({ height }).png().toBuffer()
+  const pngBuffer = await sharp(Buffer.from(logoNormalSvg)).resize({ height }).png().toBuffer()
   const result = `data:image/png;base64,${pngBuffer.toString('base64')}`
   logoPngCache.set(key, result)
   return result
@@ -157,9 +153,7 @@ async function getLogoSmallPng(height = 60): Promise<string> {
   const cached = logoPngCache.get(key)
   if (cached) return cached
 
-  const svgPath = path.resolve(process.cwd(), 'src', 'assets', 'logo', 'logo-small.svg')
-  const svgBuffer = fs.readFileSync(svgPath)
-  const pngBuffer = await sharp(svgBuffer).resize({ height }).png().toBuffer()
+  const pngBuffer = await sharp(Buffer.from(logoSmallSvg)).resize({ height }).png().toBuffer()
   const result = `data:image/png;base64,${pngBuffer.toString('base64')}`
   logoPngCache.set(key, result)
   return result
