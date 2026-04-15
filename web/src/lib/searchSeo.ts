@@ -49,9 +49,14 @@ export function makeSearchTitle({
   categories,
   attributes,
   attributeOptions,
-}: SearchSeoInput) {
+  forPageTitle = false,
+}: SearchSeoInput & { forPageTitle?: boolean }) {
   if (filters.q) {
     return `Search results for “${filters.q}”`
+  }
+
+  if (hasDefaultFilters && forPageTitle) {
+    return 'No-KYC crypto services directory'
   }
 
   const listOrformatter = new Intl.ListFormat('en', { style: 'long', type: 'disjunction' })
@@ -166,7 +171,7 @@ export function makeSearchMetaDescription({
   }
 
   if (hasDefaultFilters) {
-    return "Find services that don't require KYC (Know Your Customer) verification for better privacy and control over your data."
+    return "Find crypto exchanges, wallets, and services that don't require KYC verification. Browse privacy-focused alternatives with trust scores and detailed reviews."
   }
 
   const titleText = title.charAt(0).toLowerCase() + title.slice(1)

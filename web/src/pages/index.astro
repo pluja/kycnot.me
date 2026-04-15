@@ -448,6 +448,7 @@ const searchPageTitle = makeSearchTitle({
   categories,
   attributes,
   attributeOptions,
+  forPageTitle: true,
 })
 const searchPageDescription = makeSearchMetaDescription({
   title: searchPageTitle,
@@ -569,22 +570,27 @@ const showFiltersId = 'show-filters'
       />
     </div>
 
-    <ServicesSearchResults
-      services={services}
-      id="search-results"
-      currentPage={filters.page}
-      total={totalServices}
-      pageSize={PAGE_SIZE}
-      sortSeed={filters['sort-seed']}
-      filters={filters}
-      countCommunityOnly={countCommunityOnly}
-      inlineIcons
-      categories={categories}
-      filtersOptions={filtersOptions}
-      attributes={attributes}
-      attributeOptions={attributeOptions}
-      aria-label="Search results"
-    />
+    <div class="min-w-0 flex-1">
+      <h1 class="mb-2 text-[11px] font-medium tracking-widest text-day-500 uppercase">
+        No-KYC crypto services directory
+      </h1>
+      <ServicesSearchResults
+        services={services}
+        id="search-results"
+        currentPage={filters.page}
+        total={totalServices}
+        pageSize={PAGE_SIZE}
+        sortSeed={filters['sort-seed']}
+        filters={filters}
+        countCommunityOnly={countCommunityOnly}
+        inlineIcons
+        categories={categories}
+        filtersOptions={filtersOptions}
+        attributes={attributes}
+        attributeOptions={attributeOptions}
+        aria-label="Search results"
+      />
+    </div>
   </div>
   {
     totalServices > PAGE_SIZE && (

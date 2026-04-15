@@ -405,6 +405,14 @@ const VerificationRequestElement = user ? 'button' : 'a'
 
 const itemReviewedId = absoluteSiteUrl(`/service/${service.slug}`)
 
+const primaryCategoryName = service.categories[0]?.name
+const seoPageTitle = `${service.name}: review, KYC level & privacy score`
+const seoDescription =
+  service.description ||
+  (primaryCategoryName
+    ? `${service.name} review on KYCnot.me. Privacy score, KYC level, supported currencies, and user feedback for this ${primaryCategoryName.toLowerCase()} service.`
+    : `${service.name} review on KYCnot.me. Privacy score, KYC level, supported currencies, and user feedback.`)
+
 const ogImageTemplateData = {
   template: 'service',
   title: service.name,
@@ -506,9 +514,8 @@ const verificationStatusDate =
 ---
 
 <BaseLayout
-  pageTitle={service.name}
-  description={service.description ||
-    'View details about this service including privacy score, features, currencies accepted, and user reviews.'}
+  pageTitle={seoPageTitle}
+  description={seoDescription}
   ogImage={ogImageTemplateData}
   widthClassName="max-w-5xl"
   htmx
