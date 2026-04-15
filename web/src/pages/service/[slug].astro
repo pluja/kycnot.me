@@ -49,6 +49,7 @@ import { pluralize } from '../../lib/pluralize'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
 import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
+import { isEmbeddableBadgeStatus } from '../../lib/serviceBadges'
 import { getServiceVerificationOverview } from '../../lib/serviceVerification'
 import { transformCase } from '../../lib/strings'
 import { formatDateShort } from '../../lib/timeAgo'
@@ -1429,7 +1430,9 @@ const verificationStatusDate =
                   {event.title}
                 </h3>
 
-                <p class="text-base font-normal text-pretty text-day-400">{event.content}</p>
+                <div class="text-base font-normal text-pretty text-day-400 [&_a]:underline">
+                  <Markdown content={event.content} linkRel={['nofollow', 'noopener']} />
+                </div>
                 {event.source && (
                   <a
                     href={event.source}
@@ -1823,6 +1826,18 @@ const verificationStatusDate =
       }
     </div>
   </div>
+  {
+    isEmbeddableBadgeStatus(service.verificationStatus) && (
+      <a
+        href={`/service/${service.slug}/badge`}
+        class="mb-12 flex items-center gap-3 rounded-lg border border-day-500/10 bg-night-800/50 px-4 py-3 text-sm font-medium text-day-300 transition-colors hover:border-day-500/25 hover:text-day-100"
+      >
+        <Icon name="ri:code-s-slash-line" class="size-4 shrink-0" />
+        <span>Embed badge on your site</span>
+        <Icon name="ri:arrow-right-s-line" class="ml-auto size-4 shrink-0 text-day-500" />
+      </a>
+    )
+  }
   <CommentSection itemReviewedId={itemReviewedId} service={service} />
 </BaseLayout>
 

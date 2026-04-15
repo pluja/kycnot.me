@@ -1,0 +1,329 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import Button from '../../../components/Button.astro'
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { cn } from '../../../lib/cn'
+import { prisma } from '../../../lib/prisma'
+import {
+  badgeSizes,
+  defaultBadgeOptions,
+  escapeHtmlAttribute,
+  getBadgeDimensionsLabel,
+  getServiceBadgeEmbedCode,
+  getServiceBadgeImageUrl,
+  isEmbeddableBadgeStatus,
+  type BadgeOptions,
+} from '../../../lib/serviceBadges'
+import { siteOrigin } from '../../../lib/urls'
+
+const { slug } = Astro.params
+if (!slug) return Astro.rewrite('/404')
+
+const service = await Astro.locals.banners.try(
+  'Error fetching service',
+  () =>
+    prisma.service.findUnique({
+      where: { slug, serviceVisibility: 'PUBLIC' },
+      select: {
+        name: true,
+        slug: true,
+        verificationStatus: true,
+      },
+    }),
+  null
+)
+
+if (!service) return Astro.rewrite('/404')
+
+if (!isEmbeddableBadgeStatus(service.verificationStatus)) {
+  return Astro.redirect('/assets')
+}
+
+const serviceUrl = `${siteOrigin}/service/${service.slug}`
+
+function getBadgeImageUrl(sizeId: (typeof badgeSizes)[number]['id'], options: BadgeOptions = defaultBadgeOptions) {
+  return getServiceBadgeImageUrl(service.slug, siteOrigin, sizeId, options)
+}
+
+function getBadgeEmbedCode(sizeId: (typeof badgeSizes)[number]['id'], options: BadgeOptions = defaultBadgeOptions) {
+  return getServiceBadgeEmbedCode(service.name, serviceUrl, getBadgeImageUrl(sizeId, options))
+}
+---
+
+<BaseLayout pageTitle={`Badge for ${service.name}`} widthClassName="max-w-6xl">
+  <section class="mt-2">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-day-500/10 pb-3">
+      <div>
+        <h1 class="font-title text-xl font-bold text-white">Badge</h1>
+        <p class="mt-0.5 text-sm text-day-400">
+          <a
+            href={`/service/${service.slug}`}
+            class="text-day-200 underline decoration-day-500/40 underline-offset-4"
+          >
+            {service.name}
+          </a>
+        </p>
+      </div>
+
+      <Button
+        as="a"
+        href={`/service/${service.slug}`}
+        label="View Service"
+        icon="ri:external-link-line"
+        color="black"
+        size="sm"
+      />
+    </div>
+  </section>
+
+  <div class="mt-4 grid gap-4 xl:grid-cols-[16rem_minmax(0,1fr)]">
+    <aside class="xl:sticky xl:top-4 xl:self-start">
+      <div
+        class="space-y-4 rounded-2xl border border-day-500/10 bg-night-800/60 p-4 no-js:hidden"
+        data-badge-controls
+        data-service-name={service.name}
+        data-service-name-escaped={escapeHtmlAttribute(service.name)}
+        data-service-slug={service.slug}
+        data-service-url={serviceUrl}
+        data-service-url-escaped={escapeHtmlAttribute(serviceUrl)}
+        data-site-origin={siteOrigin}
+      >
+        <div>
+          <h2 class="font-title text-base font-bold text-white">Options</h2>
+        </div>
+
+        <div>
+          <p class="text-2xs font-semibold tracking-[0.16em] text-day-500 uppercase">Large and medium</p>
+          <div class="mt-2.5 space-y-1.5">
+            <label
+              class="flex items-center gap-2.5 rounded-xl border border-day-500/10 bg-night-900/70 px-3 py-2 transition-colors hover:border-day-500/25"
+            >
+              <input
+                type="checkbox"
+                checked
+                data-badge-toggle="score"
+                aria-label="Show trust score"
+                class="mt-0.5 shrink-0"
+              />
+              <span class="flex min-w-0 items-center gap-2 text-sm text-day-100">
+                <Icon name="ri:medal-line" class="size-3.5 text-green-400" />
+                <span>Score</span>
+              </span>
+            </label>
+
+            <label
+              class="flex items-center gap-2.5 rounded-xl border border-day-500/10 bg-night-900/70 px-3 py-2 transition-colors hover:border-day-500/25"
+            >
+              <input
+                type="checkbox"
+                checked
+                data-badge-toggle="rating"
+                aria-label="Show user rating"
+                class="mt-0.5 shrink-0"
+              />
+              <span class="flex min-w-0 items-center gap-2 text-sm text-day-100">
+                <Icon name="ri:star-line" class="size-3.5 text-yellow-300" />
+                <span>User rating</span>
+              </span>
+            </label>
+
+            <label
+              class="flex items-center gap-2.5 rounded-xl border border-day-500/10 bg-night-900/70 px-3 py-2 transition-colors hover:border-day-500/25"
+            >
+              <input
+                type="checkbox"
+                checked
+                data-badge-toggle="kyc"
+                aria-label="Show KYC level"
+                class="mt-0.5 shrink-0"
+              />
+              <span class="flex min-w-0 items-center gap-2 text-sm text-day-100">
+                <Icon name="ri:shield-check-line" class="size-3.5 text-blue-300" />
+                <span>KYC level</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <p class="text-2xs font-semibold tracking-[0.16em] text-day-500 uppercase">Theme</p>
+          <div class="mt-2.5 space-y-1.5">
+            <label
+              class="flex items-center gap-2.5 rounded-xl border border-day-500/10 bg-night-900/70 px-3 py-2 transition-colors hover:border-day-500/25"
+            >
+              <input
+                type="checkbox"
+                data-badge-toggle="light"
+                aria-label="Use light theme"
+                class="mt-0.5 shrink-0"
+              />
+              <span class="flex min-w-0 items-center gap-2 text-sm text-day-100">
+                <Icon name="ri:sun-line" class="size-3.5 text-day-200" />
+                <span>Light theme</span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3 hidden rounded-2xl border border-day-500/10 bg-night-800/60 p-4 no-js:block">
+        <h2 class="mb-2 text-sm font-bold text-day-200">URL Parameters</h2>
+        <ul class="space-y-1 text-2xs text-day-400">
+          <li><code class="text-day-200">score=1</code> Show trust score</li>
+          <li><code class="text-day-200">rating=1</code> Show user rating</li>
+          <li><code class="text-day-200">kyc=1</code> Show KYC level</li>
+          <li><code class="text-day-200">theme=light</code> Light theme</li>
+          <li><code class="text-day-200">size=lg|sm|xs</code> Badge size</li>
+        </ul>
+      </div>
+    </aside>
+
+    <section class="space-y-3">
+      {
+        badgeSizes.map((size) => (
+          <details class="group" data-badge-preview={size.id}>
+            <summary class="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 select-none hover:bg-night-800/50">
+              <div class={cn('shrink-0 rounded-lg p-2')} data-badge-bg={size.id}>
+                <img
+                  src={getBadgeImageUrl(size.id)}
+                  alt={`${size.label} badge preview`}
+                  loading="lazy"
+                  class={cn(
+                    'rounded-sm',
+                    size.id === 'lg' ? 'max-w-72' : size.id === 'sm' ? 'max-w-52' : 'max-w-40'
+                  )}
+                  data-badge-img={size.id}
+                />
+              </div>
+              <div class="flex-1">
+                <span class="text-sm font-bold text-day-200">{size.label}</span>
+                <span class="ml-1.5 text-xs text-day-500">{getBadgeDimensionsLabel(size.id)}</span>
+                <p class="text-2xs text-day-500 group-open:hidden">Click to show embed codes</p>
+              </div>
+              <Icon
+                name="ri:arrow-down-s-line"
+                class="size-4 text-day-500 transition-transform group-open:rotate-180"
+              />
+            </summary>
+            <div class="mt-1 space-y-1 pl-3">
+              <div>
+                <span class="text-2xs text-day-500">Embed:</span>
+                <pre
+                  class="mt-0.5 no-scrollbar cursor-text overflow-x-auto rounded-lg bg-night-950 px-2.5 py-1 text-2xs text-day-400 select-all"
+                  data-badge-code={size.id}
+                >
+                  {getBadgeEmbedCode(size.id)}
+                </pre>
+              </div>
+              <div>
+                <span class="text-2xs text-day-500">Image:</span>
+                <pre
+                  class="mt-0.5 no-scrollbar cursor-text overflow-x-auto rounded-lg bg-night-950 px-2.5 py-1 text-2xs text-day-400 select-all"
+                  data-badge-image-url={size.id}
+                >
+                  {getBadgeImageUrl(size.id)}
+                </pre>
+              </div>
+            </div>
+          </details>
+        ))
+      }
+    </section>
+  </div>
+</BaseLayout>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Optional script for the badge configurator page.       //
+  // Keeps previews, copy buttons, and embed code in sync   //
+  // with the current toggle state.                         //
+  ////////////////////////////////////////////////////////////
+  document.addEventListener('astro:page-load', () => {
+    const controls = document.querySelector<HTMLDivElement>('[data-badge-controls]')
+    if (!controls || controls.dataset.badgeInitialized === 'true') return
+
+    controls.dataset.badgeInitialized = 'true'
+
+    const serviceName = controls.dataset.serviceName
+    const serviceNameEscaped = controls.dataset.serviceNameEscaped
+    const serviceSlug = controls.dataset.serviceSlug
+    const serviceUrl = controls.dataset.serviceUrl
+    const serviceUrlEscaped = controls.dataset.serviceUrlEscaped
+    const currentSiteOrigin = controls.dataset.siteOrigin
+
+    if (
+      !serviceName ||
+      !serviceNameEscaped ||
+      !serviceSlug ||
+      !serviceUrl ||
+      !serviceUrlEscaped ||
+      !currentSiteOrigin
+    ) {
+      return
+    }
+
+    const sizeIds = ['lg', 'sm', 'xs'] as const
+    const toggles = controls.querySelectorAll<HTMLInputElement>('[data-badge-toggle]')
+
+    function getState() {
+      return {
+        score: controls.querySelector<HTMLInputElement>('[data-badge-toggle="score"]')?.checked ?? true,
+        rating: controls.querySelector<HTMLInputElement>('[data-badge-toggle="rating"]')?.checked ?? true,
+        kyc: controls.querySelector<HTMLInputElement>('[data-badge-toggle="kyc"]')?.checked ?? true,
+        light: controls.querySelector<HTMLInputElement>('[data-badge-toggle="light"]')?.checked ?? false,
+      }
+    }
+
+    function buildBadgeImageUrl(size: (typeof sizeIds)[number]) {
+      const state = getState()
+      const params = new URLSearchParams({
+        size,
+        theme: state.light ? 'light' : 'dark',
+      })
+
+      if (size !== 'xs') {
+        if (state.score) params.set('score', '1')
+        if (state.rating) params.set('rating', '1')
+        if (state.kyc) params.set('kyc', '1')
+      }
+
+      return `${currentSiteOrigin}/badge/${serviceSlug}.png?${params.toString()}`
+    }
+
+    function buildBadgeEmbedCode(size: (typeof sizeIds)[number]) {
+      const imageUrl = buildBadgeImageUrl(size)
+      const escapedImageUrl = imageUrl
+        .replaceAll('&', '&amp;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+
+      return `<a href="${serviceUrlEscaped}"><img src="${escapedImageUrl}" alt="${serviceNameEscaped} verification badge from KYCnot.me" /></a>`
+    }
+
+    function updateBadges() {
+      const state = getState()
+
+      for (const size of sizeIds) {
+        const imageUrl = buildBadgeImageUrl(size)
+        const img = document.querySelector<HTMLImageElement>(`[data-badge-img="${size}"]`)
+        const code = document.querySelector<HTMLPreElement>(`[data-badge-code="${size}"]`)
+        const imageUrlCode = document.querySelector<HTMLPreElement>(`[data-badge-image-url="${size}"]`)
+        const bg = document.querySelector<HTMLDivElement>(`[data-badge-bg="${size}"]`)
+
+        if (img) img.src = imageUrl
+        if (code) code.textContent = buildBadgeEmbedCode(size)
+        if (imageUrlCode) imageUrlCode.textContent = imageUrl
+
+        if (bg) {
+          bg.classList.toggle('bg-day-100', state.light)
+        }
+      }
+    }
+
+    updateBadges()
+    toggles.forEach((toggle) => toggle.addEventListener('change', updateBadges))
+  })
+</script>

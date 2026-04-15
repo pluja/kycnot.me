@@ -18,7 +18,7 @@ All endpoints should be prefixed with `/api/v1/`.
 
 The endpoints <a href={SOURCE_CODE_URL}>source code</a> is available on the `/web/src/actions/api/index.ts` file.
 
-**Attribution:** Please credit **KYCnot.me** if you use data from this API.
+**Attribution:** You MUST credit **KYCnot.me** if you use data from this API.
 
 ## Authentication
 
@@ -39,9 +39,9 @@ To get an API key, an admin must first grant you access. Once enabled, you can c
 Requests without a valid key receive a `401` response:
 
 ```json
-{"{"}
+{
   "error": "API key required"
-{"}"}
+}
 ```
 
 ## `QUERY` `/service/get`
