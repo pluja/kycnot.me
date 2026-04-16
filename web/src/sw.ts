@@ -4,7 +4,7 @@
 
 import { clientsClaim } from 'workbox-core'
 import { cleanupOutdatedCaches } from 'workbox-precaching'
-import { registerRoute, setDefaultHandler } from 'workbox-routing'
+import { registerRoute } from 'workbox-routing'
 import { NetworkFirst } from 'workbox-strategies'
 
 import {
@@ -28,7 +28,6 @@ cleanupOutdatedCaches()
 const doNothing = (..._ignore: unknown[]) => undefined
 doNothing(self.__WB_MANIFEST)
 
-setDefaultHandler(new NetworkFirst())
 registerRoute(({ request }) => request.destination === 'document', new NetworkFirst())
 
 self.addEventListener('message', (event) => {
