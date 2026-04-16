@@ -24,7 +24,6 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@astrojs/db": "0.20.1",
     "@astrojs/mdx": "4.3.14",
     "@astrojs/node": "9.5.5",
     "@astrojs/rss": "4.0.18",

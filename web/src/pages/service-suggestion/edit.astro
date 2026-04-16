@@ -2,6 +2,10 @@
 import { actions, isInputError } from 'astro:actions'
 import { z } from 'astro:content'
 
+import {
+  SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH,
+  SUGGESTION_NOTES_MAX_LENGTH,
+} from '../../actions/serviceSuggestion'
 import Captcha from '../../components/Captcha.astro'
 import InputHoneypotTrap from '../../components/InputHoneypotTrap.astro'
 import InputSubmitButton from '../../components/InputSubmitButton.astro'
@@ -95,8 +99,12 @@ if (!service) return Astro.rewrite('/404')
       label="Note for Moderators"
       name="notes"
       value={params.notes}
+      description={`Required. Explain the requested changes with enough detail for moderators to act on them. Minimum ${SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH.toLocaleString()} characters.`}
       inputProps={{
         rows: 10,
+        required: true,
+        minlength: SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH,
+        maxlength: SUGGESTION_NOTES_MAX_LENGTH,
         placeholder:
           'List the changes you want us to make to the service. Example: "Add X, Y and Z attributes" "Monero is accepted". Provide supporting evidence.',
       }}

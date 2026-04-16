@@ -112,43 +112,62 @@ When you submit a new service, it gets the `COMMUNITY_CONTRIBUTED` status and th
 
 ##### Second Review (Community Contributed -> Approved)
 
-`APPROVED` means the service passed a **limited, recent review**. It does **not** mean the service is trusted or future-proof.
+`APPROVED` means we did a **limited, recent review** and found enough **public history** to treat the service as more than just an unknown listing. It does **not** mean the service is fully trusted, future-proof, or safe from later exit scams.
+
+We are intentionally strict here. `APPROVED` services are shown more prominently, and many users naturally trust them more. Because of that, a clean-looking website is **not enough**, and a few recent successful tests are **not enough** either. If a service has **little or no public history**, it will usually stay `COMMUNITY_CONTRIBUTED` until more evidence exists.
+
+In simple terms: `APPROVED` is for services that look real **both on their own site and outside of it**.
 
 To be upgraded to `APPROVED`, the service should generally meet these conditions:
 
-- The service is eligible for listing and publicly understandable.
+- The service is eligible for listing and clear enough for users to understand.
 - It has been operating for at least **6 months**.
+- It has **working public contact methods** when contact is claimed or expected.
+- Its public information and ToS are clear enough to review and do not seriously contradict each other.
+- It has some **real public track record** over time, such as user feedback, public discussion, community mentions, or other independent signs that it is a real and active service.
 - We completed at least **3 successful core-service tests** on **3 non-consecutive dates**.
 - Those successful tests span at least **14 days**.
 - Support replied satisfactorily at least **once**, when support exists.
+- There are **no serious contradictions** between our review results and the service's public reputation or user feedback.
+- There are **no credible unresolved links** to scams, stolen funds, abuse, or other serious public red flags.
 - There are **no unresolved high-severity reports** at review time.
 - Evidence for the checks is logged publicly in the service verification section.
+
+What we require is enough credible, organic evidence that the service is real, active, and not just a fresh listing with no public history. This does not need to come from one specific website or platform.
+
+If a service works in a few tests but has almost no public history, no real user feedback, or unresolved serious red flags, it will usually stay `COMMUNITY_CONTRIBUTED` until more evidence exists.
 
 For swap or exchange services, these tests will often be swaps. For VPNs, VPS providers, AI providers, and other categories, the tests should match the core user workflow of that service.
 
 Public wording for `APPROVED`:
 
-> Passed limited checks on specific dates. This does not guarantee future safety.
+> Passed limited checks on specific dates and showed enough public history for approval. This does not guarantee future safety.
 
 ##### Final Review (Approved -> Verified)
 
-`VERIFIED` means the service showed **consistent behavior over time**. It does **not** mean the service cannot exit scam in the future.
+`VERIFIED` means the service showed **consistent behavior over time** and kept passing repeated checks. It does **not** mean the service is fully trusted, future-proof, or incapable of exit scamming later.
+
+This status is stricter than `APPROVED`. `APPROVED` means we saw enough evidence to move the service out of the "unknown" category. `VERIFIED` means the service kept behaving consistently over a longer period of time, both in our own checks and in what we can observe publicly.
 
 To be upgraded from `APPROVED` to `VERIFIED`, the service should generally meet these conditions:
 
 - It is already `APPROVED`.
 - At least **90 days** passed since the initial approval.
 - We completed at least **6 successful core-service tests** across at least **4 distinct dates**.
-- We had at least **2 successful support interactions** on separated dates, when support exists.
-- There is **no unresolved scam or blocked-funds pattern**.
-- There are **no serious contradictions** in public reports.
+- Those checks show **consistent behavior over time**, not just one good period.
+- We had at least **2 successful support interactions** on separate dates, when support is offered or expected.
+- The service still shows **ongoing public history**, user feedback, or other independent signs of active operation.
+- There are **no credible unresolved links** to scams, stolen funds, abuse, blocked-funds patterns, or other serious public red flags.
+- There are **no serious contradictions** between our review results and public user feedback.
 - Review evidence was refreshed recently and is logged publicly.
 
 For swap or exchange services, these tests will often be swaps. For VPNs, VPS providers, AI providers, and other categories, the tests should match the core user workflow of that service.
 
+`VERIFIED` is not permanent. If serious new evidence appears later, the status can be removed or downgraded.
+
 Public wording for `VERIFIED`:
 
-> Showed consistent behavior over time and passed repeated checks. This is still not a guarantee.
+> Passed repeated checks over time and kept showing consistent behavior. This is still not a guarantee.
 
 ##### Failed Verifications (Scams)
 

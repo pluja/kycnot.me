@@ -1,13 +1,70 @@
-import { createHash } from 'crypto'
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto'
 
 import { createCanvas } from '@napi-rs/canvas'
+import { VAPID_PRIVATE_KEY } from 'astro:env/server'
 
 export const CAPTCHA_LENGTH = 6
 const CAPTCHA_CHARS = 'ABCDEFGHIJKMNOPRSTUVWXYZ123456789' // Notice that ambiguous characters are removed
+const CAPTCHA_TOKEN_MAX_AGE_MS = 10 * 60 * 1000
+const CAPTCHA_TOKEN_ALGORITHM = 'aes-256-gcm'
+const CAPTCHA_TOKEN_KEY = createHash('sha256').update(VAPID_PRIVATE_KEY).digest()
 
-/** Hash a captcha value */
-function hashCaptchaValue(value: string): string {
-  return createHash('sha256').update(value).digest('hex')
+type CaptchaTokenPayload = {
+  expiresAt: number
+  solution: string
+}
+
+function normalizeCaptchaValue(value: string): string {
+  return value
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .replace(/0/g, 'O')
+    .replace(/Q/g, 'O')
+    .replace(/L/g, 'I')
+}
+
+function createCaptchaToken(payload: CaptchaTokenPayload): string {
+  const iv = randomBytes(12)
+  const cipher = createCipheriv(CAPTCHA_TOKEN_ALGORITHM, CAPTCHA_TOKEN_KEY, iv)
+
+  const encrypted = Buffer.concat([
+    cipher.update(JSON.stringify(payload), 'utf8'),
+    cipher.final(),
+  ])
+  const authTag = cipher.getAuthTag()
+
+  return `${iv.toString('base64url')}.${authTag.toString('base64url')}.${encrypted.toString('base64url')}`
+}
+
+function parseCaptchaToken(token: string): CaptchaTokenPayload | null {
+  const [ivBase64Url, authTagBase64Url, encryptedBase64Url] = token.split('.')
+  if (!ivBase64Url || !authTagBase64Url || !encryptedBase64Url) return null
+
+  try {
+    const decipher = createDecipheriv(
+      CAPTCHA_TOKEN_ALGORITHM,
+      CAPTCHA_TOKEN_KEY,
+      Buffer.from(ivBase64Url, 'base64url')
+    )
+    decipher.setAuthTag(Buffer.from(authTagBase64Url, 'base64url'))
+
+    const decrypted = Buffer.concat([
+      decipher.update(Buffer.from(encryptedBase64Url, 'base64url')),
+      decipher.final(),
+    ]).toString('utf8')
+
+    const parsedPayload = JSON.parse(decrypted) as Partial<CaptchaTokenPayload>
+    if (typeof parsedPayload.solution !== 'string' || typeof parsedPayload.expiresAt !== 'number') {
+      return null
+    }
+
+    return {
+      solution: normalizeCaptchaValue(parsedPayload.solution),
+      expiresAt: parsedPayload.expiresAt,
+    }
+  } catch {
+    return null
+  }
 }
 
 /** Generate a captcha image as a data URI */
@@ -143,27 +200,27 @@ export function generateCaptchaImage(text: string) {
   } as const satisfies ImageMetadata
 }
 
-/** Generate a new captcha with solution, its hash, and image data URI */
+/** Generate a new captcha with an encrypted verification token and image data URI */
 export function generateCaptcha() {
   const solution = Array.from({ length: CAPTCHA_LENGTH }, () =>
     CAPTCHA_CHARS.charAt(Math.floor(Math.random() * CAPTCHA_CHARS.length))
   ).join('')
 
   return {
-    solution,
-    solutionHash: hashCaptchaValue(solution),
+    token: createCaptchaToken({
+      solution,
+      expiresAt: Date.now() + CAPTCHA_TOKEN_MAX_AGE_MS,
+    }),
     image: generateCaptchaImage(solution),
   }
 }
 
-/** Verify a captcha input against the expected hash */
-export function verifyCaptcha(value: string, solutionHash: string): boolean {
-  const correctedValue = value
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, '')
-    .replace(/0/g, 'O')
-    .replace(/Q/g, 'O')
-    .replace(/L/g, 'I')
-  const valueHash = hashCaptchaValue(correctedValue)
-  return valueHash === solutionHash
+/** Verify a captcha input against the expected encrypted token */
+export function verifyCaptcha(value: string, token: string): boolean {
+  const parsedToken = parseCaptchaToken(token)
+  if (!parsedToken) return false
+
+  if (parsedToken.expiresAt < Date.now()) return false
+
+  return normalizeCaptchaValue(value) === parsedToken.solution
 }

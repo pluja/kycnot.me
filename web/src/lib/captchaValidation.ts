@@ -7,14 +7,14 @@ export const captchaFormSchemaProperties = {
     .string()
     .length(CAPTCHA_LENGTH, `Captcha must be ${CAPTCHA_LENGTH.toLocaleString()} characters long`)
     .regex(/^[A-Za-z0-9]+$/, 'Captcha must contain only uppercase letters and numbers'),
-  'captcha-solution-hash': z.string().min(1, 'Missing internal captcha data'),
+  'captcha-token': z.string().min(1, 'Missing internal captcha data'),
 } as const
 
 export const captchaFormSchemaSuperRefine = (
   value: z.infer<z.ZodObject<typeof captchaFormSchemaProperties>>,
   ctx: RefinementCtx
 ) => {
-  const isValidCaptcha = verifyCaptcha(value['captcha-value'], value['captcha-solution-hash'])
+  const isValidCaptcha = verifyCaptcha(value['captcha-value'], value['captcha-token'])
   if (!isValidCaptcha) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,

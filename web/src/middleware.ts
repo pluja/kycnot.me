@@ -1,4 +1,4 @@
-import { getActionContext } from 'astro:actions'
+import { getActionContext, isInputError } from 'astro:actions'
 import { defineMiddleware, sequence } from 'astro:middleware'
 
 import { hashApiKey } from './lib/apiKey'
@@ -13,6 +13,20 @@ import { getUserFromCookies } from './lib/userCookies'
 
 const ACTION_SESSION_COOKIE = 'action-session-id'
 
+function addActionBannerIfNeeded(
+  context: Parameters<Parameters<typeof defineMiddleware>[0]>[0],
+  error: Parameters<NonNullable<ReturnType<typeof getActionContext>['serializeActionResult']>>[0]['error']
+) {
+  if (!error || isInputError(error)) return
+
+  context.locals.banners.add({
+    uiMessage: error.message,
+    type: 'error',
+    origin: 'action',
+    error,
+  })
+}
+
 const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context, next) => {
   if (context.isPrerendered) return next()
 
@@ -26,15 +40,7 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
 
   if (session) {
     setActionResult(session.actionName, session.actionResult)
-
-    if (session.deserializedActionResult.error) {
-      context.locals.banners.add({
-        uiMessage: session.deserializedActionResult.error.message,
-        type: 'error',
-        origin: 'action',
-        error: session.deserializedActionResult.error,
-      })
-    }
+    addActionBannerIfNeeded(context, session.deserializedActionResult.error)
 
     await redisActionsSessions.delete(sessionId)
     context.cookies.delete(ACTION_SESSION_COOKIE)
@@ -43,15 +49,7 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
 
   if (action) {
     const actionResult = await action.handler()
-
-    if (actionResult.error) {
-      context.locals.banners.add({
-        uiMessage: actionResult.error.message,
-        type: 'error',
-        origin: 'action',
-        error: actionResult.error,
-      })
-    }
+    addActionBannerIfNeeded(context, actionResult.error)
 
     if (action.calledFrom === 'form') {
       const sessionId = await redisActionsSessions.store({
@@ -69,10 +67,9 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
 
       if (actionResult.error) {
         const referer = context.request.headers.get('Referer')
-        if (!referer) {
-          throw new Error('Internal: Referer unexpectedly missing from Action POST request.')
-        }
-        return context.redirect(makeSafeRedirectUrl(referer, siteOrigin))
+        return context.redirect(
+          referer ? makeSafeRedirectUrl(referer, siteOrigin) : context.originPathname
+        )
       }
       return context.redirect(context.originPathname)
     }

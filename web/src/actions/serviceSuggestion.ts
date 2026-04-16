@@ -25,6 +25,7 @@ const SUGGESTION_MESSAGE_RATE_LIMIT_WINDOW_MINUTES = 1
 const MAX_SUGGESTION_MESSAGES_PER_WINDOW = 5
 
 export const SUGGESTION_NOTES_MAX_LENGTH = 1000
+export const SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH = 50
 export const SUGGESTION_NAME_MAX_LENGTH = 20
 export const SUGGESTION_SLUG_MAX_LENGTH = 20
 export const SUGGESTION_DESCRIPTION_MAX_LENGTH = 100
@@ -104,7 +105,14 @@ export const serviceSuggestionActions = {
     permissions: 'not-spammer',
     input: z
       .object({
-        notes: z.string().max(SUGGESTION_NOTES_MAX_LENGTH).optional(),
+        notes: z
+          .string()
+          .trim()
+          .min(
+            SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH,
+            `Notes must be at least ${SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH.toLocaleString()} characters long`
+          )
+          .max(SUGGESTION_NOTES_MAX_LENGTH),
         serviceId: z.coerce.number().int().positive(),
         extraNotes: z.string().optional(),
         /** @deprecated Honey pot field, do not use */
@@ -137,7 +145,7 @@ export const serviceSuggestionActions = {
 
       // Combine notes and extraNotes if available
       const combinedNotes = input.extraNotes
-        ? `${input.notes ?? ''}\n\nSuggested changes:\n${input.extraNotes}`
+        ? `${input.notes}\n\nSuggested changes:\n${input.extraNotes}`
         : input.notes
 
       const serviceSuggestion = await prisma.serviceSuggestion.create({
@@ -235,7 +243,7 @@ export const serviceSuggestionActions = {
                 'message',
                 'imageFile',
                 'captcha-value',
-                'captcha-solution-hash',
+                'captcha-token',
                 'rulesConfirm',
               ],
               {

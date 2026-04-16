@@ -48,7 +48,12 @@ export const GET: APIRoute = async ({ site }) => {
   ${entries.join('\n  ')}
 </urlset>`
 
-    return new Response(xml, { headers: { 'Content-Type': 'application/xml' } })
+    return new Response(xml, {
+      headers: {
+        'Content-Type': 'application/xml',
+        'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    })
   } catch (error) {
     console.error('Failed to generate blog sitemap:', error)
     return new Response('Failed to generate blog sitemap', { status: 500 })
