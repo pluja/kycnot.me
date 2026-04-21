@@ -1,0 +1,152 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../lib/cn'
+import { formatNumber, type FormatNumberOptions } from '../lib/numbers'
+
+import Markdown from './Markdown.astro'
+
+import type { getAttributeTypeInfo } from '../constants/attributeTypes'
+
+type Props = {
+  attribute: {
+    title: string
+    description: string
+    privacyPoints: number
+    trustPoints: number
+    typeInfo: ReturnType<typeof getAttributeTypeInfo>
+    links: {
+      url: string
+      label: string
+      icon: string
+    }[]
+  }
+}
+
+const { attribute } = Astro.props
+
+const excerpt = attribute.description
+  .split('\n')[0]
+  .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+  .replace(/[*_`]/g, '')
+  .trim()
+
+const baseFormatOptions = {
+  roundDigits: 2,
+  showSign: true,
+  removeTrailingZeros: true,
+} as const satisfies FormatNumberOptions
+
+const weights = [
+  {
+    type: 'privacy',
+    label: 'Privacy',
+    value: attribute.privacyPoints,
+    formatOptions: baseFormatOptions,
+  },
+  {
+    type: 'trust',
+    label: 'Trust',
+    value: attribute.trustPoints,
+    formatOptions: baseFormatOptions,
+  },
+] as const satisfies {
+  type: string
+  label: string
+  value: number
+  formatOptions: FormatNumberOptions
+}[]
+---
+
+<li>
+  <details class="group/attribute">
+    <summary
+      class={cn(
+        'block cursor-pointer rounded-md bg-night-400 p-2 font-title text-sm text-pretty select-none',
+        attribute.typeInfo.classNames.container,
+        attribute.typeInfo.classNames.text
+      )}
+    >
+      <div class="flex items-center">
+        <span class="mr-auto ml-1">{attribute.title}</span>
+        {
+          weights.map((w) => (
+            <span class={cn('ml-2 text-center text-sm', w.value === 0 ? 'text-current/30' : 'text-current/60')}>
+              {formatNumber(w.value, w.formatOptions)}
+            </span>
+          ))
+        }
+        {
+          !excerpt && (
+            <Icon
+              name="ri:arrow-down-s-line"
+              class={cn('ml-1 size-5 group-open/attribute:rotate-180', attribute.typeInfo.classNames.icon)}
+            />
+          )
+        }
+      </div>
+      {
+        excerpt && (
+          <div class="mt-0.5 flex items-center gap-1 group-open/attribute:hidden">
+            <p class="ml-1 line-clamp-1 flex-1 text-xs font-normal text-current/60">{excerpt}</p>
+            <Icon name="ri:arrow-down-s-line" class={cn('size-5 shrink-0', attribute.typeInfo.classNames.icon)} />
+          </div>
+        )
+      }
+    </summary>
+
+    <div
+      class={cn(
+        'mx-2 rounded-b-lg border-2 border-t-0 border-night-400 bg-night-400/20 p-3 pt-2 text-xs text-day-300',
+        attribute.typeInfo.classNames.subcontainer,
+        attribute.typeInfo.classNames.text
+      )}
+    >
+      <div
+        class="prose prose-sm text-xs/normal text-pretty text-current prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0"
+      >
+        <Markdown content={attribute.description} />
+      </div>
+
+      <div class="mt-1 flex justify-evenly gap-4">
+        {
+          weights.map((w) => (
+            <div class="inline-flex basis-12 flex-col items-center text-day-200">
+              <span
+                class={cn('text-base', attribute.typeInfo.classNames.textLight, {
+                  'text-red-400': w.value < 0,
+                  'text-green-400': w.value > 0,
+                  'opacity-50': w.value === 0,
+                })}
+              >
+                {formatNumber(w.value, w.formatOptions)}
+              </span>
+              <span class={cn('text-2xs font-bold text-white uppercase', attribute.typeInfo.classNames.textLight)}>
+                {w.label}
+              </span>
+            </div>
+          ))
+        }
+      </div>
+
+      {
+        attribute.links.length > 0 && (
+          <div class="mt-2 flex flex-row gap-2">
+            {attribute.links.map((link) => (
+              <a
+                href={link.url}
+                class={cn(
+                  'flex flex-1 items-center justify-center gap-1 rounded-sm px-2 py-1 font-semibold whitespace-nowrap transition-colors',
+                  attribute.typeInfo.classNames.button
+                )}
+              >
+                <Icon name={link.icon} class="size-4" />
+                {link.label}
+              </a>
+            ))}
+          </div>
+        )
+      }
+    </div>
+  </details>
+</li>

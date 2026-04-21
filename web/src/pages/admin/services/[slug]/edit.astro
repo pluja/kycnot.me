@@ -28,7 +28,6 @@ import { contactMethodUrlTypes, formatContactMethod } from '../../../../constant
 import { countries } from '../../../../constants/countries'
 import { currencies } from '../../../../constants/currencies'
 import { eventTypes, getEventTypeInfo } from '../../../../constants/eventTypes'
-import { kycLevelClarifications } from '../../../../constants/kycLevelClarifications'
 import { kycLevels } from '../../../../constants/kycLevels'
 import { serviceVisibilities } from '../../../../constants/serviceVisibility'
 import { verificationStatuses } from '../../../../constants/verificationStatus'
@@ -492,19 +491,13 @@ const apiCalls = await Astro.locals.banners.try(
           class="[&>div]:grid-cols-2 [&>div]:[--card-min-size:16rem]"
         />
 
-        <InputCardGroup
-          name="kycLevelClarification"
-          label="KYC Level Clarification"
-          options={kycLevelClarifications.map((clarification) => ({
-            label: clarification.label,
-            value: clarification.value,
-            icon: clarification.icon,
-            description: clarification.description,
-          }))}
-          selectedValue={service.kycLevelClarification}
-          iconSize="sm"
-          cardSize="sm"
-          error={serviceInputErrors.kycLevelClarification}
+        <InputTextArea
+          label="KYC Policy Notes"
+          name="kycPolicyMd"
+          description="Markdown. Per-service narrative on nuances of KYC/AML/refund policy not captured by the level or attributes."
+          value={service.kycPolicyMd ?? ''}
+          inputProps={{ rows: 4 }}
+          error={serviceInputErrors.kycPolicyMd}
         />
 
         <InputCardGroup

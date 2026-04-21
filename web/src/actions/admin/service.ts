@@ -1,4 +1,4 @@
-import { Currency, ServiceVisibility, VerificationStatus, KycLevelClarification } from '@prisma/client'
+import { Currency, ServiceVisibility, VerificationStatus } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 import { uniq } from 'lodash-es'
@@ -47,7 +47,7 @@ const serviceSchemaBase = z.object({
   tosUrls: stringListOfUrlsSchemaRequired,
   contactMethods: stringListOfContactMethodsSchema,
   kycLevel: z.coerce.number().int().min(0).max(4),
-  kycLevelClarification: z.nativeEnum(KycLevelClarification).optional().nullable().default(null),
+  kycPolicyMd: z.string().trim().max(4000).optional().nullable().default(null),
   attributes: z.array(z.coerce.number().int().positive()),
   categories: z.array(z.coerce.number().int().positive()).min(1),
   verificationStatus: z.nativeEnum(VerificationStatus),
@@ -133,7 +133,8 @@ export const adminServiceActions = {
           onionUrls,
           i2pUrls,
           kycLevel: input.kycLevel,
-          kycLevelClarification: input.kycLevelClarification ?? undefined,
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+          kycPolicyMd: input.kycPolicyMd || null,
           verificationStatus: input.verificationStatus,
           verificationSummary: input.verificationSummary,
           verificationProofMd: input.verificationProofMd,
@@ -261,7 +262,8 @@ export const adminServiceActions = {
           onionUrls,
           i2pUrls,
           kycLevel: input.kycLevel,
-          kycLevelClarification: input.kycLevelClarification ?? undefined,
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+          kycPolicyMd: input.kycPolicyMd || null,
           verificationStatus: input.verificationStatus,
           verificationSummary: input.verificationSummary,
           verificationProofMd: input.verificationProofMd,

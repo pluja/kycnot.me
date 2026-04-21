@@ -309,11 +309,6 @@ enum ServiceSuggestionType {
   EDIT_SERVICE
 }
 
-enum KycLevelClarification {
-  NONE
-  DEPENDS_ON_PARTNERS
-}
-
 model ServiceSuggestion {
   id               Int                        @id @default(autoincrement())
   type             ServiceSuggestionType
@@ -357,7 +352,8 @@ model Service {
   description             String
   categories              Category[]                   @relation("ServiceToCategory")
   kycLevel                Int                          @default(4)
-  kycLevelClarification   KycLevelClarification        @default(NONE)
+  /// Markdown. Per-service narrative on nuances of KYC/AML/refund policy that a taxonomy of attributes alone can't capture.
+  kycPolicyMd             String?
   /// Date only, no time.
   operatingSince          DateTime?                    @db.Date
   overallScore            Int                          @default(0)
@@ -453,6 +449,7 @@ model ServiceContactMethod {
 enum AttributeCategory {
   PRIVACY
   TRUST
+  KYC
 }
 
 enum AttributeType {

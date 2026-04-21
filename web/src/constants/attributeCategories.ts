@@ -58,6 +58,16 @@ export const {
       },
       order: 2,
     },
+    {
+      value: 'KYC',
+      slug: 'kyc',
+      label: 'KYC',
+      icon: 'ri:fingerprint-line',
+      classNames: {
+        icon: 'text-blue-500',
+      },
+      order: 3,
+    },
   ] as const satisfies AttributeCategoryInfo<AttributeCategory>[]
 )
 

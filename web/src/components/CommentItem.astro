@@ -274,10 +274,15 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
           text="Not counting for the total"
           position="right"
           enabled={!isRatingActive}
-          class={cn('flex items-center gap-1', isRatingActive ? 'text-yellow-400' : 'text-yellow-400/60')}
+          class={cn(
+            'flex items-center gap-1',
+            isRatingActive ? 'text-yellow-400' : 'text-day-500'
+          )}
         >
           <Icon name={isRatingActive ? 'ri:star-fill' : 'ri:star-line'} class="size-3" />
-          {comment.rating.toLocaleString()}/5
+          <span class={cn(!isRatingActive && 'line-through decoration-day-500/70')}>
+            {comment.rating.toLocaleString()}/5
+          </span>
         </Tooltip>
       )
     }

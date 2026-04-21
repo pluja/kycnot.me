@@ -48,29 +48,35 @@ const {
 } = Astro.props
 
 const currentDate = new Date()
-const announcement = await Astro.locals.banners.try(
-  'Unable to load announcements.',
-  () =>
-    prisma.announcement.findFirst({
-      where: {
-        isActive: true,
-        startDate: { lte: currentDate },
-        OR: [{ endDate: null }, { endDate: { gt: currentDate } }],
-      },
-      select: {
-        id: true,
-        content: true,
-        type: true,
-        link: true,
-        linkText: true,
-        startDate: true,
-        endDate: true,
-        isActive: true,
-      },
-      orderBy: [{ type: 'desc' }, { createdAt: 'desc' }],
-    }),
-  null
-)
+// When Astro renders the 500/404 fallback, the `errors` middleware does not
+// run and `Astro.locals.banners` is undefined. Skip announcement fetching in
+// that case so BaseLayout never masks the real upstream error.
+const announcement =
+  isErrorPage || !Astro.locals.banners
+    ? null
+    : await Astro.locals.banners.try(
+        'Unable to load announcements.',
+        () =>
+          prisma.announcement.findFirst({
+            where: {
+              isActive: true,
+              startDate: { lte: currentDate },
+              OR: [{ endDate: null }, { endDate: { gt: currentDate } }],
+            },
+            select: {
+              id: true,
+              content: true,
+              type: true,
+              link: true,
+              linkText: true,
+              startDate: true,
+              endDate: true,
+              isActive: true,
+            },
+            orderBy: [{ type: 'desc' }, { createdAt: 'desc' }],
+          }),
+        null
+      )
 
 function getDeletionAnnouncement(
   user: Prisma.UserGetPayload<{ select: { scheduledDeletionAt: true } }> | null,
@@ -92,8 +98,8 @@ function getDeletionAnnouncement(
 }
 const deletionAnnouncement = getDeletionAnnouncement(Astro.locals.user, currentDate)
 
-const actualErrors = [...errors, ...Astro.locals.banners.errors]
-const actualSuccess = [...success, ...Astro.locals.banners.successes]
+const actualErrors = [...errors, ...(Astro.locals.banners?.errors ?? [])]
+const actualSuccess = [...success, ...(Astro.locals.banners?.successes ?? [])]
 ---
 
 <html lang="en" transition:name="root" transition:animate="none">

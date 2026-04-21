@@ -10,7 +10,6 @@ import { SOURCE_CODE_URL } from 'astro:env/client'
 import { kycLevels } from '../../constants/kycLevels'
 import { verificationStatuses } from '../../constants/verificationStatus'
 import { serviceVisibilities } from '../../constants/serviceVisibility'
-import { kycLevelClarifications } from '../../constants/kycLevelClarifications'
 
 Access service data via our API.
 
@@ -54,7 +53,7 @@ Fetches details for a single service by various lookup criteria.
 | ------------ | ------ | -------- | --------------------------------------------------------------------------- |
 | `id`         | number | No\*     | Service ID                                                                  |
 | `slug`       | string | No\*     | Service URL slug (lowercase letters, numbers, and hyphens only)             |
-| `serviceUrl` | string | No\*     | Service URL. May be web, onion, or i2p. May just be a domain or a full URL. |
+| `url`        | string | No\*     | Service URL. May be web, onion, or i2p. May just be a domain or a full URL. |
 
 \* At least one of the marked parameters is required.
 
@@ -83,12 +82,16 @@ type ServiceResponse = {
     name: string
     description: string
   }
-  kycLevelClarification: 'NONE' | 'DEPENDS_ON_PARTNERS' | ...
-  kycLevelClarificationInfo: {
-    value: 'NONE' | 'DEPENDS_ON_PARTNERS' | ...
-    label: string
+  /** Markdown. Per-service narrative on nuances of KYC/AML/refund policy. */
+  kycPolicyMd: string | null
+  /** KYC-category attributes attached to the service (e.g. "depends-on-partners", "own-liquidity"). */
+  kycAttributes: {
+    slug: string
+    title: string
     description: string
-  }
+    type: 'GOOD' | 'BAD' | 'WARNING' | 'INFO'
+    privacyPoints: number
+  }[]
   categories: {
     name: string
     slug: string
@@ -135,16 +138,6 @@ type ServiceResponse = {
     ))}
 </ul>
 
-#### KYC Level Clarifications
-
-<ul>
-  {kycLevelClarifications.map((clarification) => (
-    <li key={clarification.value}>
-      <strong>{clarification.value}</strong>: {clarification.description}
-    </li>
-  ))}
-</ul>
-
 ### Examples
 
 #### Request
@@ -181,12 +174,16 @@ curl -X QUERY https://kycnot.me/api/v1/service/get \
     "name": "Guaranteed no KYC",
     "description": "Terms explicitly state KYC will never be requested."
   },
-  "kycLevelClarification": "NONE",
-  "kycLevelClarificationInfo": {
-    "value": "NONE",
-    "label": "None",
-    "description": "No clarification needed."
-  },
+  "kycPolicyMd": null,
+  "kycAttributes": [
+    {
+      "slug": "own-liquidity",
+      "title": "Uses own liquidity",
+      "description": "The service runs its own liquidity, so there is no third-party LP that could independently demand KYC or block funds.",
+      "type": "GOOD",
+      "privacyPoints": 5
+    }
+  ],
   "categories": [
     {
       "name": "Exchange",

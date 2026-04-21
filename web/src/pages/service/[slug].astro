@@ -6,6 +6,7 @@ import { actions } from 'astro:actions'
 import { head, orderBy, pick, shuffle, sortBy, tail } from 'lodash-es'
 
 import AdminOnly from '../../components/AdminOnly.astro'
+import AttributeCard from '../../components/AttributeCard.astro'
 import BadgeSmall from '../../components/BadgeSmall.astro'
 import BadgeStandard from '../../components/BadgeStandard.astro'
 import CommentSection from '../../components/CommentSection.astro'
@@ -32,7 +33,6 @@ import { baseScoreType, getAttributeTypeInfo } from '../../constants/attributeTy
 import { formatContactMethod } from '../../constants/contactMethods'
 import { currencies, getCurrencyInfo } from '../../constants/currencies'
 import { getEventTypeInfo } from '../../constants/eventTypes'
-import { getKycLevelClarificationInfo } from '../../constants/kycLevelClarifications'
 import { getKycLevelInfo, kycLevels } from '../../constants/kycLevels'
 import { getServiceVisibilityInfo } from '../../constants/serviceVisibility'
 import { getTosHighlightRatingInfo } from '../../constants/tosHighlightRating'
@@ -44,7 +44,6 @@ import { someButNotAll, undefinedIfEmpty } from '../../lib/arrays'
 import { makeNonDbAttributes, sortAttributes } from '../../lib/attributes'
 import { cn } from '../../lib/cn'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
-import { formatNumber, type FormatNumberOptions } from '../../lib/numbers'
 import { pluralize } from '../../lib/pluralize'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
@@ -87,7 +86,7 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
           name: true,
           description: true,
           kycLevel: true,
-          kycLevelClarification: true,
+          kycPolicyMd: true,
           overallScore: true,
           privacyScore: true,
           trustScore: true,
@@ -325,12 +324,6 @@ if (typeof `${service.kycLevel}` !== 'string') {
 }
 const kycLevelInfo = getKycLevelInfo(`${service.kycLevel}`)
 
-if (typeof service.kycLevelClarification !== 'string') {
-  // TODO: Remove this once we figure out where this is coming from
-  console.error(`[transformCase] Error is here: getKycLevelClarificationInfo ${JSON.stringify(service)}`)
-}
-const kycLevelClarificationInfo = getKycLevelClarificationInfo(service.kycLevelClarification)
-
 const userSentiment = service.userSentiment
   ? (() => {
       if (typeof service.userSentiment.sentiment !== 'string') {
@@ -391,6 +384,9 @@ const attributes = sortAttributes([
     typeInfo: getAttributeTypeInfo(attribute.type),
   }
 })
+
+const kycAttributes = attributes.filter((a) => a.category === 'KYC')
+const nonKycAttributes = attributes.filter((a) => a.category !== 'KYC')
 
 if (typeof service.verificationStatus !== 'string') {
   // TODO: Remove this once we figure out where this is coming from
@@ -1038,12 +1034,8 @@ const verificationStatusDate =
           '@type': 'Review',
           itemReviewed: { '@id': itemReviewedId },
           reviewAspect: 'KYC Level',
-          name:
-            kycLevelInfo.name +
-            (kycLevelClarificationInfo.value !== 'NONE' ? ` (${kycLevelClarificationInfo.label})` : ''),
-          reviewBody:
-            kycLevelInfo.description +
-            (kycLevelClarificationInfo.value !== 'NONE' ? ` ${kycLevelClarificationInfo.description}` : ''),
+          name: kycLevelInfo.name,
+          reviewBody: kycLevelInfo.description,
           reviewRating: {
             '@type': 'Rating',
             ratingValue: kycLevelInfo.value,
@@ -1066,140 +1058,45 @@ const verificationStatusDate =
       <dl class="grow-5 basis-0">
         <dt class="text-base font-bold text-pretty">
           {kycLevelInfo.name}
-          {
-            kycLevelClarificationInfo.value !== 'NONE' && (
-              <>
-                <span class="mx-1 text-day-400">•</span>
-                <span class="text-blue-500">{kycLevelClarificationInfo.label}</span>
-              </>
-            )
-          }
         </dt>
         <dd class="mt-1 font-sans text-sm text-pretty text-day-700">
           {kycLevelInfo.description}
-          <span class="font-medium text-blue-600">
-            {kycLevelClarificationInfo.value !== 'NONE' && ` ${kycLevelClarificationInfo.description}`}
-          </span>
         </dd>
       </dl>
     </div>
   </div>
 
   {
-    attributes.length > 0 && (
+    (kycAttributes.length > 0 || service.kycPolicyMd) && (
+      <section class="mt-4 rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
+        <header class="mb-2 flex items-center gap-2 text-xs font-bold tracking-wider text-blue-300 uppercase">
+          <Icon name="ri:fingerprint-line" class="size-4" />
+          KYC Policy
+        </header>
+
+        {service.kycPolicyMd && (
+          <div class="prose prose-sm mb-3 max-w-none text-sm text-pretty text-day-200 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
+            <Markdown content={service.kycPolicyMd} />
+          </div>
+        )}
+
+        {kycAttributes.length > 0 && (
+          <ul class="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-2 md:gap-3">
+            {kycAttributes.map((attribute) => (
+              <AttributeCard attribute={attribute} />
+            ))}
+          </ul>
+        )}
+      </section>
+    )
+  }
+
+  {
+    nonKycAttributes.length > 0 && (
       <ul class="mt-4 grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-2 md:gap-3">
-        {attributes.map((attribute) => {
-          const baseFormatOptions = {
-            roundDigits: 2,
-            showSign: true,
-            removeTrailingZeros: true,
-          } as const satisfies FormatNumberOptions
-          const weights = [
-            {
-              type: 'privacy',
-              label: 'Privacy',
-              value: attribute.privacyPoints,
-              formatOptions: baseFormatOptions,
-            },
-            {
-              type: 'trust',
-              label: 'Trust',
-              value: attribute.trustPoints,
-              formatOptions: baseFormatOptions,
-            },
-          ] as const satisfies {
-            type: string
-            label: string
-            value: number
-            formatOptions: FormatNumberOptions
-          }[]
-
-          return (
-            <li>
-              <details class="group/attribute">
-                <summary
-                  class={cn(
-                    'flex cursor-pointer items-center rounded-md bg-night-400 p-2 font-title text-sm text-pretty select-none',
-                    attribute.typeInfo.classNames.container,
-                    attribute.typeInfo.classNames.text
-                  )}
-                >
-                  <span class="mr-auto ml-1">{attribute.title}</span>
-                  <>
-                    {weights.map((w) => (
-                      <span
-                        class={cn(
-                          'ml-2 text-center text-sm',
-                          w.value === 0 ? 'text-current/30' : 'text-current/60'
-                        )}
-                      >
-                        {formatNumber(w.value, w.formatOptions)}
-                      </span>
-                    ))}
-                  </>
-                  <Icon
-                    name="ri:arrow-down-s-line"
-                    class={cn(
-                      'ml-1 size-5 group-open/attribute:rotate-180',
-                      attribute.typeInfo.classNames.icon
-                    )}
-                  />
-                </summary>
-
-                <div
-                  class={cn(
-                    'mx-2 rounded-b-lg border-2 border-t-0 border-night-400 bg-night-400/20 p-3 pt-2 text-xs text-day-300',
-                    attribute.typeInfo.classNames.subcontainer,
-                    attribute.typeInfo.classNames.text
-                  )}
-                >
-                  <div class="prose prose-sm text-xs/normal text-pretty text-current prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
-                    <Markdown content={attribute.description} />
-                  </div>
-
-                  <div class="mt-1 flex justify-evenly gap-4">
-                    {weights.map((w) => (
-                      <div class="inline-flex basis-12 flex-col items-center text-day-200">
-                        <span
-                          class={cn('text-base', attribute.typeInfo.classNames.textLight, {
-                            'text-red-400': w.value < 0,
-                            'text-green-400': w.value > 0,
-                            'opacity-50': w.value === 0,
-                          })}
-                        >
-                          {formatNumber(w.value, w.formatOptions)}
-                        </span>
-                        <span
-                          class={cn(
-                            'text-2xs font-bold text-white uppercase',
-                            attribute.typeInfo.classNames.textLight
-                          )}
-                        >
-                          {w.label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div class="mt-2 flex flex-row gap-2">
-                    {attribute.links.map((link) => (
-                      <a
-                        href={link.url}
-                        class={cn(
-                          'flex flex-1 items-center justify-center gap-1 rounded-sm px-2 py-1 font-semibold whitespace-nowrap transition-colors',
-                          attribute.typeInfo.classNames.button
-                        )}
-                      >
-                        <Icon name={link.icon} class="size-4" />
-                        {link.label}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              </details>
-            </li>
-          )
-        })}
+        {nonKycAttributes.map((attribute) => (
+          <AttributeCard attribute={attribute} />
+        ))}
         <li
           class={cn(
             'flex items-center self-start rounded-md bg-night-400 p-2 text-sm text-pretty select-none',

@@ -1,4 +1,4 @@
-import { Currency, KycLevelClarification } from '@prisma/client'
+import { Currency } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 import { formatDistanceStrict } from 'date-fns'
@@ -183,7 +183,6 @@ export const serviceSuggestionActions = {
         tosUrls: stringListOfUrlsSchemaRequired,
         contactMethods: stringListOfContactMethodsSchema,
         kycLevel: zodCohercedNumber(z.coerce.number().int().min(0).max(4)),
-        kycLevelClarification: z.nativeEnum(KycLevelClarification),
         attributes: z.array(z.coerce.number().int().positive()),
         categories: z.array(z.coerce.number().int().positive()).min(1),
         acceptedCurrencies: z.array(z.nativeEnum(Currency)).min(1),
@@ -307,7 +306,6 @@ export const serviceSuggestionActions = {
             onionUrls,
             i2pUrls,
             kycLevel: input.kycLevel,
-            kycLevelClarification: input.kycLevelClarification,
             acceptedCurrencies: input.acceptedCurrencies,
             imageUrl,
             verificationStatus: 'COMMUNITY_CONTRIBUTED',

@@ -17,12 +17,11 @@ import {
   type User,
   type ServiceVisibility,
   ServiceSuggestionType,
-  KycLevelClarification,
   VerificationStepStatus,
   type VerificationStatus,
 } from '@prisma/client'
 import { differenceInDays, isPast } from 'date-fns'
-import { omit, uniqBy } from 'lodash-es'
+import { uniqBy } from 'lodash-es'
 import { generateUsername } from 'unique-username-generator'
 
 import { countries } from '../src/constants/countries'
@@ -108,7 +107,9 @@ const generateFakeAttribute = () => {
   const title = transformCase(faker.lorem.words({ min: 1, max: 4 }), 'sentence')
   const slug = `${faker.helpers.slugify(title).toLowerCase()}-${faker.string.numeric({ length: 2 })}`
   const type = faker.helpers.arrayElement(Object.values(AttributeType))
-  const category = faker.helpers.arrayElement(Object.values(AttributeCategory))
+  const category = faker.helpers.arrayElement(
+    Object.values(AttributeCategory).filter((c) => c !== AttributeCategory.KYC)
+  )
   const attributePointsByType = {
     [AttributeType.GOOD]: { min: 0, max: 10 },
     [AttributeType.BAD]: { min: -10, max: 0 },
@@ -647,10 +648,15 @@ const generateFakeService = (users: User[]) => {
     previousSlugs: faker.helpers.maybe(() => [`${slug}-old`], { probability: 0.5 }),
     description: faker.helpers.arrayElement(serviceDescriptions),
     kycLevel: faker.helpers.arrayElement(kycLevels.map((level) => level.value)),
-    kycLevelClarification: faker.helpers.maybe(
+    kycPolicyMd: faker.helpers.maybe(
       () =>
-        faker.helpers.arrayElement(omit(Object.values(KycLevelClarification), [KycLevelClarification.NONE])),
-      { probability: 0.25 }
+        faker.helpers.arrayElement([
+          'This exchange uses its own liquidity and is privacy-friendly. Refunds processed without additional verification.',
+          "This exchange refunds transactions that fail their AML check. In very rare cases funds may be blocked if a legal order demands it or stolen coins are involved. Past history is very good.",
+          "This exchange usually refunds transactions that fail their AML check, but if the deposit triggers their Liquidity Provider's AML system, funds may be blocked until KYC/SoF verification is passed.",
+          "Support confirmed: if the deposit fails a full AML check, the exchange may proceed via a partner DEX with an additional 1.8-2.1% fee. Otherwise, users who decline may request a refund.",
+        ]),
+      { probability: 0.4 }
     ),
     overallScore: 0,
     privacyScore: 0,
@@ -1199,13 +1205,86 @@ async function main() {
   )
 
   // ---- Create attributes ----
-  const attributes = await Promise.all(
-    Array.from({ length: 16 }, async () => {
-      return await prisma.attribute.create({
-        data: generateFakeAttribute(),
-      })
-    })
+  const kycAttributeSeeds = [
+    {
+      slug: 'aml-refund-without-kyc',
+      title: 'Refunds without KYC on AML flag',
+      description: 'If a deposit is flagged by the AML system, the service returns the funds without demanding identity verification.',
+      category: 'KYC' as const,
+      type: 'GOOD' as const,
+      privacyPoints: 8,
+      trustPoints: 0,
+    },
+    {
+      slug: 'aml-kyc-required-for-refund',
+      title: 'KYC required for refund on AML flag',
+      description: 'If a deposit is flagged by the AML system, the service requires identity verification before returning the funds.',
+      category: 'KYC' as const,
+      type: 'BAD' as const,
+      privacyPoints: -10,
+      trustPoints: 0,
+    },
+    {
+      slug: 'aml-risk-based-refund',
+      title: 'Risk-based refund on AML flag',
+      description: 'Refund behaviour on AML flags depends on the transaction risk score. Low-risk deposits are returned; high-risk deposits may require KYC.',
+      category: 'KYC' as const,
+      type: 'WARNING' as const,
+      privacyPoints: -4,
+      trustPoints: 0,
+    },
+    {
+      slug: 'lp-may-block-funds',
+      title: "Liquidity Provider may block funds",
+      description: 'Even if the service itself is permissive, the upstream Liquidity Provider can independently freeze funds and demand KYC/Source-of-Funds.',
+      category: 'KYC' as const,
+      type: 'WARNING' as const,
+      privacyPoints: -3,
+      trustPoints: 0,
+    },
+    {
+      slug: 'own-liquidity',
+      title: 'Uses own liquidity',
+      description: 'The service runs its own liquidity, so there is no third-party LP that could independently demand KYC or block funds.',
+      category: 'KYC' as const,
+      type: 'GOOD' as const,
+      privacyPoints: 5,
+      trustPoints: 0,
+    },
+    {
+      slug: 'transaction-screening-only',
+      title: 'Transaction screening (no KYC)',
+      description: 'Deposits are screened for blacklisted sources but no identity verification is performed in the normal flow.',
+      category: 'KYC' as const,
+      type: 'INFO' as const,
+      privacyPoints: 0,
+      trustPoints: 0,
+    },
+    {
+      slug: 'depends-on-partners',
+      title: 'KYC depends on partners',
+      description: 'This service routes through partner providers whose KYC policies vary. Your actual experience depends on which partner is used for a given swap.',
+      category: 'KYC' as const,
+      type: 'WARNING' as const,
+      privacyPoints: -5,
+      trustPoints: 0,
+    },
+  ]
+
+  const kycAttributes = await Promise.all(
+    kycAttributeSeeds.map((data) => prisma.attribute.create({ data }))
   )
+
+  const attributes = [
+    ...kycAttributes,
+    ...(await Promise.all(
+      Array.from({ length: 16 }, async () => {
+        return await prisma.attribute.create({
+          data: generateFakeAttribute(),
+        })
+      })
+    )),
+  ]
 
   // ---- Create services ----
   const services = await Promise.all(

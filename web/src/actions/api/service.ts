@@ -1,8 +1,8 @@
+import { AttributeCategory, type Prisma } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 import { pick } from 'lodash-es'
 
-import { getKycLevelClarificationInfo } from '../../constants/kycLevelClarifications'
 import { getKycLevelInfo } from '../../constants/kycLevels'
 import { getVerificationStatusInfo } from '../../constants/verificationStatus'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
@@ -10,7 +10,6 @@ import { prisma } from '../../lib/prisma'
 import { absoluteSiteUrl } from '../../lib/urls'
 import { zodUrlOptionalProtocol } from '../../lib/zodUtils'
 
-import type { Prisma } from '@prisma/client'
 
 export const apiServiceActions = {
   get: defineProtectedAction({
@@ -26,7 +25,7 @@ export const apiServiceActions = {
         .optional(),
       url: zodUrlOptionalProtocol.optional(),
     }),
-    handler: async (input, context) => {
+    handler: async (input) => {
       if (!input.id && !input.slug && !input.url) {
         throw new ActionError({
           code: 'BAD_REQUEST',
@@ -52,12 +51,26 @@ export const apiServiceActions = {
         slug: true,
         description: true,
         kycLevel: true,
-        kycLevelClarification: true,
+        kycPolicyMd: true,
         verificationStatus: true,
         categories: {
           select: {
             name: true,
             slug: true,
+          },
+        },
+        attributes: {
+          where: { attribute: { category: AttributeCategory.KYC } },
+          select: {
+            attribute: {
+              select: {
+                slug: true,
+                title: true,
+                description: true,
+                type: true,
+                privacyPoints: true,
+              },
+            },
           },
         },
         serviceUrls: true,
@@ -131,12 +144,8 @@ export const apiServiceActions = {
         approvedAt: service.approvedAt,
         kycLevel: service.kycLevel,
         kycLevelInfo: pick(getKycLevelInfo(service.kycLevel.toString()), ['value', 'name', 'description']),
-        kycLevelClarification: service.kycLevelClarification,
-        kycLevelClarificationInfo: pick(getKycLevelClarificationInfo(service.kycLevelClarification), [
-          'value',
-          'label',
-          'description',
-        ]),
+        kycPolicyMd: service.kycPolicyMd,
+        kycAttributes: service.attributes.map(({ attribute }) => attribute),
         categories: service.categories,
         listedAt: service.listedAt,
         serviceUrls: [...service.serviceUrls, ...service.onionUrls, ...service.i2pUrls].map(
