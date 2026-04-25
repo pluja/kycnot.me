@@ -15,6 +15,25 @@ deploy-pre:
 deploy-prod:
   @just _deploy prod production SSH_PROD_TARGET APP_DIR_PROD yes
 
+# Fast-forward master to dev and push. Run after a verified prod deploy.
+promote-to-master:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  current=$(git symbolic-ref --short HEAD)
+  if [ "$current" != "dev" ]; then
+    echo "Must be on dev (currently on $current)." >&2
+    exit 1
+  fi
+  if [ -n "$(git status --porcelain)" ]; then
+    echo "Working tree has uncommitted changes." >&2
+    exit 1
+  fi
+  git fetch origin
+  git checkout master
+  git merge --ff-only dev
+  git push origin master
+  git checkout dev
+
 _deploy env mode ssh_var dir_var confirm:
   #!/usr/bin/env bash
   set -euo pipefail
