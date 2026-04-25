@@ -7,35 +7,77 @@ sha := `git rev-parse --short HEAD`
 @default:
   just --list
 
-# Build and push pre images (tags: pre, pre-<sha>). Uses web/.env.staging at build time.
-deploy-pre: (_release "pre" "staging")
+# Build, push, and roll out pre images. SSH target and app dir are read from .env.
+deploy-pre:
+  @just _deploy pre staging SSH_PRE_TARGET APP_DIR_PRE no
 
-# Build and push prod images (tags: prod, prod-<sha>). Uses web/.env.production at build time.
-deploy-prod: (_release "prod" "production")
+# Build, push, and roll out prod images. Prompts for confirmation.
+deploy-prod:
+  @just _deploy prod production SSH_PROD_TARGET APP_DIR_PROD yes
 
-_release env mode:
+_deploy env mode ssh_var dir_var confirm:
   #!/usr/bin/env bash
   set -euo pipefail
+
+  ensure_env() {
+    local var="$1" prompt="$2" current="${!1:-}"
+    if [ -n "$current" ]; then
+      printf '%s' "$current"
+      return
+    fi
+    exec 3>/dev/tty
+    printf '%s: ' "$prompt" >&3
+    read -r val </dev/tty
+    exec 3>&-
+    if [ -z "$val" ]; then
+      echo "Empty value for $var, aborting." >&2
+      exit 1
+    fi
+    if [ -f .env ] && grep -q "^${var}=" .env; then
+      sed -i "s|^${var}=.*|${var}=${val}|" .env
+    else
+      echo "${var}=${val}" >> .env
+    fi
+    printf '%s' "$val"
+  }
+
+  ssh_target="$(ensure_env {{ssh_var}} 'SSH target for {{env}} (e.g. user@host or ssh alias)')"
+  app_dir="$(ensure_env {{dir_var}} 'App directory on {{env}} server (e.g. /var/www/kycnot.me)')"
+
+  if [ "{{confirm}}" = "yes" ]; then
+    echo
+    echo "============================================================"
+    echo "  PRODUCTION DEPLOY"
+    echo "  Commit:  {{sha}}"
+    echo "  Target:  $ssh_target:$app_dir"
+    echo "  Tags:    {{env}}-{{sha}} (immutable)"
+    echo "============================================================"
+    printf "Type 'deploy {{sha}} to prod' to continue: "
+    read -r ans
+    if [ "$ans" != "deploy {{sha}} to prod" ]; then
+      echo "Aborted."
+      exit 1
+    fi
+  fi
+
+  echo "Building and pushing images..."
   docker build \
     -f web/Dockerfile \
     --build-arg ASTRO_BUILD_MODE={{mode}} \
     -t {{astro_image}}:{{env}}-{{sha}} \
-    -t {{astro_image}}:{{env}} \
     .
   docker build \
     -t {{pyworker_image}}:{{env}}-{{sha}} \
-    -t {{pyworker_image}}:{{env}} \
     ./pyworker
   docker push {{astro_image}}:{{env}}-{{sha}}
-  docker push {{astro_image}}:{{env}}
   docker push {{pyworker_image}}:{{env}}-{{sha}}
-  docker push {{pyworker_image}}:{{env}}
+
   echo
-  echo "Pushed:"
-  echo "  {{astro_image}}:{{env}}-{{sha}}"
-  echo "  {{astro_image}}:{{env}}"
-  echo "  {{pyworker_image}}:{{env}}-{{sha}}"
-  echo "  {{pyworker_image}}:{{env}}"
+  echo "Rolling out on $ssh_target..."
+  ssh "$ssh_target" "bash -s -- '$app_dir' '{{env}}-{{sha}}'" < scripts/deploy-remote.sh
+
+  echo
+  echo "Deployed {{env}}-{{sha}} to $ssh_target:$app_dir"
 
 # Start the development database and redis services
 dev-database:
