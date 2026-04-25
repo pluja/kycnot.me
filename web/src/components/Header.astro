@@ -116,6 +116,18 @@ const splashText = showSplashText ? sample(splashTexts) : null
     }
 
     <div class="flex items-center">
+      <Tooltip
+        as="a"
+        href="/swap"
+        class="flex h-full items-center gap-1.5 px-1 text-green-500 transition-colors hover:text-green-400 2xs:px-2 xs:px-3"
+        text="Compare KYC-free exchange rates"
+        position="bottom"
+        aria-label="Compare KYC-free exchange rates"
+      >
+        <Icon name="ri:swap-line" class="size-5" />
+        <span class="hidden text-sm font-medium 2xs:inline">Swap</span>
+      </Tooltip>
+
       <AdminOnly>
         <Tooltip
           as="a"

@@ -1,7 +1,41 @@
-set dotenv-load	
+set dotenv-load
 
-@default: 
+astro_image := env_var_or_default("ASTRO_IMAGE", "codeberg.org/pluja/kycnot/astro")
+pyworker_image := env_var_or_default("PYWORKER_IMAGE", "codeberg.org/pluja/kycnot/pyworker")
+sha := `git rev-parse --short HEAD`
+
+@default:
   just --list
+
+# Build and push pre images (tags: pre, pre-<sha>). Uses web/.env.staging at build time.
+deploy-pre: (_release "pre" "staging")
+
+# Build and push prod images (tags: prod, prod-<sha>). Uses web/.env.production at build time.
+deploy-prod: (_release "prod" "production")
+
+_release env mode:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  docker build \
+    -f web/Dockerfile \
+    --build-arg ASTRO_BUILD_MODE={{mode}} \
+    -t {{astro_image}}:{{env}}-{{sha}} \
+    -t {{astro_image}}:{{env}} \
+    .
+  docker build \
+    -t {{pyworker_image}}:{{env}}-{{sha}} \
+    -t {{pyworker_image}}:{{env}} \
+    ./pyworker
+  docker push {{astro_image}}:{{env}}-{{sha}}
+  docker push {{astro_image}}:{{env}}
+  docker push {{pyworker_image}}:{{env}}-{{sha}}
+  docker push {{pyworker_image}}:{{env}}
+  echo
+  echo "Pushed:"
+  echo "  {{astro_image}}:{{env}}-{{sha}}"
+  echo "  {{astro_image}}:{{env}}"
+  echo "  {{pyworker_image}}:{{env}}-{{sha}}"
+  echo "  {{pyworker_image}}:{{env}}"
 
 # Start the development database and redis services
 dev-database:
@@ -109,7 +143,7 @@ import-db file="":
   
   echo "Production database import completed successfully!"
   echo "Migration status:"
-  cd web && npx prisma migrate status
+  cd web && npx prisma migrate status || echo "(Skipped migration status check; DATABASE_URL likely points at the docker network. Run inside a container or override DATABASE_URL=postgresql://kycnot:kycnot@localhost:3399/kycnot if you need this.)"
 
 # Scaffold a new blog post (markdown + image folder co-located in one directory)
 new-blog:

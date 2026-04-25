@@ -18,7 +18,9 @@
     "db-seed": "prisma db seed",
     "format": "prettier --write .",
     "lint": "eslint .",
-    "lint-fix": "eslint . --fix && prettier --write ."
+    "lint-fix": "eslint . --fix && prettier --write .",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "gen-proto": "mkdir -p src/generated && protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=src/generated --ts_proto_opt=outputServices=grpc-js,esModuleInterop=true,useExactTypes=false,useOptionals=messages,importSuffix=.js --proto_path=proto proto/aggregator/v1/aggregator.proto"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -28,9 +30,11 @@
     "@astrojs/node": "9.5.5",
     "@astrojs/rss": "4.0.18",
     "@astrojs/sitemap": "3.7.2",
+    "@bufbuild/protobuf": "2.11.0",
     "@fontsource-variable/space-grotesk": "5.2.10",
     "@fontsource/inter": "5.2.8",
     "@fontsource/space-grotesk": "5.2.10",
+    "@grpc/grpc-js": "1.14.3",
     "@napi-rs/canvas": "0.1.97",
     "@prisma/client": "6.11.1",
     "@tailwindcss/vite": "4.2.2",
@@ -78,6 +82,7 @@
     "@astrojs/check": "0.9.8",
     "@eslint/js": "9.39.4",
     "@faker-js/faker": "10.4.0",
+    "@iconify-json/cryptocurrency": "1.2.3",
     "@iconify-json/material-symbols": "1.2.65",
     "@iconify-json/mdi": "1.2.3",
     "@iconify-json/ri": "1.2.10",
@@ -111,6 +116,7 @@
     "prisma-json-types-generator": "3.5.1",
     "tailwind-htmx": "0.1.2",
     "ts-essentials": "10.1.1",
+    "ts-proto": "2.11.6",
     "ts-toolbelt": "9.6.0",
     "tsx": "4.21.0",
     "typescript": "5.9.3",

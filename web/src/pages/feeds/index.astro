@@ -48,7 +48,7 @@ const feeds = [
 ] as const satisfies {
   title: string
   description: string
-  rss: `/feeds/${string}` | `/blog/${string}`
+  rss: `/blog/${string}` | `/feeds/${string}`
   icon: string
   replacementDescription: string | null
 }[]

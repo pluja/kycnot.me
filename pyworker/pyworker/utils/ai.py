@@ -1,11 +1,10 @@
+import logging
 import os
 import re
 import time
 from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Literal, TypedDict, cast
-
-_PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
 from json_repair import repair_json
 from openai import OpenAI, OpenAIError
@@ -17,7 +16,8 @@ from pyworker.database import (
     TosReviewType,
 )
 from pyworker.utils import schemas
-import logging
+
+_PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
 logger = logging.getLogger(__name__)
 
@@ -144,9 +144,17 @@ def prompt_check_tos_review(content: str) -> TosReviewCheck:
     return cast(TosReviewCheck, result_dict)
 
 
-def prompt_tos_review(content: str) -> TosReviewType:
+def prompt_tos_review(content: str, service_name: str) -> TosReviewType:
+    scope = (
+        f"You are reviewing the service named exactly '{service_name}'. "
+        "The corpus may include clauses that apply to sibling products from the same operator "
+        "(e.g. shared legal terms covering multiple products). Include only clauses that apply "
+        f"to '{service_name}' or to the operator/account level that affects it. Exclude clauses "
+        "explicitly scoped to a different product, unless the same clause also applies to "
+        f"'{service_name}'.\n\n"
+    )
     messages: List[ChatCompletionMessageParam] = [
-        {"role": "system", "content": _today() + _PROMPT_TOS_REVIEW},
+        {"role": "system", "content": _today() + scope + _PROMPT_TOS_REVIEW},
         {"role": "user", "content": content},
     ]
 

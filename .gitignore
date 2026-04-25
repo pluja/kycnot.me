@@ -19,3 +19,5 @@ sync-all.sh
 
 *codex*
 *omx*
+/aggregator/
+/aggregator-go/

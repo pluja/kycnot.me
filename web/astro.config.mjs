@@ -31,7 +31,7 @@ export default defineConfig({
   },
   integrations: [
     postgresListener(),
-    icon(),
+    icon({ include: { cryptocurrency: ['*'] } }),
     mdx(),
     AstroPWA({
       base: '/',
@@ -87,9 +87,20 @@ export default defineConfig({
     sitemap({
       filter: (page) => {
         const url = new URL(page)
-        const noIndexPrefixes = ['/admin', '/account', '/service-suggestion', '/notifications', '/access-denied']
-        const excludedPaths = ['/downloads']
-        return !noIndexPrefixes.some((prefix) => url.pathname.startsWith(prefix)) && !excludedPaths.includes(url.pathname)
+        const noIndexPrefixes = [
+          '/admin',
+          '/account',
+          '/service-suggestion',
+          '/notifications',
+          '/access-denied',
+        ]
+        // /swap is owned by /sitemaps/swap.xml so it doesn't appear twice in
+        // the sitemap graph.
+        const excludedPaths = ['/downloads', '/swap']
+        return (
+          !noIndexPrefixes.some((prefix) => url.pathname.startsWith(prefix)) &&
+          !excludedPaths.includes(url.pathname)
+        )
       },
     }),
   ],
@@ -117,9 +128,9 @@ export default defineConfig({
           rel: (/** @type {{ properties?: { rel?: string | string[] } }} */ element) => {
             const existing = element.properties?.rel
             const existingArray = Array.isArray(existing)
-              ? existing.map(String)
+              ? existing
               : existing
-                ? [String(existing)]
+                ? [existing]
                 : []
             if (existingArray.includes('sponsored')) {
               return ['sponsored', 'noopener', 'noreferrer']
@@ -311,6 +322,17 @@ export default defineConfig({
         access: 'secret',
         min: 1,
         optional: false,
+      }),
+
+      AGGREGATOR_GRPC_URL: envField.string({
+        context: 'server',
+        access: 'public',
+        default: 'localhost:50051',
+      }),
+      AGGREGATOR_GRPC_TOKEN: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
       }),
     },
   },

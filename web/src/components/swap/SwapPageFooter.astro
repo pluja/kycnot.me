@@ -1,0 +1,78 @@
+---
+import { FAQ_ITEMS, formatCurrencyHumanName, POPULAR_SWAP_PAIRS } from '../../lib/exchange/swapPageInfo'
+import { buildSwapUrl } from '../../lib/exchange/swapUrls'
+import Markdown from '../Markdown.astro'
+---
+
+<section class="mt-12 space-y-10 border-t border-night-700/50 pt-8 text-sm text-day-400">
+  <div>
+    <h2 class="font-title text-base font-bold tracking-[0.15em] text-day-200 uppercase">
+      Frequently asked questions
+    </h2>
+    <div class="mt-3 space-y-2">
+      {
+        FAQ_ITEMS.map(({ id, q, a }) => (
+          <details
+            id={id}
+            class="group scroll-mt-24 rounded-lg border border-night-700/60 bg-night-800/30 px-4 py-3"
+          >
+            <summary class="cursor-pointer list-none text-day-200 [&::-webkit-details-marker]:hidden">
+              <span class="inline-flex w-full items-center justify-between gap-3">
+                <span class="font-medium">{q}</span>
+                <span class="text-day-600 transition-transform group-open:rotate-45">+</span>
+              </span>
+            </summary>
+            <div class="mt-2 leading-relaxed text-day-400 [&_a]:text-day-200 [&_a]:underline [&_a]:decoration-dotted [&_a]:underline-offset-2 hover:[&_a]:text-green-300">
+              <Markdown content={a} />
+            </div>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+
+  <div class="space-y-3 leading-relaxed">
+    <h2 class="font-title text-base font-bold tracking-[0.15em] text-day-200 uppercase">
+      Why compare KYC-free swaps on KYCnot.me
+    </h2>
+    <p>
+      In a world where your identity is predated by everyone, KYC-free swaps let you exchange one
+      cryptocurrency for another without handing over your ID, selfie, or proof of address.
+    </p>
+    <p>
+      Rates can differ a lot between providers, even on the same pair, and they move fast. This page pulls
+      live quotes together so you do not have to open ten tabs just to find out who is currently giving the
+      best deal. We only integrate providers that publicly offer no-KYC swaps and have a working backend
+      integration. You can click on any provider quote to see some quick info about KYC practices and other
+      details. If you want to see more, just visit the service's full profile.
+    </p>
+    <p>
+      We do not take custody of your funds and we do not add extra fees on top of the provider's quote. When
+      you click through, the swap happens with that provider, not with KYCnot.me. Some partners pay us a
+      referral fee out of their own margin, which does not change what you receive and helps us maintain this
+      site.
+    </p>
+  </div>
+
+  <div>
+    <h2 class="font-title text-base font-bold tracking-[0.15em] text-day-200 uppercase">
+      Popular swap pairs
+    </h2>
+    <ul class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 md:grid-cols-4">
+      {
+        POPULAR_SWAP_PAIRS.map(({ from, to }) => (
+          <li>
+            <a
+              href={buildSwapUrl(from, to)}
+              class="inline-flex items-baseline gap-1 rounded-sm hover:text-green-300"
+            >
+              {formatCurrencyHumanName(from)}
+              <span class="text-day-600">to</span>
+              {formatCurrencyHumanName(to)}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>

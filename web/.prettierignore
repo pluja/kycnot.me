@@ -3,3 +3,4 @@ web/public/
 package-lock.json
 local_data/
 .astro/
+src/generated/

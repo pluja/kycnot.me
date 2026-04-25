@@ -1,0 +1,99 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../lib/cn'
+
+import SwapResultRowDesktop from './SwapResultRowDesktop.astro'
+import SwapResultRowMobile from './SwapResultRowMobile.astro'
+import { findBestRateServiceSlug } from './swapResultUi'
+
+import type { AggregatedResultWithService } from '../../lib/exchange/aggregator'
+import type { HTMLAttributes } from 'astro/types'
+import type { O } from 'ts-toolbelt'
+
+type Props = HTMLAttributes<'div'> & {
+  result: AggregatedResultWithService[]
+  currencyFrom: { code: string; network: string }
+  currencyTo: { code: string; network: string }
+  amountSide: 'receive' | 'send'
+  highlightSlug?: string
+}
+
+const { result, currencyFrom, currencyTo, amountSide, highlightSlug, class: className, ...htmlProps } =
+  Astro.props
+const currencyFromLabel = currencyFrom.network ? `${currencyFrom.code} (${currencyFrom.network})` : currencyFrom.code
+const currencyToLabel = currencyTo.network ? `${currencyTo.code} (${currencyTo.network})` : currencyTo.code
+
+const quotes = result.filter(
+  (r): r is O.NonNullable<AggregatedResultWithService, 'quote'> => r.quote !== null
+)
+const hasRows = quotes.length > 0
+const bestRateServiceSlug = findBestRateServiceSlug(quotes, amountSide)
+
+const DESKTOP_GRID_COLS = [
+  'grid-cols-[auto_auto_auto_minmax(0,1fr)_auto_auto_auto]',
+  'md:grid-cols-[auto_auto_auto_minmax(0,1fr)_auto_auto_auto_auto]',
+  'lg:grid-cols-[auto_auto_auto_minmax(0,1fr)_auto_auto_auto_auto_auto]',
+].join(' ')
+---
+
+<div {...htmlProps} class={cn('space-y-3', className)}>
+  {
+    !hasRows ? (
+      <div class="flex flex-col items-center justify-center rounded-2xl border border-night-700/60 bg-night-800/30 py-14 text-center">
+        <div class="mb-4 flex size-16 items-center justify-center rounded-full bg-night-800">
+          <Icon name="ri:exchange-line" class="size-8 text-day-600" />
+        </div>
+        <h3 class="mb-1 font-title text-lg text-white">No quotes available</h3>
+        <p class="max-w-xs text-sm text-day-500">
+          No exchanges currently support this pair. Try a different currency combination.
+        </p>
+      </div>
+    ) : (
+      <>
+        <div class={cn('hidden items-center gap-x-5 sm:grid', DESKTOP_GRID_COLS)}>
+          <div class="col-span-full grid grid-cols-subgrid items-center border-b border-night-700/40 px-3 py-2.5 text-[11px] font-semibold tracking-wider text-day-500 uppercase">
+            <div>Provider</div>
+            <div class="text-center">Score</div>
+            <div class="text-center">KYC</div>
+            <div />
+            <div class="text-center">{amountSide === 'send' ? 'Receive' : 'Send'}</div>
+            <div class="hidden text-center lg:block">
+              Rate{' '}
+              <span class="font-normal tracking-normal text-day-600 normal-case">
+                ({currencyTo.code}/{currencyFrom.code})
+              </span>
+            </div>
+            <div class="text-center">Spread</div>
+            <div class="hidden text-center md:block">vs Market</div>
+            <div />
+          </div>
+          {quotes.map((item, i) => (
+            <SwapResultRowDesktop
+              item={item}
+              currencyFromLabel={currencyFromLabel}
+              currencyToLabel={currencyToLabel}
+              amountSide={amountSide}
+              isBest={item.serviceSlug === bestRateServiceSlug}
+              isCurrent={highlightSlug !== undefined && item.serviceSlug === highlightSlug}
+              stripe={i % 2 === 1}
+            />
+          ))}
+        </div>
+
+        <ul class="space-y-2 sm:hidden">
+          {quotes.map((item) => (
+            <SwapResultRowMobile
+              item={item}
+              currencyFromLabel={currencyFromLabel}
+              currencyToLabel={currencyToLabel}
+              amountSide={amountSide}
+              isBest={item.serviceSlug === bestRateServiceSlug}
+              isCurrent={highlightSlug !== undefined && item.serviceSlug === highlightSlug}
+            />
+          ))}
+        </ul>
+      </>
+    )
+  }
+</div>

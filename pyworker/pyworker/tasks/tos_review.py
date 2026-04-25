@@ -2,7 +2,6 @@
 Task for retrieving Terms of Service (TOS) text.
 """
 
-import hashlib
 import os
 from typing import Any, Dict, Optional
 
@@ -11,7 +10,7 @@ import requests
 from pyworker.database import TosReviewType, create_kyc_edit_suggestion, save_tos_review
 from pyworker.tasks.base import Task
 from pyworker.utils.ai import prompt_check_tos_review, prompt_tos_review
-from pyworker.utils.crawl import fetch_markdown
+from pyworker.utils.crawl import fetch_legal_corpus
 
 
 class TosReviewTask(Task):
@@ -59,7 +58,7 @@ class TosReviewTask(Task):
         )
         self.logger.info(f"TOS URLs: {tos_urls}")
 
-        review = self.get_tos_review(tos_urls, service.get("tosReview"))
+        review = self.get_tos_review(tos_urls, service.get("tosReview"), service_name)
 
         # Always update the processed timestamp, even if review is None
         save_tos_review(service_id, review)
@@ -107,61 +106,57 @@ class TosReviewTask(Task):
         return review
 
     def get_tos_review(
-        self, tos_urls: list[str], current_review: Optional[TosReviewType]
+        self,
+        tos_urls: list[str],
+        current_review: Optional[TosReviewType],
+        service_name: str,
     ) -> Optional[TosReviewType]:
         """
-        Get TOS review from a list of URLs.
-
-        Args:
-            tos_urls: List of TOS URLs to check
-            current_review: Current review data from the database
-
-        Returns:
-            Dict containing:
-            - status: Literal["skipped", "failed", "success"]
-            - review: Optional[TosReviewType] - The review data if successful
+        Build a legal corpus from all seed URLs (depth=1, legal-keyword filter)
+        and run a single review pass over the combined content.
         """
-        all_skipped = True
+        self.logger.info(f"Building legal corpus from seed URLs: {tos_urls}")
+        combined, fetched_urls, corpus_hash = fetch_legal_corpus(tos_urls)
 
-        for tos_url in tos_urls:
-            api_url = f"{tos_url}"
-            self.logger.info(f"Fetching TOS from URL: {api_url}")
+        if not combined:
+            self.logger.warning(f"Empty legal corpus for seeds: {tos_urls}")
+            return None
 
-            content = fetch_markdown(api_url)
+        self.logger.info(
+            f"Corpus assembled: {len(fetched_urls)} pages, {len(combined)} chars, hash={corpus_hash[:12]}"
+        )
 
-            if not content:
-                self.logger.warning(
-                    f"Failed to retrieve TOS content for URL: {tos_url}"
-                )
-                all_skipped = False
-                continue
-
-            # Hash the content to avoid repeating the same content
-            content_hash = hashlib.sha256(content.encode()).hexdigest()
-            self.logger.info(f"Content hash: {content_hash}")
-
-            # Skip processing if we've seen this content before
-            if current_review and current_review.get("contentHash") == content_hash:
-                self.logger.info(
-                    f"Skipping already processed TOS content with hash: {content_hash}"
-                )
-                continue
-
-            all_skipped = False
-
-            # Skip incomplete TOS content
-            check = prompt_check_tos_review(content)
-            if not check or not check["isComplete"]:
-                continue
-
-            # Query OpenAI to summarize the content
-            review = prompt_tos_review(content)
-
-            if review:
-                review["contentHash"] = content_hash
-                return review
-
-        if all_skipped:
+        if current_review and current_review.get("contentHash") == corpus_hash:
+            self.logger.info(f"Corpus unchanged (hash {corpus_hash[:12]}), skipping LLM call")
             return current_review
+
+        # Drop pages that the fast model flags as blocked / incomplete before
+        # the expensive review call.
+        filtered_sections: list[str] = []
+        for section in combined.split("===== PAGE: "):
+            if not section.strip():
+                continue
+            section = "===== PAGE: " + section
+            try:
+                check = prompt_check_tos_review(section)
+            except Exception as exc:
+                self.logger.warning(f"Completeness check failed: {exc}; keeping section")
+                filtered_sections.append(section)
+                continue
+            if check and check.get("isComplete"):
+                filtered_sections.append(section)
+            else:
+                self.logger.info("Dropping incomplete page from corpus")
+
+        if not filtered_sections:
+            self.logger.warning("All corpus pages flagged incomplete")
+            return None
+
+        filtered_corpus = "\n\n".join(filtered_sections)
+        review = prompt_tos_review(filtered_corpus, service_name)
+
+        if review:
+            review["contentHash"] = corpus_hash
+            return review
 
         return None

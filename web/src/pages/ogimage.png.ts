@@ -17,14 +17,14 @@ export const GET: APIRoute = async (context) => {
     context.url.searchParams.get('data')
   ) ?? { template: 'default' }
 
-  if (!template || !(template in ogImageTemplates)) {
+  if (!(template in ogImageTemplates)) {
     return ogImageTemplates.default({}, context)
   }
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
     const response = await ogImageTemplates[template](props as any, context)
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+
     if (!response) {
       return ogImageTemplates.default({}, context)
     }

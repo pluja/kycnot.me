@@ -1,0 +1,63 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../lib/cn'
+import { FALLBACK_ICON } from '../../lib/exchange/currencyMapping'
+import { buildSwapUrl, SWAP_OOB_TARGETS, SWAP_RESULTS_TARGET } from '../../lib/exchange/swapUrls'
+
+import type { SwapFormInput } from './SwapFormAndResults.astro'
+import type { SwapOption } from '../../lib/exchange/swapCurrencies'
+
+type Props = {
+  option: SwapOption
+  name: 'from' | 'to'
+  group: 'other' | 'popular'
+  selected: string
+  input: SwapFormInput
+}
+
+const { option, name, group, selected, input } = Astro.props
+const isSelected = option.value === selected
+
+const baseName = option.name && option.name !== option.code ? option.name : option.code
+const displayName = option.network ? `${baseName} (${option.network})` : baseName
+const searchText = [option.code, option.name, option.network].filter(Boolean).join(' ').toLowerCase()
+
+const href = buildSwapUrl(
+  name === 'from' ? option.value : input.from,
+  name === 'to' ? option.value : input.to,
+  {
+    sendAmount: input.sendAmount,
+    receiveAmount: input.receiveAmount,
+    sortBy: input.sortBy,
+    approvedOnly: input.approvedOnly,
+  }
+)
+---
+
+<a
+  href={href}
+  hx-get="/swap"
+  hx-vals={JSON.stringify({ [name]: option.value })}
+  hx-include="#swap-form"
+  hx-target={SWAP_RESULTS_TARGET}
+  hx-select={SWAP_RESULTS_TARGET}
+  hx-swap="outerHTML"
+  hx-select-oob={SWAP_OOB_TARGETS}
+  hx-push-url="true"
+  hx-indicator={SWAP_RESULTS_TARGET}
+  data-swap-select-option
+  data-group={group}
+  data-search-text={searchText}
+  aria-current={isSelected ? 'true' : undefined}
+  class={cn(
+    'swap-select-option flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors focus-visible:bg-night-800 focus-visible:outline-none',
+    isSelected ? 'bg-green-500/10 text-green-100' : 'text-day-200 hover:bg-night-800'
+  )}
+>
+  <Icon name={option.icon || FALLBACK_ICON} class="size-5 shrink-0" />
+  <span class="min-w-0 flex-1 truncate">
+    <span class="font-title text-sm font-bold text-white">{option.code}</span>
+    <span class="ml-1.5 text-xs text-day-400">{displayName}</span>
+  </span>
+</a>

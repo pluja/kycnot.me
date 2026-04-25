@@ -1,0 +1,39 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../lib/cn'
+
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = HTMLAttributes<'a'> & {
+  heading?: string
+  description?: string
+}
+
+const {
+  heading = 'Compare exchange rates',
+  description = 'Find the best rates across privacy-respecting exchanges.',
+  class: className,
+  ...htmlProps
+} = Astro.props
+---
+
+<a
+  href="/swap"
+  class={cn(
+    'group flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 transition-colors hover:border-green-500/50 hover:bg-green-500/15',
+    className
+  )}
+  {...htmlProps}
+>
+  <Icon name="ri:swap-line" class="size-8 shrink-0 text-green-500" />
+  <div class="min-w-0 flex-1">
+    <div class="font-title font-bold text-green-400 group-hover:text-green-300">
+      {heading}
+    </div>
+    <div class="text-sm text-day-400">
+      {description}
+    </div>
+  </div>
+  <Icon name="ri:arrow-right-line" class="size-5 shrink-0 text-green-500/60 group-hover:text-green-400" />
+</a>

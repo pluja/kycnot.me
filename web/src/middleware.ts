@@ -7,8 +7,8 @@ import { getImpersonationInfo } from './lib/impersonation'
 import { makeUserWithKarmaUnlocks } from './lib/karmaUnlocks'
 import { prisma } from './lib/prisma'
 import { makeLoginUrl, makeSafeRedirectUrl } from './lib/redirectUrls'
-import { siteOrigin } from './lib/urls'
 import { getRedisActionsSessions } from './lib/redis/redisActionsSessions'
+import { siteOrigin } from './lib/urls'
 import { getUserFromCookies } from './lib/userCookies'
 
 const ACTION_SESSION_COOKIE = 'action-session-id'
@@ -116,7 +116,9 @@ const apiKeyAuth = defineMiddleware(async (context, next) => {
   context.locals.apiKeyAuthenticated = true
 
   // Fire-and-forget lastUsedAt update
-  prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } }).catch(() => {})
+  prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } }).catch((error: unknown) => {
+    void error
+  })
 
   return next()
 })

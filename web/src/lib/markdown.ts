@@ -6,9 +6,10 @@ import remarkGfm from 'remark-gfm'
 import remarkRehype from 'remark-rehype'
 import { visit, EXIT } from 'unist-util-visit'
 
+import { DEPLOYMENT_MODE } from '../lib/client/envVariables'
+
 import type { Options as SanitizeSchema } from 'rehype-sanitize'
 
-import { DEPLOYMENT_MODE } from '../lib/client/envVariables'
 
 /** A string containing Markdown. */
 export type MarkdownString = string

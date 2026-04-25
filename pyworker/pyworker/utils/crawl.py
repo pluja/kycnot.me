@@ -5,12 +5,14 @@ Primary: crawl4ai Docker service with stealth mode and JS wait support.
 Fallback: Jina Reader (r.jina.ai) for simple pages or when crawl4ai is unavailable.
 """
 
+import hashlib
+import logging
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
 
 from pyworker.config import config
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +111,155 @@ def fetch_markdown(url: str) -> str:
     except requests.RequestException as e:
         logger.error(f"Jina Reader also failed for {url}: {e}")
         return ""
+
+
+# Legal-corpus deep crawl
+# Strict URL pattern filter: only follow links whose path contains a legal-relevant
+# slug. We do not want to drag in About / Pricing / Blog pages.
+_LEGAL_URL_PATTERNS = [
+    "*privacy*",
+    "*terms*",
+    "*tos*",
+    "*aml*",
+    "*kyc*",
+    "*refund*",
+    "*cookie*",
+    "*gdpr*",
+    "*legal*",
+    "*policy*",
+    "*acceptable-use*",
+    "*fees*",
+    "*compliance*",
+    "*disclosure*",
+    "*data-processing*",
+    "*data-protection*",
+]
+
+_MAX_PAGES_PER_SEED = 8
+
+
+def _normalize_url(url: str) -> str:
+    parsed = urlparse(url)
+    host = parsed.netloc.lower()
+    path = parsed.path.rstrip("/") or "/"
+    return f"{parsed.scheme}://{host}{path}"
+
+
+def _deep_crawl_seed(seed_url: str) -> list[dict[str, Any]]:
+    """Deep-crawl one seed URL with the legal-pages filter chain. Returns the
+    list of result entries from crawl4ai (each with url + markdown).
+    """
+    crawler_params: dict[str, Any] = {
+        **_CRAWLER_CONFIG["params"],
+        "deep_crawl_strategy": {
+            "type": "BFSDeepCrawlStrategy",
+            "params": {
+                "max_depth": 1,
+                "max_pages": _MAX_PAGES_PER_SEED,
+                "include_external": False,
+                "filter_chain": {
+                    "type": "FilterChain",
+                    "params": {
+                        "filters": [
+                            {
+                                "type": "URLPatternFilter",
+                                "params": {"patterns": _LEGAL_URL_PATTERNS},
+                            },
+                            {
+                                "type": "ContentTypeFilter",
+                                "params": {"allowed_types": ["text/html"]},
+                            },
+                        ]
+                    },
+                },
+            },
+        },
+    }
+    payload = {
+        "urls": [seed_url],
+        "browser_config": _BROWSER_CONFIG,
+        "crawler_config": {"type": "CrawlerRunConfig", "params": crawler_params},
+    }
+    response = requests.post(
+        f"{config.CRAWL4AI_BASE_URL}/crawl",
+        json=payload,
+        headers=_CRAWL4AI_HEADERS,
+        timeout=config.CRAWL4AI_TIMEOUT,
+    )
+    response.raise_for_status()
+    data = response.json()
+    return data.get("results") or []
+
+
+def fetch_legal_corpus(seed_urls: list[str]) -> tuple[str, list[str], str]:
+    """Fetch a deduplicated, labeled markdown corpus of legal pages.
+
+    For each seed URL: deep-crawl one level deep, restricted to same-domain pages
+    whose path matches a legal-keyword pattern. Pages are deduplicated by both
+    normalized URL and markdown content hash.
+
+    Returns (combined_markdown, fetched_urls, corpus_hash).
+
+    The combined markdown wraps each page in delimited sections so the LLM can
+    treat the union as one document but still attribute clauses to a source.
+    """
+    seen_urls: set[str] = set()
+    seen_content_hashes: set[str] = set()
+    pages: list[tuple[str, str, str]] = []  # (url, content_hash, markdown)
+
+    for seed in seed_urls:
+        if not seed:
+            continue
+        try:
+            results = _deep_crawl_seed(seed)
+        except Exception as exc:
+            logger.warning(f"Deep crawl failed for {seed} ({exc}), falling back to single fetch")
+            try:
+                md = _fetch_crawl4ai(seed)
+            except Exception:
+                try:
+                    md = _fetch_jina(seed)
+                except Exception as inner_exc:
+                    logger.error(f"All fetch methods failed for {seed}: {inner_exc}")
+                    continue
+            results = [{"url": seed, "success": True, "markdown": md}]
+
+        for entry in results:
+            if not entry.get("success"):
+                continue
+            url = entry.get("url") or ""
+            normalized = _normalize_url(url)
+            if not normalized or normalized in seen_urls:
+                continue
+            markdown = _extract_markdown(entry).strip()
+            if not markdown:
+                continue
+            content_hash = hashlib.sha256(markdown.encode()).hexdigest()
+            if content_hash in seen_content_hashes:
+                seen_urls.add(normalized)
+                continue
+            seen_urls.add(normalized)
+            seen_content_hashes.add(content_hash)
+            pages.append((url, content_hash, markdown))
+
+    if not pages:
+        return "", [], ""
+
+    combined = "\n\n".join(
+        f"===== PAGE: {url} =====\n{md}\n===== END PAGE ====="
+        for url, _, md in pages
+    )
+    fetched_urls = [url for url, _, _ in pages]
+    # Sort hashes by normalized URL so the corpus hash is order-independent;
+    # BFS deep-crawl may visit pages in different order between runs.
+    sorted_hashes = sorted((_normalize_url(url), h) for url, h, _ in pages)
+    corpus_hash = hashlib.sha256(
+        "".join(h for _, h in sorted_hashes).encode()
+    ).hexdigest()
+    logger.info(
+        f"Legal corpus assembled: {len(pages)} pages, {len(combined)} chars, hash={corpus_hash[:12]}"
+    )
+    return combined, fetched_urls, corpus_hash
 
 
 if __name__ == "__main__":

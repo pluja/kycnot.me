@@ -1,6 +1,6 @@
 import pytest
 
-from pyworker.utils.ai import _strip_thinking, _load_prompt
+from pyworker.utils.ai import _strip_thinking
 
 
 def test_strip_thinking_think_tags():

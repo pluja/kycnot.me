@@ -11,6 +11,7 @@ import { createPageUrl, urlWithParams } from '../lib/urls'
 import Button from './Button.astro'
 import ServiceCard from './ServiceCard.astro'
 import ServiceFiltersPillsRow from './ServiceFiltersPillsRow.astro'
+import SwapCTA from './swap/SwapCTA.astro'
 
 import type { ServicesFiltersOptions } from '../lib/searchFiltersOptions'
 import type { AttributeOption, ServicesFiltersObject } from '../pages/index.astro'
@@ -62,6 +63,9 @@ const {
   attributeOptions,
   ...divProps
 } = Astro.props
+
+const exchangeCategorySlugs: readonly string[] = ['exchange', 'cex', 'dex', 'aggregator']
+const hasExchangeFilter = filters.categories.some((c) => exchangeCategorySlugs.includes(c))
 
 const hasScams = filters.verification.includes('VERIFICATION_FAILED')
 const hasSomeScam = !!services?.some((service) => service.verificationStatus.includes('VERIFICATION_FAILED'))
@@ -222,6 +226,8 @@ const searchTitle = makeSearchTitle({
       </div>
     )
   }
+
+  {hasExchangeFilter && <SwapCTA class="mt-4" />}
 
   {
     !services || services.length === 0 ? (

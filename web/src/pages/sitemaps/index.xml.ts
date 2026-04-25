@@ -8,6 +8,7 @@ const SITEMAPS = [
   '/sitemaps/services.xml',
   '/sitemaps/users.xml',
   '/sitemaps/blog.xml',
+  '/sitemaps/swap.xml',
 ]
 
 export const GET: APIRoute = ({ site }) => {

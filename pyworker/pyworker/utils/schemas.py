@@ -99,7 +99,7 @@ TOS_REVIEW = PromptSchema(
         /** In regards to KYC, Privacy, Anonymity, Self-Sovereignity, etc. */
         /** anything that could harm the user's privacy, identity, self-sovereignity or anonymity is negative, anything that otherwise helps is positive. else it is neutral. */
         rating: 'negative' | 'neutral' | 'positive'
-    }[] // max 8 highlights, try to provide at least 3.
+    }[] // max 10 highlights, but typically 3-6. Quality over quantity, do not pad. May be empty.
 }""",
     validate=_validate_tos_review,
 )
@@ -117,10 +117,10 @@ COMMENT_MOD = PromptSchema(
 
 COMMENT_SEN = PromptSchema(
     ts_type="""interface CommentSummary {
-  summary: string; // Concise, 100 words max
+  summary: string; // 1-2 sentences, 50 words max, no markdown
   sentiment: 'positive'|'negative'|'neutral';
-  whatUsersLike: string[]; // Concise, 2-3 words max
-  whatUsersDislike: string[]; // Concise, 2-3 words max
+  whatUsersLike: string[]; // 0-5 items, 1-3 words each, prefer 3 or fewer
+  whatUsersDislike: string[]; // 0-5 items, 1-3 words each, prefer 3 or fewer
 }""",
     validate=_validate_comment_sentiment,
 )

@@ -23,6 +23,8 @@ import { makeOgImageUrl, type OgImageAllTemplatesWithProps } from '../../compone
 import ScoreGauge from '../../components/ScoreGauge.astro'
 import ScoreSquare from '../../components/ScoreSquare.astro'
 import ServiceLinkButton from '../../components/ServiceLinkButton.astro'
+import SwapCTA from '../../components/swap/SwapCTA.astro'
+import SwapFormAndResults from '../../components/swap/SwapFormAndResults.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import Tooltip from '../../components/Tooltip.astro'
 import UserBadge from '../../components/UserBadge.astro'
@@ -464,6 +466,9 @@ const sortedVerificationSteps = orderBy(
   ['asc', 'desc'] // Priority ascending (failed first), date descending (newest first)
 )
 
+const exchangeSlugs = ['exchange', 'cex', 'dex'] as const satisfies string[]
+const isExchange = service.categories.some((c) => exchangeSlugs.includes(c.slug))
+
 const verificationOverview = getServiceVerificationOverview(service)
 
 const checkSegments = [
@@ -629,7 +634,11 @@ const verificationStatusDate =
 
   {
     (serviceVisibilityInfo.value === 'UNLISTED' || serviceVisibilityInfo.value === 'ARCHIVED') && (
-      <div class={cn('mb-3 rounded-lg border border-day-500/10 bg-yellow-900/50 px-3 py-2 text-sm text-yellow-400')}>
+      <div
+        class={cn(
+          'mb-3 rounded-lg border border-day-500/10 bg-yellow-900/50 px-3 py-2 text-sm text-yellow-400'
+        )}
+      >
         <Icon
           name={serviceVisibilityInfo.icon}
           class="me-1.5 inline-block size-4 align-[-0.15em] text-yellow-500"
@@ -909,6 +918,16 @@ const verificationStatusDate =
           </li>
         ))}
       </ul>
+    )
+  }
+
+  {
+    !!isExchange && (
+      <SwapCTA
+        class="mt-4"
+        heading="Compare rates"
+        description="Find the best rate across privacy-respecting exchanges."
+      />
     )
   }
 
@@ -1381,7 +1400,10 @@ const verificationStatusDate =
     </a>
   </div>
 
-  <div class="mt-6 mb-3 flex items-center justify-between gap-3 border-b border-day-500 pb-1" id="verification">
+  <div
+    class="mt-6 mb-3 flex items-center justify-between gap-3 border-b border-day-500 pb-1"
+    id="verification"
+  >
     <h2 class="font-title text-lg font-bold text-day-100">Evidence and Review History</h2>
     <div class="flex items-center gap-2 text-xs leading-none">
       <a
@@ -1432,18 +1454,20 @@ const verificationStatusDate =
       <ul class="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-day-300">
         <li class="inline-flex items-center gap-1.5">
           {
-            checkSegments.length > 0
-              ? checkSegments.map((seg, i) => (
-                  <>
-                    {i > 0 && <span class="text-day-500">·</span>}
-                    <Icon name={seg.icon} class={cn('size-3.5', seg.iconClass)} />
-                    <span class={seg.textClass ?? ''}>{seg.text}</span>
-                  </>
-                ))
-              : <>
-                  <Icon name="ri:check-double-line" class="size-3.5 text-day-500" />
-                  <span>{verificationOverview.checksSummary}</span>
+            checkSegments.length > 0 ? (
+              checkSegments.map((seg, i) => (
+                <>
+                  {i > 0 && <span class="text-day-500">·</span>}
+                  <Icon name={seg.icon} class={cn('size-3.5', seg.iconClass)} />
+                  <span class={seg.textClass ?? ''}>{seg.text}</span>
                 </>
+              ))
+            ) : (
+              <>
+                <Icon name="ri:check-double-line" class="size-3.5 text-day-500" />
+                <span>{verificationOverview.checksSummary}</span>
+              </>
+            )
           }
         </li>
         <li class="inline-flex items-center gap-1.5">
@@ -1506,11 +1530,7 @@ const verificationStatusDate =
             hx-swap="outerHTML"
           >
             <input type="hidden" name="serviceId" value={service.id} />
-            <input
-              type="hidden"
-              name="action"
-              value={hasRequestedVerification ? 'withdraw' : 'request'}
-            />
+            <input type="hidden" name="action" value={hasRequestedVerification ? 'withdraw' : 'request'} />
             <VerificationRequestElement
               type={VerificationRequestElement === 'button' ? 'submit' : undefined}
               href={
@@ -1605,6 +1625,17 @@ const verificationStatusDate =
             )
           })}
         </ul>
+      </>
+    )
+  }
+
+  {
+    !!isExchange && (
+      <>
+        <h2 class="mt-6 mb-3 border-b border-day-500 font-title text-lg font-bold text-day-200" id="compare">
+          Compare Exchange Rates
+        </h2>
+        <SwapFormAndResults highlightSlug={service.slug} />
       </>
     )
   }

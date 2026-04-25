@@ -1,0 +1,138 @@
+---
+import { getCountryInfo } from '../../constants/countries'
+import { getEventTypeInfo } from '../../constants/eventTypes'
+import { getVerificationStatusInfo } from '../../constants/verificationStatus'
+import { cn } from '../../lib/cn'
+
+import KycPolicyPanel from './KycPolicyPanel.astro'
+import { describeGuaranteeCoverage } from './swapResultUi'
+import SwapRowDesktopInner from './SwapRowDesktopInner.astro'
+
+import type { AggregatedResultWithService } from '../../lib/exchange/aggregator'
+
+type Props = {
+  item: AggregatedResultWithService
+  currencyFromLabel: string
+  currencyToLabel: string
+  amountSide: 'receive' | 'send'
+  isBest?: boolean
+  isCurrent?: boolean
+  /** Zebra shading. Overridden by best/current highlights. */
+  stripe?: boolean
+}
+
+const {
+  item,
+  currencyFromLabel,
+  currencyToLabel,
+  amountSide,
+  isBest = false,
+  isCurrent = false,
+  stripe = false,
+} = Astro.props
+
+const { service } = item
+const quote = item.quote
+
+const kycAttributes = service?.attributes.map((a) => a.attribute) ?? []
+const activeEvents = (service?.events ?? []).map((event) => ({
+  ...event,
+  typeInfo: getEventTypeInfo(event.type),
+}))
+const operatingSinceYear = service?.operatingSince ? service.operatingSince.getUTCFullYear() : null
+const onionUrls = service?.onionUrls ?? []
+const i2pUrls = service?.i2pUrls ?? []
+const ratingsCount = service?._count.comments ?? 0
+const averageUserRating = service?.averageUserRating ?? null
+const registrationCountry = service?.registrationCountryCode
+  ? getCountryInfo(service.registrationCountryCode)
+  : null
+const registeredCompanyName = service?.registeredCompanyName ?? null
+const verificationInfo = service ? getVerificationStatusInfo(service.verificationStatus) : null
+const guaranteeSummaryLabel = describeGuaranteeCoverage(quote)?.summaryLabel ?? null
+
+const hasDetailsPanel =
+  Boolean(service) &&
+  (verificationInfo !== null ||
+    guaranteeSummaryLabel !== null ||
+    Boolean(service?.kycPolicyMd) ||
+    kycAttributes.length > 0 ||
+    activeEvents.length > 0 ||
+    operatingSinceYear !== null ||
+    onionUrls.length > 0 ||
+    i2pUrls.length > 0 ||
+    ratingsCount > 0 ||
+    registrationCountry !== null)
+
+// Class order matters: stripe first so best/current bg-* overrides win, and
+// hover sits after stripe so hover brightens past the stripe tint.
+const rowWrapperClasses = cn(
+  'col-span-full grid grid-cols-subgrid border-b border-l-2 border-night-700/40 transition-colors duration-200',
+  stripe && 'bg-night-800/30',
+  quote !== null && isBest && 'border-l-green-500 bg-green-500/[0.03]',
+  quote !== null && !isBest && isCurrent && 'border-l-blue-500 bg-blue-500/[0.03]',
+  quote !== null && !isBest && !isCurrent && 'border-l-transparent hover:bg-night-800/60',
+  quote?.stale && 'opacity-80',
+  quote === null && 'border-l-transparent opacity-60 hover:bg-night-800/40'
+)
+const innerClasses = cn(
+  'col-span-full grid grid-cols-subgrid items-center gap-x-5 px-3 py-2.5',
+  hasDetailsPanel && 'cursor-pointer list-none [&::-webkit-details-marker]:hidden'
+)
+---
+
+{
+  hasDetailsPanel && service ? (
+    <>
+      <details class={cn(rowWrapperClasses, 'group swap-row-expandable')}>
+        <summary class={innerClasses} title="Show KYC policy">
+          <SwapRowDesktopInner
+            item={item}
+            currencyFromLabel={currencyFromLabel}
+            currencyToLabel={currencyToLabel}
+            amountSide={amountSide}
+            isBest={isBest}
+            showChevron
+          />
+        </summary>
+      </details>
+      <div class="swap-row-panel col-span-full min-w-0 border-b border-night-700/40 px-3 pt-1 pb-3">
+        <KycPolicyPanel
+          serviceSlug={service.slug}
+          kycPolicyMd={service.kycPolicyMd}
+          kycAttributes={kycAttributes}
+          deepLinkUrl={quote?.deepLinkUrl ?? null}
+          operatingSinceYear={operatingSinceYear}
+          onionUrls={onionUrls}
+          i2pUrls={i2pUrls}
+          activeEvents={activeEvents}
+          averageUserRating={averageUserRating}
+          ratingsCount={ratingsCount}
+          registrationCountry={registrationCountry}
+          registeredCompanyName={registeredCompanyName}
+          verificationInfo={verificationInfo}
+          guaranteeSummaryLabel={guaranteeSummaryLabel}
+        />
+      </div>
+    </>
+  ) : (
+    <div class={rowWrapperClasses}>
+      <div class={innerClasses}>
+        <SwapRowDesktopInner
+          item={item}
+          currencyFromLabel={currencyFromLabel}
+          currencyToLabel={currencyToLabel}
+          amountSide={amountSide}
+          isBest={isBest}
+          showChevron={false}
+        />
+      </div>
+    </div>
+  )
+}
+
+<style is:global>
+  .swap-row-expandable:not([open]) + .swap-row-panel {
+    display: none;
+  }
+</style>

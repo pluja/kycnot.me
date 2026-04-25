@@ -1,7 +1,7 @@
 ---
+import { z } from 'astro/zod'
 import { Icon } from 'astro-icon/components'
 import { Schema } from 'astro-seo-schema'
-import { z } from 'astro/zod'
 
 import CommentItem from '../components/CommentItem.astro'
 import CommentReply from '../components/CommentReply.astro'
@@ -19,7 +19,6 @@ import { getOrCreateNotificationPreferences } from '../lib/notificationPreferenc
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
-
 import { absoluteSiteUrl, siteOrigin } from '../lib/urls'
 
 import { makeOgImageUrl } from './OgImage'

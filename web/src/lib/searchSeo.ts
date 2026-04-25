@@ -2,6 +2,7 @@ import { orderBy } from 'lodash-es'
 
 import { getCurrencyInfo } from '../constants/currencies'
 import { getVerificationStatusInfo } from '../constants/verificationStatus'
+
 import { areEqualArraysWithoutOrder } from './arrays'
 import { pluralize } from './pluralize'
 import { transformCase } from './strings'
@@ -11,8 +12,8 @@ type SearchFilters = {
   categories: string[]
   verification: string[]
   currencies: string[]
-  'currency-mode': 'or' | 'and'
-  'attribute-mode': 'or' | 'and'
+  'currency-mode': 'and' | 'or'
+  'attribute-mode': 'and' | 'or'
   'max-kyc': number
   'min-score': number
   attr?: Record<number, '' | 'no' | 'yes'> | Record<string, '' | 'no' | 'yes'>
@@ -133,7 +134,7 @@ export function makeSearchTitle({
     kycLevel = 'without KYC'
     prefix = ''
   } else if (filters['max-kyc'] <= 3) {
-    kycLevel = `with KYC level ${filters['max-kyc']} or better`
+    kycLevel = `with KYC level ${String(filters['max-kyc'])} or better`
     prefix = ''
   }
 

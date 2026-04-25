@@ -2,9 +2,9 @@ import { ActionError } from 'astro:actions'
 import { z } from 'astro:content'
 import { pick } from 'lodash-es'
 
-import { generateApiKey, getApiKeyPrefix, hashApiKey } from '../lib/apiKey'
 import { karmaUnlocksById } from '../constants/karmaUnlocks'
 import { createAccount } from '../lib/accountCreate'
+import { generateApiKey, getApiKeyPrefix, hashApiKey } from '../lib/apiKey'
 import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../lib/captchaValidation'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
 import { saveFileLocally } from '../lib/fileStorage'
@@ -323,7 +323,7 @@ export const accountActions = {
         select: { userId: true },
       })
 
-      if (!apiKey || apiKey.userId !== context.locals.user.id) {
+      if (apiKey?.userId !== context.locals.user.id) {
         throw new ActionError({
           code: 'NOT_FOUND',
           message: 'API key not found',

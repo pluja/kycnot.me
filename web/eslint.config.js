@@ -20,6 +20,7 @@ export default defineConfig(
       'build/**',
       'public/**',
       '.prettierrc.mjs',
+      'src/generated/**',
     ],
   },
   {
@@ -160,7 +161,20 @@ export default defineConfig(
       ],
       'better-tailwindcss/enforce-consistent-line-wrapping': 'off',
       'better-tailwindcss/enforce-canonical-classes': 'off',
-      'better-tailwindcss/no-unknown-classes': ['error', { ignore: ['custom-.*', 'not-prose'] }],
+      'better-tailwindcss/no-unknown-classes': [
+        'error',
+        {
+          ignore: [
+            'custom-.*',
+            'not-prose',
+            // Selector hooks + keyframes defined in inline <style> on the swap page.
+            'swap-select-option',
+            'swap-row-expandable',
+            'swap-row-panel',
+            'swap-progress-sweep',
+          ],
+        },
+      ],
     },
   },
   {

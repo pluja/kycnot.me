@@ -21,7 +21,7 @@ export const GET: APIRoute = async ({ site }) => {
     const urls = users
       .map((user) => {
         const loc = he.encode(`${origin}/u/${user.name}`)
-        const lastmod = user.updatedAt.toISOString().split('T')[0]
+        const lastmod = user.updatedAt.toISOString().slice(0, 10)
         return `<url><loc>${loc}</loc><lastmod>${lastmod}</lastmod></url>`
       })
       .join('\n  ')

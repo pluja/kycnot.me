@@ -15,6 +15,11 @@ web/dist
 web/.astro
 web/local_data
 web/public/uploads
+web/.env
+web/.env.local
+web/.env.*.local
+.env
+.env.*
 
 *.log
 *.dump

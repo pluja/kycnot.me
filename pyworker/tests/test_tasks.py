@@ -36,27 +36,22 @@ class TestTosReviewTask(unittest.TestCase):
         self.assertIsNone(result)
 
     @patch("pyworker.tasks.tos_review.save_tos_review")
-    @patch("pyworker.tasks.tos_review.fetch_markdown")
-    def test_run_skips_when_content_unchanged(
-        self, mock_fetch: MagicMock, mock_save: MagicMock
+    @patch("pyworker.tasks.tos_review.fetch_legal_corpus")
+    def test_run_skips_when_corpus_unchanged(
+        self, mock_corpus: MagicMock, mock_save: MagicMock
     ):
-        import hashlib
-
-        content = "same tos content"
-        content_hash = hashlib.sha256(content.encode()).hexdigest()
-
-        mock_fetch.return_value = content
+        corpus_hash = "a" * 64
+        mock_corpus.return_value = ("===== PAGE: x =====\nbody\n===== END PAGE =====", ["x"], corpus_hash)
         service: Dict[str, Any] = {
             "id": 3,
             "name": "Test Service",
             "verificationStatus": "APPROVED",
             "tosUrls": ["https://example.com/tos"],
-            "tosReview": {"contentHash": content_hash},
+            "tosReview": {"contentHash": corpus_hash},
         }
 
         self.task.run(service)
-        # Content hash matches — should save with existing review (no AI call)
-        mock_save.assert_called_once_with(3, {"contentHash": content_hash})
+        mock_save.assert_called_once_with(3, {"contentHash": corpus_hash})
 
 
 if __name__ == "__main__":

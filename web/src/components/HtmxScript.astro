@@ -6,6 +6,11 @@
   import htmx from 'htmx.org'
 
   htmx.config.globalViewTransitions = false
+  // The swap page's full HTML (with all currency options) is too large to
+  // cache to localStorage on every HTMX-driven navigation; HTMX's default
+  // hx-push-url flow was spamming htmx:historyCacheError. Back/forward still
+  // works without the cache; HTMX just re-fetches the previous URL.
+  htmx.config.historyCacheSize = 0
 
   document.addEventListener('astro:after-swap', () => {
     htmx.process(document.body)

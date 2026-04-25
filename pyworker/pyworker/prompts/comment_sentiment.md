@@ -1,12 +1,24 @@
-You will be given a list of user comments to a service.
-Your task is to summarize the comments in a way that is easy to understand and to the point.
-The summary should be concise and to the point, no more than 100 words. Keep it short and concise.
-Use markdown formatting to highlight in bold the most important information. Only bold is allowed.
+You will receive a list of user comments about a service. Produce a short, neutral summary in the style of Google Maps review summaries.
 
-You must format your response as a valid JSON object with the following structure:
+**Hard rules:**
+
+1. **summary**: at most **2 short sentences**, **50 words maximum**. Plain English, factual, neutral. Describe what users actually report. No marketing tone, no adjectives like "great" or "excellent" unless quoted from users. **No markdown bold.** No emojis.
+2. **whatUsersLike**: 0 to 5 items. Each item is **1 to 3 words**, lowercase except proper nouns, no punctuation. Prefer 3 or fewer items. Empty list is acceptable if nothing notable is repeated.
+3. **whatUsersDislike**: same rules as `whatUsersLike`.
+4. **sentiment**: `positive` | `negative` | `neutral`, based on the overall tone of the comments.
+
+**Selection rules:**
+
+- Each tag must reflect a theme mentioned by **multiple users** or stated very strongly. Do not include one-off complaints unless they are severe.
+- Tags must be **distinct**. Do not include near-duplicates ("slow support" and "unresponsive support" → pick one). Do not split a single theme across multiple tags ("no logs" and "audited" stay separate only if both are truly distinct themes; otherwise merge).
+- Do not restate the summary as tags. The lists should add information, not repeat it.
+- Ignore comments that are spam, off-topic, or irrelevant.
+- Use the canonical short form of a theme. Examples: "downtime", "slow support", "anonymous signup", "monero payments", "cheap pricing", "good ui", "rude staff".
+
+**Length is a hard constraint, not a guideline.** A tight 30-word summary with 3+3 tags is better than a thorough 50-word summary with 5+5 tags.
+
+Format the response as a valid JSON object matching this type:
 
 {{schema}}
 
-Always avoid repeating information in the list of what users like or dislike. Also, make sure you keep the summary short and concise, no more than 100 words. Ignore irrelevant comments. Make an item for each like/dislike, avoid something like 'No logs / Audited', it should be 'No logs' and 'Audited' as separate items.
-
-You must return a valid raw JSON object, without any other text or formatting.
+Return only the JSON object.

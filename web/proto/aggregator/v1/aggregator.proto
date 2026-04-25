@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package aggregator.v1;
+
+option go_package = "kycnot.me/aggregator/gen/go/aggregator/v1;aggregatorv1";
+
+service AggregatorService {
+  rpc GetQuotes(GetQuotesRequest) returns (GetQuotesResponse);
+  rpc ListCurrencies(ListCurrenciesRequest) returns (ListCurrenciesResponse);
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+enum AmountSide {
+  AMOUNT_SIDE_UNSPECIFIED = 0;
+  AMOUNT_SIDE_SEND        = 1;
+  AMOUNT_SIDE_RECEIVE     = 2;
+}
+
+message GetQuotesRequest {
+  // OrangeFren compound format: "usdt@trx", "btc@ln", "xmr", etc. (lowercase).
+  string currency_from = 1;
+  string currency_to   = 2;
+  reserved 3, 4; // formerly network_from, network_to
+  AmountSide amount_side = 5;
+  // Decimal string, e.g. "0.12345678". Never use float over the wire.
+  string amount = 6;
+  // Optional filter: only query providers whose service_slug is in this list.
+  // Empty = all providers (original behavior). Used by the per-provider lazy
+  // loading path in the web UI (each row fetches its single provider).
+  repeated string service_slugs = 7;
+  // Optional internal deadline in milliseconds. Caps how long the server
+  // waits on providers before collecting whatever finished and returning.
+  // Separate from the gRPC call deadline (which would cancel the entire RPC);
+  // this value bounds server work while the client keeps a longer deadline
+  // so the partial response still lands. Zero = RequestDeadline default.
+  int32 max_wait_ms = 8;
+}
+
+message GetQuotesResponse {
+  // One entry per provider registered in the service. No filtering.
+  repeated QuoteResult results = 1;
+}
+
+message QuoteResult {
+  // Identifies the Service row in the frontend DB. Stable per provider integration.
+  string service_slug = 1;
+  oneof outcome {
+    Quote quote      = 2;
+    QuoteError error = 3;
+  }
+}
+
+message Quote {
+  // All decimal strings. Empty string when unknown (min/max only).
+  string amount_from     = 1;
+  string amount_received = 2;
+  string exchange_rate   = 3;
+  string min_amount      = 4;
+  string max_amount      = 5;
+  // Percentage vs best row in the current batch. "0" for the best row.
+  string spread_percent = 6;
+  // True when the quote was served from the stale-fallback cache after a live fetch failed.
+  bool stale = 7;
+  // True when the aggregator back-calculated the receive side from an
+  // exchange rate rather than receiving it directly from the upstream (i.e.
+  // the upstream API does not accept an output amount).
+  bool approximate = 8;
+  // Decimal-string percent this quote trails CoinPaprika's USD mid-rate.
+  // Positive = provider gives fewer units than market; negative = better
+  // than market. Empty string when the market-price integration is disabled
+  // or either leg's USD rate is unknown.
+  string market_spread_percent = 9;
+  // Fully-composed click-through URL to the provider's web UI with currencies +
+  // amount + referral pre-populated. Empty string when the provider's deep-link
+  // shape isn't wired up; callers should fall back to the Service row's base URL.
+  string deep_link_url = 10;
+  // Opaque decimal-string value reported by OrangeFren for its provider
+  // guarantee metadata. Empty string when the upstream omits it. The unit is
+  // not enforced by this service.
+  string orangefren_guarantee = 11;
+}
+
+message QuoteError {
+  enum Type {
+    TYPE_UNSPECIFIED      = 0;
+    TYPE_PAIR_UNSUPPORTED = 1;
+    TYPE_AMOUNT_TOO_LOW   = 2;
+    TYPE_AMOUNT_TOO_HIGH  = 3;
+    TYPE_PROVIDER_DOWN    = 4;
+    TYPE_TIMEOUT          = 5;
+    TYPE_AUTH_CONFIG      = 6;
+    TYPE_INTERNAL         = 7;
+  }
+  Type   type    = 1;
+  string message = 2;
+  // Populated for AMOUNT_TOO_LOW / AMOUNT_TOO_HIGH when the upstream surfaces bounds.
+  string suggested_min = 3;
+  string suggested_max = 4;
+}
+
+message ListCurrenciesRequest {}
+
+message ListCurrenciesResponse {
+  repeated Currency currencies = 1;
+}
+
+message Currency {
+  // Asset code, uppercase (e.g. "BTC", "USDT"). Split from the compound currency string.
+  string code = 1;
+  // Network identifiers, uppercase (e.g. "TRX", "LN"). Empty for single-network assets.
+  repeated string networks = 2;
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string status = 1;
+}

@@ -1,0 +1,127 @@
+---
+import { getCountryInfo } from '../../constants/countries'
+import { getEventTypeInfo } from '../../constants/eventTypes'
+import { getVerificationStatusInfo } from '../../constants/verificationStatus'
+import { cn } from '../../lib/cn'
+
+import KycPolicyPanel from './KycPolicyPanel.astro'
+import { describeGuaranteeCoverage } from './swapResultUi'
+import SwapRowMobileInner from './SwapRowMobileInner.astro'
+
+import type { AggregatedResultWithService } from '../../lib/exchange/aggregator'
+
+type Props = {
+  item: AggregatedResultWithService
+  currencyFromLabel: string
+  currencyToLabel: string
+  amountSide: 'receive' | 'send'
+  isBest?: boolean
+  isCurrent?: boolean
+}
+
+const {
+  item,
+  currencyFromLabel,
+  currencyToLabel,
+  amountSide,
+  isBest = false,
+  isCurrent = false,
+} = Astro.props
+
+const { service } = item
+const quote = item.quote
+
+const kycAttributes = service?.attributes.map((a) => a.attribute) ?? []
+const activeEvents = (service?.events ?? []).map((event) => ({
+  ...event,
+  typeInfo: getEventTypeInfo(event.type),
+}))
+const operatingSinceYear = service?.operatingSince ? service.operatingSince.getUTCFullYear() : null
+const onionUrls = service?.onionUrls ?? []
+const i2pUrls = service?.i2pUrls ?? []
+const ratingsCount = service?._count.comments ?? 0
+const averageUserRating = service?.averageUserRating ?? null
+const registrationCountry = service?.registrationCountryCode
+  ? getCountryInfo(service.registrationCountryCode)
+  : null
+const registeredCompanyName = service?.registeredCompanyName ?? null
+const verificationInfo = service ? getVerificationStatusInfo(service.verificationStatus) : null
+const guaranteeSummaryLabel = describeGuaranteeCoverage(quote)?.summaryLabel ?? null
+
+const hasDetailsPanel =
+  Boolean(service) &&
+  (verificationInfo !== null ||
+    guaranteeSummaryLabel !== null ||
+    Boolean(service?.kycPolicyMd) ||
+    kycAttributes.length > 0 ||
+    activeEvents.length > 0 ||
+    operatingSinceYear !== null ||
+    onionUrls.length > 0 ||
+    i2pUrls.length > 0 ||
+    ratingsCount > 0 ||
+    registrationCountry !== null)
+
+const cardClasses =
+  quote !== null
+    ? cn(
+        'rounded-xl border p-3 transition-all duration-200',
+        isCurrent
+          ? 'border-blue-400/50 bg-blue-500/10'
+          : isBest
+            ? 'border-green-500/30 bg-green-500/[0.04]'
+            : 'border-night-700/60 bg-night-800/60 hover:border-night-600',
+        quote.stale && 'opacity-80'
+      )
+    : 'rounded-xl border border-night-700/60 bg-night-800/40 p-3 opacity-50'
+---
+
+<li>
+  {
+    hasDetailsPanel && service ? (
+      <details class="group">
+        <summary
+          class={cn(cardClasses, 'cursor-pointer list-none [&::-webkit-details-marker]:hidden')}
+          title="Show provider details"
+        >
+          <SwapRowMobileInner
+            item={item}
+            currencyFromLabel={currencyFromLabel}
+            currencyToLabel={currencyToLabel}
+            amountSide={amountSide}
+            isBest={isBest}
+            showChevron
+          />
+        </summary>
+        <div class="mt-2">
+          <KycPolicyPanel
+            serviceSlug={service.slug}
+            kycPolicyMd={service.kycPolicyMd}
+            kycAttributes={kycAttributes}
+            deepLinkUrl={quote?.deepLinkUrl ?? null}
+            operatingSinceYear={operatingSinceYear}
+            onionUrls={onionUrls}
+            i2pUrls={i2pUrls}
+            activeEvents={activeEvents}
+            averageUserRating={averageUserRating}
+            ratingsCount={ratingsCount}
+            registrationCountry={registrationCountry}
+            registeredCompanyName={registeredCompanyName}
+            verificationInfo={verificationInfo}
+            guaranteeSummaryLabel={guaranteeSummaryLabel}
+          />
+        </div>
+      </details>
+    ) : (
+      <div class={cardClasses}>
+        <SwapRowMobileInner
+          item={item}
+          currencyFromLabel={currencyFromLabel}
+          currencyToLabel={currencyToLabel}
+          amountSide={amountSide}
+          isBest={isBest}
+          showChevron={false}
+        />
+      </div>
+    )
+  }
+</li>

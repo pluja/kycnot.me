@@ -1,0 +1,72 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../lib/cn'
+import { SWAP_OOB_TARGETS } from '../../lib/exchange/swapUrls'
+
+import type { SwapFormInput } from '../../components/swap/SwapFormAndResults.astro'
+
+type Props = {
+  input: SwapFormInput
+  resultsId: string
+}
+
+const { input, resultsId } = Astro.props
+
+const controlClass =
+  'h-8 rounded-md border border-night-700 bg-night-900 text-xs text-day-100 outline-none transition-colors focus:border-green-500/40'
+---
+
+<form
+  method="GET"
+  action="/swap"
+  hx-get="/swap"
+  hx-select={`#${resultsId}`}
+  hx-target={`#${resultsId}`}
+  hx-swap="outerHTML"
+  hx-select-oob={SWAP_OOB_TARGETS}
+  hx-trigger="change"
+  hx-push-url="true"
+  hx-indicator={`#${resultsId}`}
+  class="flex flex-wrap items-center gap-2"
+>
+  <input type="hidden" name="from" value={input.from} />
+  <input type="hidden" name="to" value={input.to} />
+  {input.sendAmount !== undefined && <input type="hidden" name="sendAmount" value={input.sendAmount} />}
+  {
+    input.sendAmount === undefined && input.receiveAmount !== undefined && (
+      <input type="hidden" name="receiveAmount" value={input.receiveAmount} />
+    )
+  }
+
+  <label class={cn(controlClass, 'inline-flex items-center gap-1.5 px-2')}>
+    <Icon name="ri:sort-desc" class="size-3.5 text-day-500" />
+    <span class="sr-only">Sort by</span>
+    <select
+      name="sortBy"
+      class="h-full border-0 bg-transparent p-0 pr-5 text-xs font-semibold text-day-100 outline-none focus:ring-0 [&>option]:bg-night-900 [&>option]:text-day-100"
+    >
+      <option value="rate" selected={input.sortBy === 'rate'}>Best rate</option>
+      <option value="score" selected={input.sortBy === 'score'}>Highest score</option>
+      <option value="kyc" selected={input.sortBy === 'kyc'}>Lowest KYC</option>
+    </select>
+  </label>
+
+  <label class={cn(controlClass, 'inline-flex items-center gap-2 px-2.5 text-day-200')}>
+    <input
+      type="checkbox"
+      name="approvedOnly"
+      value="true"
+      checked={input.approvedOnly}
+      class="size-3.5 rounded-sm border-night-600 bg-night-950 text-green-500 focus:ring-green-500/40"
+    />
+    <span class="font-semibold">Only Approved or Verified</span>
+  </label>
+
+  <button
+    type="submit"
+    class="h-8 rounded-md border border-green-600 bg-green-500 px-3 text-xs font-bold text-black transition-colors hover:bg-green-400 js:hidden"
+  >
+    Apply
+  </button>
+</form>

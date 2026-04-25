@@ -1,0 +1,111 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../lib/cn'
+import MyPicture from '../MyPicture.astro'
+import Tooltip from '../Tooltip.astro'
+
+import type { getEventTypeInfo } from '../../constants/eventTypes'
+import type { getVerificationStatusInfo } from '../../constants/verificationStatus'
+
+type ActiveEventBadge = {
+  title: string
+  typeInfo: ReturnType<typeof getEventTypeInfo>
+  totalCount: number
+}
+
+type Props = {
+  serviceSlug: string
+  name: string
+  imageUrl: string | null
+  verificationInfo: ReturnType<typeof getVerificationStatusInfo> | null
+  hasOrangeFrenGuarantee?: boolean
+  orangeFrenGuaranteeTooltip?: string | null
+  activeEvent?: ActiveEventBadge | null
+  unavailable?: boolean
+  textClass?: string
+  truncateClass?: string
+}
+
+const {
+  serviceSlug,
+  name,
+  imageUrl,
+  verificationInfo,
+  hasOrangeFrenGuarantee = false,
+  orangeFrenGuaranteeTooltip = null,
+  activeEvent = null,
+  unavailable = false,
+  textClass,
+  truncateClass = 'max-w-48 truncate lg:max-w-none',
+} = Astro.props
+
+const serviceHref = `/service/${encodeURIComponent(serviceSlug)}`
+---
+
+<span class="flex min-w-0 items-center gap-2">
+  <a
+    href={serviceHref}
+    class={cn(
+      'flex min-w-0 items-center gap-2',
+      unavailable ? 'text-day-400 opacity-75 hover:text-day-300' : textClass ?? 'text-white hover:text-green-400'
+    )}
+  >
+    <MyPicture
+      src={imageUrl}
+      fallback="service"
+      alt=""
+      class={cn('size-6 shrink-0 rounded-sm object-contain', unavailable && 'grayscale')}
+      width={24}
+      height={24}
+    />
+    <span class={cn('font-title text-sm font-medium', truncateClass)}>{name}</span>
+    {
+      verificationInfo && (
+        <Tooltip
+          text={`${verificationInfo.label}: ${verificationInfo.description}`}
+          position="top"
+        >
+          <Icon
+            name={verificationInfo.icon}
+            class={cn('size-3.5 shrink-0', verificationInfo.classNames.icon)}
+          />
+        </Tooltip>
+      )
+    }
+    {
+      hasOrangeFrenGuarantee && (
+        <Tooltip text={orangeFrenGuaranteeTooltip ?? 'Guarantee Available'} position="top">
+          <Icon name="ri:shield-check-line" class="size-3.5 shrink-0 text-green-400" />
+        </Tooltip>
+      )
+    }
+  </a>
+  {
+    activeEvent && (
+      <Tooltip
+        text={
+          activeEvent.totalCount > 1
+            ? `${activeEvent.typeInfo.label}: ${activeEvent.title} (+${activeEvent.totalCount - 1} more)`
+            : `${activeEvent.typeInfo.label}: ${activeEvent.title}`
+        }
+        position="top"
+        >
+        <a
+          href={`${serviceHref}#events`}
+          target="_blank"
+          rel="noopener"
+          aria-label={`Open ${activeEvent.typeInfo.label.toLowerCase()} on provider page`}
+          class={cn(
+            'inline-flex size-4 shrink-0 items-center justify-center rounded-full',
+            activeEvent.typeInfo.id === 'ALERT'
+              ? 'text-red-400 hover:text-red-300'
+              : 'text-yellow-400 hover:text-yellow-300'
+          )}
+        >
+          <Icon name={activeEvent.typeInfo.icon} class="size-4" />
+        </a>
+      </Tooltip>
+    )
+  }
+</span>

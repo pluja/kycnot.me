@@ -1,0 +1,302 @@
+---
+import { AttributeType, EventType, VerificationStatus } from '@prisma/client'
+import { Icon } from 'astro-icon/components'
+
+import { getAttributeTypeInfo } from '../../constants/attributeTypes'
+import { cn } from '../../lib/cn'
+import { safeHttpUrl } from '../../lib/exchange/safeUrl'
+import { SWAP_FAQ_GUARANTEE_ID } from '../../lib/exchange/swapPageInfo'
+import AttributeCard from '../AttributeCard.astro'
+import Markdown from '../Markdown.astro'
+import Tooltip from '../Tooltip.astro'
+
+import type { getEventTypeInfo } from '../../constants/eventTypes'
+import type { getVerificationStatusInfo } from '../../constants/verificationStatus'
+
+type KycAttribute = {
+  id: number
+  type: AttributeType
+  title: string
+  description: string
+  privacyPoints: number
+  trustPoints: number
+}
+
+type ActiveEvent = {
+  id: number
+  type: EventType
+  title: string
+  startedAt: Date
+  typeInfo: ReturnType<typeof getEventTypeInfo>
+}
+
+type CountryInfo = {
+  code: string | null | undefined
+  name: string
+  flag: string
+}
+
+type Props = {
+  serviceSlug: string
+  kycPolicyMd: string | null
+  kycAttributes: KycAttribute[]
+  deepLinkUrl?: string | null
+  operatingSinceYear: number | null
+  onionUrls: string[]
+  i2pUrls: string[]
+  activeEvents: ActiveEvent[]
+  averageUserRating: number | null
+  ratingsCount: number
+  registrationCountry: CountryInfo | null
+  registeredCompanyName: string | null
+  verificationInfo: ReturnType<typeof getVerificationStatusInfo> | null
+  guaranteeSummaryLabel?: string | null
+}
+
+const {
+  serviceSlug,
+  kycPolicyMd,
+  kycAttributes,
+  deepLinkUrl = null,
+  operatingSinceYear,
+  onionUrls,
+  i2pUrls,
+  activeEvents,
+  averageUserRating,
+  ratingsCount,
+  registrationCountry,
+  registeredCompanyName,
+  verificationInfo,
+  guaranteeSummaryLabel = null,
+} = Astro.props
+
+const showRating = ratingsCount > 0 && averageUserRating !== null
+const ratingLabel = showRating ? averageUserRating.toFixed(1) : null
+
+const shapedAttributes = kycAttributes.map((attr) => ({
+  ...attr,
+  typeInfo: getAttributeTypeInfo(attr.type),
+  links:
+    attr.type === AttributeType.GOOD || attr.type === AttributeType.INFO
+      ? [
+          {
+            url: `/?attr-${attr.id}=yes`,
+            label: 'Search with this',
+            icon: 'ri:search-line',
+          },
+        ]
+      : [
+          {
+            url: `/?attr-${attr.id}=yes`,
+            label: 'With this',
+            icon: 'ri:search-line',
+          },
+          {
+            url: `/?attr-${attr.id}=no`,
+            label: 'Without this',
+            icon: 'ri:search-line',
+          },
+        ],
+}))
+
+const registrationTooltip = registrationCountry
+  ? registeredCompanyName
+    ? `Legally registered as ${registeredCompanyName} in ${registrationCountry.name}`
+    : `Legally registered in ${registrationCountry.name}`
+  : null
+const torOverlayUrl = safeHttpUrl(onionUrls[0])
+const torSwapUrl = torOverlayUrl ? buildOverlaySwapUrl(torOverlayUrl, deepLinkUrl) : null
+const i2pUrl = safeHttpUrl(i2pUrls[0])
+const hasServiceInfo =
+  verificationInfo !== null ||
+  guaranteeSummaryLabel !== null ||
+  operatingSinceYear !== null ||
+  torSwapUrl !== null ||
+  i2pUrl !== null ||
+  activeEvents.length > 0 ||
+  showRating ||
+  registrationCountry !== null
+
+function buildOverlaySwapUrl(overlayUrl: string, sourceUrl: string | null): string {
+  if (!sourceUrl || sourceUrl === '#') return overlayUrl
+  try {
+    const overlay = new URL(overlayUrl)
+    const source = new URL(sourceUrl)
+    overlay.pathname = source.pathname
+    overlay.search = source.search
+    overlay.hash = source.hash
+    return overlay.toString()
+  } catch {
+    return overlayUrl
+  }
+}
+---
+
+<div class="space-y-3">
+  {
+    hasServiceInfo && (
+      <section class="rounded-lg bg-gradient-to-b from-night-800/50 to-night-900/30 p-2 ring-1 ring-night-700/50 ring-inset">
+        {verificationInfo && (
+          <Tooltip
+            text={`${verificationInfo.label}: ${verificationInfo.description}`}
+            position="top"
+          >
+            <div
+              class={cn(
+                'mb-2 flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[11px] text-day-300',
+                verificationInfo.value === VerificationStatus.VERIFICATION_SUCCESS && 'border-green-500/15 bg-green-500/[0.05] text-green-200/85',
+                verificationInfo.value === VerificationStatus.APPROVED && 'border-night-600/60 bg-night-900/50 text-day-300',
+                verificationInfo.value === VerificationStatus.COMMUNITY_CONTRIBUTED && 'border-amber-500/15 bg-amber-500/[0.05] text-amber-200/85',
+                verificationInfo.value === VerificationStatus.VERIFICATION_FAILED && 'border-red-500/15 bg-red-500/[0.05] text-red-200/85'
+              )}
+            >
+              <Icon
+                name={verificationInfo.icon}
+                class={cn('size-3.5 shrink-0 opacity-80', verificationInfo.classNames.icon)}
+                aria-hidden="true"
+              />
+              <span class="font-medium normal-case">
+                {verificationInfo.label}: {verificationInfo.description}
+              </span>
+            </div>
+          </Tooltip>
+        )}
+
+        <div class="flex flex-wrap items-center gap-1.5">
+          {guaranteeSummaryLabel && (
+            <a
+              href={`#${SWAP_FAQ_GUARANTEE_ID}`}
+              class="inline-flex h-7 items-center gap-1.5 rounded-md bg-green-500/10 px-2 text-[11px] text-green-300 ring-1 ring-green-500/25 transition-colors ring-inset hover:bg-green-500/15 hover:text-green-200"
+            >
+              <Icon name="ri:shield-check-line" class="size-3.5 text-green-400" aria-hidden="true" />
+              <span class="font-semibold">{guaranteeSummaryLabel}</span>
+            </a>
+          )}
+
+          {operatingSinceYear !== null && (
+            <span
+              class="inline-flex h-7 items-center gap-1.5 rounded-md bg-night-900/50 px-2 text-[11px] text-day-300 ring-1 ring-night-700/60 ring-inset"
+              title={`Operating since ${operatingSinceYear}`}
+            >
+              <Icon name="ri:calendar-check-line" class="size-3.5 text-day-500" aria-hidden="true" />
+              <span class="hidden text-day-400 sm:inline">Since</span>
+              <span class="font-semibold text-day-100 tabular-nums">{operatingSinceYear}</span>
+            </span>
+          )}
+
+          {registrationCountry && (
+            <span
+              class="inline-flex h-7 items-center gap-1.5 rounded-md bg-night-900/50 px-2 text-[11px] text-day-300 ring-1 ring-night-700/60 ring-inset"
+              title={registrationTooltip ?? undefined}
+            >
+              <span class="text-base leading-none" aria-hidden="true">{registrationCountry.flag}</span>
+              <span class="hidden text-day-400 sm:inline">Registered in</span>
+              <span class="font-semibold text-day-100">{registrationCountry.name}</span>
+            </span>
+          )}
+
+          {showRating && (
+            <a
+              href={`/service/${serviceSlug}#comments`}
+              target="_blank"
+              rel="noopener"
+              class="group/rating inline-flex h-7 items-center gap-1.5 rounded-md bg-yellow-500/[0.06] px-2 text-[11px] text-day-200 ring-1 ring-yellow-500/20 transition-colors ring-inset hover:bg-yellow-500/10 hover:ring-yellow-400/40"
+              title={`${ratingLabel}/5 from ${ratingsCount} user ${ratingsCount === 1 ? 'review' : 'reviews'}. Click to read reviews.`}
+            >
+              <Icon name="ri:star-fill" class="size-3.5 text-yellow-400 transition-transform group-hover/rating:scale-110" aria-hidden="true" />
+              <span class="font-semibold text-day-100 tabular-nums">{ratingLabel}</span>
+              <span class="hidden text-day-500 sm:inline">/5</span>
+              <span class="text-day-700" aria-hidden="true">·</span>
+              <span class="text-day-400">
+                <span class="tabular-nums">{ratingsCount.toLocaleString()}</span>
+                <span class="hidden sm:inline"> {ratingsCount === 1 ? 'review' : 'reviews'}</span>
+              </span>
+              <Icon
+                name="ri:arrow-right-up-line"
+                class="size-3 text-day-600 transition-colors group-hover/rating:text-yellow-300"
+                aria-hidden="true"
+              />
+            </a>
+          )}
+
+          {torSwapUrl && (
+            <a
+              href={torSwapUrl}
+              target="_blank"
+              rel="noopener"
+              class="group/tor inline-flex h-7 items-center gap-1.5 rounded-md bg-night-900/50 px-2 text-[11px] text-day-300 ring-1 ring-night-700/60 transition-colors ring-inset hover:bg-purple-500/10 hover:text-purple-100 hover:ring-purple-400/40"
+              title="Provider available over Tor"
+            >
+              <Icon name="ri:shield-keyhole-line" class="size-3.5 text-purple-300 transition-colors group-hover/tor:text-purple-200" aria-hidden="true" />
+              <span class="font-medium tracking-wide">Tor</span>
+            </a>
+          )}
+
+          {i2pUrl && (
+            <a
+              href={i2pUrl}
+              target="_blank"
+              rel="noopener"
+              class="group/i2p inline-flex h-7 items-center gap-1.5 rounded-md bg-night-900/50 px-2 text-[11px] text-day-300 ring-1 ring-night-700/60 transition-colors ring-inset hover:bg-blue-500/10 hover:text-blue-100 hover:ring-blue-400/40"
+              title="Provider available over I2P"
+            >
+              <Icon name="ri:shield-keyhole-line" class="size-3.5 text-blue-300 transition-colors group-hover/i2p:text-blue-200" aria-hidden="true" />
+              <span class="font-medium tracking-wide">I2P</span>
+            </a>
+          )}
+        </div>
+
+        {activeEvents.length > 0 && (
+          <ul class="mt-2 space-y-1 border-t border-night-700/40 pt-2 text-[11px]">
+            {activeEvents.map((event) => (
+              <li>
+                <a
+                  href={`/service/${serviceSlug}#events`}
+                  target="_blank"
+                  rel="noopener"
+                  class={cn(
+                    'inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors',
+                    event.type === EventType.ALERT
+                      ? 'text-red-300 hover:bg-red-500/10'
+                      : 'text-yellow-300 hover:bg-yellow-500/10'
+                  )}
+                >
+                  <Icon name={event.typeInfo.icon} class="size-3.5" aria-hidden="true" />
+                  <span class="font-semibold">{event.typeInfo.label}:</span>
+                  <span>{event.title}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    )
+  }
+
+  <section class="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
+    <header
+      class="mb-2 flex items-center gap-2 text-xs font-bold tracking-wider text-blue-300 uppercase"
+    >
+      <Icon name="ri:fingerprint-line" class="size-4" />
+      KYC Policy
+    </header>
+
+    {
+      kycPolicyMd && (
+        <div class="prose prose-sm mb-3 max-w-none text-sm text-pretty text-day-200 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
+          <Markdown content={kycPolicyMd} />
+        </div>
+      )
+    }
+
+    {
+      shapedAttributes.length > 0 && (
+        <ul class="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-2 md:gap-3">
+          {shapedAttributes.map((attribute) => (
+            <AttributeCard attribute={attribute} />
+          ))}
+        </ul>
+      )
+    }
+  </section>
+</div>

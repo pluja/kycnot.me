@@ -3,8 +3,8 @@ import { serialize } from 'object-to-formdata'
 import { urlParamsToFormData, urlParamsToObject } from './urls'
 
 import type { AstroGlobal } from 'astro'
-import type { ActionAccept, ActionClient, SafeResult } from 'astro:actions'
 import type { z } from 'astro/zod'
+import type { ActionAccept, ActionClient, SafeResult } from 'astro:actions'
 
 /**
  * Call an Action directly from an Astro page or API endpoint.

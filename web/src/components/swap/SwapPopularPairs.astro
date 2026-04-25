@@ -1,0 +1,60 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../lib/cn'
+import { formatCurrencyLabel, SWAP_CHIPS_PAIRS } from '../../lib/exchange/swapPageInfo'
+import { buildSwapUrl, SWAP_OOB_TARGETS } from '../../lib/exchange/swapUrls'
+
+type Props = {
+  currentFrom: string
+  currentTo: string
+  sendAmount?: number
+  sortBy: 'kyc' | 'rate' | 'score'
+  approvedOnly: boolean
+  resultsId: string
+}
+
+const { currentFrom, currentTo, sendAmount, sortBy, approvedOnly, resultsId } = Astro.props
+---
+
+<div id="swap-popular-pairs">
+  <span class="mb-1.5 block text-[10px] font-semibold tracking-[0.2em] text-day-500 uppercase">Popular</span>
+  <div class="grid grid-cols-2 gap-1.5 xs:grid-cols-3 sm:grid-cols-6">
+    {
+      SWAP_CHIPS_PAIRS.map(({ from, to }) => {
+        const isActive = from === currentFrom && to === currentTo
+        return (
+          <a
+            href={buildSwapUrl(from, to, { sendAmount, sortBy, approvedOnly })}
+            hx-get="/swap"
+            hx-vals={JSON.stringify({ from, to })}
+            hx-include="#swap-form"
+            hx-target={`#${resultsId}`}
+            hx-select={`#${resultsId}`}
+            hx-swap="outerHTML"
+            hx-select-oob={SWAP_OOB_TARGETS}
+            hx-push-url="true"
+            hx-indicator={`#${resultsId}`}
+            aria-current={isActive ? 'true' : undefined}
+            class={cn(
+              'group inline-flex items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-title text-xs font-bold transition-all duration-150',
+              isActive
+                ? 'border-green-500/40 bg-green-500/10 text-green-100'
+                : 'border-night-700 bg-night-800 text-day-200 hover:border-night-600 hover:bg-night-700 hover:text-white'
+            )}
+          >
+            {formatCurrencyLabel(from)}
+            <Icon
+              name="ri:arrow-right-line"
+              class={cn(
+                'size-3 shrink-0 transition-colors',
+                isActive ? 'text-green-300' : 'text-day-600 group-hover:text-green-400'
+              )}
+            />
+            {formatCurrencyLabel(to)}
+          </a>
+        )
+      })
+    }
+  </div>
+</div>

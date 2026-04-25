@@ -17,8 +17,11 @@ pnpm-debug.log*
 
 
 # environment variables
+# .env.staging and .env.production are committed (build-time public values
+# only; real secrets are injected at runtime by docker compose).
 .env
-.env.production
+.env.local
+.env.*.local
 
 # macOS-specific files
 .DS_Store

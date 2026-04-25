@@ -128,5 +128,128 @@ class TestFetchJina(unittest.TestCase):
         self.assertIn("https://example.com/tos", call_url)
 
 
+class TestFetchLegalCorpus(unittest.TestCase):
+    """Tests for fetch_legal_corpus deep crawl + dedup logic."""
+
+    def _make_response(self, results: list[dict]) -> MagicMock:
+        r = MagicMock()
+        r.json.return_value = {"results": results}
+        return r
+
+    def _page(self, url: str, markdown: str, success: bool = True) -> dict:
+        return {
+            "url": url,
+            "success": success,
+            "markdown": {"fit_markdown": markdown, "raw_markdown": markdown},
+        }
+
+    @patch("pyworker.utils.crawl.requests.post")
+    def test_request_uses_deep_crawl_with_legal_filters(self, mock_post: MagicMock):
+        mock_post.return_value = self._make_response([self._page("https://x.com/terms", "Terms text")])
+
+        from pyworker.utils.crawl import fetch_legal_corpus
+        fetch_legal_corpus(["https://x.com/terms"])
+
+        payload = mock_post.call_args[1]["json"]
+        crawler_params = payload["crawler_config"]["params"]
+        deep = crawler_params["deep_crawl_strategy"]
+        self.assertEqual(deep["type"], "BFSDeepCrawlStrategy")
+        self.assertEqual(deep["params"]["max_depth"], 1)
+        self.assertFalse(deep["params"]["include_external"])
+        filters = deep["params"]["filter_chain"]["params"]["filters"]
+        filter_types = [f["type"] for f in filters]
+        self.assertIn("URLPatternFilter", filter_types)
+        self.assertIn("ContentTypeFilter", filter_types)
+        url_filter = next(f for f in filters if f["type"] == "URLPatternFilter")
+        patterns = url_filter["params"]["patterns"]
+        self.assertIn("*privacy*", patterns)
+        self.assertIn("*terms*", patterns)
+        self.assertIn("*aml*", patterns)
+
+    @patch("pyworker.utils.crawl.requests.post")
+    def test_dedups_by_normalized_url(self, mock_post: MagicMock):
+        mock_post.return_value = self._make_response([
+            self._page("https://x.com/terms", "Same content"),
+            self._page("https://x.com/terms/", "Different content but same URL"),
+        ])
+
+        from pyworker.utils.crawl import fetch_legal_corpus
+        combined, urls, _ = fetch_legal_corpus(["https://x.com/terms"])
+
+        self.assertEqual(len(urls), 1)
+        self.assertNotIn("Different content", combined)
+
+    @patch("pyworker.utils.crawl.requests.post")
+    def test_dedups_by_content_hash(self, mock_post: MagicMock):
+        mock_post.return_value = self._make_response([
+            self._page("https://x.com/terms", "Identical body"),
+            self._page("https://x.com/en/terms", "Identical body"),
+        ])
+
+        from pyworker.utils.crawl import fetch_legal_corpus
+        combined, urls, _ = fetch_legal_corpus(["https://x.com/terms"])
+
+        self.assertEqual(len(urls), 1)
+        self.assertEqual(combined.count("Identical body"), 1)
+
+    @patch("pyworker.utils.crawl.requests.post")
+    def test_corpus_hash_stable_across_runs(self, mock_post: MagicMock):
+        results = [
+            self._page("https://x.com/terms", "A"),
+            self._page("https://x.com/privacy", "B"),
+        ]
+        mock_post.return_value = self._make_response(results)
+
+        from pyworker.utils.crawl import fetch_legal_corpus
+        _, _, hash1 = fetch_legal_corpus(["https://x.com/terms"])
+
+        mock_post.return_value = self._make_response(results)
+        _, _, hash2 = fetch_legal_corpus(["https://x.com/terms"])
+
+        self.assertEqual(hash1, hash2)
+        self.assertEqual(len(hash1), 64)
+
+    @patch("pyworker.utils.crawl.requests.post")
+    def test_skips_failed_results(self, mock_post: MagicMock):
+        mock_post.return_value = self._make_response([
+            self._page("https://x.com/terms", "Good"),
+            self._page("https://x.com/dead", "", success=False),
+        ])
+
+        from pyworker.utils.crawl import fetch_legal_corpus
+        _, urls, _ = fetch_legal_corpus(["https://x.com/terms"])
+
+        self.assertEqual(urls, ["https://x.com/terms"])
+
+    @patch("pyworker.utils.crawl._fetch_crawl4ai")
+    @patch("pyworker.utils.crawl.requests.post")
+    def test_falls_back_to_single_fetch_when_deep_crawl_fails(
+        self, mock_post: MagicMock, mock_crawl4ai: MagicMock
+    ):
+        mock_post.side_effect = requests.RequestException("deep crawl down")
+        mock_crawl4ai.return_value = "single page content"
+
+        from pyworker.utils.crawl import fetch_legal_corpus
+        combined, urls, _ = fetch_legal_corpus(["https://x.com/terms"])
+
+        self.assertIn("single page content", combined)
+        self.assertEqual(urls, ["https://x.com/terms"])
+
+    @patch("pyworker.utils.crawl.requests.post")
+    def test_empty_seeds_returns_empty(self, mock_post: MagicMock):
+        from pyworker.utils.crawl import fetch_legal_corpus
+        combined, urls, corpus_hash = fetch_legal_corpus([])
+
+        self.assertEqual(combined, "")
+        self.assertEqual(urls, [])
+        self.assertEqual(corpus_hash, "")
+        mock_post.assert_not_called()
+
+    def test_normalize_url_strips_trailing_slash_and_lowercases_host(self):
+        from pyworker.utils.crawl import _normalize_url
+        self.assertEqual(_normalize_url("https://X.com/terms/"), "https://x.com/terms")
+        self.assertEqual(_normalize_url("https://X.com/"), "https://x.com/")
+
+
 if __name__ == "__main__":
     unittest.main()

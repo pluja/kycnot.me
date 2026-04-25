@@ -652,9 +652,9 @@ const generateFakeService = (users: User[]) => {
       () =>
         faker.helpers.arrayElement([
           'This exchange uses its own liquidity and is privacy-friendly. Refunds processed without additional verification.',
-          "This exchange refunds transactions that fail their AML check. In very rare cases funds may be blocked if a legal order demands it or stolen coins are involved. Past history is very good.",
+          'This exchange refunds transactions that fail their AML check. In very rare cases funds may be blocked if a legal order demands it or stolen coins are involved. Past history is very good.',
           "This exchange usually refunds transactions that fail their AML check, but if the deposit triggers their Liquidity Provider's AML system, funds may be blocked until KYC/SoF verification is passed.",
-          "Support confirmed: if the deposit fails a full AML check, the exchange may proceed via a partner DEX with an additional 1.8-2.1% fee. Otherwise, users who decline may request a refund.",
+          'Support confirmed: if the deposit fails a full AML check, the exchange may proceed via a partner DEX with an additional 1.8-2.1% fee. Otherwise, users who decline may request a refund.',
         ]),
       { probability: 0.4 }
     ),
@@ -1235,7 +1235,7 @@ async function main() {
     },
     {
       slug: 'lp-may-block-funds',
-      title: "Liquidity Provider may block funds",
+      title: 'Liquidity Provider may block funds',
       description: 'Even if the service itself is permissive, the upstream Liquidity Provider can independently freeze funds and demand KYC/Source-of-Funds.',
       category: 'KYC' as const,
       type: 'WARNING' as const,
@@ -1252,12 +1252,23 @@ async function main() {
       trustPoints: 0,
     },
     {
-      slug: 'transaction-screening-only',
-      title: 'Transaction screening (no KYC)',
-      description: 'Deposits are screened for blacklisted sources but no identity verification is performed in the normal flow.',
+      slug: 'transaction-screening',
+      title: 'Transaction screening',
+      description:
+        'Incoming deposits are screened against AML and sanctions databases (Chainalysis, Elliptic, and similar). The screening itself does not require identity from the user, but flagged deposits may be held for review. Outcomes vary by service: refund without ID, KYC required for refund, risk-based resolution, or seizure. See the service\'s specific flag-outcome attributes and policy notes.',
       category: 'KYC' as const,
-      type: 'INFO' as const,
-      privacyPoints: 0,
+      type: 'WARNING' as const,
+      privacyPoints: -3,
+      trustPoints: 0,
+    },
+    {
+      slug: 'may-seize-flagged-funds',
+      title: 'May seize flagged funds',
+      description:
+        'If a deposit is flagged as stolen, sanctioned, or otherwise illegitimate, the service may seize the funds without returning them to the user. This is stronger than a temporary hold pending KYC and typically affects only deposits confirmed to be from illegal sources.',
+      category: 'KYC' as const,
+      type: 'BAD' as const,
+      privacyPoints: -8,
       trustPoints: 0,
     },
     {

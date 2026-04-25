@@ -1,0 +1,57 @@
+---
+import SwapFormAndResults from '../../components/swap/SwapFormAndResults.astro'
+import SwapPageFooter from '../../components/swap/SwapPageFooter.astro'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import {
+  buildCanonical,
+  buildDescription,
+  buildFaqSchema,
+  buildOgImageProps,
+  buildOrganizationSchema,
+  buildTitle,
+  buildWebApplicationSchema,
+  resolveSwapPair,
+} from '../../lib/exchange/swapPageInfo'
+
+const curatedPair = resolveSwapPair(Astro.url.searchParams)
+const canonical = buildCanonical(curatedPair)
+const pageTitle = buildTitle(curatedPair)
+const description = buildDescription(curatedPair)
+const ogImage = buildOgImageProps(curatedPair)
+const schemas = [
+  buildOrganizationSchema(),
+  buildWebApplicationSchema(canonical, description),
+  buildFaqSchema(),
+]
+---
+
+<BaseLayout
+  pageTitle={pageTitle}
+  description={description}
+  canonical={canonical}
+  ogImage={ogImage}
+  schemas={schemas}
+  breadcrumbs={[{ name: 'Services', url: '/' }, { name: 'Compare Rates' }]}
+  htmx
+>
+  <div class="mx-auto max-w-5xl px-2 pb-12 sm:px-4">
+    <header class="flex flex-col items-center pt-6 pb-2 text-center sm:pt-8 sm:pb-3">
+      <div class="flex items-center gap-2">
+        <h1 class="font-title text-2xl font-bold tracking-tight text-white sm:text-3xl">Compare Swap Rates</h1>
+        <span
+          class="rounded-full border border-green-500/40 bg-green-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-[0.15em] text-green-300 uppercase"
+        >
+          Beta
+        </span>
+      </div>
+      <p class="mt-1 text-sm text-day-400">
+        Find the best exchange rates across KYC-free providers. This feature is in beta; rates and
+        providers may change as we refine it.
+      </p>
+    </header>
+
+    <SwapFormAndResults />
+
+    <SwapPageFooter />
+  </div>
+</BaseLayout>

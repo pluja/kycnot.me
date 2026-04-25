@@ -2,7 +2,6 @@
 FROM node:lts AS build
 WORKDIR /app
 
-COPY .env .env
 COPY web/package.json web/package-lock.json ./
 COPY web/.npmrc .npmrc
 
@@ -11,6 +10,7 @@ RUN npm ci
 COPY web/ .
 
 ARG ASTRO_BUILD_MODE=production
+ENV ASTRO_BUILD_MODE=${ASTRO_BUILD_MODE}
 
 # Generate Prisma client
 RUN npx prisma generate

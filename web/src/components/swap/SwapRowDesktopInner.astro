@@ -1,0 +1,211 @@
+---
+import { EventType } from '@prisma/client'
+import { Icon } from 'astro-icon/components'
+
+import { getEventTypeInfo } from '../../constants/eventTypes'
+import { getKycLevelInfo } from '../../constants/kycLevels'
+import { getVerificationStatusInfo } from '../../constants/verificationStatus'
+import { cn } from '../../lib/cn'
+import { safeHttpUrl } from '../../lib/exchange/safeUrl'
+import { spreadColorClass } from '../../lib/exchange/spreadStyle'
+import { makeOverallScoreInfo } from '../../lib/overallScore'
+import Tooltip from '../Tooltip.astro'
+
+import SwapKycBadge from './SwapKycBadge.astro'
+import SwapProviderLink from './SwapProviderLink.astro'
+import { describeGuaranteeCoverage, formatSwapAmount, formatSwapPercent, formatSwapRate } from './swapResultUi'
+
+import type { AggregatedResultWithService } from '../../lib/exchange/aggregator'
+
+type Props = {
+  item: AggregatedResultWithService
+  currencyFromLabel: string
+  currencyToLabel: string
+  amountSide: 'receive' | 'send'
+  isBest: boolean
+  showChevron: boolean
+  message?: string
+}
+
+const { item, currencyFromLabel, currencyToLabel, amountSide, isBest, showChevron, message = '' } = Astro.props
+
+const { service, serviceSlug } = item
+const quote = item.quote
+const kycInfo = service ? getKycLevelInfo(String(service.kycLevel)) : null
+const verificationInfo = service ? getVerificationStatusInfo(service.verificationStatus) : null
+const scoreInfo = service ? makeOverallScoreInfo(service.overallScore, 10) : null
+
+// ALERT outranks WARNING for the row badge. Aggregator already filters the list.
+const events = service?.events ?? []
+const primaryEvent =
+  events.find((e) => e.type === EventType.ALERT) ?? events[0] ?? null
+const activeEvent = primaryEvent
+  ? {
+      title: primaryEvent.title,
+      typeInfo: getEventTypeInfo(primaryEvent.type),
+      totalCount: events.length,
+    }
+  : null
+
+const deepLinkHref = quote
+  ? (safeHttpUrl(quote.deepLinkUrl) ?? safeHttpUrl(service?.serviceUrls[0]) ?? '#')
+  : '#'
+const hasOrangeFrenGuarantee = quote?.orangefrenGuarantee !== null && quote.orangefrenGuarantee > 0
+const guaranteeCoverage = describeGuaranteeCoverage(quote)
+---
+
+<div class="min-w-0" class:list={[quote === null && 'opacity-50']}>
+  <SwapProviderLink
+    serviceSlug={serviceSlug}
+    name={service?.name ?? serviceSlug}
+    imageUrl={service?.imageUrl ?? null}
+    verificationInfo={verificationInfo}
+    hasOrangeFrenGuarantee={hasOrangeFrenGuarantee}
+    orangeFrenGuaranteeTooltip={guaranteeCoverage?.tooltipLabel}
+    activeEvent={activeEvent}
+    unavailable={quote === null}
+  />
+</div>
+<div class={cn('text-center', quote === null && 'opacity-50')}>
+  {
+    scoreInfo && (
+      <Tooltip text={`${Math.round(service?.privacyScore ?? 0)}% Privacy | ${Math.round(service?.trustScore ?? 0)}% Trust`} position="top">
+        <span
+          class={cn(
+            'inline-flex size-5 items-center justify-center rounded-sm text-[10px] font-bold text-black',
+            scoreInfo.classNameBg
+          )}
+        >
+          {scoreInfo.formattedScore}
+        </span>
+      </Tooltip>
+    )
+  }
+</div>
+<div class={cn('text-center', quote === null && 'opacity-50')}>
+  {
+    kycInfo && service && (
+      <>
+        <Tooltip text={kycInfo.description || kycInfo.name} position="top">
+          <SwapKycBadge kycInfo={kycInfo} />
+        </Tooltip>
+        {showChevron && (
+          <span class="mt-0.5 block text-[10px] text-day-600 underline decoration-dotted underline-offset-2">
+            see policy
+          </span>
+        )}
+      </>
+    )
+  }
+</div>
+{
+  quote !== null ? (
+    <>
+      <div />
+      <div class="text-center">
+        <Tooltip
+          text="Approximate rate: this provider doesn't quote the receive side directly. We derived it from its current exchange rate."
+          enabled={quote.approximate}
+          position="top"
+        >
+          <span
+            class={cn(
+              'font-mono text-sm font-bold tabular-nums',
+              isBest ? 'text-green-400' : quote.approximate ? 'text-day-300' : 'text-white'
+            )}
+          >
+            {quote.approximate && <span class="text-day-500">~</span>}
+            {formatSwapAmount(amountSide === 'send' ? quote.amountReceived : quote.amountFrom)}
+          </span>
+        </Tooltip>
+        <span class="text-[11px] text-day-500">
+          {amountSide === 'send' ? currencyToLabel : currencyFromLabel}
+        </span>
+        {quote.stale && (
+          <Tooltip text="Cached rate; live fetch failed" position="top">
+            <span class="ml-1 inline-flex items-center rounded-sm bg-yellow-500/15 px-1 py-px text-[10px] font-medium text-yellow-300">
+              stale
+            </span>
+          </Tooltip>
+        )}
+      </div>
+      <div class="hidden text-center text-day-400 lg:block">
+        <span class="font-mono text-sm tabular-nums">{formatSwapRate(quote.exchangeRate)}</span>
+      </div>
+      <div class="text-center">
+        {isBest ? (
+          <span class="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-2 py-0.5 text-[11px] font-bold text-green-400">
+            <Icon name="ri:trophy-line" class="size-3" />
+            Best
+          </span>
+        ) : quote.spreadPercent !== null ? (
+          <Tooltip
+            text={
+              amountSide === 'send'
+                ? `${quote.spreadPercent.toFixed(2)}% less ${currencyToLabel} than the best quote`
+                : `${quote.spreadPercent.toFixed(2)}% more ${currencyFromLabel} than the cheapest quote`
+            }
+            position="top"
+          >
+            <span class={cn('font-mono text-xs tabular-nums', spreadColorClass(quote.spreadPercent))}>
+              +{quote.spreadPercent.toFixed(2)}%
+            </span>
+          </Tooltip>
+        ) : (
+          <span class="text-day-700">-</span>
+        )}
+      </div>
+      <div class="hidden text-center md:block">
+        {quote.marketSpreadPercent !== null ? (
+          <span class={cn('font-mono text-xs tabular-nums', spreadColorClass(quote.marketSpreadPercent))}>
+            {formatSwapPercent(quote.marketSpreadPercent)}
+          </span>
+        ) : (
+          <span class="text-day-700">-</span>
+        )}
+      </div>
+      <div class="flex items-center justify-end gap-2">
+        <a
+          href={deepLinkHref}
+          target="_blank"
+          rel="nofollow noopener"
+          class="inline-flex items-center gap-1 rounded-lg bg-green-500 px-3 py-1.5 text-xs font-bold text-black transition-all hover:bg-green-400 hover:shadow-sm hover:shadow-green-500/20 focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:outline-none"
+        >
+          Swap
+          <Icon name="ri:arrow-right-up-line" class="size-3" />
+        </a>
+        {showChevron ? (
+          <Tooltip text="See KYC policy and details" position="top">
+            <Icon
+              name="ri:information-line"
+              class="size-5 shrink-0 text-day-500 transition-colors hover:text-green-400"
+              aria-hidden="true"
+            />
+          </Tooltip>
+        ) : (
+          <span class="invisible size-5 shrink-0" aria-hidden="true" />
+        )}
+      </div>
+    </>
+  ) : (
+    <>
+      <div
+        class="text-right text-xs text-day-500 italic"
+        class:list={[showChevron ? '[grid-column:4/-2]' : '[grid-column:4/-1]']}
+      >
+        {message}
+      </div>
+      {showChevron && (
+        <div class="flex items-center justify-end">
+          <Tooltip text="See KYC policy and details" position="top">
+            <Icon
+              name="ri:information-line"
+              class="size-5 shrink-0 text-day-500 transition-colors hover:text-green-400"
+              aria-hidden="true"
+            />
+          </Tooltip>
+        </div>
+      )}
+    </>
+  )
+}
