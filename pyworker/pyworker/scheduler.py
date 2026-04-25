@@ -43,9 +43,16 @@ class TaskScheduler:
         signal.signal(signal.SIGTERM, self._handle_signal)
 
     def _handle_signal(self, signum: int, frame: FrameType | None) -> None:
-        """Handle termination signals."""
-        self.logger.info(f"Received signal {signum}, shutting down...")
-        self.stop()
+        """Handle termination signals.
+
+        Keep the handler trivial: set the stop event and let the main loop
+        coordinate shutdown. Doing joins / pool close from inside the handler
+        blocks the main thread while signals are queued, easily exceeding
+        docker's stop_grace_period and triggering a SIGKILL.
+        """
+        self.logger.info(f"Received signal {signum}, requesting shutdown...")
+        self.stop_event.set()
+        self.running = False
 
     def register_task(
         self,
@@ -174,9 +181,10 @@ class TaskScheduler:
         self.running = False
         self.stop_event.set()
 
-        # Wait for all threads to terminate
+        # Bounded wait: workers are daemon threads, so anything still stuck
+        # on a long task (LLM call, web crawl) will be killed at process exit.
         for thread in self.threads:
-            thread.join(timeout=5.0)
+            thread.join(timeout=1.0)
 
         self.threads = []
 
