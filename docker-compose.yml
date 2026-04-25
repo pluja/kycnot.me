@@ -58,6 +58,8 @@ services:
       dockerfile: web/Dockerfile
     image: codeberg.org/pluja/kycnot/astro:${ASTRO_IMAGE_TAG:-latest}
     restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
     env_file:
       - .env
     depends_on:

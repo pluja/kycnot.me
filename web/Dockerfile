@@ -40,8 +40,11 @@ COPY --from=build /app/prisma ./prisma
 COPY web/migrate.sh /usr/local/bin/knm-migrate
 RUN chmod +x /usr/local/bin/knm-migrate
 
+COPY web/entrypoint.sh /usr/local/bin/knm-entrypoint
+RUN chmod +x /usr/local/bin/knm-entrypoint
+
 ENV HOST=0.0.0.0
 ENV PORT=4321
 EXPOSE 4321
 
-CMD ["sh", "-c", "node ./dist/server/server-init.js & node ./dist/server/entry.mjs"]
+CMD ["knm-entrypoint"]
