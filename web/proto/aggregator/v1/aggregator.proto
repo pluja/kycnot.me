@@ -7,6 +7,7 @@ option go_package = "kycnot.me/aggregator/gen/go/aggregator/v1;aggregatorv1";
 service AggregatorService {
   rpc GetQuotes(GetQuotesRequest) returns (GetQuotesResponse);
   rpc ListCurrencies(ListCurrenciesRequest) returns (ListCurrenciesResponse);
+  rpc ListSupportedProviders(ListSupportedProvidersRequest) returns (ListSupportedProvidersResponse);
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }
 
@@ -109,6 +110,15 @@ message Currency {
   string code = 1;
   // Network identifiers, uppercase (e.g. "TRX", "LN"). Empty for single-network assets.
   repeated string networks = 2;
+}
+
+message ListSupportedProvidersRequest {}
+
+message ListSupportedProvidersResponse {
+  // Service slugs (matching the frontend Service.slug field) for which the
+  // aggregator can return quotes. Stable across requests; intended for clients
+  // to cache.
+  repeated string service_slugs = 1;
 }
 
 message HealthCheckRequest {}

@@ -45,6 +45,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro'
 import { someButNotAll, undefinedIfEmpty } from '../../lib/arrays'
 import { makeNonDbAttributes, sortAttributes } from '../../lib/attributes'
 import { cn } from '../../lib/cn'
+import { getSupportedProviderSlugs } from '../../lib/exchange/supportedProviders'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
 import { pluralize } from '../../lib/pluralize'
 import { prisma } from '../../lib/prisma'
@@ -468,6 +469,11 @@ const sortedVerificationSteps = orderBy(
 
 const exchangeSlugs = ['exchange', 'cex', 'dex'] as const satisfies string[]
 const isExchange = service.categories.some((c) => exchangeSlugs.includes(c.slug))
+
+// Show swap CTA / compare section only when the aggregator can actually quote
+// this provider. List is cached for 30 minutes server-side.
+const supportedProviderSlugs = isExchange ? await getSupportedProviderSlugs() : null
+const isSwapSupported = !!supportedProviderSlugs && supportedProviderSlugs.has(service.slug)
 
 const verificationOverview = getServiceVerificationOverview(service)
 
@@ -922,7 +928,7 @@ const verificationStatusDate =
   }
 
   {
-    !!isExchange && (
+    !!isSwapSupported && (
       <SwapCTA
         class="mt-4"
         heading="Compare rates"
@@ -1630,7 +1636,7 @@ const verificationStatusDate =
   }
 
   {
-    !!isExchange && (
+    !!isSwapSupported && (
       <>
         <h2 class="mt-6 mb-3 border-b border-day-500 font-title text-lg font-bold text-day-200" id="compare">
           Compare Exchange Rates

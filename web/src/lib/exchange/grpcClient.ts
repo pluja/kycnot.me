@@ -6,6 +6,7 @@ import {
   type GetQuotesRequest,
   type GetQuotesResponse,
   type ListCurrenciesResponse,
+  type ListSupportedProvidersResponse,
 } from '../../generated/aggregator/v1/aggregator'
 
 // Keep this strictly longer than the server's max_wait_ms. If the client
@@ -50,6 +51,17 @@ export function listCurrencies(): Promise<ListCurrenciesResponse> {
   const options = { deadline: Date.now() + DEFAULT_DEADLINE_MS }
   return new Promise<ListCurrenciesResponse>((resolve, reject) => {
     client.listCurrencies({}, authMetadata(), options, (error, response) => {
+      if (error) { reject(error); return; }
+      resolve(response)
+    })
+  })
+}
+
+export function listSupportedProviders(): Promise<ListSupportedProvidersResponse> {
+  const client = getClient()
+  const options = { deadline: Date.now() + DEFAULT_DEADLINE_MS }
+  return new Promise<ListSupportedProvidersResponse>((resolve, reject) => {
+    client.listSupportedProviders({}, authMetadata(), options, (error, response) => {
       if (error) { reject(error); return; }
       resolve(response)
     })

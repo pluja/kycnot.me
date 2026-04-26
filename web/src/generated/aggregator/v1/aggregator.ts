@@ -224,6 +224,18 @@ export interface Currency {
   networks: string[];
 }
 
+export interface ListSupportedProvidersRequest {
+}
+
+export interface ListSupportedProvidersResponse {
+  /**
+   * Service slugs (matching the frontend Service.slug field) for which the
+   * aggregator can return quotes. Stable across requests; intended for clients
+   * to cache.
+   */
+  serviceSlugs: string[];
+}
+
 export interface HealthCheckRequest {
 }
 
@@ -1114,6 +1126,113 @@ export const Currency: MessageFns<Currency> = {
   },
 };
 
+function createBaseListSupportedProvidersRequest(): ListSupportedProvidersRequest {
+  return {};
+}
+
+export const ListSupportedProvidersRequest: MessageFns<ListSupportedProvidersRequest> = {
+  encode(_: ListSupportedProvidersRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListSupportedProvidersRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListSupportedProvidersRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): ListSupportedProvidersRequest {
+    return {};
+  },
+
+  toJSON(_: ListSupportedProvidersRequest): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListSupportedProvidersRequest>): ListSupportedProvidersRequest {
+    return ListSupportedProvidersRequest.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<ListSupportedProvidersRequest>): ListSupportedProvidersRequest {
+    const message = createBaseListSupportedProvidersRequest();
+    return message;
+  },
+};
+
+function createBaseListSupportedProvidersResponse(): ListSupportedProvidersResponse {
+  return { serviceSlugs: [] };
+}
+
+export const ListSupportedProvidersResponse: MessageFns<ListSupportedProvidersResponse> = {
+  encode(message: ListSupportedProvidersResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.serviceSlugs) {
+      writer.uint32(10).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListSupportedProvidersResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListSupportedProvidersResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.serviceSlugs.push(reader.string());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListSupportedProvidersResponse {
+    return {
+      serviceSlugs: globalThis.Array.isArray(object?.serviceSlugs)
+        ? object.serviceSlugs.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.service_slugs)
+        ? object.service_slugs.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ListSupportedProvidersResponse): unknown {
+    const obj: any = {};
+    if (message.serviceSlugs?.length) {
+      obj.serviceSlugs = message.serviceSlugs;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListSupportedProvidersResponse>): ListSupportedProvidersResponse {
+    return ListSupportedProvidersResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListSupportedProvidersResponse>): ListSupportedProvidersResponse {
+    const message = createBaseListSupportedProvidersResponse();
+    message.serviceSlugs = object.serviceSlugs?.map((e) => e) || [];
+    return message;
+  },
+};
+
 function createBaseHealthCheckRequest(): HealthCheckRequest {
   return {};
 }
@@ -1237,6 +1356,18 @@ export const AggregatorServiceService = {
       Buffer.from(ListCurrenciesResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): ListCurrenciesResponse => ListCurrenciesResponse.decode(value),
   },
+  listSupportedProviders: {
+    path: "/aggregator.v1.AggregatorService/ListSupportedProviders" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ListSupportedProvidersRequest): Buffer =>
+      Buffer.from(ListSupportedProvidersRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListSupportedProvidersRequest => ListSupportedProvidersRequest.decode(value),
+    responseSerialize: (value: ListSupportedProvidersResponse): Buffer =>
+      Buffer.from(ListSupportedProvidersResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListSupportedProvidersResponse =>
+      ListSupportedProvidersResponse.decode(value),
+  },
   healthCheck: {
     path: "/aggregator.v1.AggregatorService/HealthCheck" as const,
     requestStream: false as const,
@@ -1251,6 +1382,7 @@ export const AggregatorServiceService = {
 export interface AggregatorServiceServer extends UntypedServiceImplementation {
   getQuotes: handleUnaryCall<GetQuotesRequest, GetQuotesResponse>;
   listCurrencies: handleUnaryCall<ListCurrenciesRequest, ListCurrenciesResponse>;
+  listSupportedProviders: handleUnaryCall<ListSupportedProvidersRequest, ListSupportedProvidersResponse>;
   healthCheck: handleUnaryCall<HealthCheckRequest, HealthCheckResponse>;
 }
 
@@ -1284,6 +1416,21 @@ export interface AggregatorServiceClient extends Client {
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: ListCurrenciesResponse) => void,
+  ): ClientUnaryCall;
+  listSupportedProviders(
+    request: ListSupportedProvidersRequest,
+    callback: (error: ServiceError | null, response: ListSupportedProvidersResponse) => void,
+  ): ClientUnaryCall;
+  listSupportedProviders(
+    request: ListSupportedProvidersRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListSupportedProvidersResponse) => void,
+  ): ClientUnaryCall;
+  listSupportedProviders(
+    request: ListSupportedProvidersRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListSupportedProvidersResponse) => void,
   ): ClientUnaryCall;
   healthCheck(
     request: HealthCheckRequest,
