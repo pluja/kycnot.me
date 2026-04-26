@@ -12,6 +12,33 @@ set -a
 [ -f .env ] && . ./.env
 set +a
 
+# notify: post a message to ntfy.sh if NTFY_TOPIC is set in the server's .env.
+# Failures are swallowed so a flaky network never blocks a deploy.
+notify() {
+  [ -z "${NTFY_TOPIC:-}" ] && return 0
+  local title="$1" message="$2" tags="${3:-}" priority="${4:-default}"
+  curl -sS --max-time 10 \
+    -H "Title: $title" \
+    -H "Tags: $tags" \
+    -H "Priority: $priority" \
+    -d "$message" \
+    "https://ntfy.sh/${NTFY_TOPIC}" >/dev/null || true
+}
+
+on_failure() {
+  local rc=$?
+  if [ "$rc" -ne 0 ]; then
+    notify "Deploy FAILED on $(hostname)" \
+      "Tag ${NEW_TAG} aborted at exit ${rc} in ${APP_DIR}" \
+      "x,error" "high"
+  fi
+}
+trap on_failure EXIT
+
+notify "Deploy started on $(hostname)" \
+  "Rolling ${NEW_TAG} to ${APP_DIR}" \
+  "rocket" "default"
+
 run_hooks() {
   local stage="$1"
   local dir=".platform/hooks/$stage"
@@ -59,3 +86,8 @@ docker rollout pyworker
 
 echo "==> Postdeploy hooks"
 run_hooks postdeploy
+
+trap - EXIT
+notify "Deploy OK on $(hostname)" \
+  "Now serving ${NEW_TAG} from ${APP_DIR}" \
+  "white_check_mark" "default"
