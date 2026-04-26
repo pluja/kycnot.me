@@ -21,3 +21,5 @@ sync-all.sh
 *omx*
 /aggregator/
 /aggregator-go/
+*.md
+!README.md
