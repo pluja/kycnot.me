@@ -24,7 +24,6 @@ import ScoreGauge from '../../components/ScoreGauge.astro'
 import ScoreSquare from '../../components/ScoreSquare.astro'
 import ServiceLinkButton from '../../components/ServiceLinkButton.astro'
 import SwapCTA from '../../components/swap/SwapCTA.astro'
-import SwapFormAndResults from '../../components/swap/SwapFormAndResults.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import Tooltip from '../../components/Tooltip.astro'
 import UserBadge from '../../components/UserBadge.astro'
@@ -1635,18 +1634,7 @@ const verificationStatusDate =
     )
   }
 
-  {
-    !!isSwapSupported && (
-      <>
-        <h2 class="mt-6 mb-3 border-b border-day-500 font-title text-lg font-bold text-day-200" id="compare">
-          Compare Exchange Rates
-        </h2>
-        <SwapFormAndResults highlightSlug={service.slug} />
-      </>
-    )
-  }
-
-  <h2 class="mt-2 mb-3 border-b border-day-500 font-title text-lg font-bold text-day-200" id="comments">
+  <h2 class="mt-6 mb-3 border-b border-day-500 font-title text-lg font-bold text-day-200" id="comments">
     Comments
   </h2>
   <div
