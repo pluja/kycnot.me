@@ -8,12 +8,28 @@ sha := `git rev-parse --short HEAD`
   just --list
 
 # Build, push, and roll out pre images. SSH target and app dir are read from .env.
-deploy-pre:
-  @just _deploy pre staging SSH_PRE_TARGET APP_DIR_PRE no
+# Pass `nocache` to bypass the docker layer cache (forces fresh dependency fetch).
+deploy-pre flag="":
+  #!/usr/bin/env bash
+  if [ "{{flag}}" = "nocache" ]; then
+    export NOCACHE=yes
+  elif [ -n "{{flag}}" ]; then
+    echo "Unknown flag: {{flag}} (expected: nocache)" >&2
+    exit 1
+  fi
+  exec just _deploy pre staging SSH_PRE_TARGET APP_DIR_PRE no
 
 # Build, push, and roll out prod images. Prompts for confirmation.
-deploy-prod:
-  @just _deploy prod production SSH_PROD_TARGET APP_DIR_PROD yes
+# Pass `nocache` to bypass the docker layer cache.
+deploy-prod flag="":
+  #!/usr/bin/env bash
+  if [ "{{flag}}" = "nocache" ]; then
+    export NOCACHE=yes
+  elif [ -n "{{flag}}" ]; then
+    echo "Unknown flag: {{flag}} (expected: nocache)" >&2
+    exit 1
+  fi
+  exec just _deploy prod production SSH_PROD_TARGET APP_DIR_PROD yes
 
 # Fast-forward master to dev and push. Run after a verified prod deploy.
 promote-to-master:
@@ -79,17 +95,27 @@ _deploy env mode ssh_var dir_var confirm:
     fi
   fi
 
+  build_args=()
+  if [ "${NOCACHE:-}" = "yes" ]; then
+    echo "Building with --no-cache."
+    build_args+=(--no-cache)
+  fi
+
   echo "Building and pushing images..."
-  docker build \
+  docker build "${build_args[@]}" \
     -f web/Dockerfile \
     --build-arg ASTRO_BUILD_MODE={{mode}} \
     -t {{astro_image}}:{{env}}-{{sha}} \
     .
-  docker build \
+  docker build "${build_args[@]}" \
     -t {{pyworker_image}}:{{env}}-{{sha}} \
     ./pyworker
   docker push {{astro_image}}:{{env}}-{{sha}}
   docker push {{pyworker_image}}:{{env}}-{{sha}}
+
+  echo
+  echo "Syncing justfile.prod to $ssh_target..."
+  rsync -a justfile.prod "$ssh_target:$app_dir/justfile"
 
   echo
   echo "Rolling out on $ssh_target..."
