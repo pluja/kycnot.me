@@ -1,9 +1,5 @@
 set dotenv-load
 
-# Lives on PRE/PROD servers as `justfile` (synced from this file by the
-# deploy recipe). Edit here, then deploy; changes only take effect on the
-# next deploy run.
-
 # Compose service that runs the Astro app (must have prisma + node_modules
 # baked into the image). Adjust if your compose file uses a different name.
 web_service := "astro"
