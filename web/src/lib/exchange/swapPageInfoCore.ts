@@ -168,6 +168,10 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
     q: 'Does this website require JavaScript enabled?',
     a: 'No. All core features on KYCnot.me work with JavaScript disabled. Enabling JavaScript only adds convenience features and reduces full-page refreshes. All of our JavaScript code is open source, and we publish source maps so it is easier to inspect.',
   },
+  {
+    q: 'Do you track usage of the swap feature?',
+    a: 'Only as anonymous aggregate counters. We record day-resolution totals like "12 quote fetches for BTC → XMR today" or "5 click-throughs to FixedFloat today" so we can see which exchanges and pairs are popular. We never store IP, browser, session, cookie, user id, or per-event timestamp. No JavaScript tracker is involved: outbound links pass through our `/go/` redirect to count clicks server-side, and the destination URL stays visible in the address bar. Our code is open source, so anyone can inspect exactly what we record and how.',
+  },
 ]
 
 export function faqAnswerToPlainText(markdown: string): string {
