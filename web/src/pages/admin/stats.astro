@@ -1,0 +1,187 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { prisma } from '../../lib/prisma'
+
+const user = Astro.locals.user
+if (!user?.admin) return Astro.rewrite('/404')
+
+const WINDOW_DAYS = 30
+const cutoff = new Date()
+cutoff.setUTCDate(cutoff.getUTCDate() - WINDOW_DAYS)
+cutoff.setUTCHours(0, 0, 0, 0)
+
+const [topServices, topPairs, topRefs, totals] = await Promise.all([
+  Astro.locals.banners.try(
+    'Failed to fetch top services',
+    () =>
+      prisma.stat.groupBy({
+        by: ['serviceId'],
+        where: { kind: 'swap.clickout', day: { gte: cutoff } },
+        _sum: { count: true },
+        orderBy: { _sum: { count: 'desc' } },
+        take: 20,
+      }),
+    []
+  ),
+  Astro.locals.banners.try(
+    'Failed to fetch top pairs',
+    () =>
+      prisma.stat.groupBy({
+        by: ['fromCurrency', 'toCurrency'],
+        where: { kind: 'swap.quote-fetched', day: { gte: cutoff } },
+        _sum: { count: true },
+        orderBy: { _sum: { count: 'desc' } },
+        take: 20,
+      }),
+    []
+  ),
+  Astro.locals.banners.try(
+    'Failed to fetch top referrals',
+    () =>
+      prisma.stat.groupBy({
+        by: ['refCode'],
+        where: { kind: 'swap.clickout', day: { gte: cutoff }, refCode: { not: null } },
+        _sum: { count: true },
+        orderBy: { _sum: { count: 'desc' } },
+        take: 20,
+      }),
+    []
+  ),
+  Astro.locals.banners.try(
+    'Failed to fetch totals',
+    () =>
+      prisma.stat.groupBy({
+        by: ['kind'],
+        where: { day: { gte: cutoff } },
+        _sum: { count: true },
+        orderBy: { _sum: { count: 'desc' } },
+      }),
+    []
+  ),
+])
+
+const serviceIds = topServices.map((row) => row.serviceId).filter((id): id is number => id !== null)
+
+const services =
+  serviceIds.length === 0
+    ? []
+    : await Astro.locals.banners.try(
+        'Failed to resolve service names',
+        () =>
+          prisma.service.findMany({
+            where: { id: { in: serviceIds } },
+            select: { id: true, name: true, slug: true },
+          }),
+        []
+      )
+
+const serviceById = new Map(services.map((s) => [s.id, s]))
+
+const formatPair = (from: string | null, to: string | null): string => {
+  const f = from ?? '?'
+  const t = to ?? '?'
+  return `${f.toUpperCase()} → ${t.toUpperCase()}`
+}
+---
+
+<BaseLayout pageTitle="Stats" widthClassName="max-w-5xl">
+  <header class="mb-6 flex items-center gap-3">
+    <Icon name="ri:bar-chart-2-line" class="size-8 text-teal-300" />
+    <h1 class="font-title text-3xl font-bold text-day-100">Stats</h1>
+    <span class="ml-2 text-sm text-day-500">last {WINDOW_DAYS} days</span>
+  </header>
+
+  <p class="mb-6 text-sm text-day-500">
+    Aggregate counters only. No IP, User-Agent, session, cookie, user id, or sub-day timestamp is stored. Each
+    row is a (kind, day, dimensions) bucket; rows track activity, not visitors.
+  </p>
+
+  <section class="mb-8">
+    <h2 class="mb-3 font-title text-xl font-semibold text-day-200">Totals by kind</h2>
+    {
+      totals.length === 0 ? (
+        <p class="text-sm text-day-500">No data yet.</p>
+      ) : (
+        <ul class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {totals.map((row) => (
+            <li class="rounded-lg border border-night-700/50 bg-night-800/30 px-4 py-3">
+              <div class="text-xs tracking-wider text-day-500 uppercase">{row.kind}</div>
+              <div class="mt-1 font-mono text-2xl font-bold text-day-100 tabular-nums">
+                {row._sum.count ?? 0}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </section>
+
+  <section class="mb-8">
+    <h2 class="mb-3 font-title text-xl font-semibold text-day-200">Top services by clickout</h2>
+    {
+      topServices.length === 0 ? (
+        <p class="text-sm text-day-500">No clickouts in this window.</p>
+      ) : (
+        <ol class="divide-y divide-night-700/40 rounded-lg border border-night-700/50 bg-night-800/30">
+          {topServices.map((row) => {
+            const service = row.serviceId !== null ? (serviceById.get(row.serviceId) ?? null) : null
+            const label = service ? service.name : '(deleted)'
+            const href = service ? `/service/${service.slug}` : null
+            return (
+              <li class="flex items-center justify-between px-4 py-2 text-sm">
+                <div class="min-w-0 truncate">
+                  {href ? (
+                    <a class="text-day-200 hover:underline" href={href}>
+                      {label}
+                    </a>
+                  ) : (
+                    <span class="text-day-500 italic">{label}</span>
+                  )}
+                </div>
+                <span class="font-mono text-day-300 tabular-nums">{row._sum.count ?? 0}</span>
+              </li>
+            )
+          })}
+        </ol>
+      )
+    }
+  </section>
+
+  <section class="mb-8">
+    <h2 class="mb-3 font-title text-xl font-semibold text-day-200">Top currency pairs by quote</h2>
+    {
+      topPairs.length === 0 ? (
+        <p class="text-sm text-day-500">No quote fetches in this window.</p>
+      ) : (
+        <ol class="divide-y divide-night-700/40 rounded-lg border border-night-700/50 bg-night-800/30">
+          {topPairs.map((row) => (
+            <li class="flex items-center justify-between px-4 py-2 text-sm">
+              <span class="font-mono text-day-200">{formatPair(row.fromCurrency, row.toCurrency)}</span>
+              <span class="font-mono text-day-300 tabular-nums">{row._sum.count ?? 0}</span>
+            </li>
+          ))}
+        </ol>
+      )
+    }
+  </section>
+
+  <section class="mb-8">
+    <h2 class="mb-3 font-title text-xl font-semibold text-day-200">Top referral codes by clickout</h2>
+    {
+      topRefs.length === 0 ? (
+        <p class="text-sm text-day-500">No referrals tracked yet.</p>
+      ) : (
+        <ol class="divide-y divide-night-700/40 rounded-lg border border-night-700/50 bg-night-800/30">
+          {topRefs.map((row) => (
+            <li class="flex items-center justify-between px-4 py-2 text-sm">
+              <span class="font-mono text-day-200">{row.refCode ?? '(none)'}</span>
+              <span class="font-mono text-day-300 tabular-nums">{row._sum.count ?? 0}</span>
+            </li>
+          ))}
+        </ol>
+      )
+    }
+  </section>
+</BaseLayout>

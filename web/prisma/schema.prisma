@@ -414,6 +414,8 @@ model Service {
   strictCommentingEnabled Boolean @default(false)
   commentSectionMessage   String?
 
+  stats Stat[]
+
   @@index([listedAt])
   @@index([approvedAt])
   @@index([verifiedAt])
@@ -430,6 +432,32 @@ model Service {
   @@index([slug])
   @@index([previousSlugs])
   @@index([serviceVisibility])
+}
+
+/// Aggregate counters only.
+/// We NEVER store IP, User-Agent, session id, cookie, user id, or per-event
+/// timestamp. The only time field is `day` at UTC-midnight resolution.
+/// Dimension fields describe site activity (which service, which currency
+/// pair, which referral code), never who triggered it. `dimensionKey` is a
+/// deterministic non-null serialization of the nullable dimensions, used
+/// only to keep upserts idempotent under Postgres' "NULLs distinct" rule.
+/// These is only for aggregated metrics on swap feature usage.
+model Stat {
+  id           Int      @id @default(autoincrement())
+  kind         String
+  day          DateTime @db.Date
+  dimensionKey String
+  serviceId    Int?
+  fromCurrency String?
+  toCurrency   String?
+  refCode      String?
+  count        Int      @default(0)
+
+  service Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  @@unique([kind, day, dimensionKey])
+  @@index([kind, day])
+  @@index([serviceId, day])
 }
 
 model ServiceContactMethod {

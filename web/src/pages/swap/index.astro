@@ -12,6 +12,12 @@ import {
   buildWebApplicationSchema,
   resolveSwapPair,
 } from '../../lib/exchange/swapPageInfo'
+import { bump } from '../../lib/stats'
+
+const isHtmxRequest = Astro.request.headers.get('hx-request') === 'true'
+if (!isHtmxRequest) {
+  void bump({ kind: 'swap.view' }).catch(() => null)
+}
 
 const curatedPair = resolveSwapPair(Astro.url.searchParams)
 const canonical = buildCanonical(curatedPair)

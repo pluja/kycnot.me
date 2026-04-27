@@ -8,6 +8,7 @@ import { getVerificationStatusInfo } from '../../constants/verificationStatus'
 import { cn } from '../../lib/cn'
 import { safeHttpUrl } from '../../lib/exchange/safeUrl'
 import { spreadColorClass } from '../../lib/exchange/spreadStyle'
+import { buildGoHref } from '../../lib/goLink'
 import { makeOverallScoreInfo } from '../../lib/overallScore'
 import Tooltip from '../Tooltip.astro'
 
@@ -49,6 +50,17 @@ const activeEvent = primaryEvent
 const deepLinkHref = quote
   ? (safeHttpUrl(quote.deepLinkUrl) ?? safeHttpUrl(service?.serviceUrls[0]) ?? '#')
   : '#'
+// Aggregator-only rows (service unknown to our DB) fall back to the
+// direct deep link so they still work.
+const swapHref =
+  quote && service?.slug != null && deepLinkHref !== '#'
+    ? buildGoHref({
+        slug: service.slug,
+        deepLinkUrl: deepLinkHref,
+        from: quote.currencyFrom,
+        to: quote.currencyTo,
+      })
+    : deepLinkHref
 const hasOrangeFrenGuarantee = quote?.orangefrenGuarantee !== null && quote.orangefrenGuarantee > 0
 const guaranteeCoverage = describeGuaranteeCoverage(quote)
 ---
@@ -130,9 +142,9 @@ const guaranteeCoverage = describeGuaranteeCoverage(quote)
           </div>
         </div>
         <a
-          href={deepLinkHref}
+          href={swapHref}
           target="_blank"
-          rel="nofollow noopener"
+          rel="nofollow noopener noreferrer"
           class="inline-flex shrink-0 items-center gap-1 rounded-lg bg-green-500 px-3 py-1.5 text-xs font-bold text-black transition-all hover:bg-green-400 hover:shadow-sm hover:shadow-green-500/20 focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:outline-none"
         >
           Swap

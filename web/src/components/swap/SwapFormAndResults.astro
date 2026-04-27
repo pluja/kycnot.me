@@ -10,6 +10,7 @@ import { cn } from '../../lib/cn'
 import { getAggregatedQuotesWithServices } from '../../lib/exchange/aggregator'
 import { getSwapCurrencies } from '../../lib/exchange/swapCurrencies'
 import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
+import { bump } from '../../lib/stats'
 
 import { formatSwapRate, sortSwapResults } from './swapResultUi'
 
@@ -82,14 +83,29 @@ const REQUEST_MAX_WAIT_MS = 6_000
 
 const result = await Astro.locals.banners.try(
   'Error fetching rates',
-  async () =>
-    await getAggregatedQuotesWithServices({
+  async () => {
+    const quotes = await getAggregatedQuotesWithServices({
       currencyFrom: fromOption.value,
       currencyTo: toOption.value,
       sendAmount: input.sendAmount,
       receiveAmount: input.receiveAmount,
       maxWaitMs: REQUEST_MAX_WAIT_MS,
-    }),
+    })
+    // Bump only inside the success path; banners.try swallows gRPC errors
+    // into a [] fallback that would otherwise inflate the counter.
+    if (
+      fromOption.value &&
+      toOption.value &&
+      (input.sendAmount !== undefined || input.receiveAmount !== undefined)
+    ) {
+      void bump({
+        kind: 'swap.quote-fetched',
+        fromCurrency: fromOption.value,
+        toCurrency: toOption.value,
+      }).catch(() => null)
+    }
+    return quotes
+  },
   []
 )
 
