@@ -93,6 +93,7 @@ const displayServiceSelect = {
       attribute: {
         select: {
           id: true,
+          slug: true,
           type: true,
           title: true,
           description: true,

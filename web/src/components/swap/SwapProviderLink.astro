@@ -21,6 +21,7 @@ type Props = {
   verificationInfo: ReturnType<typeof getVerificationStatusInfo> | null
   hasOrangeFrenGuarantee?: boolean
   orangeFrenGuaranteeTooltip?: string | null
+  hasAmlPrecheck?: boolean
   activeEvent?: ActiveEventBadge | null
   unavailable?: boolean
   textClass?: string
@@ -34,6 +35,7 @@ const {
   verificationInfo,
   hasOrangeFrenGuarantee = false,
   orangeFrenGuaranteeTooltip = null,
+  hasAmlPrecheck = false,
   activeEvent = null,
   unavailable = false,
   textClass,
@@ -77,6 +79,13 @@ const serviceHref = `/service/${encodeURIComponent(serviceSlug)}`
       hasOrangeFrenGuarantee && (
         <Tooltip text={orangeFrenGuaranteeTooltip ?? 'Guarantee Available'} position="top">
           <Icon name="ri:shield-check-line" class="size-3.5 shrink-0 text-green-400" />
+        </Tooltip>
+      )
+    }
+    {
+      hasAmlPrecheck && (
+        <Tooltip text="Free AML pre-check before deposit. Passes mean no KYC on the swap." position="top">
+          <Icon name="ri:scan-line" class="size-3.5 shrink-0 text-cyan-400" />
         </Tooltip>
       )
     }

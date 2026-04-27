@@ -35,6 +35,8 @@ const quote = item.quote
 const kycInfo = service ? getKycLevelInfo(String(service.kycLevel)) : null
 const verificationInfo = service ? getVerificationStatusInfo(service.verificationStatus) : null
 const scoreInfo = service ? makeOverallScoreInfo(service.overallScore, 10) : null
+const hasAmlPrecheck =
+  service?.attributes.some((a) => a.attribute.slug === 'no-kyc-after-aml-check') ?? false
 
 // ALERT outranks WARNING for the row badge. Aggregator already filters the list.
 const events = service?.events ?? []
@@ -74,6 +76,7 @@ const guaranteeCoverage = describeGuaranteeCoverage(quote)
     verificationInfo={verificationInfo}
     hasOrangeFrenGuarantee={hasOrangeFrenGuarantee}
     orangeFrenGuaranteeTooltip={guaranteeCoverage?.tooltipLabel}
+    hasAmlPrecheck={hasAmlPrecheck}
     activeEvent={activeEvent}
     unavailable={quote === null}
   />

@@ -1,5 +1,6 @@
 ---
 import { VerificationStatus } from '@prisma/client'
+import { Icon } from 'astro-icon/components'
 import { z } from 'astro:content'
 
 import SwapForm from '../../components/swap/SwapForm.astro'
@@ -74,7 +75,14 @@ export type SwapFormInput = typeof input
 
 const parseCompound = (v: string) => {
   const [code = '', network = ''] = v.split('@')
-  return { value: v, code: code.toUpperCase(), network: network.toUpperCase(), name: code.toUpperCase(), icon: '', popular: false }
+  return {
+    value: v,
+    code: code.toUpperCase(),
+    network: network.toUpperCase(),
+    name: code.toUpperCase(),
+    icon: '',
+    popular: false,
+  }
 }
 const fromOption = currencies.byValue.get(input.from) ?? parseCompound(input.from)
 const toOption = currencies.byValue.get(input.to) ?? parseCompound(input.to)
@@ -118,7 +126,8 @@ const filteredResult = input.approvedOnly
   : result
 
 const RESULTS_ID = 'swap-results'
-const amountSide: 'receive' | 'send' = input.receiveAmount !== undefined && input.sendAmount === undefined ? 'receive' : 'send'
+const amountSide: 'receive' | 'send' =
+  input.receiveAmount !== undefined && input.sendAmount === undefined ? 'receive' : 'send'
 const displayResult = sortSwapResults(filteredResult, input.sortBy, amountSide)
 
 const bestResult = displayResult.find((r) => r.quote !== null)
@@ -143,10 +152,7 @@ function truncateTo2(value: number): number {
 }
 
 const flipSendAmount = (() => {
-  const raw =
-    amountSide === 'send'
-      ? bestQuote?.amountReceived
-      : input.receiveAmount
+  const raw = amountSide === 'send' ? bestQuote?.amountReceived : input.receiveAmount
   if (raw === undefined) return undefined
   const truncated = truncateTo2(raw)
   return truncated > 0 ? truncated : undefined
@@ -192,29 +198,56 @@ const flipSendAmount = (() => {
               {quotesCount === 1 ? 'quote' : 'quotes'}
             </div>
 
-            {showMarketData && marketRate !== null && (
-              <div class="text-xs text-day-500">
-                Market{' '}
-                <span class="font-mono font-semibold text-day-200 tabular-nums">
-                  {formatSwapRate(marketRate)}
-                </span>{' '}
-                {toOption.code}/{fromOption.code}
-                <span class="text-day-700"> · </span>
-                <a
-                  href="https://coinpaprika.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-day-600 underline decoration-dotted underline-offset-2 hover:text-day-400"
-                >
-                  CoinPaprika
-                </a>
-              </div>
-            )}
+            {
+              showMarketData && marketRate !== null && (
+                <div class="text-xs text-day-500">
+                  Market{' '}
+                  <span class="font-mono font-semibold text-day-200 tabular-nums">
+                    {formatSwapRate(marketRate)}
+                  </span>{' '}
+                  {toOption.code}/{fromOption.code}
+                  <span class="text-day-700"> · </span>
+                  <a
+                    href="https://coinpaprika.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-day-600 underline decoration-dotted underline-offset-2 hover:text-day-400"
+                  >
+                    CoinPaprika
+                  </a>
+                </div>
+              )
+            }
           </div>
 
           <SwapResultControls input={input} resultsId={RESULTS_ID} />
         </div>
       </div>
+
+      <details class="mt-4 px-2">
+        <summary
+          class="inline-flex cursor-pointer list-none items-center gap-1 text-xs text-day-500 hover:text-day-300"
+        >
+          <Icon name="ri:information-line" class="size-3.5" />
+          What do the icons mean?
+        </summary>
+        <ul class="mt-2 space-y-1.5 text-xs text-day-400">
+          <li class="flex items-start gap-2">
+            <Icon name="ri:shield-check-line" class="mt-0.5 size-3.5 shrink-0 text-green-400" />
+            <span>
+              <strong class="text-day-200">OrangeFren Guarantee</strong>: your trade is protected if this
+              provider violates its own stated policies. Read the FAQ below for more information.
+            </span>
+          </li>
+          <li class="flex items-start gap-2">
+            <Icon name="ri:scan-line" class="mt-0.5 size-3.5 shrink-0 text-cyan-400" />
+            <span>
+              <strong class="text-day-200">AML pre-check</strong>: submit your wallet address to the
+              provider's support before sending; if they give an OK, no KYC on this swap.
+            </span>
+          </li>
+        </ul>
+      </details>
 
       <SwapResultsTable
         result={displayResult}
@@ -222,7 +255,7 @@ const flipSendAmount = (() => {
         currencyTo={toOption}
         amountSide={amountSide}
         highlightSlug={highlightSlug}
-        class="mt-4"
+        class=""
       />
     </div>
   </div>
@@ -233,7 +266,11 @@ const flipSendAmount = (() => {
     animation: swap-progress-sweep 1.1s ease-in-out infinite;
   }
   @keyframes swap-progress-sweep {
-    0%   { transform: translateX(-120%); }
-    100% { transform: translateX(420%); }
+    0% {
+      transform: translateX(-120%);
+    }
+    100% {
+      transform: translateX(420%);
+    }
   }
 </style>
