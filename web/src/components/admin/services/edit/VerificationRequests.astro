@@ -1,0 +1,61 @@
+---
+import FormSection from '../../../FormSection.astro'
+import TimeFormatted from '../../../TimeFormatted.astro'
+import UserBadge from '../../../UserBadge.astro'
+import { pluralize } from '../../../../lib/pluralize'
+
+import type { Prisma } from '@prisma/client'
+
+type Request = Prisma.VerificationRequestGetPayload<{
+  select: {
+    id: true
+    user: { select: { name: true; displayName: true; picture: true } }
+    createdAt: true
+  }
+}>
+
+type Props = {
+  total: number
+  requests: Request[]
+  id?: string
+}
+
+const { total, requests, id = 'verification-requests' } = Astro.props
+---
+
+<FormSection
+  title="Verification Requests"
+  subtitle={`Total: ${total} ${pluralize('request', total)}`}
+  id={id}
+>
+  {
+    requests.length > 0 ? (
+      <div class="overflow-x-auto rounded-md border border-night-500 bg-night-800">
+        <table class="w-full text-sm">
+          <thead class="bg-night-600">
+            <tr class="text-left">
+              <th class="p-3 font-semibold text-day-300">User</th>
+              <th class="p-3 font-semibold text-day-300">Requested</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-night-500">
+            {requests.map((request) => (
+              <tr class="transition-colors hover:bg-night-700">
+                <td class="p-3 text-day-300">
+                  <UserBadge user={request.user} size="md" />
+                </td>
+                <td class="p-3 text-day-400">
+                  <TimeFormatted date={request.createdAt} hourPrecision />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
+        No verification requests yet.
+      </p>
+    )
+  }
+</FormSection>

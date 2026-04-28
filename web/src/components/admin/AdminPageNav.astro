@@ -1,0 +1,94 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../lib/cn'
+
+type Item = {
+  id: string
+  label: string
+  icon: string
+  badge?: string | number
+}
+
+type Props = {
+  items: Item[]
+  class?: string
+}
+
+const { items, class: className } = Astro.props
+---
+
+<nav
+  class={cn(
+    'sticky top-20 z-10 -mx-4 flex flex-row gap-1 overflow-x-auto px-4 pb-2 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0',
+    className
+  )}
+  aria-label="Page sections"
+>
+  {
+    items.map((item) => (
+      <a
+        href={`#${item.id}`}
+        data-admin-nav-item
+        data-target-id={item.id}
+        class="group flex shrink-0 items-center gap-2 rounded-md border border-transparent px-3 py-2 text-sm text-day-300 transition-colors hover:border-night-500 hover:bg-night-800 hover:text-day-100 lg:shrink"
+      >
+        <Icon name={item.icon} class="size-4 shrink-0 text-day-400 group-hover:text-day-200" />
+        <span class="grow truncate">{item.label}</span>
+        {item.badge !== undefined && item.badge !== '' && item.badge !== 0 && (
+          <span class="shrink-0 rounded-sm bg-night-600 px-1.5 py-0.5 text-xs text-day-300">
+            {item.badge}
+          </span>
+        )}
+      </a>
+    ))
+  }
+</nav>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Optional script for AdminPageNav.                      //
+  // Highlights the current section as the user scrolls,    //
+  // using IntersectionObserver. Falls back to a click-to-  //
+  // highlight behavior if the observer is unavailable.     //
+  ////////////////////////////////////////////////////////////
+  document.addEventListener('astro:page-load', () => {
+    const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-admin-nav-item]'))
+    if (links.length === 0) return
+
+    const setActive = (id: string) => {
+      links.forEach((link) => {
+        const isActive = link.dataset.targetId === id
+        link.classList.toggle('border-night-500', isActive)
+        link.classList.toggle('bg-night-700', isActive)
+        link.classList.toggle('text-day-100', isActive)
+      })
+    }
+
+    const targets = links
+      .map((link) => link.dataset.targetId && document.getElementById(link.dataset.targetId))
+      .filter((el): el is HTMLElement => !!el)
+    if (targets.length === 0) return
+
+    if (!('IntersectionObserver' in window)) {
+      links.forEach((link) =>
+        link.addEventListener('click', () => {
+          if (link.dataset.targetId) setActive(link.dataset.targetId)
+        })
+      )
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
+        if (visible[0]) setActive(visible[0].target.id)
+      },
+      { rootMargin: '-20% 0px -60% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] }
+    )
+
+    targets.forEach((target) => observer.observe(target))
+  })
+</script>

@@ -1,0 +1,170 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
+import EditableListItem from '../../EditableListItem.astro'
+import EditToggleButton from '../../EditToggleButton.astro'
+import FormSection from '../../../FormSection.astro'
+import FormSubSection from '../../../FormSubSection.astro'
+import InputCardGroup from '../../../InputCardGroup.astro'
+import InputSubmitButton from '../../../InputSubmitButton.astro'
+import InputText from '../../../InputText.astro'
+import InputTextArea from '../../../InputTextArea.astro'
+import Markdown from '../../../Markdown.astro'
+import Tooltip from '../../../Tooltip.astro'
+import { getTosHighlightRatingInfo, tosHighlightRatings } from '../../../../constants/tosHighlightRating'
+
+type Props = {
+  serviceId: number
+  tosReview: PrismaJson.TosReview | null
+  addInputErrors: Record<string, string[] | undefined>
+  updateInputErrors: Record<string, string[] | undefined>
+  id?: string
+}
+
+const {
+  serviceId,
+  tosReview,
+  addInputErrors,
+  updateInputErrors,
+  id = 'tos-highlights',
+} = Astro.props
+---
+
+<FormSection title="ToS Highlights" id={id}>
+  {
+    !tosReview ? (
+      <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
+        No ToS review exists yet. Highlights can be managed once a review has been generated.
+      </p>
+    ) : (
+      <>
+        <FormSubSection title="Existing Highlights">
+          {tosReview.highlights.length === 0 ? (
+            <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
+              No highlights yet.
+            </p>
+          ) : (
+            <div class="space-y-3">
+              {tosReview.highlights.map((highlight, index) => {
+                const ratingInfo = getTosHighlightRatingInfo(highlight.rating)
+                const itemId = `tos-highlight-${index}`
+                return (
+                  <EditableListItem id={itemId} borderClass={ratingInfo.classNames.borderColor}>
+                    <Fragment slot="header">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <Tooltip text={ratingInfo.name}>
+                          <Icon
+                            name={ratingInfo.icon}
+                            class={`size-4 ${ratingInfo.classNames.icon}`}
+                          />
+                        </Tooltip>
+                        <span class="font-semibold text-day-100">{highlight.title}</span>
+                      </div>
+                      <div class="prose prose-sm max-w-none text-pretty text-day-300 prose-invert">
+                        <Markdown content={highlight.content} />
+                      </div>
+                    </Fragment>
+
+                    <Fragment slot="actions">
+                      <EditToggleButton for={itemId} />
+                      <DeleteConfirmButton
+                        action={actions.admin.service.tosHighlight.delete}
+                        id={itemId}
+                      >
+                        <input type="hidden" name="serviceId" value={serviceId} />
+                        <input type="hidden" name="index" value={index} />
+                      </DeleteConfirmButton>
+                    </Fragment>
+
+                    <Fragment slot="edit">
+                      <form
+                        method="POST"
+                        action={actions.admin.service.tosHighlight.update}
+                        class="space-y-3"
+                      >
+                        <input type="hidden" name="serviceId" value={serviceId} />
+                        <input type="hidden" name="index" value={index} />
+
+                        <InputText
+                          label="Title"
+                          name="title"
+                          inputProps={{ required: true, value: highlight.title }}
+                          error={updateInputErrors.title}
+                        />
+
+                        <InputTextArea
+                          label="Content"
+                          description="Markdown supported"
+                          name="content"
+                          inputProps={{ required: true, rows: 4 }}
+                          value={highlight.content}
+                          error={updateInputErrors.content}
+                        />
+
+                        <InputCardGroup
+                          name="rating"
+                          label="Rating"
+                          options={tosHighlightRatings.map((rating) => ({
+                            label: rating.name,
+                            value: rating.id,
+                            icon: rating.icon,
+                            iconClass: rating.classNames.icon,
+                          }))}
+                          selectedValue={highlight.rating}
+                          error={updateInputErrors.rating}
+                          cardSize="sm"
+                          iconSize="sm"
+                        />
+
+                        <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
+                      </form>
+                    </Fragment>
+                  </EditableListItem>
+                )
+              })}
+            </div>
+          )}
+        </FormSubSection>
+
+        <FormSubSection title="Add New Highlight">
+          <form method="POST" action={actions.admin.service.tosHighlight.add} class="space-y-3">
+            <input type="hidden" name="serviceId" value={serviceId} />
+
+            <InputText
+              label="Title"
+              name="title"
+              inputProps={{ required: true, placeholder: 'Very short headline' }}
+              error={addInputErrors.title}
+            />
+
+            <InputTextArea
+              label="Content"
+              description="Markdown supported"
+              name="content"
+              inputProps={{ required: true, rows: 4 }}
+              error={addInputErrors.content}
+            />
+
+            <InputCardGroup
+              name="rating"
+              label="Rating"
+              options={tosHighlightRatings.map((rating) => ({
+                label: rating.name,
+                value: rating.id,
+                icon: rating.icon,
+                iconClass: rating.classNames.icon,
+              }))}
+              error={addInputErrors.rating}
+              cardSize="sm"
+              iconSize="sm"
+            />
+
+            <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />
+          </form>
+        </FormSubSection>
+      </>
+    )
+  }
+</FormSection>

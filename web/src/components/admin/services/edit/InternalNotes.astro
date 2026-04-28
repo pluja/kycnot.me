@@ -1,0 +1,117 @@
+---
+import { actions } from 'astro:actions'
+
+import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
+import EditableListItem from '../../EditableListItem.astro'
+import EditToggleButton from '../../EditToggleButton.astro'
+import FormSection from '../../../FormSection.astro'
+import FormSubSection from '../../../FormSubSection.astro'
+import InputSubmitButton from '../../../InputSubmitButton.astro'
+import InputTextArea from '../../../InputTextArea.astro'
+import Markdown from '../../../Markdown.astro'
+import TimeFormatted from '../../../TimeFormatted.astro'
+import UserBadge from '../../../UserBadge.astro'
+
+import type { Prisma } from '@prisma/client'
+
+type Note = Prisma.InternalServiceNoteGetPayload<{
+  include: {
+    addedByUser: {
+      select: {
+        name: true
+        displayName: true
+        picture: true
+      }
+    }
+  }
+}>
+
+type Props = {
+  serviceId: number
+  notes: Note[]
+  addInputErrors: Record<string, string[] | undefined>
+  id?: string
+}
+
+const { serviceId, notes, addInputErrors, id = 'internal-notes' } = Astro.props
+---
+
+<FormSection title="Internal Notes" id={id}>
+  <FormSubSection title="Existing Notes">
+    {
+      notes.length === 0 ? (
+        <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
+          No internal notes yet.
+        </p>
+      ) : (
+        <div class="space-y-4">
+          {notes.map((note) => {
+            const itemId = `note-${note.id}`
+            return (
+              <EditableListItem id={itemId}>
+                <Fragment slot="header">
+                  <div class="prose prose-sm max-w-none text-pretty text-day-200 prose-invert">
+                    <Markdown content={note.content} />
+                  </div>
+                  <div class="flex items-center gap-2 text-xs text-day-500">
+                    <TimeFormatted date={note.createdAt} hourPrecision />
+                    {note.addedByUser && (
+                      <span class="flex items-center gap-1">
+                        by <UserBadge user={note.addedByUser} size="sm" />
+                      </span>
+                    )}
+                  </div>
+                </Fragment>
+
+                <Fragment slot="actions">
+                  <EditToggleButton for={itemId} />
+                  <DeleteConfirmButton
+                    action={actions.admin.service.internalNote.delete}
+                    id={itemId}
+                  >
+                    <input type="hidden" name="noteId" value={note.id} />
+                  </DeleteConfirmButton>
+                </Fragment>
+
+                <Fragment slot="edit">
+                  <form
+                    method="POST"
+                    action={actions.admin.service.internalNote.update}
+                    data-astro-reload
+                    class="space-y-4"
+                  >
+                    <input type="hidden" name="noteId" value={note.id} />
+                    <InputTextArea
+                      label="Note Content"
+                      name="content"
+                      value={note.content}
+                      inputProps={{ class: 'bg-night-700' }}
+                    />
+                    <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
+                  </form>
+                </Fragment>
+              </EditableListItem>
+            )
+          })}
+        </div>
+      )
+    }
+  </FormSubSection>
+
+  <FormSubSection title="Add New Note">
+    <form method="POST" action={actions.admin.service.internalNote.add} class="space-y-4">
+      <input type="hidden" name="serviceId" value={serviceId} />
+      <InputTextArea
+        label="Note Content"
+        name="content"
+        inputProps={{
+          required: true,
+          rows: 4,
+          placeholder: 'Add internal note about this service...',
+        }}
+        error={addInputErrors.content}
+      />
+      <InputSubmitButton label="Add Note" icon="ri:add-line" hideCancel />
+    </form>
+  </FormSubSection>
+</FormSection>

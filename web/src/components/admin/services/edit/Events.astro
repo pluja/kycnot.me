@@ -1,0 +1,258 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import BadgeSmall from '../../../BadgeSmall.astro'
+import Button from '../../../Button.astro'
+import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
+import EditableListItem from '../../EditableListItem.astro'
+import EditToggleButton from '../../EditToggleButton.astro'
+import FormSection from '../../../FormSection.astro'
+import FormSubSection from '../../../FormSubSection.astro'
+import InputSelect from '../../../InputSelect.astro'
+import InputSubmitButton from '../../../InputSubmitButton.astro'
+import InputText from '../../../InputText.astro'
+import InputTextArea from '../../../InputTextArea.astro'
+import Tooltip from '../../../Tooltip.astro'
+import { eventTypes, getEventTypeInfo } from '../../../../constants/eventTypes'
+
+import type { Prisma } from '@prisma/client'
+
+type Props = {
+  serviceId: number
+  events: Prisma.EventGetPayload<true>[]
+  createInputErrors: Record<string, string[] | undefined>
+  updateInputErrors: Record<string, string[] | undefined>
+  id?: string
+}
+
+const { serviceId, events, createInputErrors, updateInputErrors, id = 'events' } = Astro.props
+
+const toLocalDateTime = (date: Date) =>
+  new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+---
+
+<FormSection title="Events" id={id}>
+  <FormSubSection title="Existing Events">
+    {
+      events.length === 0 ? (
+        <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
+          No events yet.
+        </p>
+      ) : (
+        <div class="space-y-2">
+          {events.map((event) => {
+            const eventTypeInfo = getEventTypeInfo(event.type)
+            const itemId = `event-${event.id}`
+            return (
+              <EditableListItem id={itemId}>
+                <Fragment slot="header">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-semibold text-day-100">{event.title}</span>
+                    <BadgeSmall
+                      text={eventTypeInfo.label}
+                      variant="faded"
+                      color={eventTypeInfo.color}
+                      icon={eventTypeInfo.icon}
+                    />
+                    {!event.visible && (
+                      <BadgeSmall
+                        text="Hidden"
+                        variant="faded"
+                        color="gray"
+                        icon="ri:eye-off-line"
+                      />
+                    )}
+                  </div>
+                  <p class="text-sm text-pretty text-day-400">{event.content}</p>
+                  <div class="flex flex-wrap items-center gap-3 text-xs text-day-500">
+                    <span>Started: {new Date(event.startedAt).toLocaleDateString()}</span>
+                    <span>
+                      Ended:
+                      {event.endedAt
+                        ? event.endedAt === event.startedAt
+                          ? '1-time event'
+                          : new Date(event.endedAt).toLocaleDateString()
+                        : 'Ongoing'}
+                    </span>
+                    {event.source && <span>Source: {event.source}</span>}
+                  </div>
+                </Fragment>
+
+                <Fragment slot="actions">
+                  <Tooltip text={event.visible ? 'Hide' : 'Show'}>
+                    <form method="POST" action={actions.admin.event.toggle} class="contents">
+                      <input type="hidden" name="eventId" value={event.id} />
+                      <Button
+                        type="submit"
+                        variant="faded"
+                        size="sm"
+                        icon={event.visible ? 'ri:eye-off-line' : 'ri:eye-line'}
+                        iconOnly
+                        label={event.visible ? 'Hide' : 'Show'}
+                      />
+                    </form>
+                  </Tooltip>
+                  <EditToggleButton for={itemId} />
+                  <DeleteConfirmButton action={actions.admin.event.delete} id={itemId}>
+                    <input type="hidden" name="eventId" value={event.id} />
+                  </DeleteConfirmButton>
+                </Fragment>
+
+                <Fragment slot="edit">
+                  <form
+                    method="POST"
+                    action={actions.admin.event.update}
+                    class="space-y-3"
+                  >
+                    <input type="hidden" name="eventId" value={event.id} />
+
+                    <InputText
+                      label="Title"
+                      name="title"
+                      inputProps={{ required: true, value: event.title }}
+                      error={updateInputErrors.title}
+                    />
+
+                    <InputTextArea
+                      label="Content"
+                      name="content"
+                      inputProps={{ required: true, rows: 3 }}
+                      value={event.content}
+                      error={updateInputErrors.content}
+                    />
+
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <InputText
+                        label="Started At"
+                        name="startedAt"
+                        inputProps={{
+                          type: 'datetime-local',
+                          required: true,
+                          value: toLocalDateTime(new Date(event.startedAt)),
+                        }}
+                        error={updateInputErrors.startedAt}
+                      />
+
+                      <div>
+                        <InputText
+                          label="Ended At"
+                          name="endedAt"
+                          inputProps={{
+                            type: 'datetime-local',
+                            value: event.endedAt ? toLocalDateTime(new Date(event.endedAt)) : '',
+                          }}
+                          error={updateInputErrors.endedAt}
+                          description="- Empty: Event is ongoing.\n- Filled: Event with specific end date.\n- Same as start date: One-time event."
+                        />
+                        <button
+                          type="button"
+                          data-clear-datetime="endedAt"
+                          class="mt-1 inline-flex items-center gap-1 text-xs text-day-500 transition-colors hover:text-day-200"
+                        >
+                          <Icon name="ri:close-circle-line" class="size-3.5" />
+                          Clear (event is ongoing)
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <InputText
+                        label="Source URL"
+                        name="source"
+                        inputProps={{ value: event.source }}
+                        error={updateInputErrors.source}
+                      />
+
+                      <InputSelect
+                        label="Type"
+                        name="type"
+                        options={eventTypes.map((type) => ({
+                          label: type.label,
+                          value: type.id,
+                        }))}
+                        selectedValue={event.type}
+                        selectProps={{ required: true }}
+                        error={updateInputErrors.type}
+                      />
+                    </div>
+
+                    <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
+                  </form>
+                </Fragment>
+              </EditableListItem>
+            )
+          })}
+        </div>
+      )
+    }
+  </FormSubSection>
+
+  <FormSubSection title="Add New Event">
+    <form method="POST" action={actions.admin.event.create} class="space-y-2">
+      <input type="hidden" name="serviceId" value={serviceId} />
+
+      <InputText
+        label="Title"
+        name="title"
+        inputProps={{ required: true }}
+        error={createInputErrors.title}
+      />
+
+      <InputTextArea
+        label="Content"
+        name="content"
+        inputProps={{ required: true, rows: 3 }}
+        error={createInputErrors.content}
+      />
+
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <InputText
+          label="Started At"
+          name="startedAt"
+          inputProps={{
+            type: 'datetime-local',
+            required: true,
+            value: toLocalDateTime(new Date()),
+          }}
+          error={createInputErrors.startedAt}
+        />
+
+        <div>
+          <InputText
+            label="Ended At"
+            name="endedAt"
+            inputProps={{ type: 'datetime-local' }}
+            error={createInputErrors.endedAt}
+            description="- Empty: Event is ongoing.\n- Filled: Event with specific end date.\n- Same as start date: One-time event."
+          />
+          <button
+            type="button"
+            data-clear-datetime="endedAt"
+            class="mt-1 inline-flex items-center gap-1 text-xs text-day-500 transition-colors hover:text-day-200"
+          >
+            <Icon name="ri:close-circle-line" class="size-3.5" />
+            Clear (event is ongoing)
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <InputText label="Source URL" name="source" error={createInputErrors.source} />
+
+        <InputSelect
+          label="Type"
+          name="type"
+          options={eventTypes.map((type) => ({
+            label: type.label,
+            value: type.id,
+          }))}
+          selectProps={{ required: true }}
+          error={createInputErrors.type}
+        />
+      </div>
+
+      <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />
+    </form>
+  </FormSubSection>
+</FormSection>

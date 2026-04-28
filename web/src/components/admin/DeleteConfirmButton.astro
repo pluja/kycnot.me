@@ -1,0 +1,56 @@
+---
+import Button from '../Button.astro'
+import Tooltip from '../Tooltip.astro'
+
+import type { AstroChildren } from '../../lib/astro'
+
+type Props = {
+  action: unknown
+  id: string
+  label?: string
+  children?: AstroChildren
+}
+
+const { action, id, label = 'Delete' } = Astro.props
+const checkboxId = `confirm-delete-${id}`
+---
+
+<form method="POST" action={action as never} class="contents">
+  <slot />
+  <input type="checkbox" id={checkboxId} class="peer/del sr-only" />
+
+  <div class="contents peer-checked/del:hidden">
+    <Tooltip text={label}>
+      <Button
+        as="label"
+        for={checkboxId}
+        size="sm"
+        variant="faded"
+        icon="ri:delete-bin-line"
+        iconOnly
+        label={label}
+      />
+    </Tooltip>
+  </div>
+
+  <div class="hidden items-center gap-1 rounded-md border border-red-500/40 bg-red-950/40 px-1.5 py-0.5 peer-checked/del:flex">
+    <span class="px-1 text-xs whitespace-nowrap text-red-200">Sure?</span>
+    <Button
+      type="submit"
+      size="sm"
+      color="danger"
+      icon="ri:check-line"
+      iconOnly
+      label={`Confirm ${label}`}
+    />
+    <Button
+      as="label"
+      for={checkboxId}
+      size="sm"
+      variant="faded"
+      icon="ri:close-line"
+      iconOnly
+      label="Cancel"
+    />
+  </div>
+</form>

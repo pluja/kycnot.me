@@ -1,0 +1,137 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
+import EditableListItem from '../../EditableListItem.astro'
+import EditToggleButton from '../../EditToggleButton.astro'
+import FormSection from '../../../FormSection.astro'
+import FormSubSection from '../../../FormSubSection.astro'
+import InputSubmitButton from '../../../InputSubmitButton.astro'
+import InputText from '../../../InputText.astro'
+import { contactMethodUrlTypes, formatContactMethod } from '../../../../constants/contactMethods'
+
+import type { Prisma } from '@prisma/client'
+
+type Props = {
+  serviceId: number
+  contactMethods: Prisma.ServiceContactMethodGetPayload<true>[]
+  addInputErrors: Record<string, string[] | undefined>
+  updateInputErrors: Record<string, string[] | undefined>
+  id?: string
+}
+
+const {
+  serviceId,
+  contactMethods,
+  addInputErrors,
+  updateInputErrors,
+  id = 'contact-methods',
+} = Astro.props
+
+const acceptedTypesText = contactMethodUrlTypes.map((type) => type.labelPlural).join(', ')
+---
+
+<FormSection title="Contact Methods" id={id}>
+  <FormSubSection title="Existing Contact Methods">
+    {
+      contactMethods.length === 0 ? (
+        <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
+          No contact methods yet.
+        </p>
+      ) : (
+        <div class="space-y-3">
+          {contactMethods.map((method) => {
+            const contactMethodInfo = formatContactMethod(method.value)
+            const itemId = `contact-method-${method.id}`
+            return (
+              <EditableListItem id={itemId}>
+                <Fragment slot="header">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <Icon name={contactMethodInfo.icon} class="size-4 text-day-300" />
+                    <span class="font-semibold text-day-100">
+                      {method.label ?? contactMethodInfo.formattedValue}
+                    </span>
+                  </div>
+                  <p class="text-sm text-pretty text-day-400">{method.value}</p>
+                </Fragment>
+
+                <Fragment slot="actions">
+                  <EditToggleButton for={itemId} />
+                  <DeleteConfirmButton
+                    action={actions.admin.service.contactMethod.delete}
+                    id={itemId}
+                  >
+                    <input type="hidden" name="id" value={method.id} />
+                  </DeleteConfirmButton>
+                </Fragment>
+
+                <Fragment slot="edit">
+                  <form
+                    method="POST"
+                    action={actions.admin.service.contactMethod.update}
+                    class="space-y-3"
+                  >
+                    <input type="hidden" name="id" value={method.id} />
+                    <input type="hidden" name="serviceId" value={serviceId} />
+
+                    <InputText
+                      label="Value"
+                      description={`Accepts: ${acceptedTypesText}`}
+                      name="value"
+                      inputProps={{
+                        required: true,
+                        value: method.value,
+                        placeholder: 'contact@example.com',
+                      }}
+                      error={updateInputErrors.value}
+                    />
+
+                    <InputText
+                      label="Label"
+                      name="label"
+                      description="Leave empty to auto-generate"
+                      inputProps={{
+                        value: method.label,
+                        placeholder: contactMethodInfo.formattedValue,
+                      }}
+                      error={updateInputErrors.label}
+                    />
+
+                    <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
+                  </form>
+                </Fragment>
+              </EditableListItem>
+            )
+          })}
+        </div>
+      )
+    }
+  </FormSubSection>
+
+  <FormSubSection title="Add New Contact Method">
+    <form method="POST" action={actions.admin.service.contactMethod.add} class="space-y-2">
+      <input type="hidden" name="serviceId" value={serviceId} />
+
+      <InputText
+        label="Value"
+        description={`Accepts: ${acceptedTypesText}`}
+        name="value"
+        inputProps={{
+          required: true,
+          placeholder: 'contact@example.com',
+        }}
+        error={addInputErrors.value}
+      />
+
+      <InputText
+        label="Label"
+        description="Leave empty to auto-generate"
+        name="label"
+        inputProps={{ placeholder: 'Auto-generated' }}
+      />
+
+      <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />
+    </form>
+  </FormSubSection>
+</FormSection>

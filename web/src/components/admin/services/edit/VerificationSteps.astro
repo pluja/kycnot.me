@@ -1,0 +1,173 @@
+---
+import { actions } from 'astro:actions'
+
+import BadgeSmall from '../../../BadgeSmall.astro'
+import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
+import EditableListItem from '../../EditableListItem.astro'
+import EditToggleButton from '../../EditToggleButton.astro'
+import FormSection from '../../../FormSection.astro'
+import FormSubSection from '../../../FormSubSection.astro'
+import InputSelect from '../../../InputSelect.astro'
+import InputSubmitButton from '../../../InputSubmitButton.astro'
+import InputText from '../../../InputText.astro'
+import InputTextArea from '../../../InputTextArea.astro'
+import {
+  getVerificationStepStatusInfo,
+  verificationStepStatuses,
+} from '../../../../constants/verificationStepStatus'
+
+import type { Prisma } from '@prisma/client'
+
+type Props = {
+  serviceId: number
+  verificationSteps: Prisma.VerificationStepGetPayload<true>[]
+  createInputErrors: Record<string, string[] | undefined>
+  updateInputErrors: Record<string, string[] | undefined>
+  id?: string
+}
+
+const {
+  serviceId,
+  verificationSteps,
+  createInputErrors,
+  updateInputErrors,
+  id = 'verification-steps',
+} = Astro.props
+---
+
+<FormSection title="Verification Steps" id={id}>
+  <FormSubSection title="Existing Verification Steps">
+    {
+      verificationSteps.length === 0 ? (
+        <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
+          No verification steps yet.
+        </p>
+      ) : (
+        <div class="space-y-2">
+          {verificationSteps.map((step) => {
+            const statusInfo = getVerificationStepStatusInfo(step.status)
+            const itemId = `verification-step-${step.id}`
+            return (
+              <EditableListItem id={itemId}>
+                <Fragment slot="header">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-semibold text-day-100">{step.title}</span>
+                    <BadgeSmall
+                      text={statusInfo.label}
+                      variant="faded"
+                      color={statusInfo.color}
+                      icon={statusInfo.icon}
+                    />
+                  </div>
+                  <p class="text-sm text-pretty text-day-400">{step.description}</p>
+                  {step.evidenceMd && (
+                    <p class="mt-1 text-xs text-day-500 italic">Evidence provided (see edit form)</p>
+                  )}
+                  <p class="text-xs text-day-500">
+                    Created: {new Date(step.createdAt).toLocaleDateString()}
+                  </p>
+                </Fragment>
+
+                <Fragment slot="actions">
+                  <EditToggleButton for={itemId} />
+                  <DeleteConfirmButton action={actions.admin.verificationStep.delete} id={itemId}>
+                    <input type="hidden" name="id" value={step.id} />
+                  </DeleteConfirmButton>
+                </Fragment>
+
+                <Fragment slot="edit">
+                  <form
+                    method="POST"
+                    action={actions.admin.verificationStep.update}
+                    class="space-y-3"
+                  >
+                    <input type="hidden" name="id" value={step.id} />
+
+                    <InputText
+                      label="Title"
+                      name="title"
+                      inputProps={{ value: step.title }}
+                      error={updateInputErrors.title}
+                    />
+
+                    <InputTextArea
+                      label="Description (Max 200 chars)"
+                      name="description"
+                      inputProps={{ rows: 2 }}
+                      value={step.description}
+                      error={updateInputErrors.description}
+                    />
+
+                    <InputTextArea
+                      label="Evidence"
+                      description="Markdown supported"
+                      name="evidenceMd"
+                      inputProps={{ rows: 4 }}
+                      value={step.evidenceMd}
+                      error={updateInputErrors.evidenceMd}
+                    />
+
+                    <InputSelect
+                      label="Status"
+                      name="status"
+                      options={verificationStepStatuses.map((status) => ({
+                        label: status.label,
+                        value: status.value,
+                      }))}
+                      selectedValue={step.status}
+                      error={updateInputErrors.status}
+                    />
+
+                    <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
+                  </form>
+                </Fragment>
+              </EditableListItem>
+            )
+          })}
+        </div>
+      )
+    }
+  </FormSubSection>
+
+  <FormSubSection title="Add New Verification Step">
+    <form method="POST" action={actions.admin.verificationStep.create} class="space-y-2">
+      <input type="hidden" name="serviceId" value={serviceId} />
+
+      <InputText
+        label="Title"
+        name="title"
+        inputProps={{ required: true }}
+        error={createInputErrors.title}
+      />
+
+      <InputTextArea
+        label="Description"
+        description="Max 200 chars"
+        name="description"
+        inputProps={{ required: true, rows: 3 }}
+        error={createInputErrors.description}
+      />
+
+      <InputTextArea
+        label="Evidence"
+        description="Markdown supported"
+        name="evidenceMd"
+        inputProps={{ rows: 5 }}
+        error={createInputErrors.evidenceMd}
+      />
+
+      <InputSelect
+        label="Status"
+        name="status"
+        options={verificationStepStatuses.map((status) => ({
+          label: status.label,
+          value: status.value,
+        }))}
+        selectProps={{ required: true }}
+        error={createInputErrors.status}
+      />
+
+      <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />
+    </form>
+  </FormSubSection>
+</FormSection>

@@ -1,0 +1,20 @@
+---
+import Button from '../Button.astro'
+
+type Props = {
+  for: string
+  label?: string
+}
+
+const { for: htmlFor, label = 'Edit' } = Astro.props
+---
+
+<Button
+  as="label"
+  for={`edit-${htmlFor}`}
+  size="sm"
+  variant="faded"
+  icon="ri:pencil-line"
+  iconOnly
+  label={label}
+/>

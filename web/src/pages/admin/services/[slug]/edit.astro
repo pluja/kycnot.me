@@ -1,54 +1,35 @@
 ---
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
-import { Code } from 'astro:components'
-import { orderBy } from 'lodash-es'
 
-import BadgeSmall from '../../../../components/BadgeSmall.astro'
+import AdminPageNav from '../../../../components/admin/AdminPageNav.astro'
 import Button from '../../../../components/Button.astro'
-import FormSection from '../../../../components/FormSection.astro'
-import FormSubSection from '../../../../components/FormSubSection.astro'
-import InputCardGroup from '../../../../components/InputCardGroup.astro'
-import InputCheckbox from '../../../../components/InputCheckbox.astro'
-import InputCheckboxGroup from '../../../../components/InputCheckboxGroup.astro'
-import InputImageFile from '../../../../components/InputImageFile.astro'
-import InputSelect from '../../../../components/InputSelect.astro'
-import InputSubmitButton from '../../../../components/InputSubmitButton.astro'
-import InputText from '../../../../components/InputText.astro'
-import InputTextArea from '../../../../components/InputTextArea.astro'
-import Markdown from '../../../../components/Markdown.astro'
 import MyPicture from '../../../../components/MyPicture.astro'
 import ServiceCard from '../../../../components/ServiceCard.astro'
-import TimeFormatted from '../../../../components/TimeFormatted.astro'
-import Tooltip from '../../../../components/Tooltip.astro'
-import UserBadge from '../../../../components/UserBadge.astro'
-import { getAttributeCategoryInfo } from '../../../../constants/attributeCategories'
-import { getAttributeTypeInfo } from '../../../../constants/attributeTypes'
-import { contactMethodUrlTypes, formatContactMethod } from '../../../../constants/contactMethods'
-import { countries } from '../../../../constants/countries'
-import { currencies } from '../../../../constants/currencies'
-import { eventTypes, getEventTypeInfo } from '../../../../constants/eventTypes'
-import { kycLevels } from '../../../../constants/kycLevels'
-import { serviceVisibilities } from '../../../../constants/serviceVisibility'
-import { verificationStatuses } from '../../../../constants/verificationStatus'
-import {
-  getVerificationStepStatusInfo,
-  verificationStepStatuses,
-} from '../../../../constants/verificationStepStatus'
+import ApiSection from '../../../../components/admin/services/edit/Api.astro'
+import ContactMethodsSection from '../../../../components/admin/services/edit/ContactMethods.astro'
+import DetailsSection from '../../../../components/admin/services/edit/Details.astro'
+import EventsSection from '../../../../components/admin/services/edit/Events.astro'
+import EvidenceImagesSection from '../../../../components/admin/services/edit/EvidenceImages.astro'
+import InternalNotesSection from '../../../../components/admin/services/edit/InternalNotes.astro'
+import TosHighlightsSection from '../../../../components/admin/services/edit/TosHighlights.astro'
+import VerificationRequestsSection from '../../../../components/admin/services/edit/VerificationRequests.astro'
+import VerificationStepsSection from '../../../../components/admin/services/edit/VerificationSteps.astro'
 import BaseLayout from '../../../../layouts/BaseLayout.astro'
-import { DEPLOYMENT_MODE } from '../../../../lib/client/envVariables'
 import { listImageFiles } from '../../../../lib/fileStorage'
 import { makeAdminApiCallInfo } from '../../../../lib/makeAdminApiCallInfo'
-import { pluralize } from '../../../../lib/pluralize'
 import { prisma } from '../../../../lib/prisma'
 
 const { slug } = Astro.params
 
 if (!slug) return Astro.rewrite('/404')
 
+const errorsOf = <T extends { error?: unknown } | undefined>(result: T) =>
+  isInputError(result?.error) ? result.error.fields : {}
+
 const serviceResult = Astro.getActionResult(actions.admin.service.update)
 Astro.locals.banners.addIfSuccess(serviceResult, 'Service updated successfully')
-const serviceInputErrors = isInputError(serviceResult?.error) ? serviceResult.error.fields : {}
+const serviceInputErrors = errorsOf(serviceResult)
 
 if (serviceResult && !serviceResult.error && slug !== serviceResult.data.service.slug) {
   return Astro.redirect(`/admin/services/${serviceResult.data.service.slug}/edit`)
@@ -56,11 +37,9 @@ if (serviceResult && !serviceResult.error && slug !== serviceResult.data.service
 
 const eventCreateResult = Astro.getActionResult(actions.admin.event.create)
 Astro.locals.banners.addIfSuccess(eventCreateResult, 'Event created successfully')
-const eventInputErrors = isInputError(eventCreateResult?.error) ? eventCreateResult.error.fields : {}
 
 const eventUpdateResult = Astro.getActionResult(actions.admin.event.update)
 Astro.locals.banners.addIfSuccess(eventUpdateResult, 'Event updated successfully')
-const eventUpdateInputErrors = isInputError(eventUpdateResult?.error) ? eventUpdateResult.error.fields : {}
 
 const eventToggleResult = Astro.getActionResult(actions.admin.event.toggle)
 Astro.locals.banners.addIfSuccess(eventToggleResult, 'Event visibility updated successfully')
@@ -70,39 +49,39 @@ Astro.locals.banners.addIfSuccess(eventDeleteResult, 'Event deleted successfully
 
 const verificationStepCreateResult = Astro.getActionResult(actions.admin.verificationStep.create)
 Astro.locals.banners.addIfSuccess(verificationStepCreateResult, 'Verification step added successfully')
-const verificationStepInputErrors = isInputError(verificationStepCreateResult?.error)
-  ? verificationStepCreateResult.error.fields
-  : {}
 
 const verificationStepUpdateResult = Astro.getActionResult(actions.admin.verificationStep.update)
 Astro.locals.banners.addIfSuccess(verificationStepUpdateResult, 'Verification step updated successfully')
-const verificationStepUpdateInputErrors = isInputError(verificationStepUpdateResult?.error)
-  ? verificationStepUpdateResult.error.fields
-  : {}
 
 const verificationStepDeleteResult = Astro.getActionResult(actions.admin.verificationStep.delete)
 Astro.locals.banners.addIfSuccess(verificationStepDeleteResult, 'Verification step deleted successfully')
 
 const internalNoteCreateResult = Astro.getActionResult(actions.admin.service.internalNote.add)
 Astro.locals.banners.addIfSuccess(internalNoteCreateResult, 'Internal note added successfully')
-const internalNoteInputErrors = isInputError(internalNoteCreateResult?.error)
-  ? internalNoteCreateResult.error.fields
-  : {}
 
-const contactMethodUpdateResult = Astro.getActionResult(actions.admin.service.contactMethod.update)
-Astro.locals.banners.addIfSuccess(contactMethodUpdateResult, 'Contact method updated successfully')
-const contactMethodUpdateInputErrors = isInputError(contactMethodUpdateResult?.error)
-  ? contactMethodUpdateResult.error.fields
-  : {}
-
-const contactMethodAddResult = Astro.getActionResult(actions.admin.service.contactMethod.add)
-Astro.locals.banners.addIfSuccess(contactMethodAddResult, 'Contact method added successfully')
-const contactMethodAddInputErrors = isInputError(contactMethodAddResult?.error)
-  ? contactMethodAddResult.error.fields
-  : {}
+const internalNoteUpdateResult = Astro.getActionResult(actions.admin.service.internalNote.update)
+Astro.locals.banners.addIfSuccess(internalNoteUpdateResult, 'Internal note updated successfully')
 
 const internalNoteDeleteResult = Astro.getActionResult(actions.admin.service.internalNote.delete)
 Astro.locals.banners.addIfSuccess(internalNoteDeleteResult, 'Internal note deleted successfully')
+
+const contactMethodAddResult = Astro.getActionResult(actions.admin.service.contactMethod.add)
+Astro.locals.banners.addIfSuccess(contactMethodAddResult, 'Contact method added successfully')
+
+const contactMethodUpdateResult = Astro.getActionResult(actions.admin.service.contactMethod.update)
+Astro.locals.banners.addIfSuccess(contactMethodUpdateResult, 'Contact method updated successfully')
+
+const contactMethodDeleteResult = Astro.getActionResult(actions.admin.service.contactMethod.delete)
+Astro.locals.banners.addIfSuccess(contactMethodDeleteResult, 'Contact method deleted successfully')
+
+const tosHighlightAddResult = Astro.getActionResult(actions.admin.service.tosHighlight.add)
+Astro.locals.banners.addIfSuccess(tosHighlightAddResult, 'ToS highlight added successfully')
+
+const tosHighlightUpdateResult = Astro.getActionResult(actions.admin.service.tosHighlight.update)
+Astro.locals.banners.addIfSuccess(tosHighlightUpdateResult, 'ToS highlight updated successfully')
+
+const tosHighlightDeleteResult = Astro.getActionResult(actions.admin.service.tosHighlight.delete)
+Astro.locals.banners.addIfSuccess(tosHighlightDeleteResult, 'ToS highlight deleted successfully')
 
 const evidenceImageAddResult = Astro.getActionResult(actions.admin.service.evidenceImage.add)
 if (evidenceImageAddResult?.data?.imageUrl) {
@@ -112,9 +91,6 @@ if (evidenceImageAddResult?.data?.imageUrl) {
     origin: 'action',
   })
 }
-const evidenceImageAddInputErrors = isInputError(evidenceImageAddResult?.error)
-  ? evidenceImageAddResult.error.fields
-  : {}
 
 const evidenceImageDeleteResult = Astro.getActionResult(actions.admin.service.evidenceImage.delete)
 Astro.locals.banners.addIfSuccess(evidenceImageDeleteResult, 'Evidence image deleted successfully')
@@ -248,10 +224,57 @@ const apiCalls = await Astro.locals.banners.try(
     ]),
   []
 )
+
+const navItems = [
+  { id: 'details', label: 'Service Details', icon: 'ri:settings-3-line' },
+  {
+    id: 'tos-highlights',
+    label: 'ToS Highlights',
+    icon: 'ri:file-list-3-line',
+    badge: service.tosReview?.highlights.length,
+  },
+  {
+    id: 'internal-notes',
+    label: 'Internal Notes',
+    icon: 'ri:sticky-note-line',
+    badge: service.internalNotes.length,
+  },
+  {
+    id: 'events',
+    label: 'Events',
+    icon: 'ri:calendar-event-line',
+    badge: service.events.length,
+  },
+  {
+    id: 'verification-steps',
+    label: 'Verification Steps',
+    icon: 'ri:list-check-2',
+    badge: service.verificationSteps.length,
+  },
+  {
+    id: 'verification-requests',
+    label: 'Verification Requests',
+    icon: 'ri:user-received-line',
+    badge: service._count.verificationRequests,
+  },
+  {
+    id: 'contact-methods',
+    label: 'Contact Methods',
+    icon: 'ri:contacts-line',
+    badge: service.contactMethods.length,
+  },
+  { id: 'api', label: 'API', icon: 'ri:terminal-box-line' },
+  {
+    id: 'evidence-images',
+    label: 'Evidence Images',
+    icon: 'ri:image-line',
+    badge: evidenceImages.length,
+  },
+]
 ---
 
 <BaseLayout pageTitle={`Edit Service: ${service.name}`}>
-  <div class="mx-auto max-w-3xl space-y-24">
+  <div class="mx-auto max-w-7xl px-4">
     <div class="mt-12 flex flex-wrap items-center justify-center gap-6">
       <div class="grow">
         {
@@ -292,1091 +315,65 @@ const apiCalls = await Astro.locals.banners.try(
       <ServiceCard service={service} class="flex-1 grow-2 basis-64" withoutLink />
     </div>
 
-    <FormSection title="Service Details">
-      <form
-        method="POST"
-        action={actions.admin.service.update}
-        class="space-y-6"
-        enctype="multipart/form-data"
-      >
-        <input type="hidden" name="id" value={service.id} />
+    <div class="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-[14rem_1fr]">
+      <AdminPageNav items={navItems} class="lg:py-2" />
 
-        <div class="grid grid-cols-1 gap-x-4 gap-y-6 md:grid-cols-2">
-          <InputText
-            label="Name"
-            name="name"
-            inputProps={{
-              required: true,
-              value: service.name,
-            }}
-            error={serviceInputErrors.name}
-          />
-
-          <InputText
-            label="Slug"
-            description={`Auto-generated if empty. ${
-              service.previousSlugs.length > 0 ? `Old slugs: ${service.previousSlugs.join(', ')}` : ''
-            }`}
-            name="slug"
-            inputProps={{
-              value: service.slug,
-              class: 'font-title',
-            }}
-            error={serviceInputErrors.slug}
-            class="font-title"
-          />
-        </div>
-        <InputTextArea
-          label="Description"
-          name="description"
-          inputProps={{
-            required: true,
-            rows: 4,
-          }}
-          value={service.description}
-          error={serviceInputErrors.description}
+      <div class="min-w-0 max-w-3xl space-y-24">
+        <DetailsSection
+          service={service}
+          categories={categories}
+          attributes={attributes}
+          inputErrors={serviceInputErrors}
         />
 
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <InputTextArea
-            label="Service URLs"
-            description="One per line. Accepts **Web**, **Onion**, and **I2P** URLs."
-            name="allServiceUrls"
-            inputProps={{
-              placeholder: 'https://example1.com\nhttps://example2.onion\nhttps://example3.b32.i2p',
-              class: 'grow min-h-24',
-              required: true,
-            }}
-            class="row-span-2 flex flex-col self-stretch"
-            value={[...service.serviceUrls, ...service.onionUrls, ...service.i2pUrls].join('\n\n')}
-            error={serviceInputErrors.allServiceUrls}
-          />
-          <InputTextArea
-            label="ToS URLs"
-            description="One per line. AI review uses the first working URL only."
-            name="tosUrls"
-            inputProps={{
-              placeholder: 'https://example1.com/tos\nhttps://example2.com/tos',
-              required: true,
-            }}
-            value={service.tosUrls.join('\n')}
-            error={serviceInputErrors.tosUrls}
-          />
-          <InputText
-            label="Operating since"
-            name="operatingSince"
-            description="Date the service started operating"
-            inputProps={{
-              type: 'date',
-              value: service.operatingSince?.toISOString().slice(0, 10),
-              max: new Date().toISOString().slice(0, 10),
-            }}
-            error={serviceInputErrors.operatingSince}
-          />
-          <InputText
-            label="Referral link path"
-            name="referral"
-            inputProps={{
-              value: service.referral,
-              placeholder: 'e.g. ?ref=123 or /ref/123',
-            }}
-            error={serviceInputErrors.referral}
-            class="self-end"
-            description="Will be appended to the service URL"
-          />
-        </div>
-
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <InputText
-            label="Registered Company Name"
-            name="registeredCompanyName"
-            description="If legally registered, the official name of the company."
-            inputProps={{
-              value: service.registeredCompanyName,
-              placeholder: 'Example Corp LTD',
-            }}
-            error={serviceInputErrors.registeredCompanyName}
-          />
-
-          <InputSelect
-            name="registrationCountryCode"
-            label="Company Registration Country"
-            description="Where is the company legally registered?"
-            options={[
-              { label: 'Not registered', value: '' },
-              ...countries
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((country) => ({
-                  label: `${country.flag} ${country.name}`,
-                  value: country.code,
-                })),
-            ]}
-            selectedValue={service.registrationCountryCode ?? ''}
-            error={serviceInputErrors.registrationCountryCode}
-          />
-        </div>
-
-        <div class="flex items-center justify-between gap-2">
-          <InputImageFile
-            label="Image"
-            name="imageFile"
-            description="Square image. At least 192x192px. Transparency supported. Leave empty to keep current image."
-            error={serviceInputErrors.imageFile}
-            square
-            value={service.imageUrl}
-            downloadButton
-            removeCheckbox={service.imageUrl
-              ? {
-                  name: 'removeImage',
-                  label: 'Remove image',
-                }
-              : undefined}
-            class="grow"
-          />
-        </div>
-
-        <div class="grid grid-cols-1 items-stretch gap-x-4 gap-y-6 xs:grid-cols-[1fr_2fr]">
-          <InputCheckboxGroup
-            name="categories"
-            label="Categories"
-            size="lg"
-            required
-            options={categories.map((category) => ({
-              label: category.name,
-              value: category.id.toString(),
-              icon: category.icon,
-            }))}
-            selectedValues={service.categories.map((c) => c.id.toString())}
-            error={serviceInputErrors.categories}
-            class="min-w-auto"
-          />
-
-          <InputCheckboxGroup
-            name="attributes"
-            label="Attributes"
-            size="lg"
-            options={orderBy(
-              attributes.map((attribute) => ({
-                ...attribute,
-                categoryInfo: getAttributeCategoryInfo(attribute.category),
-                typeInfo: getAttributeTypeInfo(attribute.type),
-              })),
-              ['categoryInfo.order', 'typeInfo.order']
-            ).map((attribute) => {
-              return {
-                label: attribute.title,
-                value: attribute.id.toString(),
-                icon: [attribute.categoryInfo.icon, attribute.typeInfo.icon],
-                iconClassName: [attribute.categoryInfo.classNames.icon, attribute.typeInfo.classNames.icon],
-              }
-            })}
-            selectedValues={service.attributes.map((a) => a.attribute.id.toString())}
-            error={serviceInputErrors.attributes}
-          />
-        </div>
-
-        <InputCardGroup
-          name="kycLevel"
-          label="KYC Level"
-          options={kycLevels.map((kycLevel) => ({
-            label: `${kycLevel.name} (${kycLevel.value}/4)`,
-            value: kycLevel.id,
-            icon: kycLevel.icon,
-            description: kycLevel.description,
-          }))}
-          selectedValue={service.kycLevel.toString()}
-          iconSize="md"
-          cardSize="md"
-          error={serviceInputErrors.kycLevel}
-          class="[&>div]:grid-cols-2 [&>div]:[--card-min-size:16rem]"
+        <TosHighlightsSection
+          serviceId={service.id}
+          tosReview={service.tosReview}
+          addInputErrors={errorsOf(tosHighlightAddResult)}
+          updateInputErrors={errorsOf(tosHighlightUpdateResult)}
         />
 
-        <InputTextArea
-          label="KYC Policy Notes"
-          name="kycPolicyMd"
-          description="Markdown. Per-service narrative on nuances of KYC/AML/refund policy not captured by the level or attributes."
-          value={service.kycPolicyMd ?? ''}
-          inputProps={{ rows: 4 }}
-          error={serviceInputErrors.kycPolicyMd}
+        <InternalNotesSection
+          serviceId={service.id}
+          notes={service.internalNotes}
+          addInputErrors={errorsOf(internalNoteCreateResult)}
         />
 
-        <InputCardGroup
-          name="verificationStatus"
-          label="Verification Status"
-          options={verificationStatuses.map((status) => ({
-            label: status.label,
-            value: status.value,
-            icon: status.icon,
-            iconClass: status.classNames.icon,
-            description: status.description,
-          }))}
-          selectedValue={service.verificationStatus}
-          error={serviceInputErrors.verificationStatus}
-          cardSize="sm"
-          iconSize="sm"
-          class="[&>div]:grid-cols-2 [&>div]:[--card-min-size:16rem]"
+        <EventsSection
+          serviceId={service.id}
+          events={service.events}
+          createInputErrors={errorsOf(eventCreateResult)}
+          updateInputErrors={errorsOf(eventUpdateResult)}
         />
 
-        <InputCardGroup
-          name="acceptedCurrencies"
-          label="Accepted Currencies"
-          options={currencies.map((currency) => ({
-            label: currency.name,
-            value: currency.id,
-            icon: currency.icon,
-          }))}
-          selectedValue={service.acceptedCurrencies}
-          error={serviceInputErrors.acceptedCurrencies}
-          required
-          multiple
+        <VerificationStepsSection
+          serviceId={service.id}
+          verificationSteps={service.verificationSteps}
+          createInputErrors={errorsOf(verificationStepCreateResult)}
+          updateInputErrors={errorsOf(verificationStepUpdateResult)}
         />
 
-        <div class="grid grid-cols-1 gap-x-4 gap-y-6 md:grid-cols-[2fr_3fr]">
-          <InputTextArea
-            label="Verification Summary"
-            description="Markdown supported"
-            name="verificationSummary"
-            inputProps={{
-              rows: 4,
-            }}
-            value={service.verificationSummary ?? undefined}
-            error={serviceInputErrors.verificationSummary}
-          />
-
-          <InputTextArea
-            label="Verification Proof"
-            description="Markdown supported"
-            name="verificationProofMd"
-            inputProps={{
-              rows: 8,
-            }}
-            value={service.verificationProofMd ?? undefined}
-            error={serviceInputErrors.verificationProofMd}
-          />
-        </div>
-
-        <InputCardGroup
-          name="serviceVisibility"
-          label="Service Visibility"
-          options={serviceVisibilities.map((visibility) => ({
-            label: visibility.label,
-            value: visibility.value,
-            icon: visibility.icon,
-            iconClass: visibility.iconClass,
-            description: visibility.description,
-          }))}
-          selectedValue={service.serviceVisibility}
-          error={serviceInputErrors.serviceVisibility}
-          cardSize="sm"
+        <VerificationRequestsSection
+          total={service._count.verificationRequests}
+          requests={service.verificationRequests}
         />
 
-        <InputCheckbox
-          label="Strict Commenting"
-          name="strictCommentingEnabled"
-          checked={service.strictCommentingEnabled}
-          descriptionInline="Require proof of being a client for comments."
+        <ContactMethodsSection
+          serviceId={service.id}
+          contactMethods={service.contactMethods}
+          addInputErrors={errorsOf(contactMethodAddResult)}
+          updateInputErrors={errorsOf(contactMethodUpdateResult)}
         />
 
-        <InputTextArea
-          label="Comment Section Message"
-          name="commentSectionMessage"
-          value={service.commentSectionMessage ?? ''}
-          description="Markdown supported"
-          inputProps={{
-            rows: 4,
-          }}
-          error={serviceInputErrors.commentSectionMessage}
-        />
+        <ApiSection apiCalls={apiCalls} />
 
-        <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
-      </form>
-    </FormSection>
-
-    <FormSection title="Internal Notes" id="internal-notes">
-      <FormSubSection title="Existing Notes">
-        {
-          service.internalNotes.length === 0 ? (
-            <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
-              No internal notes yet.
-            </p>
-          ) : (
-            <div class="space-y-4">
-              {service.internalNotes.map((note) => (
-                <div class="rounded-md border border-night-600 bg-night-800 p-4">
-                  <input
-                    type="checkbox"
-                    class="peer/edit-note sr-only"
-                    data-edit-note-checkbox
-                    id={`edit-note-${note.id}`}
-                  />
-
-                  <div class="flex items-start justify-between">
-                    <div class="grow space-y-1">
-                      <div
-                        data-note-content
-                        class="prose prose-sm max-w-none text-pretty text-day-200 prose-invert"
-                      >
-                        <Markdown content={note.content} />
-                      </div>
-                      <div class="flex items-center gap-2 text-xs text-day-500">
-                        <TimeFormatted date={note.createdAt} hourPrecision />
-                        {note.addedByUser && (
-                          <span class="flex items-center gap-1">
-                            by <UserBadge user={note.addedByUser} size="sm" />
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div class="flex items-center gap-1">
-                      <Button
-                        as="label"
-                        for={`edit-note-${note.id}`}
-                        variant="faded"
-                        size="sm"
-                        icon="ri:edit-line"
-                        iconOnly
-                        label="Edit"
-                      />
-
-                      <form method="POST" action={actions.admin.service.internalNote.delete} class="contents">
-                        <input type="hidden" name="noteId" value={note.id} />
-                        <Button
-                          type="submit"
-                          size="sm"
-                          variant="faded"
-                          icon="ri:delete-bin-line"
-                          iconOnly
-                          label="Delete"
-                        />
-                      </form>
-                    </div>
-                  </div>
-
-                  <form
-                    method="POST"
-                    action={actions.admin.service.internalNote.update}
-                    data-note-edit-form
-                    data-astro-reload
-                    class="mt-4 hidden space-y-4 peer-checked/edit-note:block"
-                  >
-                    <input type="hidden" name="noteId" value={note.id} />
-                    <InputTextArea
-                      label="Note Content"
-                      name="content"
-                      value={note.content}
-                      inputProps={{ class: 'bg-night-700' }}
-                    />
-                    <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
-                  </form>
-                </div>
-              ))}
-            </div>
-          )
-        }
-      </FormSubSection>
-
-      <FormSubSection title="Add New Note">
-        <form method="POST" action={actions.admin.service.internalNote.add} class="space-y-4">
-          <input type="hidden" name="serviceId" value={service.id} />
-          <InputTextArea
-            label="Note Content"
-            name="content"
-            inputProps={{
-              required: true,
-              rows: 4,
-              placeholder: 'Add internal note about this service...',
-            }}
-            error={internalNoteInputErrors.content}
-          />
-          <InputSubmitButton label="Add Note" icon="ri:add-line" hideCancel />
-        </form>
-      </FormSubSection>
-    </FormSection>
-
-    <FormSection title="Events">
-      <FormSubSection title="Existing Events">
-        {
-          service.events.length === 0 ? (
-            <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
-              No events yet.
-            </p>
-          ) : (
-            <div class="space-y-2">
-              {service.events.map((event) => {
-                const eventTypeInfo = getEventTypeInfo(event.type)
-                return (
-                  <div class="rounded-md border border-night-600 bg-night-800 px-3 py-2">
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="grow space-y-1">
-                        <div class="flex flex-wrap items-center gap-2">
-                          <span class="font-semibold text-day-100">{event.title}</span>
-                          <BadgeSmall
-                            text={eventTypeInfo.label}
-                            variant="faded"
-                            color={eventTypeInfo.color}
-                            icon={eventTypeInfo.icon}
-                          />
-                          {!event.visible && (
-                            <BadgeSmall text="Hidden" variant="faded" color="gray" icon="ri:eye-off-line" />
-                          )}
-                        </div>
-                        <p class="text-sm text-pretty text-day-400">{event.content}</p>
-                        <div class="flex flex-wrap items-center gap-3 text-xs text-day-500">
-                          <span>Started: {new Date(event.startedAt).toLocaleDateString()}</span>
-                          <span>
-                            Ended:
-                            {event.endedAt
-                              ? event.endedAt === event.startedAt
-                                ? '1-time event'
-                                : new Date(event.endedAt).toLocaleDateString()
-                              : 'Ongoing'}
-                          </span>
-                          {event.source && <span>Source: {event.source}</span>}
-                        </div>
-                      </div>
-                      <div class="flex shrink-0 gap-1.5">
-                        <Tooltip text={event.visible ? 'Hide' : 'Show'}>
-                          <form method="POST" action={actions.admin.event.toggle} class="contents">
-                            <input type="hidden" name="eventId" value={event.id} />
-                            <Button
-                              type="submit"
-                              variant="faded"
-                              size="sm"
-                              icon={event.visible ? 'ri:eye-off-line' : 'ri:eye-line'}
-                              iconOnly
-                              label={event.visible ? 'Hide' : 'Show'}
-                            />
-                          </form>
-                        </Tooltip>
-                        <Tooltip text="Edit">
-                          <Button
-                            type="button"
-                            variant="faded"
-                            size="sm"
-                            icon="ri:pencil-line"
-                            onclick={`document.getElementById('edit-event-${event.id}')?.classList.toggle('hidden')`}
-                            iconOnly
-                            label="Edit"
-                          />
-                        </Tooltip>
-                        <Tooltip text="Delete">
-                          <form method="POST" action={actions.admin.event.delete} class="contents">
-                            <input type="hidden" name="eventId" value={event.id} />
-                            <Button
-                              type="submit"
-                              size="sm"
-                              variant="faded"
-                              icon="ri:delete-bin-line"
-                              iconOnly
-                              label="Delete"
-                            />
-                          </form>
-                        </Tooltip>
-                      </div>
-                    </div>
-                    {/* Edit Event Form - Hidden by default */}
-                    <form
-                      id={`edit-event-${event.id}`}
-                      method="POST"
-                      action={actions.admin.event.update}
-                      class="mt-3 hidden space-y-3 rounded-md border border-night-500 bg-night-700 p-3"
-                    >
-                      <input type="hidden" name="eventId" value={event.id} />
-
-                      <InputText
-                        label="Title"
-                        name="title"
-                        inputProps={{ required: true, value: event.title }}
-                        error={eventUpdateInputErrors.title}
-                      />
-
-                      <InputTextArea
-                        label="Content"
-                        name="content"
-                        inputProps={{ required: true, rows: 3 }}
-                        value={event.content}
-                        error={eventUpdateInputErrors.content}
-                      />
-
-                      <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <InputText
-                          label="Started At"
-                          name="startedAt"
-                          inputProps={{
-                            type: 'datetime-local',
-                            required: true,
-                            value: new Date(
-                              new Date(event.startedAt).getTime() -
-                                new Date(event.startedAt).getTimezoneOffset() * 60000
-                            )
-                              .toISOString()
-                              .slice(0, 16),
-                          }}
-                          error={eventUpdateInputErrors.startedAt}
-                        />
-
-                        <div>
-                          <InputText
-                            label="Ended At"
-                            name="endedAt"
-                            inputProps={{
-                              type: 'datetime-local',
-                              value: event.endedAt
-                                ? new Date(
-                                    new Date(event.endedAt).getTime() -
-                                      new Date(event.endedAt).getTimezoneOffset() * 60000
-                                  )
-                                    .toISOString()
-                                    .slice(0, 16)
-                                : '',
-                            }}
-                            error={eventUpdateInputErrors.endedAt}
-                            description="- Empty: Event is ongoing.\n- Filled: Event with specific end date.\n- Same as start date: One-time event."
-                          />
-                          <button
-                            type="button"
-                            data-clear-datetime="endedAt"
-                            class="mt-1 inline-flex items-center gap-1 text-xs text-day-500 transition-colors hover:text-day-200"
-                          >
-                            <Icon name="ri:close-circle-line" class="size-3.5" />
-                            Clear (event is ongoing)
-                          </button>
-                        </div>
-                      </div>
-
-                      <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <InputText
-                          label="Source URL"
-                          name="source"
-                          inputProps={{ value: event.source }}
-                          error={eventUpdateInputErrors.source}
-                        />
-
-                        <InputSelect
-                          label="Type"
-                          name="type"
-                          options={eventTypes.map((type) => ({
-                            label: type.label,
-                            value: type.id,
-                          }))}
-                          selectedValue={event.type}
-                          selectProps={{ required: true }}
-                          error={eventUpdateInputErrors.type}
-                        />
-                      </div>
-
-                      <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
-                    </form>
-                  </div>
-                )
-              })}
-            </div>
-          )
-        }
-      </FormSubSection>
-
-      <FormSubSection title="Add New Event">
-        <form method="POST" action={actions.admin.event.create} class="space-y-2">
-          <input type="hidden" name="serviceId" value={service.id} />
-
-          <InputText
-            label="Title"
-            name="title"
-            inputProps={{ required: true }}
-            error={eventInputErrors.title}
-          />
-
-          <InputTextArea
-            label="Content"
-            name="content"
-            inputProps={{ required: true, rows: 3 }}
-            error={eventInputErrors.content}
-          />
-
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <InputText
-              label="Started At"
-              name="startedAt"
-              inputProps={{
-                type: 'datetime-local',
-                required: true,
-                value: new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
-                  .toISOString()
-                  .slice(0, 16),
-              }}
-              error={eventInputErrors.startedAt}
-            />
-
-            <div>
-              <InputText
-                label="Ended At"
-                name="endedAt"
-                inputProps={{ type: 'datetime-local' }}
-                error={eventInputErrors.endedAt}
-                description="- Empty: Event is ongoing.\n- Filled: Event with specific end date.\n- Same as start date: One-time event."
-              />
-              <button
-                type="button"
-                data-clear-datetime="endedAt"
-                class="mt-1 inline-flex items-center gap-1 text-xs text-day-500 transition-colors hover:text-day-200"
-              >
-                <Icon name="ri:close-circle-line" class="size-3.5" />
-                Clear (event is ongoing)
-              </button>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <InputText label="Source URL" name="source" error={eventInputErrors.source} />
-
-            <InputSelect
-              label="Type"
-              name="type"
-              options={eventTypes.map((type) => ({
-                label: type.label,
-                value: type.id,
-              }))}
-              selectProps={{ required: true }}
-              error={eventInputErrors.type}
-            />
-          </div>
-
-          <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />
-        </form>
-      </FormSubSection>
-    </FormSection>
-
-    <FormSection title="Verification Steps">
-      <FormSubSection title="Existing Verification Steps">
-        {
-          service.verificationSteps.length === 0 ? (
-            <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
-              No verification steps yet.
-            </p>
-          ) : (
-            <div class="space-y-2">
-              {service.verificationSteps.map((step) => {
-                const verificationStepStatusInfo = getVerificationStepStatusInfo(step.status)
-                return (
-                  <div class="rounded-md border border-night-600 bg-night-800 p-3">
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="grow space-y-1">
-                        <div class="flex flex-wrap items-center gap-2">
-                          <span class="font-semibold text-day-100">{step.title}</span>
-                          <BadgeSmall
-                            text={verificationStepStatusInfo.label}
-                            variant="faded"
-                            color={verificationStepStatusInfo.color}
-                            icon={verificationStepStatusInfo.icon}
-                          />
-                        </div>
-                        <p class="text-sm text-pretty text-day-400">{step.description}</p>
-                        {step.evidenceMd && (
-                          <p class="mt-1 text-xs text-day-500 italic">Evidence provided (see edit form)</p>
-                        )}
-                        <p class="text-xs text-day-500">
-                          Created: {new Date(step.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div class="flex shrink-0 gap-1.5">
-                        <Tooltip text="Edit">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="faded"
-                            icon="ri:pencil-line"
-                            onclick={`document.getElementById('edit-verification-step-${step.id}')?.classList.toggle('hidden')`}
-                            iconOnly
-                            label="Edit"
-                          />
-                        </Tooltip>
-                        <Tooltip text="Delete">
-                          <form method="POST" action={actions.admin.verificationStep.delete} class="inline">
-                            <input type="hidden" name="id" value={step.id} />
-                            <Button
-                              type="submit"
-                              size="sm"
-                              variant="faded"
-                              icon="ri:delete-bin-line"
-                              iconOnly
-                              label="Delete"
-                            />
-                          </form>
-                        </Tooltip>
-                      </div>
-                    </div>
-
-                    {/* Edit Verification Step Form - Hidden by default */}
-                    <form
-                      id={`edit-verification-step-${step.id}`}
-                      method="POST"
-                      action={actions.admin.verificationStep.update}
-                      class="mt-3 hidden space-y-3 rounded-md border border-night-500 bg-night-700 p-3"
-                    >
-                      <input type="hidden" name="id" value={step.id} />
-
-                      <InputText
-                        label="Title"
-                        name="title"
-                        inputProps={{ value: step.title }}
-                        error={verificationStepUpdateInputErrors.title}
-                      />
-
-                      <InputTextArea
-                        label="Description (Max 200 chars)"
-                        name="description"
-                        inputProps={{ rows: 2 }}
-                        value={step.description}
-                        error={verificationStepUpdateInputErrors.description}
-                      />
-
-                      <InputTextArea
-                        label="Evidence"
-                        description="Markdown supported"
-                        name="evidenceMd"
-                        inputProps={{ rows: 4 }}
-                        value={step.evidenceMd}
-                        error={verificationStepUpdateInputErrors.evidenceMd}
-                      />
-
-                      <InputSelect
-                        label="Status"
-                        name="status"
-                        options={verificationStepStatuses.map((status) => ({
-                          label: status.label,
-                          value: status.value,
-                        }))}
-                        selectedValue={step.status}
-                        error={verificationStepUpdateInputErrors.status}
-                      />
-
-                      <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
-                    </form>
-                  </div>
-                )
-              })}
-            </div>
-          )
-        }
-      </FormSubSection>
-
-      <FormSubSection title="Add New Verification Step">
-        <form method="POST" action={actions.admin.verificationStep.create} class="space-y-2">
-          <input type="hidden" name="serviceId" value={service.id} />
-
-          <InputText
-            label="Title"
-            name="title"
-            inputProps={{ required: true }}
-            error={verificationStepInputErrors.title}
-          />
-
-          <InputTextArea
-            label="Description"
-            description="Max 200 chars"
-            name="description"
-            inputProps={{ required: true, rows: 3 }}
-            error={verificationStepInputErrors.description}
-          />
-
-          <InputTextArea
-            label="Evidence"
-            description="Markdown supported"
-            name="evidenceMd"
-            inputProps={{ rows: 5 }}
-            error={verificationStepInputErrors.evidenceMd}
-          />
-
-          <InputSelect
-            label="Status"
-            name="status"
-            options={verificationStepStatuses.map((status) => ({
-              label: status.label,
-              value: status.value,
-            }))}
-            selectProps={{ required: true }}
-            error={verificationStepInputErrors.status}
-          />
-
-          <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />
-        </form>
-      </FormSubSection>
-    </FormSection>
-
-    <FormSection
-      title="Verification Requests"
-      subtitle={`Total: ${service._count.verificationRequests} ${pluralize('request', service._count.verificationRequests)}`}
-    >
-      {
-        service.verificationRequests.length > 0 ? (
-          <div class="overflow-x-auto rounded-md border border-night-500 bg-night-800">
-            <table class="w-full text-sm">
-              <thead class="bg-night-600">
-                <tr class="text-left">
-                  <th class="p-3 font-semibold text-day-300">User</th>
-                  <th class="p-3 font-semibold text-day-300">Requested</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-night-500">
-                {service.verificationRequests.map((request) => (
-                  <tr class="transition-colors hover:bg-night-700">
-                    <td class="p-3 text-day-300">
-                      <UserBadge user={request.user} size="md" />
-                    </td>
-                    <td class="p-3 text-day-400">
-                      <TimeFormatted date={request.createdAt} hourPrecision />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
-            No verification requests yet.
-          </p>
-        )
-      }
-    </FormSection>
-
-    <FormSection title="Contact Methods">
-      <FormSubSection title="Existing Contact Methods">
-        {
-          service.contactMethods.length === 0 ? (
-            <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
-              No contact methods yet.
-            </p>
-          ) : (
-            <div class="space-y-3">
-              {service.contactMethods.map((method) => {
-                const contactMethodInfo = formatContactMethod(method.value)
-                return (
-                  <div class="rounded-md border border-night-600 bg-night-800 p-3">
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="grow space-y-1">
-                        <div class="flex flex-wrap items-center gap-2">
-                          <Icon name={contactMethodInfo.icon} class="size-4 text-day-300" />
-                          <span class="font-semibold text-day-100">
-                            {method.label ?? contactMethodInfo.formattedValue}
-                          </span>
-                        </div>
-                        <p class="text-sm text-pretty text-day-400">{method.value}</p>
-                      </div>
-                      <div class="flex shrink-0 gap-1.5">
-                        <Tooltip text="Edit">
-                          <Button
-                            type="button"
-                            variant="faded"
-                            size="sm"
-                            icon="ri:pencil-line"
-                            onclick={`document.getElementById('edit-contact-method-${method.id}')?.classList.toggle('hidden')`}
-                            iconOnly
-                            label="Edit"
-                          />
-                        </Tooltip>
-                        <Tooltip text="Delete">
-                          <form
-                            method="POST"
-                            action={actions.admin.service.contactMethod.delete}
-                            class="contents"
-                          >
-                            <input type="hidden" name="id" value={method.id} />
-                            <Button
-                              type="submit"
-                              size="sm"
-                              variant="faded"
-                              icon="ri:delete-bin-line"
-                              iconOnly
-                              label="Delete"
-                            />
-                          </form>
-                        </Tooltip>
-                      </div>
-                    </div>
-
-                    {/* Edit Contact Method Form - Hidden by default */}
-                    <form
-                      id={`edit-contact-method-${method.id}`}
-                      method="POST"
-                      action={actions.admin.service.contactMethod.update}
-                      class="mt-3 hidden space-y-3 rounded-md border border-night-500 bg-night-700 p-3"
-                    >
-                      <input type="hidden" name="id" value={method.id} />
-                      <input type="hidden" name="serviceId" value={service.id} />
-
-                      <InputText
-                        label="Value"
-                        description={`Accepts: ${contactMethodUrlTypes.map((type) => type.labelPlural).join(', ')}`}
-                        name="value"
-                        inputProps={{
-                          required: true,
-                          value: method.value,
-                          placeholder: 'contact@example.com',
-                        }}
-                        error={contactMethodUpdateInputErrors.value}
-                      />
-
-                      <InputText
-                        label="Label"
-                        name="label"
-                        description="Leave empty to auto-generate"
-                        inputProps={{
-                          value: method.label,
-                          placeholder: contactMethodInfo.formattedValue,
-                        }}
-                        error={contactMethodUpdateInputErrors.label}
-                      />
-
-                      <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
-                    </form>
-                  </div>
-                )
-              })}
-            </div>
-          )
-        }
-      </FormSubSection>
-
-      <FormSubSection title="Add New Contact Method">
-        <form method="POST" action={actions.admin.service.contactMethod.add} class="space-y-2">
-          <input type="hidden" name="serviceId" value={service.id} />
-
-          <InputText
-            label="Value"
-            description={`Accepts: ${contactMethodUrlTypes.map((type) => type.labelPlural).join(', ')}`}
-            name="value"
-            inputProps={{
-              required: true,
-              placeholder: 'contact@example.com',
-            }}
-            error={contactMethodAddInputErrors.value}
-          />
-
-          <InputText
-            label="Label"
-            description="Leave empty to auto-generate"
-            name="label"
-            inputProps={{ placeholder: 'Auto-generated' }}
-          />
-
-          <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />
-        </form>
-      </FormSubSection>
-    </FormSection>
-
-    <FormSection title="API">
-      {
-        DEPLOYMENT_MODE === 'staging' && (
-          <p class="rounded-lg bg-red-900/30 p-4 text-sm text-red-200">
-            <Icon name="ri:alert-line" class="inline-block size-4 align-[-0.2em] text-red-400" />
-            This endpoints section doesn't work in PRE. Use curl commands instead.
-          </p>
-        )
-      }
-      <div class="mb-6 flex justify-center">
-        <Button
-          as="a"
-          href="/docs/api"
-          icon="ri:book-open-line"
-          color="gray"
-          size="sm"
-          label=" Documentation"
+        <EvidenceImagesSection
+          serviceId={service.id}
+          evidenceImages={evidenceImages}
+          addInputErrors={errorsOf(evidenceImageAddResult)}
         />
       </div>
-      {
-        apiCalls.map((call) => (
-          <FormSubSection title={`${call.method} ${call.path}`}>
-            <p class="text-sm text-day-400">Input:</p>
-            <Code code={JSON.stringify(call.input, null, 2)} lang="json" class="rounded-lg p-4 text-xs" />
-
-            <p class="text-sm text-day-400">Output:</p>
-            <Code code={JSON.stringify(call.output, null, 2)} lang="json" class="rounded-lg p-4 text-xs" />
-          </FormSubSection>
-        ))
-      }
-    </FormSection>
-
-    <FormSection title="Evidence Images" id="evidence-images">
-      <FormSubSection title={`Existing Evidence Images (${evidenceImages.length})`}>
-        {
-          evidenceImages.length === 0 ? (
-            <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
-              No evidence images yet.
-            </p>
-          ) : (
-            <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-              {evidenceImages.map((image) => (
-                <div class="group relative rounded-md border border-night-600 bg-night-800 p-2">
-                  <button
-                    type="button"
-                    class="block w-full cursor-zoom-in"
-                    data-lightbox-trigger
-                    data-lightbox-src={image.url}
-                  >
-                    <MyPicture
-                      src={image.url}
-                      alt="Evidence image"
-                      class="aspect-square w-full rounded-sm object-cover"
-                      width={200}
-                      height={200}
-                    />
-                  </button>
-                  <form
-                    method="POST"
-                    action={actions.admin.service.evidenceImage.delete}
-                    class="absolute top-1 right-1"
-                  >
-                    <input type="hidden" name="fileUrl" value={image.url} />
-                    <Button
-                      type="submit"
-                      variant="faded"
-                      color="danger"
-                      size="sm"
-                      icon="ri:delete-bin-line"
-                      iconOnly
-                      label="Delete Image"
-                      class="opacity-0 transition-opacity group-hover:opacity-100"
-                    />
-                  </form>
-
-                  <div class="mt-2 space-y-1">
-                    <p class="text-xs text-day-500">
-                      <TimeFormatted date={image.date} hourPrecision />
-                    </p>
-                    <input
-                      type="text"
-                      readonly
-                      value={`![Evidence](${image.url})`}
-                      class="w-full cursor-text rounded-sm border bg-night-700 p-1.5 font-mono text-xs text-day-200 select-all"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        }
-      </FormSubSection>
-      <FormSubSection title="Add New Evidence Image">
-        <form
-          method="POST"
-          action={actions.admin.service.evidenceImage.add}
-          class="space-y-4"
-          enctype="multipart/form-data"
-        >
-          <input type="hidden" name="serviceId" value={service.id} />
-          <InputImageFile
-            label="Upload Image"
-            name="imageFile"
-            description="Upload an evidence image."
-            error={evidenceImageAddInputErrors.imageFile}
-            required
-          />
-          <InputSubmitButton label="Add Image" icon="ri:add-line" hideCancel />
-        </form>
-      </FormSubSection>
-    </FormSection>
-
+    </div>
   </div>
 
   <div
@@ -1389,7 +386,7 @@ const apiCalls = await Astro.locals.banners.try(
       class="absolute inset-0 cursor-default"
       data-lightbox-close
       aria-label="Close"
-    />
+    ></button>
     <button
       type="button"
       class="absolute top-4 right-4 z-10 flex size-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
@@ -1436,6 +433,9 @@ const apiCalls = await Astro.locals.banners.try(
   </script>
 
   <script>
+    ////////////////////////////////////////////////////////////
+    // Optional script for the evidence image lightbox.       //
+    ////////////////////////////////////////////////////////////
     document.addEventListener('astro:page-load', () => {
       const overlay = document.querySelector<HTMLDivElement>('[data-lightbox-overlay]')
       const img = document.querySelector<HTMLImageElement>('[data-lightbox-img]')

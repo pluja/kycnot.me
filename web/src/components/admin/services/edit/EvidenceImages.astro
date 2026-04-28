@@ -1,0 +1,102 @@
+---
+import { actions } from 'astro:actions'
+
+import Button from '../../../Button.astro'
+import FormSection from '../../../FormSection.astro'
+import FormSubSection from '../../../FormSubSection.astro'
+import InputImageFile from '../../../InputImageFile.astro'
+import InputSubmitButton from '../../../InputSubmitButton.astro'
+import MyPicture from '../../../MyPicture.astro'
+import TimeFormatted from '../../../TimeFormatted.astro'
+
+import type { ImageFileInfo } from '../../../../lib/fileStorage'
+
+type Props = {
+  serviceId: number
+  evidenceImages: ImageFileInfo[]
+  addInputErrors: Record<string, string[] | undefined>
+  id?: string
+}
+
+const { serviceId, evidenceImages, addInputErrors, id = 'evidence-images' } = Astro.props
+---
+
+<FormSection title="Evidence Images" id={id}>
+  <FormSubSection title={`Existing Evidence Images (${evidenceImages.length})`}>
+    {
+      evidenceImages.length === 0 ? (
+        <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
+          No evidence images yet.
+        </p>
+      ) : (
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+          {evidenceImages.map((image) => (
+            <div class="group relative rounded-md border border-night-600 bg-night-800 p-2">
+              <button
+                type="button"
+                class="block w-full cursor-zoom-in"
+                data-lightbox-trigger
+                data-lightbox-src={image.url}
+              >
+                <MyPicture
+                  src={image.url}
+                  alt="Evidence image"
+                  class="aspect-square w-full rounded-sm object-cover"
+                  width={200}
+                  height={200}
+                />
+              </button>
+              <form
+                method="POST"
+                action={actions.admin.service.evidenceImage.delete}
+                class="absolute top-1 right-1"
+              >
+                <input type="hidden" name="fileUrl" value={image.url} />
+                <Button
+                  type="submit"
+                  variant="faded"
+                  color="danger"
+                  size="sm"
+                  icon="ri:delete-bin-line"
+                  iconOnly
+                  label="Delete Image"
+                  class="opacity-0 transition-opacity group-hover:opacity-100"
+                />
+              </form>
+
+              <div class="mt-2 space-y-1">
+                <p class="text-xs text-day-500">
+                  <TimeFormatted date={image.date} hourPrecision />
+                </p>
+                <input
+                  type="text"
+                  readonly
+                  value={`![Evidence](${image.url})`}
+                  class="w-full cursor-text rounded-sm border bg-night-700 p-1.5 font-mono text-xs text-day-200 select-all"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+  </FormSubSection>
+  <FormSubSection title="Add New Evidence Image">
+    <form
+      method="POST"
+      action={actions.admin.service.evidenceImage.add}
+      class="space-y-4"
+      enctype="multipart/form-data"
+    >
+      <input type="hidden" name="serviceId" value={serviceId} />
+      <InputImageFile
+        label="Upload Image"
+        name="imageFile"
+        description="Upload an evidence image."
+        error={addInputErrors.imageFile}
+        required
+      />
+      <InputSubmitButton label="Add Image" icon="ri:add-line" hideCancel />
+    </form>
+  </FormSubSection>
+</FormSection>

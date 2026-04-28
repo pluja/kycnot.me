@@ -1,0 +1,338 @@
+---
+import { actions } from 'astro:actions'
+import { orderBy } from 'lodash-es'
+
+import FormSection from '../../../FormSection.astro'
+import InputCardGroup from '../../../InputCardGroup.astro'
+import InputCheckbox from '../../../InputCheckbox.astro'
+import InputCheckboxGroup from '../../../InputCheckboxGroup.astro'
+import InputImageFile from '../../../InputImageFile.astro'
+import InputSelect from '../../../InputSelect.astro'
+import InputSubmitButton from '../../../InputSubmitButton.astro'
+import InputText from '../../../InputText.astro'
+import InputTextArea from '../../../InputTextArea.astro'
+import { getAttributeCategoryInfo } from '../../../../constants/attributeCategories'
+import { getAttributeTypeInfo } from '../../../../constants/attributeTypes'
+import { countries } from '../../../../constants/countries'
+import { currencies } from '../../../../constants/currencies'
+import { kycLevels } from '../../../../constants/kycLevels'
+import { serviceVisibilities } from '../../../../constants/serviceVisibility'
+import { verificationStatuses } from '../../../../constants/verificationStatus'
+
+import type { Prisma } from '@prisma/client'
+
+type Props = {
+  service: Prisma.ServiceGetPayload<{
+    include: {
+      attributes: { select: { attribute: { select: { id: true } } } }
+      categories: { select: { id: true; name: true; icon: true } }
+    }
+  }>
+  categories: { id: number; name: string; icon: string | null }[]
+  attributes: Prisma.AttributeGetPayload<true>[]
+  inputErrors: Record<string, string[] | undefined>
+  id?: string
+}
+
+const { service, categories, attributes, inputErrors, id = 'details' } = Astro.props
+---
+
+<FormSection title="Service Details" id={id}>
+  <form
+    method="POST"
+    action={actions.admin.service.update}
+    class="space-y-6"
+    enctype="multipart/form-data"
+  >
+    <input type="hidden" name="id" value={service.id} />
+
+    <div class="grid grid-cols-1 gap-x-4 gap-y-6 md:grid-cols-2">
+      <InputText
+        label="Name"
+        name="name"
+        inputProps={{
+          required: true,
+          value: service.name,
+        }}
+        error={inputErrors.name}
+      />
+
+      <InputText
+        label="Slug"
+        description={`Auto-generated if empty. ${
+          service.previousSlugs.length > 0 ? `Old slugs: ${service.previousSlugs.join(', ')}` : ''
+        }`}
+        name="slug"
+        inputProps={{
+          value: service.slug,
+          class: 'font-title',
+        }}
+        error={inputErrors.slug}
+        class="font-title"
+      />
+    </div>
+    <InputTextArea
+      label="Description"
+      name="description"
+      inputProps={{
+        required: true,
+        rows: 4,
+      }}
+      value={service.description}
+      error={inputErrors.description}
+    />
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <InputTextArea
+        label="Service URLs"
+        description="One per line. Accepts **Web**, **Onion**, and **I2P** URLs."
+        name="allServiceUrls"
+        inputProps={{
+          placeholder: 'https://example1.com\nhttps://example2.onion\nhttps://example3.b32.i2p',
+          class: 'grow min-h-24',
+          required: true,
+        }}
+        class="row-span-2 flex flex-col self-stretch"
+        value={[...service.serviceUrls, ...service.onionUrls, ...service.i2pUrls].join('\n\n')}
+        error={inputErrors.allServiceUrls}
+      />
+      <InputTextArea
+        label="ToS URLs"
+        description="One per line. AI review uses the first working URL only."
+        name="tosUrls"
+        inputProps={{
+          placeholder: 'https://example1.com/tos\nhttps://example2.com/tos',
+          required: true,
+        }}
+        value={service.tosUrls.join('\n')}
+        error={inputErrors.tosUrls}
+      />
+      <InputText
+        label="Operating since"
+        name="operatingSince"
+        description="Date the service started operating"
+        inputProps={{
+          type: 'date',
+          value: service.operatingSince?.toISOString().slice(0, 10),
+          max: new Date().toISOString().slice(0, 10),
+        }}
+        error={inputErrors.operatingSince}
+      />
+      <InputText
+        label="Referral link path"
+        name="referral"
+        inputProps={{
+          value: service.referral,
+          placeholder: 'e.g. ?ref=123 or /ref/123',
+        }}
+        error={inputErrors.referral}
+        class="self-end"
+        description="Will be appended to the service URL"
+      />
+    </div>
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <InputText
+        label="Registered Company Name"
+        name="registeredCompanyName"
+        description="If legally registered, the official name of the company."
+        inputProps={{
+          value: service.registeredCompanyName,
+          placeholder: 'Example Corp LTD',
+        }}
+        error={inputErrors.registeredCompanyName}
+      />
+
+      <InputSelect
+        name="registrationCountryCode"
+        label="Company Registration Country"
+        description="Where is the company legally registered?"
+        options={[
+          { label: 'Not registered', value: '' },
+          ...countries
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((country) => ({
+              label: `${country.flag} ${country.name}`,
+              value: country.code,
+            })),
+        ]}
+        selectedValue={service.registrationCountryCode ?? ''}
+        error={inputErrors.registrationCountryCode}
+      />
+    </div>
+
+    <div class="flex items-center justify-between gap-2">
+      <InputImageFile
+        label="Image"
+        name="imageFile"
+        description="Square image. At least 192x192px. Transparency supported. Leave empty to keep current image."
+        error={inputErrors.imageFile}
+        square
+        value={service.imageUrl}
+        downloadButton
+        removeCheckbox={service.imageUrl
+          ? {
+              name: 'removeImage',
+              label: 'Remove image',
+            }
+          : undefined}
+        class="grow"
+      />
+    </div>
+
+    <div class="grid grid-cols-1 items-stretch gap-x-4 gap-y-6 xs:grid-cols-[1fr_2fr]">
+      <InputCheckboxGroup
+        name="categories"
+        label="Categories"
+        size="lg"
+        required
+        options={categories.map((category) => ({
+          label: category.name,
+          value: category.id.toString(),
+          icon: category.icon,
+        }))}
+        selectedValues={service.categories.map((c) => c.id.toString())}
+        error={inputErrors.categories}
+        class="min-w-auto"
+      />
+
+      <InputCheckboxGroup
+        name="attributes"
+        label="Attributes"
+        size="lg"
+        options={orderBy(
+          attributes.map((attribute) => ({
+            ...attribute,
+            categoryInfo: getAttributeCategoryInfo(attribute.category),
+            typeInfo: getAttributeTypeInfo(attribute.type),
+          })),
+          ['categoryInfo.order', 'typeInfo.order']
+        ).map((attribute) => {
+          return {
+            label: attribute.title,
+            value: attribute.id.toString(),
+            icon: [attribute.categoryInfo.icon, attribute.typeInfo.icon],
+            iconClassName: [attribute.categoryInfo.classNames.icon, attribute.typeInfo.classNames.icon],
+          }
+        })}
+        selectedValues={service.attributes.map((a) => a.attribute.id.toString())}
+        error={inputErrors.attributes}
+      />
+    </div>
+
+    <InputCardGroup
+      name="kycLevel"
+      label="KYC Level"
+      options={kycLevels.map((kycLevel) => ({
+        label: `${kycLevel.name} (${kycLevel.value}/4)`,
+        value: kycLevel.id,
+        icon: kycLevel.icon,
+        description: kycLevel.description,
+      }))}
+      selectedValue={service.kycLevel.toString()}
+      iconSize="md"
+      cardSize="md"
+      error={inputErrors.kycLevel}
+      class="[&>div]:grid-cols-2 [&>div]:[--card-min-size:16rem]"
+    />
+
+    <InputTextArea
+      label="KYC Policy Notes"
+      name="kycPolicyMd"
+      description="Markdown. Per-service narrative on nuances of KYC/AML/refund policy not captured by the level or attributes."
+      value={service.kycPolicyMd ?? ''}
+      inputProps={{ rows: 4 }}
+      error={inputErrors.kycPolicyMd}
+    />
+
+    <InputCardGroup
+      name="verificationStatus"
+      label="Verification Status"
+      options={verificationStatuses.map((status) => ({
+        label: status.label,
+        value: status.value,
+        icon: status.icon,
+        iconClass: status.classNames.icon,
+        description: status.description,
+      }))}
+      selectedValue={service.verificationStatus}
+      error={inputErrors.verificationStatus}
+      cardSize="sm"
+      iconSize="sm"
+      class="[&>div]:grid-cols-2 [&>div]:[--card-min-size:16rem]"
+    />
+
+    <InputCardGroup
+      name="acceptedCurrencies"
+      label="Accepted Currencies"
+      options={currencies.map((currency) => ({
+        label: currency.name,
+        value: currency.id,
+        icon: currency.icon,
+      }))}
+      selectedValue={service.acceptedCurrencies}
+      error={inputErrors.acceptedCurrencies}
+      required
+      multiple
+    />
+
+    <div class="grid grid-cols-1 gap-x-4 gap-y-6 md:grid-cols-[2fr_3fr]">
+      <InputTextArea
+        label="Verification Summary"
+        description="Markdown supported"
+        name="verificationSummary"
+        inputProps={{
+          rows: 4,
+        }}
+        value={service.verificationSummary ?? undefined}
+        error={inputErrors.verificationSummary}
+      />
+
+      <InputTextArea
+        label="Verification Proof"
+        description="Markdown supported"
+        name="verificationProofMd"
+        inputProps={{
+          rows: 8,
+        }}
+        value={service.verificationProofMd ?? undefined}
+        error={inputErrors.verificationProofMd}
+      />
+    </div>
+
+    <InputCardGroup
+      name="serviceVisibility"
+      label="Service Visibility"
+      options={serviceVisibilities.map((visibility) => ({
+        label: visibility.label,
+        value: visibility.value,
+        icon: visibility.icon,
+        iconClass: visibility.iconClass,
+        description: visibility.description,
+      }))}
+      selectedValue={service.serviceVisibility}
+      error={inputErrors.serviceVisibility}
+      cardSize="sm"
+    />
+
+    <InputCheckbox
+      label="Strict Commenting"
+      name="strictCommentingEnabled"
+      checked={service.strictCommentingEnabled}
+      descriptionInline="Require proof of being a client for comments."
+    />
+
+    <InputTextArea
+      label="Comment Section Message"
+      name="commentSectionMessage"
+      value={service.commentSectionMessage ?? ''}
+      description="Markdown supported"
+      inputProps={{
+        rows: 4,
+      }}
+      error={inputErrors.commentSectionMessage}
+    />
+
+    <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
+  </form>
+</FormSection>
