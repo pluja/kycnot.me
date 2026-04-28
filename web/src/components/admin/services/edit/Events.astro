@@ -2,11 +2,9 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
+import { eventTypes, getEventTypeInfo } from '../../../../constants/eventTypes'
 import BadgeSmall from '../../../BadgeSmall.astro'
 import Button from '../../../Button.astro'
-import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
-import EditableListItem from '../../EditableListItem.astro'
-import EditToggleButton from '../../EditToggleButton.astro'
 import FormSection from '../../../FormSection.astro'
 import FormSubSection from '../../../FormSubSection.astro'
 import InputSelect from '../../../InputSelect.astro'
@@ -14,7 +12,9 @@ import InputSubmitButton from '../../../InputSubmitButton.astro'
 import InputText from '../../../InputText.astro'
 import InputTextArea from '../../../InputTextArea.astro'
 import Tooltip from '../../../Tooltip.astro'
-import { eventTypes, getEventTypeInfo } from '../../../../constants/eventTypes'
+import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
+import EditableListItem from '../../EditableListItem.astro'
+import EditToggleButton from '../../EditToggleButton.astro'
 
 import type { Prisma } from '@prisma/client'
 

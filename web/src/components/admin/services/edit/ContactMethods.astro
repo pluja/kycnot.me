@@ -2,14 +2,14 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
-import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
-import EditableListItem from '../../EditableListItem.astro'
-import EditToggleButton from '../../EditToggleButton.astro'
+import { contactMethodUrlTypes, formatContactMethod } from '../../../../constants/contactMethods'
 import FormSection from '../../../FormSection.astro'
 import FormSubSection from '../../../FormSubSection.astro'
 import InputSubmitButton from '../../../InputSubmitButton.astro'
 import InputText from '../../../InputText.astro'
-import { contactMethodUrlTypes, formatContactMethod } from '../../../../constants/contactMethods'
+import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
+import EditableListItem from '../../EditableListItem.astro'
+import EditToggleButton from '../../EditToggleButton.astro'
 
 import type { Prisma } from '@prisma/client'
 

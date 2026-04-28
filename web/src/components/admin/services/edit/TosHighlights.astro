@@ -2,9 +2,7 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
-import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
-import EditableListItem from '../../EditableListItem.astro'
-import EditToggleButton from '../../EditToggleButton.astro'
+import { getTosHighlightRatingInfo, tosHighlightRatings } from '../../../../constants/tosHighlightRating'
 import FormSection from '../../../FormSection.astro'
 import FormSubSection from '../../../FormSubSection.astro'
 import InputCardGroup from '../../../InputCardGroup.astro'
@@ -13,11 +11,23 @@ import InputText from '../../../InputText.astro'
 import InputTextArea from '../../../InputTextArea.astro'
 import Markdown from '../../../Markdown.astro'
 import Tooltip from '../../../Tooltip.astro'
-import { getTosHighlightRatingInfo, tosHighlightRatings } from '../../../../constants/tosHighlightRating'
+import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
+import EditableListItem from '../../EditableListItem.astro'
+import EditToggleButton from '../../EditToggleButton.astro'
+
+import type { MarkdownString } from '../../../../lib/markdown'
+
+type TosReview = {
+  highlights: {
+    title: string
+    content: MarkdownString
+    rating: 'negative' | 'neutral' | 'positive'
+  }[]
+}
 
 type Props = {
   serviceId: number
-  tosReview: PrismaJson.TosReview | null
+  tosReview: TosReview | null
   addInputErrors: Record<string, string[] | undefined>
   updateInputErrors: Record<string, string[] | undefined>
   id?: string

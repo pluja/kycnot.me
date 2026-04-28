@@ -2,10 +2,10 @@
 import { Icon } from 'astro-icon/components'
 import { Code } from 'astro:components'
 
+import { DEPLOYMENT_MODE } from '../../../../lib/client/envVariables'
 import Button from '../../../Button.astro'
 import FormSection from '../../../FormSection.astro'
 import FormSubSection from '../../../FormSubSection.astro'
-import { DEPLOYMENT_MODE } from '../../../../lib/client/envVariables'
 
 type ApiCall = {
   method: string

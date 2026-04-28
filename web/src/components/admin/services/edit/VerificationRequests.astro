@@ -1,12 +1,12 @@
 ---
+import { pluralize } from '../../../../lib/pluralize'
 import FormSection from '../../../FormSection.astro'
 import TimeFormatted from '../../../TimeFormatted.astro'
 import UserBadge from '../../../UserBadge.astro'
-import { pluralize } from '../../../../lib/pluralize'
 
 import type { Prisma } from '@prisma/client'
 
-type Request = Prisma.VerificationRequestGetPayload<{
+type Request = Prisma.ServiceVerificationRequestGetPayload<{
   select: {
     id: true
     user: { select: { name: true; displayName: true; picture: true } }

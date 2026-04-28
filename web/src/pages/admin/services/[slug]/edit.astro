@@ -3,9 +3,6 @@ import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 
 import AdminPageNav from '../../../../components/admin/AdminPageNav.astro'
-import Button from '../../../../components/Button.astro'
-import MyPicture from '../../../../components/MyPicture.astro'
-import ServiceCard from '../../../../components/ServiceCard.astro'
 import ApiSection from '../../../../components/admin/services/edit/Api.astro'
 import ContactMethodsSection from '../../../../components/admin/services/edit/ContactMethods.astro'
 import DetailsSection from '../../../../components/admin/services/edit/Details.astro'
@@ -15,6 +12,9 @@ import InternalNotesSection from '../../../../components/admin/services/edit/Int
 import TosHighlightsSection from '../../../../components/admin/services/edit/TosHighlights.astro'
 import VerificationRequestsSection from '../../../../components/admin/services/edit/VerificationRequests.astro'
 import VerificationStepsSection from '../../../../components/admin/services/edit/VerificationSteps.astro'
+import Button from '../../../../components/Button.astro'
+import MyPicture from '../../../../components/MyPicture.astro'
+import ServiceCard from '../../../../components/ServiceCard.astro'
 import BaseLayout from '../../../../layouts/BaseLayout.astro'
 import { listImageFiles } from '../../../../lib/fileStorage'
 import { makeAdminApiCallInfo } from '../../../../lib/makeAdminApiCallInfo'
@@ -318,7 +318,7 @@ const navItems = [
     <div class="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-[14rem_1fr]">
       <AdminPageNav items={navItems} class="lg:py-2" />
 
-      <div class="min-w-0 max-w-3xl space-y-24">
+      <div class="max-w-3xl min-w-0 space-y-24">
         <DetailsSection
           service={service}
           categories={categories}

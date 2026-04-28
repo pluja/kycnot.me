@@ -2,6 +2,13 @@
 import { actions } from 'astro:actions'
 import { orderBy } from 'lodash-es'
 
+import { getAttributeCategoryInfo } from '../../../../constants/attributeCategories'
+import { getAttributeTypeInfo } from '../../../../constants/attributeTypes'
+import { countries } from '../../../../constants/countries'
+import { currencies } from '../../../../constants/currencies'
+import { kycLevels } from '../../../../constants/kycLevels'
+import { serviceVisibilities } from '../../../../constants/serviceVisibility'
+import { verificationStatuses } from '../../../../constants/verificationStatus'
 import FormSection from '../../../FormSection.astro'
 import InputCardGroup from '../../../InputCardGroup.astro'
 import InputCheckbox from '../../../InputCheckbox.astro'
@@ -11,13 +18,6 @@ import InputSelect from '../../../InputSelect.astro'
 import InputSubmitButton from '../../../InputSubmitButton.astro'
 import InputText from '../../../InputText.astro'
 import InputTextArea from '../../../InputTextArea.astro'
-import { getAttributeCategoryInfo } from '../../../../constants/attributeCategories'
-import { getAttributeTypeInfo } from '../../../../constants/attributeTypes'
-import { countries } from '../../../../constants/countries'
-import { currencies } from '../../../../constants/currencies'
-import { kycLevels } from '../../../../constants/kycLevels'
-import { serviceVisibilities } from '../../../../constants/serviceVisibility'
-import { verificationStatuses } from '../../../../constants/verificationStatus'
 
 import type { Prisma } from '@prisma/client'
 
@@ -189,7 +189,7 @@ const { service, categories, attributes, inputErrors, id = 'details' } = Astro.p
         options={categories.map((category) => ({
           label: category.name,
           value: category.id.toString(),
-          icon: category.icon,
+          icon: category.icon ?? undefined,
         }))}
         selectedValues={service.categories.map((c) => c.id.toString())}
         error={inputErrors.categories}

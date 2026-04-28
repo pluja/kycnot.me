@@ -1,20 +1,20 @@
 ---
 import { actions } from 'astro:actions'
 
+import {
+  getVerificationStepStatusInfo,
+  verificationStepStatuses,
+} from '../../../../constants/verificationStepStatus'
 import BadgeSmall from '../../../BadgeSmall.astro'
-import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
-import EditableListItem from '../../EditableListItem.astro'
-import EditToggleButton from '../../EditToggleButton.astro'
 import FormSection from '../../../FormSection.astro'
 import FormSubSection from '../../../FormSubSection.astro'
 import InputSelect from '../../../InputSelect.astro'
 import InputSubmitButton from '../../../InputSubmitButton.astro'
 import InputText from '../../../InputText.astro'
 import InputTextArea from '../../../InputTextArea.astro'
-import {
-  getVerificationStepStatusInfo,
-  verificationStepStatuses,
-} from '../../../../constants/verificationStepStatus'
+import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
+import EditableListItem from '../../EditableListItem.astro'
+import EditToggleButton from '../../EditToggleButton.astro'
 
 import type { Prisma } from '@prisma/client'
 
