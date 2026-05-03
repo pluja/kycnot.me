@@ -173,8 +173,9 @@ class TaskScheduler:
         self.logger.info(f"Started {len(self.threads)} scheduler threads")
 
     def stop(self):
-        """Stop the scheduler."""
-        if not self.running:
+        """Stop the scheduler and release shared resources."""
+        if not self.running and not self.threads:
+            close_db_pool()
             return
 
         self.logger.info("Stopping scheduler")
@@ -186,9 +187,16 @@ class TaskScheduler:
         for thread in self.threads:
             thread.join(timeout=1.0)
 
+        alive_threads = [str(thread.name) for thread in self.threads if thread.is_alive()]
+        if alive_threads:
+            self.logger.warning(
+                "Scheduler stopped while task threads were still running: %s",
+                ", ".join(alive_threads),
+            )
+
         self.threads = []
 
-        # Close database pool when the scheduler stops
+        # Close database pool when the scheduler stops.
         close_db_pool()
 
         self.logger.info("Scheduler stopped")

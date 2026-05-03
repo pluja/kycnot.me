@@ -591,6 +591,7 @@ def run_worker_mode() -> int:
 
     # Start the scheduler if tasks were registered
     if scheduler.tasks:
+        exit_code = 0
         try:
             scheduler.start()
             logger.info("Worker started, press Ctrl+C to stop")
@@ -598,16 +599,14 @@ def run_worker_mode() -> int:
             # Keep the main thread alive
             while scheduler.is_running():
                 time.sleep(1)
-
-            return 0
         except KeyboardInterrupt:
             logger.info("Keyboard interrupt received, shutting down...")
-            scheduler.stop()
-            return 0
         except Exception as e:
             logger.exception(f"Error in worker mode: {e}")
+            exit_code = 1
+        finally:
             scheduler.stop()
-            return 1
+        return exit_code
     else:
         logger.error("No valid tasks registered")
         return 1
