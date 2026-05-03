@@ -93,10 +93,10 @@ deploy_compose config --images \
     done
 
 echo "==> Running migrations"
-deploy_compose run --rm -T astro knm-migrate </dev/null
+deploy_compose run --rm --no-deps -T astro knm-migrate </dev/null
 
 echo "==> Verifying migrations"
-deploy_compose run --rm -T astro sh -c "cd /app && npx prisma migrate status --schema=./prisma/schema.prisma" </dev/null
+deploy_compose run --rm --no-deps -T astro sh -c "cd /app && npx prisma migrate status --schema=./prisma/schema.prisma" </dev/null
 
 echo "==> Rolling out astro"
 deploy_rollout astro
