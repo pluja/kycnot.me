@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 from typing import Dict, Any
 
-from pyworker.cli import is_disabled_schedule
+from pyworker.cli import is_disabled_schedule, should_use_scheduler_task_instance
 from pyworker.tasks import TosReviewTask
 
 
@@ -17,6 +17,11 @@ class TestWorkerSchedules(unittest.TestCase):
 
     def test_keeps_regular_cron_values_enabled(self):
         self.assertFalse(is_disabled_schedule("0 0 * * *"))
+
+    def test_skips_scheduler_instances_for_function_backed_tasks(self):
+        self.assertFalse(should_use_scheduler_task_instance("deep_scan"))
+        self.assertFalse(should_use_scheduler_task_instance("service_score_recalc_all"))
+        self.assertTrue(should_use_scheduler_task_instance("tosreview"))
 
 
 class TestTosReviewTask(unittest.TestCase):

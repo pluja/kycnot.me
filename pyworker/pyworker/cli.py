@@ -33,11 +33,17 @@ configure_logging()
 logger = logging.getLogger(__name__)
 
 _DISABLED_SCHEDULE_VALUES = {"", "disabled", "off", "false", "none"}
+_TASKS_WITHOUT_SCHEDULER_INSTANCE = {"deep_scan", "service_score_recalc_all"}
 
 
 def is_disabled_schedule(schedule: str) -> bool:
     """Return true when a cron env value intentionally disables a task."""
     return schedule.strip().lower() in _DISABLED_SCHEDULE_VALUES
+
+
+def should_use_scheduler_task_instance(task_name: str) -> bool:
+    """Return true when TaskScheduler should instantiate the task class."""
+    return task_name not in _TASKS_WITHOUT_SCHEDULER_INSTANCE
 
 
 def parse_args(args: List[str]) -> argparse.Namespace:
@@ -576,12 +582,12 @@ def run_worker_mode() -> int:
         if task_callable is None:
             logger.warning("Ignoring unknown cron task schedule: %s", task_name)
             continue
-        if task_name == "deep_scan":
-            scheduler.register_task(
-                task_name, schedule, task_callable, instantiate=False
-            )
-        else:
-            scheduler.register_task(task_name, schedule, task_callable)
+        scheduler.register_task(
+            task_name,
+            schedule,
+            task_callable,
+            instantiate=should_use_scheduler_task_instance(task_name),
+        )
 
     # Start the scheduler if tasks were registered
     if scheduler.tasks:
