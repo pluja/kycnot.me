@@ -6,7 +6,17 @@ import unittest
 from unittest.mock import patch, MagicMock
 from typing import Dict, Any
 
+from pyworker.cli import is_disabled_schedule
 from pyworker.tasks import TosReviewTask
+
+
+class TestWorkerSchedules(unittest.TestCase):
+    def test_detects_disabled_cron_values(self):
+        for value in ("", "disabled", "DISABLED", " off ", "false", "none"):
+            self.assertTrue(is_disabled_schedule(value))
+
+    def test_keeps_regular_cron_values_enabled(self):
+        self.assertFalse(is_disabled_schedule("0 0 * * *"))
 
 
 class TestTosReviewTask(unittest.TestCase):

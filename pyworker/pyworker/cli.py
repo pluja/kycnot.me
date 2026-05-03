@@ -32,6 +32,13 @@ from pyworker.utils.app_logging import configure_logging
 configure_logging()
 logger = logging.getLogger(__name__)
 
+_DISABLED_SCHEDULE_VALUES = {"", "disabled", "off", "false", "none"}
+
+
+def is_disabled_schedule(schedule: str) -> bool:
+    """Return true when a cron env value intentionally disables a task."""
+    return schedule.strip().lower() in _DISABLED_SCHEDULE_VALUES
+
 
 def parse_args(args: List[str]) -> argparse.Namespace:
     """
@@ -505,12 +512,24 @@ def run_worker_mode() -> int:
 
     # Get task schedules from config
     task_schedules = config.task_schedules
+    enabled_task_schedules = {
+        task_name: schedule
+        for task_name, schedule in task_schedules.items()
+        if not is_disabled_schedule(schedule)
+    }
+    disabled_task_names = [
+        task_name
+        for task_name, schedule in task_schedules.items()
+        if is_disabled_schedule(schedule)
+    ]
     logger.info(
-        "Found %s cron schedule%s from environment variables: %s",
-        len(task_schedules),
-        "s" if len(task_schedules) != 1 else "",
-        ", ".join(task_schedules.keys()) if task_schedules else "<none>",
+        "Found %s enabled cron schedule%s from environment variables: %s",
+        len(enabled_task_schedules),
+        "s" if len(enabled_task_schedules) != 1 else "",
+        ", ".join(enabled_task_schedules.keys()) if enabled_task_schedules else "<none>",
     )
+    if disabled_task_names:
+        logger.info("Disabled cron task schedules: %s", ", ".join(disabled_task_names))
 
     task_callables: dict[str, Any] = {
         "tosreview": partial(run_tos_task, close_pool=False),
@@ -536,7 +555,11 @@ def run_worker_mode() -> int:
         "service_score_recalc_all",
     ]
 
-    missing_tasks = [t for t in required_task_names if t not in task_schedules]
+    missing_tasks = [
+        task_name
+        for task_name in required_task_names
+        if task_name not in task_schedules
+    ]
     if missing_tasks:
         logger.error(
             "Missing cron schedule for task%s: %s. Set the corresponding CRON_<TASKNAME>_TASK environment variable%s.",
@@ -548,7 +571,7 @@ def run_worker_mode() -> int:
 
     scheduler = TaskScheduler()
 
-    for task_name, schedule in task_schedules.items():
+    for task_name, schedule in enabled_task_schedules.items():
         task_callable = task_callables.get(task_name)
         if task_callable is None:
             logger.warning("Ignoring unknown cron task schedule: %s", task_name)
