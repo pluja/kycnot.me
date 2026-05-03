@@ -13,6 +13,7 @@ from openai.types.chat import ChatCompletionMessageParam
 from pyworker.database import (
     CommentModerationType,
     CommentSentimentSummaryType,
+    DeepScanResultType,
     TosReviewType,
 )
 from pyworker.utils import schemas
@@ -45,6 +46,7 @@ def _today() -> str:
 
 PROMPT_CHECK_TOS_REVIEW = _load_prompt("tos_check.md", schema=schemas.TOS_CHECK.ts_type)
 _PROMPT_TOS_REVIEW = _load_prompt("tos_review.md", schema=schemas.TOS_REVIEW.ts_type)
+_PROMPT_DEEP_SCAN = _load_prompt("deep_scan.md", schema=schemas.DEEP_SCAN.ts_type)
 PROMPT_COMMENT_SENTIMENT_SUMMARY = _load_prompt(
     "comment_sentiment.md", schema=schemas.COMMENT_SEN.ts_type
 )
@@ -162,6 +164,41 @@ def prompt_tos_review(content: str, service_name: str) -> TosReviewType:
 
     schemas.TOS_REVIEW.validate(result_dict)
     return cast(TosReviewType, result_dict)
+
+
+def prompt_deep_scan(
+    content: str,
+    service_name: str,
+    attribute_catalog_md: str,
+    current_attribute_ids: list[int],
+) -> DeepScanResultType:
+    scope = (
+        f"You are reviewing the service named exactly '{service_name}'. "
+        "The corpus may include clauses that apply to sibling products from the same operator "
+        "(e.g. shared legal terms covering multiple products). Include only clauses that apply "
+        f"to '{service_name}' or to the operator/account level that affects it. Exclude clauses "
+        "explicitly scoped to a different product, unless the same clause also applies to "
+        f"'{service_name}'.\n\n"
+    )
+
+    user_payload = (
+        "## Attribute catalog (use these IDs verbatim when proposing add/remove)\n\n"
+        f"{attribute_catalog_md}\n\n"
+        "## Attribute IDs currently assigned to this service\n\n"
+        f"{current_attribute_ids}\n\n"
+        "## Legal corpus\n\n"
+        f"{content}"
+    )
+
+    messages: List[ChatCompletionMessageParam] = [
+        {"role": "system", "content": _today() + scope + _PROMPT_DEEP_SCAN},
+        {"role": "user", "content": user_payload},
+    ]
+
+    result_dict = query_openai_json(messages)
+
+    schemas.DEEP_SCAN.validate(result_dict)
+    return cast(DeepScanResultType, result_dict)
 
 
 def prompt_comment_sentiment_summary(content: str) -> CommentSentimentSummaryType:

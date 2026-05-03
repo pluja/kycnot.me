@@ -57,6 +57,17 @@ def _extract_markdown(result: dict[str, Any]) -> str:
     return str(markdown_obj)
 
 
+def _raise_for_status_with_body(response: requests.Response) -> None:
+    """Raise HTTP errors with a short response body preview."""
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        body = response.text.strip().replace("\n", " ")[:500]
+        if body:
+            raise requests.HTTPError(f"{exc}; body={body}") from exc
+        raise
+
+
 def _fetch_crawl4ai(url: str) -> str:
     """Fetch markdown via the crawl4ai /crawl endpoint with stealth mode."""
     logger.debug(f"Fetching {url} via crawl4ai")
@@ -70,7 +81,7 @@ def _fetch_crawl4ai(url: str) -> str:
         headers=_CRAWL4AI_HEADERS,
         timeout=config.CRAWL4AI_TIMEOUT,
     )
-    response.raise_for_status()
+    _raise_for_status_with_body(response)
     data = response.json()
 
     results = data.get("results", [])
@@ -88,7 +99,7 @@ def _fetch_jina(url: str) -> str:
     jina_url = f"https://r.jina.ai/{url}"
     logger.debug(f"Fetching via Jina Reader: {jina_url}")
     response = requests.get(jina_url, timeout=80)
-    response.raise_for_status()
+    _raise_for_status_with_body(response)
     return response.text
 
 

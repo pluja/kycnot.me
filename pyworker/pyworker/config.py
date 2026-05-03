@@ -42,6 +42,11 @@ class Config:
     # Bot user settings
     BOT_USERNAME: str = os.getenv("PYWORKER_BOT_USERNAME", "pyworker-bot")
 
+    # Service scan queue settings
+    SERVICE_SCAN_CLAIM_TIMEOUT_MINUTES: int = int(
+        os.getenv("SERVICE_SCAN_CLAIM_TIMEOUT_MINUTES", "15")
+    )
+
     # Logging settings
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     LOG_FORMAT: str = os.getenv(

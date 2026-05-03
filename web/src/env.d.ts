@@ -37,6 +37,36 @@ declare global {
       }[]
     }
 
+    type ProposedEdits = {
+      /** sha256 hash of the legal corpus used to generate these edits. */
+      contentHash: string
+      /** Same shape as Service.tosReview, mirrored here for the admin UI. */
+      tosReview: {
+        kycLevel: 0 | 1 | 2 | 3 | 4
+        summary: MarkdownString
+        complexity: 'high' | 'low' | 'medium'
+        highlights: {
+          title: string
+          content: MarkdownString
+          rating: 'negative' | 'neutral' | 'positive'
+        }[]
+      }
+      kycPolicy: {
+        inferredLevel: 0 | 1 | 2 | 3 | 4
+        notesMd: MarkdownString
+        rationale: string
+      }
+      attributes: {
+        add: { attributeId: number; rationale: string }[]
+        remove: { attributeId: number; rationale: string }[]
+      }
+      warnings: {
+        title: string
+        bodyMd: MarkdownString
+        severity: 'alert' | 'info' | 'warning'
+      }[]
+    }
+
     type UserSentiment = {
       summary: MarkdownString
       sentiment: 'negative' | 'neutral' | 'positive'

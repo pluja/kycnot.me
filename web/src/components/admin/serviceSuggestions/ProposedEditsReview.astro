@@ -1,0 +1,343 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import { getKycLevelInfo } from '../../../constants/kycLevels'
+import { cn } from '../../../lib/cn'
+import BadgeSmall from '../../BadgeSmall.astro'
+import Button from '../../Button.astro'
+import InputSubmitButton from '../../InputSubmitButton.astro'
+import Markdown from '../../Markdown.astro'
+import TimeFormatted from '../../TimeFormatted.astro'
+import Tooltip from '../../Tooltip.astro'
+
+import AttributeProposalGroups from './AttributeProposalGroups.astro'
+import TosReviewProposalRow from './TosReviewProposalRow.astro'
+
+import type { Prisma } from '@prisma/client'
+
+type Attribute = Prisma.AttributeGetPayload<{
+  select: {
+    id: true
+    title: true
+    description: true
+    category: true
+    type: true
+    privacyPoints: true
+    trustPoints: true
+  }
+}>
+
+type Suggestion = Prisma.ServiceSuggestionGetPayload<{
+  select: { id: true; status: true; createdAt: true; proposedEdits: true }
+}>
+
+type Service = Prisma.ServiceGetPayload<{
+  select: { id: true; kycLevel: true; kycPolicyMd: true; tosReview: true }
+}>
+
+type Props = {
+  suggestion: Suggestion
+  service: Service
+  attributes: Attribute[]
+  class?: string
+  title?: string
+  compactHeader?: boolean
+}
+
+const {
+  suggestion,
+  service,
+  attributes,
+  class: className,
+  title = 'Structured proposed edits',
+  compactHeader = false,
+} = Astro.props
+
+const proposedEdits = suggestion.proposedEdits
+
+const currentKycLevelInfo = getKycLevelInfo(service.kycLevel.toString())
+const proposedKycLevelInfo = proposedEdits
+  ? getKycLevelInfo(proposedEdits.kycPolicy.inferredLevel.toString())
+  : null
+
+const kycLevelChanged =
+  !!proposedEdits && proposedEdits.kycPolicy.inferredLevel !== service.kycLevel
+const kycPolicyChanged =
+  !!proposedEdits && (proposedEdits.kycPolicy.notesMd ?? '') !== (service.kycPolicyMd ?? '')
+const addCount = proposedEdits?.attributes.add.length ?? 0
+const removeCount = proposedEdits?.attributes.remove.length ?? 0
+const warningCount = proposedEdits?.warnings.length ?? 0
+const isActionable = suggestion.status === 'PENDING' || suggestion.status === 'UNDER_REVIEW'
+const currentTosReview = service.tosReview
+const tosSummaryChanged =
+  !!proposedEdits && (currentTosReview?.summary ?? '') !== proposedEdits.tosReview.summary
+const tosHighlightsChanged =
+  !!proposedEdits &&
+  JSON.stringify(currentTosReview?.highlights ?? []) !==
+    JSON.stringify(proposedEdits.tosReview.highlights)
+const tosReviewChanged = tosSummaryChanged || tosHighlightsChanged || !currentTosReview
+
+const warningSeverityIcons = {
+  info: { icon: 'ri:information-line', className: 'text-blue-400' },
+  warning: { icon: 'ri:alert-line', className: 'text-yellow-400' },
+  alert: { icon: 'ri:error-warning-line', className: 'text-red-400' },
+} as const
+
+const acceptTosReviewInputId = `accept-tos-review-${suggestion.id}`
+---
+
+{
+  proposedEdits && (
+    <section class={cn('rounded-lg border border-night-500 bg-night-700 p-4', className)}>
+      <div class={cn('flex flex-wrap items-start justify-between gap-3', !compactHeader && 'mb-4')}>
+        <div>
+          <h2
+            class={cn(
+              'font-title font-semibold text-day-100',
+              compactHeader ? 'text-base' : 'text-xl'
+            )}
+          >
+            {title}
+          </h2>
+          <p class="mt-1 flex flex-wrap items-center gap-2 text-xs text-day-500">
+            <span>Suggestion #{suggestion.id}</span>
+            <span class="text-night-400">/</span>
+            <span>
+              Created <TimeFormatted date={suggestion.createdAt} hourPrecision />
+            </span>
+          </p>
+        </div>
+
+        <div class="flex flex-wrap gap-1.5">
+          <BadgeSmall
+            color={kycLevelChanged ? 'orange' : 'gray'}
+            text={kycLevelChanged ? 'KYC change' : 'KYC unchanged'}
+            icon={kycLevelChanged ? 'ri:exchange-line' : 'ri:checkbox-circle-line'}
+          />
+          {(addCount > 0 || removeCount > 0) && (
+            <BadgeSmall color="blue" text={`${addCount + removeCount} attributes`} icon="ri:price-tag-3-line" />
+          )}
+          {warningCount > 0 && (
+            <BadgeSmall color="yellow" text={`${warningCount} warnings`} icon="ri:alert-line" />
+          )}
+        </div>
+      </div>
+
+      <form method="POST" action={actions.admin.service.deepScan.apply} class="space-y-4">
+        <input type="hidden" name="suggestionId" value={suggestion.id} />
+
+        <div class="rounded-md border border-night-600 bg-night-800">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-night-600 px-4 py-3">
+            <div>
+              <h3 class="font-title text-base font-semibold text-day-100">Review changes</h3>
+              <p class="mt-1 text-xs text-day-500">
+                Select exactly what should be applied to the service record.
+              </p>
+            </div>
+            <span class="inline-flex items-center gap-1.5 rounded-md bg-night-700 px-2 py-1 text-xs text-day-400">
+              <Icon name="ri:checkbox-multiple-line" class="size-3.5" />
+              {Number(tosReviewChanged) + Number(kycLevelChanged) + Number(kycPolicyChanged) + addCount + removeCount} proposed
+            </span>
+          </div>
+
+          <div class="divide-y divide-night-600">
+            <TosReviewProposalRow
+              currentTosReview={currentTosReview}
+              proposedTosReview={proposedEdits.tosReview}
+              changed={tosReviewChanged}
+              isActionable={isActionable}
+              inputId={acceptTosReviewInputId}
+            />
+
+            <label
+              class={cn(
+                'grid gap-3 p-4 sm:grid-cols-[auto_1fr] sm:items-start',
+                isActionable && kycLevelChanged
+                  ? 'cursor-pointer bg-orange-500/5 hover:bg-orange-500/10'
+                  : 'bg-night-800'
+              )}
+            >
+              <input
+                type="checkbox"
+                name="acceptKycLevel"
+                value="on"
+                checked={kycLevelChanged}
+                disabled={!isActionable || !kycLevelChanged}
+                class="mt-1"
+              />
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-title text-sm font-semibold text-day-100">
+                    Apply KYC level change
+                  </span>
+                  {!kycLevelChanged && <BadgeSmall color="gray" text="No change" icon="ri:checkbox-circle-line" />}
+                </div>
+                <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                  <Tooltip text={currentKycLevelInfo.name}>
+                    <span class="inline-flex items-center gap-1.5 rounded-md border border-night-500 bg-night-900 px-2 py-1 text-day-300">
+                      <Icon name={currentKycLevelInfo.icon} class="size-4" />
+                      KYC {service.kycLevel}
+                    </span>
+                  </Tooltip>
+                  <Icon name="ri:arrow-right-line" class="size-4 text-day-500" />
+                  {proposedKycLevelInfo && (
+                    <Tooltip text={proposedKycLevelInfo.name}>
+                      <span
+                        class={cn(
+                          'inline-flex items-center gap-1.5 rounded-md border px-2 py-1',
+                          kycLevelChanged
+                            ? 'border-orange-500/40 bg-orange-500/10 text-orange-100'
+                            : 'border-night-500 bg-night-900 text-day-300'
+                        )}
+                      >
+                        <Icon name={proposedKycLevelInfo.icon} class="size-4" />
+                        KYC {proposedEdits.kycPolicy.inferredLevel}
+                      </span>
+                    </Tooltip>
+                  )}
+                </div>
+                {!!proposedEdits.kycPolicy.rationale && (
+                  <p class="mt-2 text-sm text-day-400">{proposedEdits.kycPolicy.rationale}</p>
+                )}
+              </div>
+            </label>
+
+            <label
+              class={cn(
+                'grid gap-3 p-4 sm:grid-cols-[auto_1fr] sm:items-start',
+                isActionable && kycPolicyChanged
+                  ? 'cursor-pointer bg-orange-500/5 hover:bg-orange-500/10'
+                  : 'bg-night-800'
+              )}
+            >
+              <input
+                type="checkbox"
+                name="acceptKycPolicy"
+                value="on"
+                checked={kycPolicyChanged}
+                disabled={!isActionable || !kycPolicyChanged}
+                class="mt-1"
+              />
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-title text-sm font-semibold text-day-100">
+                    Apply KYC policy notes
+                  </span>
+                  {kycPolicyChanged ? (
+                    <BadgeSmall color="orange" text="Text update" icon="ri:file-edit-line" />
+                  ) : (
+                    <BadgeSmall color="gray" text="No change" icon="ri:checkbox-circle-line" />
+                  )}
+                </div>
+                {kycPolicyChanged && (
+                  <details class="mt-3 rounded-md border border-night-600 bg-night-900 p-3">
+                    <summary class="cursor-pointer text-sm font-medium text-day-200">
+                      Compare current and proposed notes
+                    </summary>
+                    <div class="mt-3 grid gap-3 lg:grid-cols-2">
+                      <div>
+                        <p class="text-xs font-bold tracking-wider text-day-500 uppercase">Current</p>
+                        <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-400 prose-invert">
+                          {service.kycPolicyMd ? (
+                            <Markdown content={service.kycPolicyMd} />
+                          ) : (
+                            <p class="text-day-500 italic">(empty)</p>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p class="text-xs font-bold tracking-wider text-orange-300 uppercase">Proposed</p>
+                        <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-200 prose-invert">
+                          {proposedEdits.kycPolicy.notesMd ? (
+                            <Markdown content={proposedEdits.kycPolicy.notesMd} />
+                          ) : (
+                            <p class="text-day-500 italic">(empty)</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </details>
+                )}
+              </div>
+            </label>
+
+            <AttributeProposalGroups
+              add={proposedEdits.attributes.add}
+              remove={proposedEdits.attributes.remove}
+              attributes={attributes}
+              isActionable={isActionable}
+            />
+          </div>
+        </div>
+
+        {warningCount > 0 && (
+          <details class="rounded-md border border-yellow-500/20 bg-yellow-500/5 p-3">
+            <summary class="cursor-pointer list-none">
+              <div class="inline-flex items-center gap-2 font-title text-sm font-semibold text-yellow-100">
+                <Icon name="ri:alert-line" class="size-4 text-yellow-400" />
+                Review {warningCount} warning{warningCount === 1 ? '' : 's'}
+              </div>
+            </summary>
+            <ul class="mt-3 space-y-2">
+              {proposedEdits.warnings.map((warning) => {
+                const severityInfo = warningSeverityIcons[warning.severity]
+                return (
+                  <li class="flex items-start gap-3 rounded-sm border border-night-600 bg-night-900 p-3 text-sm">
+                    <Icon
+                      name={severityInfo.icon}
+                      class={cn('mt-0.5 size-4 shrink-0', severityInfo.className)}
+                    />
+                    <div class="min-w-0 flex-1">
+                      <div class="font-semibold text-day-100">{warning.title}</div>
+                      <div class="prose prose-sm mt-1 max-w-none text-pretty text-day-400 prose-invert">
+                        <Markdown content={warning.bodyMd} />
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </details>
+        )}
+
+        {Number(tosReviewChanged) + Number(kycLevelChanged) + Number(kycPolicyChanged) + addCount + removeCount === 0 && (
+          <div class="rounded-md border border-night-600 bg-night-800 p-3 text-sm text-day-400">
+            No direct service-record changes were proposed. Warnings and ToS evidence remain available for review.
+          </div>
+        )}
+
+        {isActionable ? (
+          <div class="flex flex-wrap items-center justify-between gap-3 border-t border-night-600 pt-4">
+            <p class="text-xs text-day-500">Checked items will be applied. Unchecked findings remain only in the audit record.</p>
+            <InputSubmitButton
+              label="Apply selected"
+              icon="ri:check-line"
+              hideCancel
+              class="ml-auto"
+            />
+          </div>
+        ) : (
+          <div class="rounded-md border border-night-600 bg-night-800 p-3 text-sm text-day-400">
+            This suggestion is {suggestion.status.toLowerCase().replace('_', ' ')} and can no longer be applied from this panel.
+          </div>
+        )}
+      </form>
+
+      {isActionable && (
+        <form method="POST" action={actions.admin.service.deepScan.dismiss} class="mt-3 flex justify-end">
+          <input type="hidden" name="suggestionId" value={suggestion.id} />
+          <Button
+            as="button"
+            type="submit"
+            color="danger"
+            variant="faded"
+            size="sm"
+            icon="ri:close-line"
+            label="Dismiss without applying"
+          />
+        </form>
+      )}
+    </section>
+  )
+}

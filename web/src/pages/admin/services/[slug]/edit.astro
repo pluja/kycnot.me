@@ -1,4 +1,5 @@
 ---
+import { Prisma } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 
@@ -9,6 +10,7 @@ import DetailsSection from '../../../../components/admin/services/edit/Details.a
 import EventsSection from '../../../../components/admin/services/edit/Events.astro'
 import EvidenceImagesSection from '../../../../components/admin/services/edit/EvidenceImages.astro'
 import InternalNotesSection from '../../../../components/admin/services/edit/InternalNotes.astro'
+import TasksSection from '../../../../components/admin/services/edit/Tasks.astro'
 import TosHighlightsSection from '../../../../components/admin/services/edit/TosHighlights.astro'
 import VerificationRequestsSection from '../../../../components/admin/services/edit/VerificationRequests.astro'
 import VerificationStepsSection from '../../../../components/admin/services/edit/VerificationSteps.astro'
@@ -94,6 +96,15 @@ if (evidenceImageAddResult?.data?.imageUrl) {
 
 const evidenceImageDeleteResult = Astro.getActionResult(actions.admin.service.evidenceImage.delete)
 Astro.locals.banners.addIfSuccess(evidenceImageDeleteResult, 'Evidence image deleted successfully')
+
+const deepScanRequestResult = Astro.getActionResult(actions.admin.service.deepScan.request)
+Astro.locals.banners.addIfSuccess(deepScanRequestResult, 'Deep scan queued')
+
+const deepScanApplyResult = Astro.getActionResult(actions.admin.service.deepScan.apply)
+Astro.locals.banners.addIfSuccess(deepScanApplyResult, 'Proposed edits applied')
+
+const deepScanDismissResult = Astro.getActionResult(actions.admin.service.deepScan.dismiss)
+Astro.locals.banners.addIfSuccess(deepScanDismissResult, 'Proposed edits dismissed')
 
 const [service, categories, attributes] = await Astro.locals.banners.tryMany([
   [
@@ -211,6 +222,43 @@ const evidenceImages = await Astro.locals.banners.try(
   []
 )
 
+const [scanJob, pendingDeepScanSuggestion] = await Astro.locals.banners.tryMany([
+  [
+    'Error fetching scan job',
+    () =>
+      prisma.serviceScanJob.findUnique({
+        where: { serviceId: service.id },
+        select: {
+          id: true,
+          createdAt: true,
+          claimedAt: true,
+          processedAt: true,
+          error: true,
+        },
+      }),
+    null,
+  ],
+  [
+    'Error fetching deep scan suggestion',
+    () =>
+      prisma.serviceSuggestion.findFirst({
+        where: {
+          serviceId: service.id,
+          status: { in: ['PENDING', 'UNDER_REVIEW'] },
+          proposedEdits: { not: Prisma.AnyNull },
+        },
+        select: {
+          id: true,
+          status: true,
+          createdAt: true,
+          proposedEdits: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    null,
+  ],
+])
+
 const apiCalls = await Astro.locals.banners.try(
   'Error fetching api calls',
   () =>
@@ -225,8 +273,17 @@ const apiCalls = await Astro.locals.banners.try(
   []
 )
 
+const isScanning = !!scanJob && scanJob.processedAt === null
+const tasksBadge = pendingDeepScanSuggestion ? '!' : isScanning ? '...' : undefined
+
 const navItems = [
   { id: 'details', label: 'Service Details', icon: 'ri:settings-3-line' },
+  {
+    id: 'tasks',
+    label: 'Tasks',
+    icon: 'ri:sparkling-2-line',
+    badge: tasksBadge,
+  },
   {
     id: 'tos-highlights',
     label: 'ToS Highlights',
@@ -324,6 +381,13 @@ const navItems = [
           categories={categories}
           attributes={attributes}
           inputErrors={serviceInputErrors}
+        />
+
+        <TasksSection
+          service={service}
+          scanJob={scanJob}
+          pendingSuggestion={pendingDeepScanSuggestion}
+          attributes={attributes}
         />
 
         <TosHighlightsSection

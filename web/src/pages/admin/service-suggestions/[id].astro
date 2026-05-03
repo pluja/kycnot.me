@@ -2,6 +2,7 @@
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 
+import ProposedEditsReview from '../../../components/admin/serviceSuggestions/ProposedEditsReview.astro'
 import BadgeSmall from '../../../components/BadgeSmall.astro'
 import Button from '../../../components/Button.astro'
 import Chat from '../../../components/Chat.astro'
@@ -30,6 +31,12 @@ const serviceSuggestionUpdateInputErrors = isInputError(serviceSuggestionUpdateR
   ? serviceSuggestionUpdateResult.error.fields
   : {}
 
+const deepScanApplyResult = Astro.getActionResult(actions.admin.service.deepScan.apply)
+Astro.locals.banners.addIfSuccess(deepScanApplyResult, 'Proposed edits applied')
+
+const deepScanDismissResult = Astro.getActionResult(actions.admin.service.deepScan.dismiss)
+Astro.locals.banners.addIfSuccess(deepScanDismissResult, 'Proposed edits dismissed')
+
 const { id: serviceSuggestionIdRaw } = Astro.params
 const serviceSuggestionId = parseIntWithFallback(serviceSuggestionIdRaw)
 if (!serviceSuggestionId) {
@@ -45,6 +52,7 @@ const serviceSuggestion = await Astro.locals.banners.try('Error fetching service
       id: true,
       status: true,
       notes: true,
+      proposedEdits: true,
       createdAt: true,
       type: true,
       user: {
@@ -63,6 +71,8 @@ const serviceSuggestion = await Astro.locals.banners.try('Error fetching service
           description: true,
           overallScore: true,
           kycLevel: true,
+          kycPolicyMd: true,
+          tosReview: true,
           imageUrl: true,
           verificationStatus: true,
           acceptedCurrencies: true,
@@ -101,6 +111,26 @@ if (!serviceSuggestion) {
   return Astro.rewrite('/404')
 }
 
+const attributes = serviceSuggestion.proposedEdits
+  ? await Astro.locals.banners.try(
+      'Error fetching attributes',
+      () =>
+        prisma.attribute.findMany({
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            category: true,
+            type: true,
+            privacyPoints: true,
+            trustPoints: true,
+          },
+          orderBy: [{ category: 'asc' }, { title: 'asc' }],
+        }),
+      []
+    )
+  : []
+
 const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
 const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
 ---
@@ -108,7 +138,7 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
 <BaseLayout
   pageTitle={`${serviceSuggestion.service.name} | Admin Service Suggestion`}
   description="View and manage service suggestion"
-  widthClassName="max-w-3xl"
+  widthClassName="max-w-5xl"
   htmx
 >
   <h1 class="mt-12 mb-6 text-center font-title text-3xl font-bold">Service suggestion</h1>
@@ -164,21 +194,36 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
       }
     </div>
 
-    <form method="POST" action={actions.admin.serviceSuggestions.update} class="mt-6 flex items-end gap-2">
-      <input type="hidden" name="suggestionId" value={serviceSuggestion.id} />
-      <InputSelect
-        name="status"
-        label="Update status"
-        options={serviceSuggestionStatuses.map((status) => ({
-          label: status.label,
-          value: status.value,
-        }))}
-        selectedValue={serviceSuggestion.status}
-        class="flex-1"
-        error={serviceSuggestionUpdateInputErrors.status}
-      />
-      <Button as="button" type="submit" color="success" size="md" icon="ri:save-line" label="Update" />
-    </form>
+    {
+      serviceSuggestion.proposedEdits && (
+        <ProposedEditsReview
+          suggestion={serviceSuggestion}
+          service={serviceSuggestion.service}
+          attributes={attributes}
+          class="mt-6"
+        />
+      )
+    }
+
+    {
+      !serviceSuggestion.proposedEdits && (
+        <form method="POST" action={actions.admin.serviceSuggestions.update} class="mt-6 flex items-end gap-2">
+          <input type="hidden" name="suggestionId" value={serviceSuggestion.id} />
+          <InputSelect
+            name="status"
+            label="Update status"
+            options={serviceSuggestionStatuses.map((status) => ({
+              label: status.label,
+              value: status.value,
+            }))}
+            selectedValue={serviceSuggestion.status}
+            class="flex-1"
+            error={serviceSuggestionUpdateInputErrors.status}
+          />
+          <Button as="button" type="submit" color="success" size="md" icon="ri:save-line" label="Update" />
+        </form>
+      )
+    }
   </section>
 
   <Chat

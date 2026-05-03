@@ -1,0 +1,159 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import FormSection from '../../../FormSection.astro'
+import FormSubSection from '../../../FormSubSection.astro'
+import TimeFormatted from '../../../TimeFormatted.astro'
+import ProposedEditsReview from '../../serviceSuggestions/ProposedEditsReview.astro'
+
+import type { Prisma } from '@prisma/client'
+
+type Attribute = Prisma.AttributeGetPayload<{
+  select: {
+    id: true
+    title: true
+    description: true
+    category: true
+    type: true
+    privacyPoints: true
+    trustPoints: true
+  }
+}>
+
+type Suggestion = Prisma.ServiceSuggestionGetPayload<{
+  select: { id: true; status: true; createdAt: true; proposedEdits: true }
+}>
+
+type ScanJob = Prisma.ServiceScanJobGetPayload<{
+  select: { id: true; createdAt: true; claimedAt: true; processedAt: true; error: true }
+}>
+
+type Service = Prisma.ServiceGetPayload<{
+  select: { id: true; kycLevel: true; kycPolicyMd: true; tosUrls: true; tosReview: true }
+}>
+
+type Props = {
+  service: Service
+  scanJob: ScanJob | null
+  pendingSuggestion: Suggestion | null
+  attributes: Attribute[]
+  id?: string
+}
+
+const { service, scanJob, pendingSuggestion, attributes, id = 'tasks' } = Astro.props
+
+const scanClaimTimeoutMs = 15 * 60 * 1000
+const isScanStalled =
+  !!scanJob?.claimedAt &&
+  scanJob.processedAt === null &&
+  Date.now() - scanJob.claimedAt.getTime() > scanClaimTimeoutMs
+const isScanning = !!scanJob && scanJob.processedAt === null && !isScanStalled
+const stalledClaimedAt = isScanStalled ? scanJob.claimedAt : null
+const lastScanFailed = !!scanJob?.error && !!scanJob.processedAt
+
+const proposedEdits = pendingSuggestion?.proposedEdits ?? null
+---
+
+<FormSection title="Tasks" id={id}>
+  <FormSubSection title="Deep Scan">
+    <p class="text-center text-sm text-day-400">
+      Crawl the ToS and linked legal pages, then propose KYC level, attribute add/remove, KYC policy
+      notes, and warnings for human review.
+    </p>
+
+    <div
+      class="rounded-lg border border-night-600 bg-night-800 p-4"
+      data-deep-scan-status
+      data-pending={isScanning ? 'true' : 'false'}
+    >
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="text-sm text-day-300">
+          {
+            isScanning ? (
+              <span class="inline-flex items-center gap-2">
+                <Icon name="ri:loader-4-line" class="size-4 animate-spin text-orange-400" />
+                Scanning since
+                <TimeFormatted date={scanJob.createdAt} hourPrecision />
+              </span>
+            ) : stalledClaimedAt ? (
+              <span class="inline-flex items-center gap-2 text-yellow-300">
+                <Icon name="ri:alert-line" class="size-4" />
+                Scan stalled since
+                <TimeFormatted date={stalledClaimedAt} hourPrecision />
+              </span>
+            ) : scanJob?.processedAt ? (
+              <span class="inline-flex items-center gap-2 text-day-400">
+                <Icon name="ri:history-line" class="size-4" />
+                Last scanned
+                <TimeFormatted date={scanJob.processedAt} hourPrecision />
+              </span>
+            ) : (
+              <span class="text-day-500">Never scanned</span>
+            )
+          }
+        </div>
+
+        <form method="POST" action={actions.admin.service.deepScan.request}>
+          <input type="hidden" name="serviceId" value={service.id} />
+          <button
+            type="submit"
+            disabled={isScanning || service.tosUrls.length === 0}
+            class="inline-flex items-center gap-2 rounded-md border border-orange-500/40 bg-orange-500/10 px-3 py-1.5 text-sm font-medium text-orange-200 transition-colors hover:bg-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Icon name="ri:sparkling-2-line" class="size-4" />
+            {isScanning ? 'Scanning...' : isScanStalled ? 'Retry scan' : 'Run scan'}
+          </button>
+        </form>
+      </div>
+
+      {
+        service.tosUrls.length === 0 && (
+          <p class="mt-2 text-xs text-yellow-300/80">
+            Add at least one ToS URL in the service details before running a scan.
+          </p>
+        )
+      }
+
+      {
+        lastScanFailed && (
+          <p class="mt-2 rounded-sm bg-red-500/10 p-2 text-xs text-red-300">
+            <Icon name="ri:error-warning-line" class="me-1 inline-block size-3.5 align-[-0.15em]" />
+            Last scan failed: {scanJob.error}
+          </p>
+        )
+      }
+    </div>
+  </FormSubSection>
+
+  {
+    !!proposedEdits && !!pendingSuggestion && (
+      <FormSubSection title="Proposed edits awaiting review">
+        <ProposedEditsReview
+          suggestion={pendingSuggestion}
+          service={service}
+          attributes={attributes}
+          title="Deep scan proposed edits"
+          compactHeader
+        />
+      </FormSubSection>
+    )
+  }
+</FormSection>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Optional script: while a deep scan job is pending, the //
+  // section auto-refreshes the page every 5 seconds so the //
+  // admin sees the result without manually reloading.      //
+  // Without JS, the admin can refresh manually.            //
+  ////////////////////////////////////////////////////////////
+  document.addEventListener('astro:page-load', () => {
+    document.querySelectorAll<HTMLElement>('[data-deep-scan-status]').forEach((el) => {
+      if (el.dataset.pending !== 'true') return
+      window.setTimeout(() => {
+        window.location.reload()
+      }, 5000)
+    })
+  })
+</script>

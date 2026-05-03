@@ -1,0 +1,193 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { getAttributeTypeInfo } from '../../../constants/attributeTypes'
+import { cn } from '../../../lib/cn'
+import { formatNumber } from '../../../lib/numbers'
+import BadgeSmall from '../../BadgeSmall.astro'
+
+import type { Prisma } from '@prisma/client'
+
+type Attribute = Prisma.AttributeGetPayload<{
+  select: {
+    id: true
+    title: true
+    description: true
+    category: true
+    type: true
+    privacyPoints: true
+    trustPoints: true
+  }
+}>
+
+type AttributeProposal = {
+  attributeId: number
+  rationale: string
+}
+
+type Props = {
+  add: AttributeProposal[]
+  remove: AttributeProposal[]
+  attributes: Attribute[]
+  isActionable: boolean
+}
+
+const { add, remove, attributes, isActionable } = Astro.props
+const attributesById = new Map(attributes.map((attribute) => [attribute.id, attribute]))
+
+const scoreTextClass = (value: number) =>
+  cn('font-medium tabular-nums', {
+    'text-green-400': value > 0,
+    'text-red-400': value < 0,
+    'text-day-500': value === 0,
+  })
+---
+
+{
+  (add.length > 0 || remove.length > 0) && (
+    <div class="space-y-4 p-4">
+      <div class="flex items-center gap-2 font-title text-sm font-semibold text-day-100">
+        <Icon name="ri:price-tag-3-line" class="size-4 text-day-400" />
+        Attributes
+      </div>
+
+      {add.length > 0 && (
+        <div class="rounded-md border border-green-500/30 bg-green-500/5">
+          <div class="flex items-center gap-2 border-b border-green-500/20 px-3 py-2">
+            <BadgeSmall color="green" text="Add" icon="ri:add-line" />
+            <span class="text-xs font-bold tracking-wider text-green-200 uppercase">
+              {add.length} attribute{add.length === 1 ? '' : 's'}
+            </span>
+          </div>
+          <div class="divide-y divide-green-500/10">
+            {add.map((proposal) => {
+              const attribute = attributesById.get(proposal.attributeId)
+              const typeInfo = attribute ? getAttributeTypeInfo(attribute.type) : null
+              return (
+                <label class="grid cursor-pointer gap-3 p-3 hover:bg-green-500/10 sm:grid-cols-[auto_1fr] sm:items-start">
+                  <input
+                    type="checkbox"
+                    name="attributeAddIds"
+                    value={proposal.attributeId}
+                    checked
+                    disabled={!isActionable}
+                    class="mt-1"
+                  />
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="font-semibold text-green-100">
+                        {attribute?.title ?? `Unknown attribute #${proposal.attributeId}`}
+                      </span>
+                      {typeInfo && (
+                        <span
+                          class={cn(
+                            'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium',
+                            typeInfo.classNames.container,
+                            typeInfo.classNames.text
+                          )}
+                        >
+                          <Icon name={typeInfo.icon} class="size-3" />
+                          {typeInfo.label}
+                        </span>
+                      )}
+                      {attribute && (
+                        <span class="inline-flex items-center gap-2 rounded-md bg-night-900 px-2 py-0.5 text-xs text-day-400">
+                          <span>
+                            Privacy{' '}
+                            <span class={scoreTextClass(attribute.privacyPoints)}>
+                              {formatNumber(attribute.privacyPoints, { showSign: true })}
+                            </span>
+                          </span>
+                          <span class="text-night-400">/</span>
+                          <span>
+                            Trust{' '}
+                            <span class={scoreTextClass(attribute.trustPoints)}>
+                              {formatNumber(attribute.trustPoints, { showSign: true })}
+                            </span>
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                    {attribute?.description && (
+                      <p class="mt-1 text-xs text-day-500">{attribute.description}</p>
+                    )}
+                    <p class="mt-2 text-sm text-day-300">{proposal.rationale}</p>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {remove.length > 0 && (
+        <div class="rounded-md border border-red-500/30 bg-red-500/5">
+          <div class="flex items-center gap-2 border-b border-red-500/20 px-3 py-2">
+            <BadgeSmall color="red" text="Remove" icon="ri:subtract-line" />
+            <span class="text-xs font-bold tracking-wider text-red-200 uppercase">
+              {remove.length} attribute{remove.length === 1 ? '' : 's'}
+            </span>
+          </div>
+          <div class="divide-y divide-red-500/10">
+            {remove.map((proposal) => {
+              const attribute = attributesById.get(proposal.attributeId)
+              const typeInfo = attribute ? getAttributeTypeInfo(attribute.type) : null
+              return (
+                <label class="grid cursor-pointer gap-3 p-3 hover:bg-red-500/10 sm:grid-cols-[auto_1fr] sm:items-start">
+                  <input
+                    type="checkbox"
+                    name="attributeRemoveIds"
+                    value={proposal.attributeId}
+                    checked
+                    disabled={!isActionable}
+                    class="mt-1"
+                  />
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="font-semibold text-red-100">
+                        {attribute?.title ?? `Unknown attribute #${proposal.attributeId}`}
+                      </span>
+                      {typeInfo && (
+                        <span
+                          class={cn(
+                            'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium',
+                            typeInfo.classNames.container,
+                            typeInfo.classNames.text
+                          )}
+                        >
+                          <Icon name={typeInfo.icon} class="size-3" />
+                          {typeInfo.label}
+                        </span>
+                      )}
+                      {attribute && (
+                        <span class="inline-flex items-center gap-2 rounded-md bg-night-900 px-2 py-0.5 text-xs text-day-400">
+                          <span>
+                            Privacy{' '}
+                            <span class={scoreTextClass(attribute.privacyPoints)}>
+                              {formatNumber(attribute.privacyPoints, { showSign: true })}
+                            </span>
+                          </span>
+                          <span class="text-night-400">/</span>
+                          <span>
+                            Trust{' '}
+                            <span class={scoreTextClass(attribute.trustPoints)}>
+                              {formatNumber(attribute.trustPoints, { showSign: true })}
+                            </span>
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                    {attribute?.description && (
+                      <p class="mt-1 text-xs text-day-500">{attribute.description}</p>
+                    )}
+                    <p class="mt-2 text-sm text-day-300">{proposal.rationale}</p>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

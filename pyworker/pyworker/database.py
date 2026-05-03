@@ -5,6 +5,7 @@ Database operations for the pyworker package.
 import hashlib
 import json
 import secrets
+import string
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Dict, Generator, List, Optional, TypedDict, Union
@@ -73,6 +74,31 @@ class TosReviewType(TypedDict, total=False):
     summary: str
     complexity: TypeLiteral["low", "medium", "high"]
     highlights: List[Dict[str, Any]]
+
+
+class DeepScanAttributeProposalType(TypedDict):
+    attributeId: int
+    rationale: str
+
+
+class DeepScanWarningType(TypedDict):
+    title: str
+    bodyMd: str
+    severity: TypeLiteral["info", "warning", "alert"]
+
+
+class DeepScanResultType(TypedDict):
+    """Raw structured output from the deep scan LLM call."""
+
+    kycLevel: int
+    summary: str
+    complexity: TypeLiteral["low", "medium", "high"]
+    highlights: List[Dict[str, Any]]
+    kycPolicyNotesMd: str
+    kycLevelRationale: str
+    attributesToAdd: List[DeepScanAttributeProposalType]
+    attributesToRemove: List[DeepScanAttributeProposalType]
+    warnings: List[DeepScanWarningType]
 
 
 class CommentSentimentSummaryType(TypedDict):
@@ -164,13 +190,23 @@ def get_db_connection() -> Generator[psycopg.Connection, None, None]:
 _bot_user_id: Optional[int] = None
 
 
+def _generate_feed_id() -> str:
+    """Generate a feed id for raw SQL user inserts.
+
+    Prisma fills feedId with cuid(2), but pyworker creates the bot user through
+    psycopg, so the application-level Prisma default never runs.
+    """
+    alphabet = string.ascii_lowercase + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(24))
+
+
 def ensure_bot_user() -> int:
     """
     Get or create the bot user that PyWorker uses to author edit suggestions.
 
     The user is looked up by name (from config.BOT_USERNAME). If it doesn't
     exist, a new row is inserted with a random secret token hash (the token
-    itself is discarded — bot accounts don't log in through the web UI).
+    itself is discarded: bot accounts don't log in through the web UI).
 
     Returns:
         The bot user's database ID.
@@ -198,23 +234,49 @@ def ensure_bot_user() -> int:
                     )
                     return _bot_user_id
 
-                # Create a new bot user with a random, unusable secret token
-                random_token = secrets.token_hex(32)
-                token_hash = hashlib.sha512(random_token.encode()).hexdigest()
+                row = None
+                for _ in range(5):
+                    random_token = secrets.token_hex(32)
+                    token_hash = hashlib.sha512(random_token.encode()).hexdigest()
+                    try:
+                        cursor.execute(
+                            """
+                            INSERT INTO "User" (
+                                name,
+                                "secretTokenHash",
+                                "feedId",
+                                "createdAt",
+                                "updatedAt",
+                                "lastLoginAt"
+                            )
+                            VALUES (%s, %s, %s, NOW(), NOW(), NOW())
+                            ON CONFLICT (name) DO NOTHING
+                            RETURNING id
+                            """,
+                            (username, token_hash, _generate_feed_id()),
+                        )
+                        row = cursor.fetchone()
+                        if row is not None:
+                            conn.commit()
+                            break
 
-                cursor.execute(
-                    """
-                    INSERT INTO "User" (name, "secretTokenHash", "createdAt", "updatedAt", "lastLoginAt")
-                    VALUES (%s, %s, NOW(), NOW(), NOW())
-                    RETURNING id
-                    """,
-                    (username, token_hash),
-                )
-                conn.commit()
-                row = cursor.fetchone()
-                assert row is not None, "INSERT RETURNING should always return a row"
+                        cursor.execute(
+                            'SELECT id FROM "User" WHERE name = %s',
+                            (username,),
+                        )
+                        row = cursor.fetchone()
+                        if row is not None:
+                            break
+                    except psycopg.errors.UniqueViolation:
+                        conn.rollback()
+                        continue
+
+                if row is None:
+                    raise RuntimeError(f"Could not create bot user '{username}'")
+
+                assert row is not None, "Bot user lookup should always return a row"
                 _bot_user_id = int(row["id"])
-                logger.info(f"Created bot user '{username}' (ID: {_bot_user_id})")
+                logger.info(f"Using bot user '{username}' (ID: {_bot_user_id})")
                 return _bot_user_id
     except Exception as e:
         logger.error(f"Error ensuring bot user '{username}': {e}")
@@ -239,9 +301,9 @@ def create_kyc_edit_suggestion(
     bot_user_id = ensure_bot_user()
 
     lines = [
-        "⚠️ AI-Generated Suggestion — Requires human review",
+        "AI-Generated Suggestion: Requires human review",
         "",
-        f"Proposed KYC level change: {old_level} → {new_level}",
+        f"Proposed KYC level change: {old_level} -> {new_level}",
     ]
 
     if review_summary:
@@ -270,7 +332,7 @@ def create_kyc_edit_suggestion(
                 if suggestion_id:
                     logger.info(
                         f"Created KYC edit suggestion #{suggestion_id} for service {service_id} "
-                        f"(level {old_level} → {new_level})"
+                        f"(level {old_level} -> {new_level})"
                     )
                 return suggestion_id
     except Exception as e:
@@ -347,6 +409,183 @@ def fetch_services_with_pending_comments() -> List[Dict[str, Any]]:
         logger.error(f"Error fetching services with pending comments: {e}")
 
     return services
+
+
+def fetch_attribute_catalog() -> List[Dict[str, Any]]:
+    """Fetch every attribute the platform tracks (id, slug, title, description, category, type)."""
+    attributes: List[Dict[str, Any]] = []
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, slug, title, description, category, type
+                    FROM "Attribute"
+                    ORDER BY category, type, title
+                    """
+                )
+                attributes = cursor.fetchall()
+    except Exception as e:
+        logger.error(f"Error fetching attribute catalog: {e}")
+    return attributes
+
+
+def fetch_service_for_deep_scan(service_id: int) -> Optional[Dict[str, Any]]:
+    """Fetch the fields needed to run a deep scan for a single service.
+
+    Returns None if the service does not exist.
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, name, slug, "kycLevel", "verificationStatus",
+                           "serviceVisibility", "tosUrls", "tosReview"
+                    FROM "Service"
+                    WHERE id = %s
+                    """,
+                    (service_id,),
+                )
+                return cursor.fetchone()
+    except Exception as e:
+        logger.error(f"Error fetching service {service_id} for deep scan: {e}")
+        return None
+
+
+def claim_next_scan_job() -> Optional[Dict[str, Any]]:
+    """Atomically claim the next pending ServiceScanJob.
+
+    The claim is durable: claimedAt is set in the same transaction that selects
+    the row, so another worker cannot pick the same scan after the lock is
+    released. Jobs with very old claims can be retried if a worker died.
+
+    Returns the job row (id, serviceId, requestedByUserId) or None if the queue
+    is empty.
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    WITH next_job AS (
+                        SELECT id
+                        FROM "ServiceScanJob"
+                        WHERE "processedAt" IS NULL
+                          AND (
+                            "claimedAt" IS NULL
+                            OR "claimedAt" < NOW() - (%s * INTERVAL '1 minute')
+                          )
+                        ORDER BY "createdAt" ASC
+                        LIMIT 1
+                        FOR UPDATE SKIP LOCKED
+                    )
+                    UPDATE "ServiceScanJob" AS job
+                    SET "claimedAt" = NOW(), "error" = NULL
+                    FROM next_job
+                    WHERE job.id = next_job.id
+                    RETURNING job.id, job."serviceId", job."requestedByUserId"
+                    """,
+                    (config.SERVICE_SCAN_CLAIM_TIMEOUT_MINUTES,),
+                )
+                job = cursor.fetchone()
+                conn.commit()
+                return job
+    except Exception as e:
+        logger.error(f"Error claiming next scan job: {e}")
+        return None
+
+
+def mark_scan_job_done(job_id: int, error: Optional[str] = None) -> None:
+    """Mark a ServiceScanJob as processed, recording an error message on failure."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE "ServiceScanJob"
+                    SET "processedAt" = NOW(), "error" = %s
+                    WHERE id = %s
+                    """,
+                    (error, job_id),
+                )
+                conn.commit()
+                logger.info(
+                    f"Scan job {job_id} marked done"
+                    + (f" with error: {error}" if error else "")
+                )
+    except Exception as e:
+        logger.error(f"Error marking scan job {job_id} done: {e}")
+
+
+def save_deep_scan_proposed_edits(
+    service_id: int,
+    proposed_edits: Dict[str, Any],
+    summary_notes: str,
+) -> Optional[int]:
+    """Insert a ServiceSuggestion carrying the bot's proposed edits.
+
+    Returns the new suggestion id, or None on failure.
+    """
+    bot_user_id = ensure_bot_user()
+    edits_json = json.dumps(proposed_edits)
+
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO "ServiceSuggestion"
+                        (type, status, notes, "proposedEdits", "userId", "serviceId", "createdAt", "updatedAt")
+                    VALUES ('EDIT_SERVICE', 'PENDING', %s, %s::jsonb, %s, %s, NOW(), NOW())
+                    RETURNING id
+                    """,
+                    (summary_notes, edits_json, bot_user_id, service_id),
+                )
+                row = cursor.fetchone()
+                suggestion_id = row["id"] if row else None
+                withdrawn_rows = []
+                if suggestion_id:
+                    cursor.execute(
+                        """
+                        UPDATE "ServiceSuggestion"
+                        SET
+                            status = 'WITHDRAWN',
+                            notes = CASE
+                                WHEN notes IS NULL OR notes = '' THEN %s
+                                ELSE notes || E'\n\n' || %s
+                            END,
+                            "updatedAt" = NOW()
+                        WHERE "serviceId" = %s
+                          AND id <> %s
+                          AND "proposedEdits" IS NOT NULL
+                          AND status IN ('PENDING', 'UNDER_REVIEW')
+                        RETURNING id
+                        """,
+                        (
+                            f"Withdrawn automatically: newer deep scan suggestion #{suggestion_id} created.",
+                            f"Withdrawn automatically: newer deep scan suggestion #{suggestion_id} created.",
+                            service_id,
+                            suggestion_id,
+                        ),
+                    )
+                    withdrawn_rows = cursor.fetchall()
+                conn.commit()
+                if suggestion_id:
+                    logger.info(
+                        f"Created deep scan suggestion #{suggestion_id} for service {service_id}"
+                    )
+                    if withdrawn_rows:
+                        logger.info(
+                            f"Withdrew {len(withdrawn_rows)} older deep scan suggestion(s) "
+                            f"for service {service_id}"
+                        )
+                return suggestion_id
+    except Exception as e:
+        logger.error(
+            f"Error creating deep scan suggestion for service {service_id}: {e}"
+        )
+        return None
 
 
 def fetch_service_attributes(service_id: int) -> List[Dict[str, Any]]:
@@ -752,7 +991,7 @@ def update_comment_moderation(comment_data: CommentType):
 
     The AI worker populates requiresAdminReview, communityNote, and
     internalNote so human moderators can make informed approve/reject
-    decisions.  Status is intentionally NOT written here — only humans
+    decisions. Status is intentionally NOT written here: only humans
     change comment status.
     """
     comment_id = comment_data.get("id")

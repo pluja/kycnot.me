@@ -11,13 +11,16 @@ from typing import List, Optional, Dict, Any
 
 from pyworker.config import config
 from pyworker.database import (
+    claim_next_scan_job,
     close_db_pool,
     fetch_all_services,
     fetch_services_with_pending_comments,
+    mark_scan_job_done,
 )
 from pyworker.scheduler import TaskScheduler
 from .tasks import (
     CommentModerationTask,
+    DeepScanTask,
     ForceTriggersTask,
     InactiveUsersTask,
     ServiceScoreRecalculationTask,
@@ -109,6 +112,17 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     subparsers.add_parser(
         "inactive-users",
         help="Handle inactive users - send deletion warnings and clean up accounts",
+    )
+
+    # Deep scan task
+    deep_scan_parser = subparsers.add_parser(
+        "deep-scan",
+        help="Deep-scan a service (TOS + KYC + attribute proposals + warnings)",
+    )
+    deep_scan_parser.add_argument(
+        "--service-id",
+        type=int,
+        help="Specific service ID to scan. If omitted, drains the ServiceScanJob queue.",
     )
 
     return parser.parse_args(args)
@@ -392,6 +406,69 @@ def run_service_score_recalc_all_task(close_pool: bool = True) -> int:
     return run_service_score_recalc_task(all_services=True, close_pool=close_pool)
 
 
+def run_deep_scan_task(
+    service_id: Optional[int] = None, close_pool: bool = True
+) -> int:
+    """Run the deep scan task.
+
+    With service_id: scan that single service once, ignoring the queue.
+    Without: drain the ServiceScanJob queue, claiming one job at a time. The
+    worker-mode scheduler ticks this on a short cron so admin clicks turn into
+    scans within a minute or so.
+    """
+    logger.info("Starting deep scan task")
+
+    try:
+        if service_id is not None:
+            with DeepScanTask() as task:  # type: ignore
+                suggestion_id = task.run(service_id)  # type: ignore
+                if suggestion_id:
+                    logger.info(
+                        f"Deep scan completed for service {service_id}, "
+                        f"suggestion #{suggestion_id} created"
+                    )
+                else:
+                    logger.warning(
+                        f"Deep scan produced no suggestion for service {service_id}"
+                    )
+            return 0
+
+        processed = 0
+        with DeepScanTask() as task:  # type: ignore
+            while True:
+                job = claim_next_scan_job()
+                if job is None:
+                    break
+
+                job_id = int(job["id"])
+                job_service_id = int(job["serviceId"])
+                logger.info(
+                    f"Claimed scan job {job_id} for service {job_service_id}"
+                )
+
+                try:
+                    suggestion_id = task.run(job_service_id)  # type: ignore
+                    error_msg: Optional[str] = None
+                    if suggestion_id is None:
+                        error_msg = (
+                            "Deep scan produced no suggestion (empty corpus, "
+                            "filtered pages, or LLM rejection)"
+                        )
+                    mark_scan_job_done(job_id, error=error_msg)
+                except Exception as e:
+                    logger.exception(
+                        f"Deep scan job {job_id} failed for service {job_service_id}: {e}"
+                    )
+                    mark_scan_job_done(job_id, error=str(e))
+                processed += 1
+
+        logger.info(f"Deep scan task drained {processed} job(s)")
+        return 0
+    finally:
+        if close_pool:
+            close_db_pool()
+
+
 def run_inactive_users_task(close_pool: bool = True) -> int:
     """
     Run the inactive users task.
@@ -435,7 +512,7 @@ def run_worker_mode() -> int:
         ", ".join(task_schedules.keys()) if task_schedules else "<none>",
     )
 
-    required_tasks: dict[str, Any] = {
+    task_callables: dict[str, Any] = {
         "tosreview": partial(run_tos_task, close_pool=False),
         "user_sentiment": partial(run_sentiment_task, close_pool=False),
         "comment_moderation": partial(run_moderation_task, close_pool=False),
@@ -447,9 +524,19 @@ def run_worker_mode() -> int:
         "service_score_recalc_all": partial(
             run_service_score_recalc_all_task, close_pool=False
         ),
+        "deep_scan": partial(run_deep_scan_task, close_pool=False),
     }
+    required_task_names = [
+        "tosreview",
+        "user_sentiment",
+        "comment_moderation",
+        "force_triggers",
+        "inactive_users",
+        "service_score_recalc",
+        "service_score_recalc_all",
+    ]
 
-    missing_tasks = [t for t in required_tasks if t not in task_schedules]
+    missing_tasks = [t for t in required_task_names if t not in task_schedules]
     if missing_tasks:
         logger.error(
             "Missing cron schedule for task%s: %s. Set the corresponding CRON_<TASKNAME>_TASK environment variable%s.",
@@ -461,8 +548,17 @@ def run_worker_mode() -> int:
 
     scheduler = TaskScheduler()
 
-    for task_name, task_callable in required_tasks.items():
-        scheduler.register_task(task_name, task_schedules[task_name], task_callable)
+    for task_name, schedule in task_schedules.items():
+        task_callable = task_callables.get(task_name)
+        if task_callable is None:
+            logger.warning("Ignoring unknown cron task schedule: %s", task_name)
+            continue
+        if task_name == "deep_scan":
+            scheduler.register_task(
+                task_name, schedule, task_callable, instantiate=False
+            )
+        else:
+            scheduler.register_task(task_name, schedule, task_callable)
 
     # Start the scheduler if tasks were registered
     if scheduler.tasks:
@@ -519,6 +615,8 @@ def main() -> int:
             return run_service_score_recalc_all_task()
         elif args.task == "inactive-users":
             return run_inactive_users_task()
+        elif args.task == "deep-scan":
+            return run_deep_scan_task(args.service_id)
         elif args.task:
             logger.error(f"Unknown task: {args.task}")
             return 1

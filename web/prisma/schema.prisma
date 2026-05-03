@@ -314,6 +314,8 @@ model ServiceSuggestion {
   type             ServiceSuggestionType
   status           ServiceSuggestionStatus    @default(PENDING)
   notes            String?
+  /// [ProposedEdits]
+  proposedEdits    Json?
   createdAt        DateTime                   @default(now())
   updatedAt        DateTime                   @default(now()) @updatedAt
   userId           Int
@@ -708,6 +710,20 @@ model ServiceScoreRecalculationJob {
   createdAt   DateTime  @default(now())
   processedAt DateTime? @updatedAt
 
+  @@index([processedAt])
+  @@index([createdAt])
+}
+
+model ServiceScanJob {
+  id                Int       @id @default(autoincrement())
+  serviceId         Int       @unique
+  requestedByUserId Int?
+  createdAt         DateTime  @default(now())
+  claimedAt         DateTime?
+  processedAt       DateTime?
+  error             String?
+
+  @@index([claimedAt])
   @@index([processedAt])
   @@index([createdAt])
 }

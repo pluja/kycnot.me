@@ -16,6 +16,7 @@ import {
   zodContactMethod,
 } from '../../lib/zodUtils'
 
+import { deepScanActions } from './service/deepScan'
 import { tosHighlightActions } from './service/tosHighlight'
 
 const addSlugIfMissing = <
@@ -453,6 +454,8 @@ export const adminServiceActions = {
   },
 
   tosHighlight: tosHighlightActions,
+
+  deepScan: deepScanActions,
 
   evidenceImage: {
     add: defineProtectedAction({

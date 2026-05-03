@@ -1,0 +1,136 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { getTosHighlightRatingInfo } from '../../../constants/tosHighlightRating'
+import { cn } from '../../../lib/cn'
+import BadgeSmall from '../../BadgeSmall.astro'
+import Markdown from '../../Markdown.astro'
+
+import type { MarkdownString } from '../../../lib/markdown'
+
+type TosReview = {
+  summary: MarkdownString
+  highlights: {
+    title: string
+    content: MarkdownString
+    rating: 'negative' | 'neutral' | 'positive'
+  }[]
+}
+
+type Props = {
+  currentTosReview: TosReview | null
+  proposedTosReview: TosReview
+  changed: boolean
+  isActionable: boolean
+  inputId: string
+}
+
+const { currentTosReview, proposedTosReview, changed, isActionable, inputId } = Astro.props
+---
+
+<div class={cn('grid gap-3 p-4', isActionable && changed ? 'bg-orange-500/5' : 'bg-night-800')}>
+  <div class="grid gap-3 sm:grid-cols-[auto_1fr] sm:items-start">
+    <input
+      id={inputId}
+      type="checkbox"
+      name="acceptTosReview"
+      value="on"
+      checked={changed}
+      disabled={!isActionable || !changed}
+      class="mt-1"
+    />
+    <div class="min-w-0">
+      <div class="flex flex-wrap items-center gap-2">
+        <label
+          for={inputId}
+          class={cn(
+            'font-title text-sm font-semibold text-day-100',
+            isActionable && changed && 'cursor-pointer'
+          )}
+        >
+          Publish this ToS review
+        </label>
+        {currentTosReview ? (
+          <BadgeSmall
+            color={changed ? 'orange' : 'gray'}
+            text={changed ? 'Changed' : 'Same as current'}
+            icon={changed ? 'ri:arrow-left-right-line' : 'ri:checkbox-circle-line'}
+          />
+        ) : (
+          <BadgeSmall color="blue" text="No current review" icon="ri:information-line" />
+        )}
+      </div>
+      <p class="mt-2 text-sm text-day-400">
+        Controls the public ToS summary and highlights shown on the service page.
+      </p>
+    </div>
+  </div>
+
+  <div class="grid gap-3 lg:grid-cols-2">
+    <div class="rounded-md border border-night-600 bg-night-900 p-3">
+      <p class="text-xs font-bold tracking-wider text-day-500 uppercase">Current published</p>
+      {currentTosReview ? (
+        <>
+          <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-400 prose-invert">
+            {currentTosReview.summary ? (
+              <Markdown content={currentTosReview.summary} />
+            ) : (
+              <p class="text-day-500 italic">(empty summary)</p>
+            )}
+          </div>
+          {currentTosReview.highlights.length > 0 ? (
+            <ul class="mt-3 divide-y divide-night-600 rounded-md border border-night-600">
+              {currentTosReview.highlights.map((highlight) => {
+                const ratingInfo = getTosHighlightRatingInfo(highlight.rating)
+                return (
+                  <li class="flex items-start gap-3 p-3 text-sm">
+                    <Icon
+                      name={ratingInfo.icon}
+                      class={cn('mt-0.5 size-4 shrink-0', ratingInfo.classNames.icon)}
+                    />
+                    <div>
+                      <div class="font-semibold text-day-100">{highlight.title}</div>
+                      <div class="mt-1 text-day-400">{highlight.content}</div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
+            <p class="mt-3 text-sm text-day-500 italic">No current highlights.</p>
+          )}
+        </>
+      ) : (
+        <p class="mt-3 text-sm text-day-500 italic">No current ToS review.</p>
+      )}
+    </div>
+
+    <div class="rounded-md border border-orange-500/30 bg-night-900 p-3">
+      <p class="text-xs font-bold tracking-wider text-orange-300 uppercase">Scan result</p>
+      <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-200 prose-invert">
+        <Markdown content={proposedTosReview.summary} />
+      </div>
+      {proposedTosReview.highlights.length > 0 ? (
+        <ul class="mt-3 divide-y divide-night-600 rounded-md border border-night-600">
+          {proposedTosReview.highlights.map((highlight) => {
+            const ratingInfo = getTosHighlightRatingInfo(highlight.rating)
+            return (
+              <li class="flex items-start gap-3 p-3 text-sm">
+                <Icon
+                  name={ratingInfo.icon}
+                  class={cn('mt-0.5 size-4 shrink-0', ratingInfo.classNames.icon)}
+                />
+                <div>
+                  <div class="font-semibold text-day-100">{highlight.title}</div>
+                  <div class="mt-1 text-day-400">{highlight.content}</div>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        <p class="mt-3 text-sm text-day-500 italic">No scan highlights.</p>
+      )}
+    </div>
+  </div>
+</div>
