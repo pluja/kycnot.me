@@ -74,15 +74,15 @@ for var in ASTRO_IMAGE_TAG PYWORKER_IMAGE_TAG; do
 done
 
 echo "==> Pulling images"
-docker compose pull astro pyworker
+docker compose pull --policy always astro pyworker
 
 echo "==> Running migrations"
 docker compose run --rm -T astro knm-migrate </dev/null
 
 echo "==> Rolling out astro"
 docker rollout astro
-echo "==> Rolling out pyworker"
-docker rollout pyworker
+echo "==> Recreating pyworker"
+docker compose up -d --no-deps --force-recreate pyworker
 
 echo "==> Postdeploy hooks"
 run_hooks postdeploy

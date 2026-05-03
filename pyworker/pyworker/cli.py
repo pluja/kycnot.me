@@ -46,6 +46,21 @@ def should_use_scheduler_task_instance(task_name: str) -> bool:
     return task_name not in _TASKS_WITHOUT_SCHEDULER_INSTANCE
 
 
+def group_task_schedules(task_schedules: dict[str, str]) -> tuple[dict[str, str], list[str]]:
+    """Split cron schedules into enabled and intentionally disabled groups."""
+    enabled_task_schedules = {
+        task_name: schedule
+        for task_name, schedule in task_schedules.items()
+        if not is_disabled_schedule(schedule)
+    }
+    disabled_task_names = [
+        task_name
+        for task_name, schedule in task_schedules.items()
+        if is_disabled_schedule(schedule)
+    ]
+    return enabled_task_schedules, disabled_task_names
+
+
 def parse_args(args: List[str]) -> argparse.Namespace:
     """
     Parse command line arguments.
@@ -518,16 +533,7 @@ def run_worker_mode() -> int:
 
     # Get task schedules from config
     task_schedules = config.task_schedules
-    enabled_task_schedules = {
-        task_name: schedule
-        for task_name, schedule in task_schedules.items()
-        if not is_disabled_schedule(schedule)
-    }
-    disabled_task_names = [
-        task_name
-        for task_name, schedule in task_schedules.items()
-        if is_disabled_schedule(schedule)
-    ]
+    enabled_task_schedules, disabled_task_names = group_task_schedules(task_schedules)
     logger.info(
         "Found %s enabled cron schedule%s from environment variables: %s",
         len(enabled_task_schedules),
@@ -551,30 +557,6 @@ def run_worker_mode() -> int:
         ),
         "deep_scan": partial(run_deep_scan_task, close_pool=False),
     }
-    required_task_names = [
-        "tosreview",
-        "user_sentiment",
-        "comment_moderation",
-        "force_triggers",
-        "inactive_users",
-        "service_score_recalc",
-        "service_score_recalc_all",
-    ]
-
-    missing_tasks = [
-        task_name
-        for task_name in required_task_names
-        if task_name not in task_schedules
-    ]
-    if missing_tasks:
-        logger.error(
-            "Missing cron schedule for task%s: %s. Set the corresponding CRON_<TASKNAME>_TASK environment variable%s.",
-            "s" if len(missing_tasks) != 1 else "",
-            ", ".join(missing_tasks),
-            "s" if len(missing_tasks) != 1 else "",
-        )
-        return 1
-
     scheduler = TaskScheduler()
 
     for task_name, schedule in enabled_task_schedules.items():
