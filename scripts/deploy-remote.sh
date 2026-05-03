@@ -8,9 +8,7 @@ NEW_TAG="$2"
 
 cd "$APP_DIR"
 
-set -a
 [ -f .env ] && . ./.env
-set +a
 
 # notify: post a message to ntfy.sh if NTFY_TOPIC is set in the server's .env.
 # Failures are swallowed so a flaky network never blocks a deploy.
@@ -72,17 +70,55 @@ for var in ASTRO_IMAGE_TAG PYWORKER_IMAGE_TAG; do
     echo "${var}=${NEW_TAG}" >> .env
   fi
 done
+export ASTRO_IMAGE_TAG="$NEW_TAG"
+export PYWORKER_IMAGE_TAG="$NEW_TAG"
+
+deploy_compose() {
+  ASTRO_IMAGE_TAG="$NEW_TAG" PYWORKER_IMAGE_TAG="$NEW_TAG" docker compose "$@"
+}
+
+deploy_rollout() {
+  ASTRO_IMAGE_TAG="$NEW_TAG" PYWORKER_IMAGE_TAG="$NEW_TAG" docker rollout "$@"
+}
+
+echo "==> Compose images for $NEW_TAG"
+deploy_compose config --images | sed -n '/\/kycnot\/astro:/p;/\/kycnot\/pyworker:/p'
 
 echo "==> Pulling images"
-docker compose pull --policy always astro pyworker
+deploy_compose config --images \
+  | sed -n '/\/kycnot\/astro:/p;/\/kycnot\/pyworker:/p' \
+  | sort -u \
+  | while IFS= read -r image; do
+      docker pull "$image"
+    done
 
 echo "==> Running migrations"
-docker compose run --rm -T astro knm-migrate </dev/null
+deploy_compose run --rm -T astro knm-migrate </dev/null
+
+echo "==> Verifying migrations"
+deploy_compose run --rm -T astro sh -c "cd /app && npx prisma migrate status --schema=./prisma/schema.prisma" </dev/null
 
 echo "==> Rolling out astro"
-docker rollout astro
+deploy_rollout astro
 echo "==> Recreating pyworker"
-docker compose up -d --no-deps --force-recreate pyworker
+deploy_compose up -d --no-deps --force-recreate --pull always pyworker
+
+echo "==> Verifying running image tags"
+for service in astro pyworker; do
+  container_id=$(deploy_compose ps -q "$service")
+  if [ -z "$container_id" ]; then
+    echo "Service $service is not running" >&2
+    exit 1
+  fi
+  running_image=$(docker inspect -f '{{.Config.Image}}' "$container_id")
+  case "$running_image" in
+    *":$NEW_TAG") echo "    $service: $running_image" ;;
+    *)
+      echo "Service $service is running $running_image, expected tag $NEW_TAG" >&2
+      exit 1
+      ;;
+  esac
+done
 
 echo "==> Postdeploy hooks"
 run_hooks postdeploy
