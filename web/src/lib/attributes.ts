@@ -196,7 +196,7 @@ export const nonDbAttributes: NonDbAttributeFull[] = [
     type: 'WARNING',
     category: 'TRUST',
     description:
-      'The Terms of Service page is not analyable by our AI. Possible reasons may be: captchas, client side rendering, DDoS protections, or non-text format.',
+      'The Terms of Service page is not analysable by our AI. Possible reasons may be: captchas, client side rendering, DDoS protections, or non-text format.',
     privacyPoints: 0,
     trustPoints: -3,
     links: [],
