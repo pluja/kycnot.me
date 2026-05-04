@@ -53,20 +53,17 @@ const stalledClaimedAt = isScanStalled ? scanJob.claimedAt : null
 const lastScanFailed = !!scanJob?.error && !!scanJob.processedAt
 
 const proposedEdits = pendingSuggestion?.proposedEdits ?? null
+const currentUrl = `${Astro.url.pathname}${Astro.url.search}`
 ---
 
 <FormSection title="Tasks" id={id}>
   <FormSubSection title="Deep Scan">
     <p class="text-center text-sm text-day-400">
-      Crawl the ToS and linked legal pages, then propose KYC level, attribute add/remove, KYC policy
-      notes, and warnings for human review.
+      Crawl the ToS and linked legal pages, then propose KYC level, attribute add/remove, KYC policy notes,
+      and warnings for human review.
     </p>
 
-    <div
-      class="rounded-lg border border-night-600 bg-night-800 p-4"
-      data-deep-scan-status
-      data-pending={isScanning ? 'true' : 'false'}
-    >
+    <div class="rounded-lg border border-night-600 bg-night-800 p-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="text-sm text-day-300">
           {
@@ -94,17 +91,36 @@ const proposedEdits = pendingSuggestion?.proposedEdits ?? null
           }
         </div>
 
-        <form method="POST" action={actions.admin.service.deepScan.request}>
-          <input type="hidden" name="serviceId" value={service.id} />
-          <button
-            type="submit"
-            disabled={isScanning || service.tosUrls.length === 0}
-            class="inline-flex items-center gap-2 rounded-md border border-orange-500/40 bg-orange-500/10 px-3 py-1.5 text-sm font-medium text-orange-200 transition-colors hover:bg-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Icon name="ri:sparkling-2-line" class="size-4" />
-            {isScanning ? 'Scanning...' : isScanStalled ? 'Retry scan' : 'Run scan'}
-          </button>
-        </form>
+        <div class="flex flex-wrap items-center gap-2">
+          {
+            isScanning && (
+              <a
+                href={currentUrl}
+                hx-get={currentUrl}
+                hx-target={`#${id}`}
+                hx-select={`#${id}`}
+                hx-swap="outerHTML"
+                hx-indicator="this"
+                class="inline-flex items-center gap-2 rounded-md border border-day-500/30 bg-night-700 px-3 py-1.5 text-sm font-medium text-day-200 transition-colors hover:bg-night-600 htmx-request:opacity-70"
+              >
+                <Icon name="ri:refresh-line" class="size-4 htmx-request:animate-spin" />
+                Refresh status
+              </a>
+            )
+          }
+
+          <form method="POST" action={actions.admin.service.deepScan.request}>
+            <input type="hidden" name="serviceId" value={service.id} />
+            <button
+              type="submit"
+              disabled={isScanning || service.tosUrls.length === 0}
+              class="inline-flex items-center gap-2 rounded-md border border-orange-500/40 bg-orange-500/10 px-3 py-1.5 text-sm font-medium text-orange-200 transition-colors hover:bg-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon name="ri:sparkling-2-line" class="size-4" />
+              {isScanning ? 'Scanning...' : isScanStalled ? 'Retry scan' : 'Run scan'}
+            </button>
+          </form>
+        </div>
       </div>
 
       {
@@ -140,20 +156,3 @@ const proposedEdits = pendingSuggestion?.proposedEdits ?? null
     )
   }
 </FormSection>
-
-<script>
-  ////////////////////////////////////////////////////////////
-  // Optional script: while a deep scan job is pending, the //
-  // section auto-refreshes the page every 5 seconds so the //
-  // admin sees the result without manually reloading.      //
-  // Without JS, the admin can refresh manually.            //
-  ////////////////////////////////////////////////////////////
-  document.addEventListener('astro:page-load', () => {
-    document.querySelectorAll<HTMLElement>('[data-deep-scan-status]').forEach((el) => {
-      if (el.dataset.pending !== 'true') return
-      window.setTimeout(() => {
-        window.location.reload()
-      }, 5000)
-    })
-  })
-</script>
