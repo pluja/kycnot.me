@@ -33,10 +33,15 @@ const { comment, class: className, ...divProps } = Astro.props
 
 const communityNotePresets = [
   'Private proof was verified by KYCnot.me.',
-  'Private proof was not sufficient to verify this claim.',
-  'This comment is from a new account and has limited score impact.',
+  'Private proof could not be verified by KYCnot.me.',
+  'This comment makes claims without supporting evidence.',
+  'This comment is too vague to verify.',
+  'This comment describes the service, but does not include a personal experience.',
+  'This comment appears to be AI-generated or promotional.',
+  'This comment appears to be part of a coordinated review wave.',
+  'This comment is unrelated to this service.',
+  'This comment was copied from an external source. The rating is disabled.',
   'The service disputes this claim.',
-  'This appears to be part of a coordinated review wave.',
   'KYCnot.me could not independently verify this claim.',
 ] as const
 
