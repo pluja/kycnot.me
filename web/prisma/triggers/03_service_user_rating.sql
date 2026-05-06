@@ -77,31 +77,31 @@ BEGIN
     END IF;
 
     IF author_record.admin IS TRUE OR author_record.moderator IS TRUE THEN
-        RETURN QUERY SELECT 0.9::DOUBLE PRECISION, 'Trusted account'::TEXT, 'Author is a KYCnot.me admin or moderator'::TEXT;
+        RETURN QUERY SELECT 0.9::DOUBLE PRECISION, 'Trusted user'::TEXT, 'Author is a KYCnot.me admin or moderator'::TEXT;
         RETURN;
     END IF;
 
     IF author_record.verified IS TRUE THEN
-        RETURN QUERY SELECT 0.8::DOUBLE PRECISION, 'Trusted account'::TEXT, 'Author account is verified'::TEXT;
+        RETURN QUERY SELECT 0.8::DOUBLE PRECISION, 'Trusted user'::TEXT, 'Author account is verified'::TEXT;
         RETURN;
     END IF;
 
     IF author_record."totalKarma" >= 500 THEN
-        RETURN QUERY SELECT 0.8::DOUBLE PRECISION, 'Trusted account'::TEXT, 'Author has high karma'::TEXT;
+        RETURN QUERY SELECT 0.8::DOUBLE PRECISION, 'Trusted user'::TEXT, 'Author has high karma'::TEXT;
         RETURN;
     END IF;
 
     IF author_record."totalKarma" >= 10 THEN
-        RETURN QUERY SELECT 0.35::DOUBLE PRECISION, 'Active account'::TEXT, 'Author has account activity'::TEXT;
+        RETURN QUERY SELECT 0.35::DOUBLE PRECISION, 'Active user'::TEXT, 'Author has account activity'::TEXT;
         RETURN;
     END IF;
 
     IF author_record."totalKarma" > 0 THEN
-        RETURN QUERY SELECT 0.2::DOUBLE PRECISION, 'Some activity'::TEXT, 'Author has some account activity'::TEXT;
+        RETURN QUERY SELECT 0.2::DOUBLE PRECISION, 'Returning user'::TEXT, 'Author has some account activity'::TEXT;
         RETURN;
     END IF;
 
-    RETURN QUERY SELECT 0.1::DOUBLE PRECISION, 'New account'::TEXT, 'Author has little account activity'::TEXT;
+    RETURN QUERY SELECT 0.1::DOUBLE PRECISION, 'New user'::TEXT, 'Author has little account activity'::TEXT;
 END;
 $$ LANGUAGE plpgsql;
 
