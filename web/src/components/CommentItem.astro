@@ -52,6 +52,8 @@ const {
 const user = Astro.locals.user
 const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
 const authorUnlocks = computeKarmaUnlocks(comment.author.totalKarma)
+const authorCommentCount = comment.author._count.comments
+const authorActivityText = `${authorCommentCount.toLocaleString()} ${authorCommentCount === 1 ? 'comment' : 'comments'}`
 
 function checkIsHighlightParent(c: CommentWithRepliesPopulated, highlight: number | null): boolean {
   if (!highlight) return false
@@ -204,7 +206,9 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
 
       {
         isNewUser && !comment.author.admin && !comment.author.moderator && (
-          <Tooltip text={`Joined ${formatDateShort(comment.author.createdAt, { hourPrecision: true })}`}>
+          <Tooltip
+            text={`Joined ${formatDateShort(comment.author.createdAt, { hourPrecision: true })}. ${authorActivityText}.`}
+          >
             <BadgeSmall icon="ri:user-add-fill" color="purple" text="New User" variant="faded" inlineIcon />
           </Tooltip>
         )
@@ -292,7 +296,10 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
 
     {
       shouldShowRatingTrustBadge && (
-        <Tooltip text={comment.ratingTrustReason ?? 'Review trust weight'} position="right">
+        <Tooltip
+          text={`${comment.ratingTrustReason ?? 'Review trust weight'}. Score influence: ${Math.round(comment.ratingWeight * 100).toLocaleString()}%.`}
+          position="right"
+        >
           <BadgeSmall
             icon={comment.ratingWeight >= 0.5 ? 'ri:shield-check-line' : 'ri:shield-flash-line'}
             color={comment.ratingWeight >= 0.5 ? 'lime' : 'yellow'}

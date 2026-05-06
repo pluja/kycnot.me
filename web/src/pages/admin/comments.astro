@@ -2,6 +2,7 @@
 import { z } from 'astro/zod'
 import { Icon } from 'astro-icon/components'
 
+import AdminCommentContext from '../../components/admin/comments/AdminCommentContext.astro'
 import BadgeSmall from '../../components/BadgeSmall.astro'
 import CommentModeration from '../../components/CommentModeration.astro'
 import MyPicture from '../../components/MyPicture.astro'
@@ -27,6 +28,8 @@ import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
 import { prisma } from '../../lib/prisma'
 import { urlWithParams } from '../../lib/urls'
 
+import type { CommentStatus, VerificationStatus } from '@prisma/client'
+
 const user = Astro.locals.user
 if (!user || (!user.admin && !user.moderator)) {
   return Astro.rewrite('/404')
@@ -50,11 +53,12 @@ const PRIORITY_PAGE_SIZE = 20
 const statusFilter = getCommentStatusFilterInfo(params.status)
 const sortBy = getAdminCommentSortOptionInfo(params['sort-by'])
 
-const listedServiceStatuses = ['APPROVED', 'VERIFICATION_SUCCESS'] as const
+const listedServiceStatuses = ['APPROVED', 'VERIFICATION_SUCCESS'] satisfies VerificationStatus[]
+const pendingCommentStatuses = ['PENDING', 'HUMAN_PENDING'] satisfies CommentStatus[]
 
 const priorityWhere = {
   ...statusFilter.whereClause,
-  status: { in: ['PENDING', 'HUMAN_PENDING'] as const },
+  status: { in: pendingCommentStatuses },
   service: { verificationStatus: { in: [...listedServiceStatuses] } },
 }
 
@@ -62,7 +66,7 @@ const regularWhere = {
   ...statusFilter.whereClause,
   NOT: {
     AND: [
-      { status: { in: ['PENDING', 'HUMAN_PENDING'] as const } },
+      { status: { in: pendingCommentStatuses } },
       { service: { verificationStatus: { in: [...listedServiceStatuses] } } },
     ],
   },
@@ -74,6 +78,16 @@ const commentInclude = {
       name: true,
       displayName: true,
       picture: true,
+      createdAt: true,
+      lastLoginAt: true,
+      totalKarma: true,
+      verified: true,
+      spammer: true,
+      _count: {
+        select: {
+          comments: true,
+        },
+      },
     },
   },
   service: {
@@ -298,6 +312,8 @@ const makePriorityPageUrl = (page: number) => {
                   </a>
                 </div>
 
+                <AdminCommentContext comment={comment} class="mb-4" />
+
                 {comment.parent && (
                   <div class="mb-4 border-l-2 border-zinc-700 pl-4">
                     <div class="mb-1 text-sm opacity-50">
@@ -520,6 +536,8 @@ const makePriorityPageUrl = (page: number) => {
                 Open
               </a>
             </div>
+
+            <AdminCommentContext comment={comment} class="mb-4" />
 
             {/* Parent Comment Context */}
             {comment.parent && (

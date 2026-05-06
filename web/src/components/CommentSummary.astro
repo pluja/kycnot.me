@@ -6,6 +6,8 @@ import { clamp, round, sum, sumBy } from 'lodash-es'
 import { cn } from '../lib/cn'
 import { prisma } from '../lib/prisma'
 
+import Tooltip from './Tooltip.astro'
+
 import type { HTMLAttributes } from 'astro/types'
 
 const MIN_TRUSTED_RATING_WEIGHT = 0.5
@@ -135,7 +137,14 @@ const trustWeightedUserRating =
       }
     </div>
     <div class="mt-1 text-sm text-zinc-400">
-      {trustWeightedUserRating !== null ? 'Trust weighted score' : 'Not enough trusted feedback yet'}
+      <Tooltip
+        as="span"
+        class="inline-flex items-center gap-1"
+        text="Calculated from reviews weighted by private proof, account activity, moderation status, and service affiliation. Low trust reviews have limited score impact."
+      >
+        {trustWeightedUserRating !== null ? 'Trust weighted score' : 'Not enough trusted feedback yet'}
+        <Icon name="ri:information-line" class="size-3.5" />
+      </Tooltip>
     </div>
     <div class="mt-0.5 text-xs text-zinc-500">
       {userRatingCount.toLocaleString()} ratings, {trustedUserRatingCount.toLocaleString()} trusted

@@ -44,6 +44,12 @@ const commentReplyQuery = {
         spammer: true,
         verifiedLink: true,
 
+        _count: {
+          select: {
+            comments: true,
+          },
+        },
+
         serviceAffiliations: {
           select: {
             role: true,

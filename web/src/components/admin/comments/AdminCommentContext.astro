@@ -1,0 +1,120 @@
+---
+import { differenceInDays } from 'date-fns'
+
+import BadgeSmall from '../../BadgeSmall.astro'
+import TimeFormatted from '../../TimeFormatted.astro'
+import Tooltip from '../../Tooltip.astro'
+
+import type { CommentStatus, OrderIdStatus } from '@prisma/client'
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = HTMLAttributes<'div'> & {
+  comment: {
+    rating: number | null
+    ratingActive: boolean
+    ratingWeight: number
+    ratingTrustLabel: string | null
+    ratingTrustReason: string | null
+    status: CommentStatus
+    suspicious: boolean
+    orderId: string | null
+    orderIdStatus: OrderIdStatus | null
+    author: {
+      createdAt: Date
+      lastLoginAt: Date
+      totalKarma: number
+      verified: boolean
+      spammer: boolean
+      _count: {
+        comments: number
+      }
+    }
+  }
+}
+
+const { comment, class: className, ...htmlProps } = Astro.props
+
+const accountAgeDays = differenceInDays(new Date(), comment.author.createdAt)
+const accountAgeLabel = accountAgeDays === 0 ? 'Created today' : `${accountAgeDays.toLocaleString()} days old`
+const commentCount = comment.author._count.comments
+const commentCountLabel = `${commentCount.toLocaleString()} ${commentCount === 1 ? 'comment' : 'comments'}`
+const ratingInfluence = Math.round(comment.ratingWeight * 100)
+const ratingCounts =
+  comment.rating !== null &&
+  !comment.suspicious &&
+  comment.ratingActive &&
+  (comment.status === 'APPROVED' || comment.status === 'VERIFIED') &&
+  comment.ratingWeight > 0
+---
+
+<div {...htmlProps} class:list={['flex flex-wrap items-center gap-1 text-xs', className]}>
+  <Tooltip text={`Created ${comment.author.createdAt.toLocaleString()}`}>
+    <BadgeSmall
+      icon="ri:user-line"
+      color={accountAgeDays < 7 ? 'purple' : 'gray'}
+      text={accountAgeLabel}
+      inlineIcon
+    />
+  </Tooltip>
+
+  <Tooltip text={`Last login ${comment.author.lastLoginAt.toLocaleString()}`}>
+    <BadgeSmall icon="ri:login-circle-line" color="gray" text="Last login" inlineIcon>
+      <TimeFormatted date={comment.author.lastLoginAt} hourPrecision />
+    </BadgeSmall>
+  </Tooltip>
+
+  <BadgeSmall icon="ri:sparkling-2-line" color={comment.author.totalKarma >= 25 ? 'lime' : 'gray'} inlineIcon>
+    {comment.author.totalKarma.toLocaleString()} karma
+  </BadgeSmall>
+
+  <BadgeSmall
+    icon="ri:chat-3-line"
+    color={commentCount <= 1 ? 'yellow' : 'gray'}
+    text={commentCountLabel}
+    inlineIcon
+  />
+
+  {
+    comment.author.verified && (
+      <BadgeSmall icon="ri:verified-badge-fill" color="cyan" text="Verified user" inlineIcon />
+    )
+  }
+  {comment.author.spammer && <BadgeSmall icon="ri:spam-2-fill" color="red" text="Spammer" inlineIcon />}
+
+  {
+    comment.rating !== null && (
+      <Tooltip text={comment.ratingTrustReason ?? 'Rating trust'}>
+        <BadgeSmall
+          icon={ratingCounts ? 'ri:star-fill' : 'ri:star-line'}
+          color={ratingCounts ? 'yellow' : 'gray'}
+          inlineIcon
+        >
+          {ratingCounts ? `${ratingInfluence.toLocaleString()}% rating influence` : 'Rating not counted'}
+        </BadgeSmall>
+      </Tooltip>
+    )
+  }
+
+  {
+    comment.ratingTrustLabel && comment.ratingTrustLabel !== 'Not counted' && (
+      <BadgeSmall icon="ri:shield-check-line" color="blue" text={comment.ratingTrustLabel} inlineIcon />
+    )
+  }
+
+  {
+    comment.orderId && (
+      <BadgeSmall
+        icon="ri:key-2-line"
+        color={
+          comment.orderIdStatus === 'APPROVED'
+            ? 'green'
+            : comment.orderIdStatus === 'REJECTED'
+              ? 'red'
+              : 'purple'
+        }
+        text={`Proof ${comment.orderIdStatus?.toLowerCase() ?? 'pending'}`}
+        inlineIcon
+      />
+    )
+  }
+</div>
