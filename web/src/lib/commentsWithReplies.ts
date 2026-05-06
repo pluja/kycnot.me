@@ -38,6 +38,7 @@ const commentReplyQuery = {
         admin: true,
         moderator: true,
         createdAt: true,
+        lastLoginAt: true,
         displayName: true,
         picture: true,
         totalKarma: true,

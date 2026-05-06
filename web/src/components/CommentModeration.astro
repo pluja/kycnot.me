@@ -3,6 +3,8 @@ import { Icon } from 'astro-icon/components'
 
 import { cn } from '../lib/cn'
 
+import AdminCommentContext from './admin/comments/AdminCommentContext.astro'
+
 import type { Prisma } from '@prisma/client'
 import type { HTMLAttributes } from 'astro/types'
 
@@ -25,6 +27,20 @@ type Props = HTMLAttributes<'div'> & {
       ratingWeight: true
       ratingTrustLabel: true
       ratingTrustReason: true
+      author: {
+        select: {
+          createdAt: true
+          lastLoginAt: true
+          totalKarma: true
+          verified: true
+          spammer: true
+          _count: {
+            select: {
+              comments: true
+            }
+          }
+        }
+      }
     }
   }>
 }
@@ -63,6 +79,8 @@ if (!user || (!user.admin && !user.moderator)) return null
   <div
     class="mt-2 hidden overflow-hidden rounded-md border border-night-500 bg-night-600 peer-checked:block peer-checked:p-2"
   >
+    <AdminCommentContext comment={comment} class="mb-2 border-b border-night-500 pb-2" />
+
     <div class="flex flex-wrap items-center gap-1 border-b border-night-500 pb-2">
       <button
         class={cn(
