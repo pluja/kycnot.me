@@ -17,7 +17,20 @@ import type { CommentStatus, Prisma } from '@prisma/client'
 const COMMENT_RATE_LIMIT_WINDOW_MINUTES = 2
 const MAX_COMMENTS_PER_WINDOW = 1
 const MAX_COMMENTS_PER_WINDOW_VERIFIED_USER = 10
+export const ROOT_COMMENT_ACCOUNT_AGE_HOURS = 24
+export const ROOT_COMMENT_ACCOUNT_AGE_BYPASS_KARMA = karmaUnlocksById.voteComments.karma
 export const COMMENT_ORDER_ID_MAX_LENGTH = 100
+
+function isRootCommentAgeGateExempt(user: {
+  admin: boolean
+  moderator: boolean
+  verified: boolean
+  totalKarma: number
+}) {
+  return (
+    user.admin || user.moderator || user.verified || user.totalKarma >= ROOT_COMMENT_ACCOUNT_AGE_BYPASS_KARMA
+  )
+}
 
 export const commentActions = {
   vote: defineProtectedAction({
@@ -149,6 +162,23 @@ export const commentActions = {
         location: `service with id ${input.serviceId.toString()}`,
         dontMarkAsSpammer: context.locals.user.admin,
       })
+
+      const isRootComment = !input.parentId
+      const hasPrivateProof = !!input.orderId?.trim()
+      const accountAgeMs = Date.now() - context.locals.user.createdAt.getTime()
+      const minimumAccountAgeMs = ROOT_COMMENT_ACCOUNT_AGE_HOURS * 60 * 60 * 1000
+
+      if (
+        isRootComment &&
+        !hasPrivateProof &&
+        !isRootCommentAgeGateExempt(context.locals.user) &&
+        accountAgeMs < minimumAccountAgeMs
+      ) {
+        throw new ActionError({
+          code: 'FORBIDDEN',
+          message: `New accounts can reply immediately, but reviews require a ${ROOT_COMMENT_ACCOUNT_AGE_HOURS.toLocaleString()} hour old account or private proof of being a customer.`,
+        })
+      }
 
       // --- Time Trap Validation Start ---
       try {

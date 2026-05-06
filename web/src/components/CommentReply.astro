@@ -2,7 +2,11 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
-import { COMMENT_ORDER_ID_MAX_LENGTH } from '../actions/comment'
+import {
+  COMMENT_ORDER_ID_MAX_LENGTH,
+  ROOT_COMMENT_ACCOUNT_AGE_BYPASS_KARMA,
+  ROOT_COMMENT_ACCOUNT_AGE_HOURS,
+} from '../actions/comment'
 import { cn } from '../lib/cn'
 import { makeLoginUrl } from '../lib/redirectUrls'
 import { siteOrigin } from '../lib/urls'
@@ -48,6 +52,16 @@ const MIN_COMMENT_LENGTH = parentId ? 10 : 30
 
 const user = Astro.locals.user
 const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
+const isRootComment = !parentId
+const rootCommentAccountAgeMs = ROOT_COMMENT_ACCOUNT_AGE_HOURS * 60 * 60 * 1000
+const rootCommentNeedsPrivateProof =
+  !!user &&
+  isRootComment &&
+  !user.admin &&
+  !user.moderator &&
+  !user.verified &&
+  user.totalKarma < ROOT_COMMENT_ACCOUNT_AGE_BYPASS_KARMA &&
+  Date.now() - user.createdAt.getTime() < rootCommentAccountAgeMs
 ---
 
 <form
@@ -85,6 +99,15 @@ const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
                 Commenting as: <UserBadge user={user} size="sm" class="text-green-400" />
               </span>
             </div>
+
+            {isRootComment && (
+              <div class="rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-200">
+                <Icon name="ri:information-line" class="mr-1 inline size-4 align-[-0.2em]" />
+                New accounts can reply immediately. Reviews require a{' '}
+                {ROOT_COMMENT_ACCOUNT_AGE_HOURS.toLocaleString()} hour old account or private proof of being a
+                customer.
+              </div>
+            )}
 
             <InputHoneypotTrap name="message" />
 
@@ -126,15 +149,15 @@ const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
                     </InputWrapper>
 
                     <InputText
-                      label="Order ID"
+                      label="Private proof"
                       name="orderId"
                       inputProps={{
                         maxlength: COMMENT_ORDER_ID_MAX_LENGTH,
-                        placeholder: 'Order ID / URL / Proof',
+                        placeholder: 'Order ID / URL / proof',
                         class: 'bg-night-800',
-                        required: strictCommentingEnabled,
+                        required: rootCommentNeedsPrivateProof ? true : (strictCommentingEnabled ?? false),
                       }}
-                      descriptionLabel="Only visible to admins, to verify your comment"
+                      descriptionLabel="Only visible to admins. Used to verify your review and bypass the new account review limit."
                       class="grow"
                     />
                   </div>
