@@ -91,17 +91,17 @@ BEGIN
         RETURN;
     END IF;
 
-    IF author_record."totalKarma" >= 20 THEN
-        RETURN QUERY SELECT 0.35::DOUBLE PRECISION, 'Some history'::TEXT, 'Author has account activity'::TEXT;
+    IF author_record."totalKarma" >= 10 THEN
+        RETURN QUERY SELECT 0.35::DOUBLE PRECISION, 'Active account'::TEXT, 'Author has account activity'::TEXT;
         RETURN;
     END IF;
 
     IF author_record."totalKarma" > 0 THEN
-        RETURN QUERY SELECT 0.2::DOUBLE PRECISION, 'Limited history'::TEXT, 'Author has limited account activity'::TEXT;
+        RETURN QUERY SELECT 0.2::DOUBLE PRECISION, 'Some activity'::TEXT, 'Author has some account activity'::TEXT;
         RETURN;
     END IF;
 
-    RETURN QUERY SELECT 0.1::DOUBLE PRECISION, 'Low trust'::TEXT, 'Author has little account history'::TEXT;
+    RETURN QUERY SELECT 0.1::DOUBLE PRECISION, 'New account'::TEXT, 'Author has little account activity'::TEXT;
 END;
 $$ LANGUAGE plpgsql;
 
