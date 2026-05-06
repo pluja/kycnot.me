@@ -172,7 +172,7 @@ export const commentActions = {
       if (isRootComment && !isRootCommentAgeGateExempt(context.locals.user) && !isOldEnoughForRootComment) {
         throw new ActionError({
           code: 'FORBIDDEN',
-          message: `New accounts can reply immediately, but reviews require a ${ROOT_COMMENT_ACCOUNT_AGE_HOURS.toLocaleString()} hour old account.`,
+          message: `You can only reply. You need to wait ${ROOT_COMMENT_ACCOUNT_AGE_HOURS.toLocaleString()} hours to add reviews.`,
         })
       }
 
