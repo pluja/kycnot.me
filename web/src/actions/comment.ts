@@ -469,6 +469,9 @@ export const commentActions = {
             break
           case 'order-id-status':
             updateData.orderIdStatus = input.value as 'APPROVED' | 'PENDING' | 'REJECTED' | 'WITHDRAWN'
+            if (input.value === 'APPROVED') {
+              updateData.status = 'VERIFIED'
+            }
             break
           case 'kyc-requested':
             updateData.kycRequested = !!input.value

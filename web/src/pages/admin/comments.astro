@@ -94,9 +94,7 @@ const commentInclude = {
 
 const commentOrderBy = [
   {
-    [sortBy.value]: sortBy.hasNulls
-      ? { sort: params['sort-order'], nulls: 'last' }
-      : params['sort-order'],
+    [sortBy.value]: sortBy.hasNulls ? { sort: params['sort-order'], nulls: 'last' } : params['sort-order'],
   },
   { id: 'asc' as const },
 ]
@@ -264,7 +262,11 @@ const makePriorityPageUrl = (page: number) => {
                   {comment.approvedAt && (
                     <>
                       <span class="text-xs text-zinc-500">•</span>
-                      <Tooltip as="span" class="inline-flex items-center gap-1 text-zinc-500" text="Approved at">
+                      <Tooltip
+                        as="span"
+                        class="inline-flex items-center gap-1 text-zinc-500"
+                        text="Approved at"
+                      >
                         <Icon name="ri:check-line" class="size-4" />
                         <TimeFormatted
                           date={comment.approvedAt}
@@ -328,7 +330,7 @@ const makePriorityPageUrl = (page: number) => {
 
                 {comment.orderId && (
                   <div class="mt-2">
-                    <div class="text-sm font-medium text-purple-500">Order ID</div>
+                    <div class="text-sm font-medium text-purple-500">Private proof</div>
                     <div class="flex items-center gap-2">
                       <p class="text-sm text-gray-300">{comment.orderId}</p>
                       {comment.orderIdStatus && (
@@ -373,7 +375,7 @@ const makePriorityPageUrl = (page: number) => {
           <div class="border-t border-amber-700/50 bg-amber-950/20 px-4 py-3">
             <div class="flex items-center justify-between">
               <div class="text-xs text-amber-200/80">
-                Showing {((priorityCurrentPage - 1) * PRIORITY_PAGE_SIZE) + 1} to{' '}
+                Showing {(priorityCurrentPage - 1) * PRIORITY_PAGE_SIZE + 1} to{' '}
                 {Math.min(priorityCurrentPage * PRIORITY_PAGE_SIZE, totalPriorityComments)} of{' '}
                 {totalPriorityComments} priority comments
               </div>
@@ -554,7 +556,7 @@ const makePriorityPageUrl = (page: number) => {
 
             {comment.orderId && (
               <div class="mt-2">
-                <div class="text-sm font-medium text-purple-500">Order ID</div>
+                <div class="text-sm font-medium text-purple-500">Private proof</div>
                 <div class="flex items-center gap-2">
                   <p class="text-sm text-gray-300">{comment.orderId}</p>
                   {comment.orderIdStatus && (

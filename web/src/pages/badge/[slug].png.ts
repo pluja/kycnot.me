@@ -98,7 +98,11 @@ async function readResponseBody(body: ReadableStream<Uint8Array> | null) {
   return result
 }
 
-async function cacheBadgeResponse(cacheKey: string, bodyStream: ReadableStream<Uint8Array> | null, headers: Headers) {
+async function cacheBadgeResponse(
+  cacheKey: string,
+  bodyStream: ReadableStream<Uint8Array> | null,
+  headers: Headers
+) {
   const body = await readResponseBody(bodyStream)
 
   badgeResponseCache.set(cacheKey, {
@@ -138,7 +142,7 @@ export const GET: APIRoute = async (context) => {
     select: {
       name: true,
       overallScore: true,
-      averageUserRating: true,
+      trustWeightedUserRating: true,
       verificationStatus: true,
       kycLevel: true,
     },
@@ -160,7 +164,7 @@ export const GET: APIRoute = async (context) => {
               ...baseProps,
               name: service.name,
               overallScore: service.overallScore,
-              averageUserRating: service.averageUserRating,
+              averageUserRating: service.trustWeightedUserRating,
               kycLevel: service.kycLevel,
               showScore,
               showRating,
@@ -173,7 +177,7 @@ export const GET: APIRoute = async (context) => {
               {
                 ...baseProps,
                 overallScore: service.overallScore,
-                averageUserRating: service.averageUserRating,
+                averageUserRating: service.trustWeightedUserRating,
                 kycLevel: service.kycLevel,
                 showScore,
                 showRating,

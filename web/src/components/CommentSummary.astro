@@ -8,22 +8,31 @@ import { prisma } from '../lib/prisma'
 
 import type { HTMLAttributes } from 'astro/types'
 
+const MIN_TRUSTED_RATING_WEIGHT = 0.5
+
 type Props = HTMLAttributes<'div'> & {
   serviceId: number
   itemReviewedId: string
   averageUserRating?: number | null
+  trustWeightedUserRating?: number | null
+  userRatingCount?: number
+  trustedUserRatingCount?: number
+  userRatingWeight?: number
 }
 
 const {
   serviceId,
   itemReviewedId,
   averageUserRating: averageUserRatingFromProps,
+  trustWeightedUserRating: trustWeightedUserRatingFromProps,
+  userRatingCount: userRatingCountFromProps,
+  trustedUserRatingCount: trustedUserRatingCountFromProps,
+  userRatingWeight: userRatingWeightFromProps,
   class: className,
   ...htmlProps
 } = Astro.props
 
-const ratingsFromDb = await prisma.comment.groupBy({
-  by: ['rating'],
+const ratingsFromDb = await prisma.comment.findMany({
   where: {
     serviceId,
     ratingActive: true,
@@ -32,19 +41,32 @@ const ratingsFromDb = await prisma.comment.groupBy({
     },
     parentId: null,
     suspicious: false,
+    rating: { not: null },
   },
-  _count: true,
+  select: {
+    rating: true,
+    ratingWeight: true,
+  },
 })
 
 const ratings = ([5, 4, 3, 2, 1] as const).map((rating) => ({
   rating,
-  count: ratingsFromDb.find((stat) => stat.rating === rating)?._count ?? 0,
+  count: ratingsFromDb.filter((stat) => stat.rating === rating).length,
 }))
 
-const totalComments = sumBy(ratings, 'count')
-
+const userRatingCountFromQuery = ratingsFromDb.length
+const trustedUserRatingCountFromQuery = ratingsFromDb.filter(
+  (stat) => stat.ratingWeight >= MIN_TRUSTED_RATING_WEIGHT
+).length
+const userRatingWeightFromQuery = sumBy(ratingsFromDb, 'ratingWeight')
 const averageUserRatingFromQuery =
-  totalComments > 0 ? sum(ratings.map((stat) => stat.rating * stat.count)) / totalComments : null
+  userRatingCountFromQuery > 0
+    ? sum(ratingsFromDb.map((stat) => stat.rating ?? 0)) / userRatingCountFromQuery
+    : null
+const trustWeightedUserRatingFromQuery =
+  userRatingWeightFromQuery >= MIN_TRUSTED_RATING_WEIGHT
+    ? sum(ratingsFromDb.map((stat) => (stat.rating ?? 0) * stat.ratingWeight)) / userRatingWeightFromQuery
+    : null
 
 if (averageUserRatingFromProps !== undefined) {
   const a = averageUserRatingFromQuery === null ? null : round(averageUserRatingFromQuery, 2)
@@ -56,37 +78,52 @@ if (averageUserRatingFromProps !== undefined) {
   }
 }
 
-const averageUserRating =
-  averageUserRatingFromProps === undefined ? averageUserRatingFromQuery : averageUserRatingFromProps
+if (trustWeightedUserRatingFromProps !== undefined) {
+  const a = trustWeightedUserRatingFromQuery === null ? null : round(trustWeightedUserRatingFromQuery, 2)
+  const b = trustWeightedUserRatingFromProps === null ? null : round(trustWeightedUserRatingFromProps, 2)
+  if (a !== b) {
+    console.error(
+      `The trustWeightedUserRating of the comments shown is different from the trustWeightedUserRating from the database. Service ID: ${serviceId} ratingUi: ${trustWeightedUserRatingFromQuery} ratingDb: ${trustWeightedUserRatingFromProps}`
+    )
+  }
+}
+
+const userRatingCount = userRatingCountFromProps ?? userRatingCountFromQuery
+const trustedUserRatingCount = trustedUserRatingCountFromProps ?? trustedUserRatingCountFromQuery
+const userRatingWeight = userRatingWeightFromProps ?? userRatingWeightFromQuery
+const trustWeightedUserRating =
+  userRatingWeight >= MIN_TRUSTED_RATING_WEIGHT
+    ? (trustWeightedUserRatingFromProps ?? trustWeightedUserRatingFromQuery)
+    : null
 ---
 
 <div {...htmlProps} class={cn('flex flex-wrap items-center justify-center gap-4', className)}>
   {
-    averageUserRating !== null && (
+    trustWeightedUserRating !== null && (
       <Schema
         item={{
           '@context': 'https://schema.org',
           '@type': 'AggregateRating',
           itemReviewed: { '@id': itemReviewedId },
-          ratingValue: round(averageUserRating, 1),
+          ratingValue: round(trustWeightedUserRating, 1),
           bestRating: 5,
           worstRating: 1,
-          ratingCount: totalComments,
+          ratingCount: userRatingCount,
         }}
       />
     )
   }
 
-  <div class="flex flex-col items-center">
+  <div class="flex flex-col items-center text-center">
     <div class="mb-1 text-5xl">
-      {averageUserRating !== null ? round(averageUserRating, 1).toLocaleString() : '-'}
+      {trustWeightedUserRating !== null ? round(trustWeightedUserRating, 1).toLocaleString() : '-'}
     </div>
     <div class="flex items-center space-x-1">
       {
         ([1, 2, 3, 4, 5] as const).map((rating) => (
           <div
             class="relative size-5"
-            style={`--percent: ${clamp((averageUserRating ?? 0) - (rating - 1), 0, 1) * 100}%`}
+            style={`--percent: ${clamp((trustWeightedUserRating ?? 0) - (rating - 1), 0, 1) * 100}%`}
           >
             <Icon name="ri:star-line" class="absolute inset-0 size-full text-zinc-500" />
             <Icon
@@ -98,14 +135,17 @@ const averageUserRating =
       }
     </div>
     <div class="mt-1 text-sm text-zinc-400">
-      {totalComments.toLocaleString()} ratings
+      {trustWeightedUserRating !== null ? 'Trust weighted score' : 'Not enough trusted feedback yet'}
+    </div>
+    <div class="mt-0.5 text-xs text-zinc-500">
+      {userRatingCount.toLocaleString()} ratings, {trustedUserRatingCount.toLocaleString()} trusted
     </div>
   </div>
 
   <div class="grid min-w-32 flex-1 grid-cols-[auto_1fr_auto] items-center gap-1">
     {
       ratings.map(({ rating, count }) => {
-        const percent = totalComments > 0 ? (count / totalComments) * 100 : null
+        const percent = userRatingCount > 0 ? (count / userRatingCount) * 100 : null
         return (
           <>
             <div class="text-center text-xs text-zinc-400" aria-label={`${rating} stars`}>

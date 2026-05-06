@@ -75,6 +75,7 @@ const displayServiceSelect = {
   registrationCountryCode: true,
   registeredCompanyName: true,
   averageUserRating: true,
+  trustWeightedUserRating: true,
   _count: {
     select: {
       comments: {

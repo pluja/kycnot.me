@@ -274,15 +274,25 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
           text="Not counting for the total"
           position="right"
           enabled={!isRatingActive}
-          class={cn(
-            'flex items-center gap-1',
-            isRatingActive ? 'text-yellow-400' : 'text-day-500'
-          )}
+          class={cn('flex items-center gap-1', isRatingActive ? 'text-yellow-400' : 'text-day-500')}
         >
           <Icon name={isRatingActive ? 'ri:star-fill' : 'ri:star-line'} class="size-3" />
           <span class={cn(!isRatingActive && 'line-through decoration-day-500/70')}>
             {comment.rating.toLocaleString()}/5
           </span>
+        </Tooltip>
+      )
+    }
+
+    {
+      comment.rating !== null && !comment.parentId && comment.ratingTrustLabel && (
+        <Tooltip text={comment.ratingTrustReason ?? 'Review trust weight'} position="right">
+          <BadgeSmall
+            icon={comment.ratingWeight >= 0.5 ? 'ri:shield-check-line' : 'ri:shield-flash-line'}
+            color={comment.ratingWeight >= 0.9 ? 'green' : comment.ratingWeight >= 0.5 ? 'lime' : 'yellow'}
+            text={comment.ratingTrustLabel}
+            inlineIcon
+          />
         </Tooltip>
       )
     }
@@ -337,7 +347,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
     {/* Service usage verification indicators */}
     {
       comment.orderId && comment.orderIdStatus === 'APPROVED' && (
-        <BadgeSmall icon="ri:verified-badge-fill" color="green" text="Valid order ID" inlineIcon />
+        <BadgeSmall icon="ri:verified-badge-fill" color="green" text="Verified customer" inlineIcon />
       )
     }
     {
@@ -418,7 +428,9 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
         <div class="flex items-center gap-1.5 border-l-2 border-purple-600 bg-purple-900/20 py-1 pl-2 text-xs">
           <Icon name="ri:key-2-line" class="size-3 shrink-0 text-purple-400" />
           <span class="font-medium text-purple-400">Order ID:</span>
-          <code class="rounded-sm bg-purple-950/50 px-1.5 py-0.5 font-mono text-purple-300 select-all">{comment.orderId}</code>
+          <code class="rounded-sm bg-purple-950/50 px-1.5 py-0.5 font-mono text-purple-300 select-all">
+            {comment.orderId}
+          </code>
         </div>
       </div>
     )

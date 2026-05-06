@@ -115,6 +115,10 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
           userSentiment: true,
           userSentimentAt: true,
           averageUserRating: true,
+          trustWeightedUserRating: true,
+          userRatingCount: true,
+          trustedUserRatingCount: true,
+          userRatingWeight: true,
           isRecentlyApproved: true,
           strictCommentingEnabled: true,
           commentSectionMessage: true,
@@ -657,8 +661,8 @@ const verificationStatusDate =
     serviceVisibilityInfo.value === 'HIDDEN' && (
       <div class="mb-3 rounded-lg border border-red-500/20 bg-red-900/40 px-3 py-2 text-sm text-red-300">
         <Icon name="ri:eye-off-line" class="me-1.5 inline-block size-4 align-[-0.15em] text-red-400" />
-        This service is <span class="font-bold">hidden</span>. It is not publicly visible and can only be
-        seen by admins and moderators.
+        This service is <span class="font-bold">hidden</span>. It is not publicly visible and can only be seen
+        by admins and moderators.
       </div>
     )
   }
@@ -1669,12 +1673,16 @@ const verificationStatusDate =
     <CommentSummary
       serviceId={service.id}
       averageUserRating={service.averageUserRating}
+      trustWeightedUserRating={service.trustWeightedUserRating}
+      userRatingCount={service.userRatingCount}
+      trustedUserRatingCount={service.trustedUserRatingCount}
+      userRatingWeight={service.userRatingWeight}
       class="grow [grid-area:rating]"
       itemReviewedId={itemReviewedId}
     />
 
     {
-      userSentiment && service.averageUserRating !== null && (
+      userSentiment && service.trustWeightedUserRating !== null && (
         <Schema
           item={
             {
@@ -1691,7 +1699,7 @@ const verificationStatusDate =
               },
               reviewRating: {
                 '@type': 'Rating',
-                ratingValue: service.averageUserRating,
+                ratingValue: service.trustWeightedUserRating,
                 worstRating: 1,
                 bestRating: 5,
               },

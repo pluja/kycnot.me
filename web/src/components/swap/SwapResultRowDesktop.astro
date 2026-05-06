@@ -43,7 +43,7 @@ const operatingSinceYear = service?.operatingSince ? service.operatingSince.getU
 const onionUrls = service?.onionUrls ?? []
 const i2pUrls = service?.i2pUrls ?? []
 const ratingsCount = service?._count.comments ?? 0
-const averageUserRating = service?.averageUserRating ?? null
+const averageUserRating = service?.trustWeightedUserRating ?? null
 const registrationCountry = service?.registrationCountryCode
   ? getCountryInfo(service.registrationCountryCode)
   : null

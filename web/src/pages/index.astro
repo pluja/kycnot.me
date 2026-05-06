@@ -165,7 +165,7 @@ const where = {
     ...(filters['user-rating'] > 0
       ? [
           {
-            averageUserRating: {
+            trustWeightedUserRating: {
               gte: filters['user-rating'],
             },
           } satisfies Prisma.ServiceWhereInput,
@@ -472,13 +472,13 @@ const showFiltersId = 'show-filters'
     {
       '@context': 'https://schema.org',
       '@type': 'WebSite',
-      'name': 'KYCnot.me',
-      'url': siteOrigin,
-      'potentialAction': {
+      name: 'KYCnot.me',
+      url: siteOrigin,
+      potentialAction: {
         '@type': 'SearchAction',
-        'target': {
+        target: {
           '@type': 'EntryPoint',
-          'urlTemplate': `${siteOrigin}/?q={search_term_string}`,
+          urlTemplate: `${siteOrigin}/?q={search_term_string}`,
         },
         'query-input': 'required name=search_term_string',
       },

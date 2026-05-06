@@ -22,6 +22,9 @@ type Props = HTMLAttributes<'div'> & {
       orderIdStatus: true
       rating: true
       ratingActive: true
+      ratingWeight: true
+      ratingTrustLabel: true
+      ratingTrustReason: true
     }
   }>
 }
@@ -191,6 +194,16 @@ if (!user || (!user.admin && !user.moderator)) return null
     </div>
 
     <div class="mt-2 space-y-1.5">
+      {
+        comment.rating && (
+          <div class="rounded-sm border border-night-500 bg-night-700 px-1.5 py-1 text-[10px] text-day-400">
+            <span class="font-medium text-day-300">Rating trust:</span>{' '}
+            {comment.ratingTrustLabel ?? 'Unknown'} · weight {comment.ratingWeight.toFixed(2)}
+            {comment.ratingTrustReason && <span> · {comment.ratingTrustReason}</span>}
+          </div>
+        )
+      }
+
       <div class="flex items-center gap-1.5">
         <span class="text-[10px] text-day-500">Community:</span>
         <input
@@ -234,7 +247,7 @@ if (!user || (!user.admin && !user.moderator)) return null
         comment.orderId && (
           <div class="mt-3 space-y-1.5 border-t border-night-500 pt-2">
             <div class="flex items-center gap-1.5">
-              <span class="text-[10px] text-day-500">Order ID:</span>
+              <span class="text-[10px] text-day-500">Private proof:</span>
               <div class="flex-1 rounded-sm bg-night-700 px-1.5 py-0.5 text-xs">{comment.orderId}</div>
             </div>
 
