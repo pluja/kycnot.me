@@ -35,12 +35,13 @@ type Props = {
 }
 
 const { service, categories, attributes, inputErrors, id = 'details' } = Astro.props
+const sectionHash = `#${id}`
 ---
 
 <FormSection title="Service Details" id={id}>
   <form
     method="POST"
-    action={actions.admin.service.update}
+    action={`${actions.admin.service.update}${sectionHash}`}
     class="space-y-6"
     enctype="multipart/form-data"
   >

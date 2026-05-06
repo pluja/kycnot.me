@@ -30,6 +30,7 @@ const { serviceId, events, createInputErrors, updateInputErrors, id = 'events' }
 
 const toLocalDateTime = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+const sectionHash = `#${id}`
 ---
 
 <FormSection title="Events" id={id}>
@@ -56,12 +57,7 @@ const toLocalDateTime = (date: Date) =>
                       icon={eventTypeInfo.icon}
                     />
                     {!event.visible && (
-                      <BadgeSmall
-                        text="Hidden"
-                        variant="faded"
-                        color="gray"
-                        icon="ri:eye-off-line"
-                      />
+                      <BadgeSmall text="Hidden" variant="faded" color="gray" icon="ri:eye-off-line" />
                     )}
                   </div>
                   <p class="text-sm text-pretty text-day-400">{event.content}</p>
@@ -81,7 +77,11 @@ const toLocalDateTime = (date: Date) =>
 
                 <Fragment slot="actions">
                   <Tooltip text={event.visible ? 'Hide' : 'Show'}>
-                    <form method="POST" action={actions.admin.event.toggle} class="contents">
+                    <form
+                      method="POST"
+                      action={`${actions.admin.event.toggle}${sectionHash}`}
+                      class="contents"
+                    >
                       <input type="hidden" name="eventId" value={event.id} />
                       <Button
                         type="submit"
@@ -94,7 +94,7 @@ const toLocalDateTime = (date: Date) =>
                     </form>
                   </Tooltip>
                   <EditToggleButton for={itemId} />
-                  <DeleteConfirmButton action={actions.admin.event.delete} id={itemId}>
+                  <DeleteConfirmButton action={`${actions.admin.event.delete}${sectionHash}`} id={itemId}>
                     <input type="hidden" name="eventId" value={event.id} />
                   </DeleteConfirmButton>
                 </Fragment>
@@ -102,7 +102,7 @@ const toLocalDateTime = (date: Date) =>
                 <Fragment slot="edit">
                   <form
                     method="POST"
-                    action={actions.admin.event.update}
+                    action={`${actions.admin.event.update}${sectionHash}`}
                     class="space-y-3"
                   >
                     <input type="hidden" name="eventId" value={event.id} />
@@ -189,15 +189,10 @@ const toLocalDateTime = (date: Date) =>
   </FormSubSection>
 
   <FormSubSection title="Add New Event">
-    <form method="POST" action={actions.admin.event.create} class="space-y-2">
+    <form method="POST" action={`${actions.admin.event.create}${sectionHash}`} class="space-y-2">
       <input type="hidden" name="serviceId" value={serviceId} />
 
-      <InputText
-        label="Title"
-        name="title"
-        inputProps={{ required: true }}
-        error={createInputErrors.title}
-      />
+      <InputText label="Title" name="title" inputProps={{ required: true }} error={createInputErrors.title} />
 
       <InputTextArea
         label="Content"

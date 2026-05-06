@@ -33,6 +33,7 @@ const {
   updateInputErrors,
   id = 'verification-steps',
 } = Astro.props
+const sectionHash = `#${id}`
 ---
 
 <FormSection title="Verification Steps" id={id}>
@@ -63,14 +64,15 @@ const {
                   {step.evidenceMd && (
                     <p class="mt-1 text-xs text-day-500 italic">Evidence provided (see edit form)</p>
                   )}
-                  <p class="text-xs text-day-500">
-                    Created: {new Date(step.createdAt).toLocaleDateString()}
-                  </p>
+                  <p class="text-xs text-day-500">Created: {new Date(step.createdAt).toLocaleDateString()}</p>
                 </Fragment>
 
                 <Fragment slot="actions">
                   <EditToggleButton for={itemId} />
-                  <DeleteConfirmButton action={actions.admin.verificationStep.delete} id={itemId}>
+                  <DeleteConfirmButton
+                    action={`${actions.admin.verificationStep.delete}${sectionHash}`}
+                    id={itemId}
+                  >
                     <input type="hidden" name="id" value={step.id} />
                   </DeleteConfirmButton>
                 </Fragment>
@@ -78,7 +80,7 @@ const {
                 <Fragment slot="edit">
                   <form
                     method="POST"
-                    action={actions.admin.verificationStep.update}
+                    action={`${actions.admin.verificationStep.update}${sectionHash}`}
                     class="space-y-3"
                   >
                     <input type="hidden" name="id" value={step.id} />
@@ -130,15 +132,10 @@ const {
   </FormSubSection>
 
   <FormSubSection title="Add New Verification Step">
-    <form method="POST" action={actions.admin.verificationStep.create} class="space-y-2">
+    <form method="POST" action={`${actions.admin.verificationStep.create}${sectionHash}`} class="space-y-2">
       <input type="hidden" name="serviceId" value={serviceId} />
 
-      <InputText
-        label="Title"
-        name="title"
-        inputProps={{ required: true }}
-        error={createInputErrors.title}
-      />
+      <InputText label="Title" name="title" inputProps={{ required: true }} error={createInputErrors.title} />
 
       <InputTextArea
         label="Description"

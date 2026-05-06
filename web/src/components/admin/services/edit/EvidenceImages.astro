@@ -19,6 +19,9 @@ type Props = {
 }
 
 const { serviceId, evidenceImages, addInputErrors, id = 'evidence-images' } = Astro.props
+const addImageSectionId = `${id}-add`
+const sectionHash = `#${id}`
+const addImageSectionHash = `#${addImageSectionId}`
 ---
 
 <FormSection title="Evidence Images" id={id}>
@@ -48,7 +51,7 @@ const { serviceId, evidenceImages, addInputErrors, id = 'evidence-images' } = As
               </button>
               <form
                 method="POST"
-                action={actions.admin.service.evidenceImage.delete}
+                action={`${actions.admin.service.evidenceImage.delete}${sectionHash}`}
                 class="absolute top-1 right-1"
               >
                 <input type="hidden" name="fileUrl" value={image.url} />
@@ -81,10 +84,10 @@ const { serviceId, evidenceImages, addInputErrors, id = 'evidence-images' } = As
       )
     }
   </FormSubSection>
-  <FormSubSection title="Add New Evidence Image">
+  <FormSubSection title="Add New Evidence Image" id={addImageSectionId}>
     <form
       method="POST"
-      action={actions.admin.service.evidenceImage.add}
+      action={`${actions.admin.service.evidenceImage.add}${addImageSectionHash}`}
       class="space-y-4"
       enctype="multipart/form-data"
     >

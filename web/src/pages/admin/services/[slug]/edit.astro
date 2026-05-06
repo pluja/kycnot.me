@@ -34,7 +34,7 @@ Astro.locals.banners.addIfSuccess(serviceResult, 'Service updated successfully')
 const serviceInputErrors = errorsOf(serviceResult)
 
 if (serviceResult && !serviceResult.error && slug !== serviceResult.data.service.slug) {
-  return Astro.redirect(`/admin/services/${serviceResult.data.service.slug}/edit`)
+  return Astro.redirect(`/admin/services/${serviceResult.data.service.slug}/edit#details`)
 }
 
 const eventCreateResult = Astro.getActionResult(actions.admin.event.create)

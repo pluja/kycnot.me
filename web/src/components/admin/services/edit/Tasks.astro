@@ -54,6 +54,7 @@ const lastScanFailed = !!scanJob?.error && !!scanJob.processedAt
 
 const proposedEdits = pendingSuggestion?.proposedEdits ?? null
 const currentUrl = `${Astro.url.pathname}${Astro.url.search}`
+const sectionHash = `#${id}`
 ---
 
 <FormSection title="Tasks" id={id}>
@@ -109,7 +110,7 @@ const currentUrl = `${Astro.url.pathname}${Astro.url.search}`
             )
           }
 
-          <form method="POST" action={actions.admin.service.deepScan.request}>
+          <form method="POST" action={`${actions.admin.service.deepScan.request}${sectionHash}`}>
             <input type="hidden" name="serviceId" value={service.id} />
             <button
               type="submit"
@@ -151,6 +152,7 @@ const currentUrl = `${Astro.url.pathname}${Astro.url.search}`
           attributes={attributes}
           title="Deep scan proposed edits"
           compactHeader
+          actionHash={sectionHash}
         />
       </FormSubSection>
     )

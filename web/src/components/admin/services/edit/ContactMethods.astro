@@ -21,15 +21,10 @@ type Props = {
   id?: string
 }
 
-const {
-  serviceId,
-  contactMethods,
-  addInputErrors,
-  updateInputErrors,
-  id = 'contact-methods',
-} = Astro.props
+const { serviceId, contactMethods, addInputErrors, updateInputErrors, id = 'contact-methods' } = Astro.props
 
 const acceptedTypesText = contactMethodUrlTypes.map((type) => type.labelPlural).join(', ')
+const sectionHash = `#${id}`
 ---
 
 <FormSection title="Contact Methods" id={id}>
@@ -59,7 +54,7 @@ const acceptedTypesText = contactMethodUrlTypes.map((type) => type.labelPlural).
                 <Fragment slot="actions">
                   <EditToggleButton for={itemId} />
                   <DeleteConfirmButton
-                    action={actions.admin.service.contactMethod.delete}
+                    action={`${actions.admin.service.contactMethod.delete}${sectionHash}`}
                     id={itemId}
                   >
                     <input type="hidden" name="id" value={method.id} />
@@ -69,7 +64,7 @@ const acceptedTypesText = contactMethodUrlTypes.map((type) => type.labelPlural).
                 <Fragment slot="edit">
                   <form
                     method="POST"
-                    action={actions.admin.service.contactMethod.update}
+                    action={`${actions.admin.service.contactMethod.update}${sectionHash}`}
                     class="space-y-3"
                   >
                     <input type="hidden" name="id" value={method.id} />
@@ -110,7 +105,7 @@ const acceptedTypesText = contactMethodUrlTypes.map((type) => type.labelPlural).
   </FormSubSection>
 
   <FormSubSection title="Add New Contact Method">
-    <form method="POST" action={actions.admin.service.contactMethod.add} class="space-y-2">
+    <form method="POST" action={`${actions.admin.service.contactMethod.add}${sectionHash}`} class="space-y-2">
       <input type="hidden" name="serviceId" value={serviceId} />
 
       <InputText

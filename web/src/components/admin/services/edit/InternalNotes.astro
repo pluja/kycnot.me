@@ -34,6 +34,7 @@ type Props = {
 }
 
 const { serviceId, notes, addInputErrors, id = 'internal-notes' } = Astro.props
+const sectionHash = `#${id}`
 ---
 
 <FormSection title="Internal Notes" id={id}>
@@ -66,7 +67,7 @@ const { serviceId, notes, addInputErrors, id = 'internal-notes' } = Astro.props
                 <Fragment slot="actions">
                   <EditToggleButton for={itemId} />
                   <DeleteConfirmButton
-                    action={actions.admin.service.internalNote.delete}
+                    action={`${actions.admin.service.internalNote.delete}${sectionHash}`}
                     id={itemId}
                   >
                     <input type="hidden" name="noteId" value={note.id} />
@@ -76,7 +77,7 @@ const { serviceId, notes, addInputErrors, id = 'internal-notes' } = Astro.props
                 <Fragment slot="edit">
                   <form
                     method="POST"
-                    action={actions.admin.service.internalNote.update}
+                    action={`${actions.admin.service.internalNote.update}${sectionHash}`}
                     data-astro-reload
                     class="space-y-4"
                   >
@@ -99,7 +100,7 @@ const { serviceId, notes, addInputErrors, id = 'internal-notes' } = Astro.props
   </FormSubSection>
 
   <FormSubSection title="Add New Note">
-    <form method="POST" action={actions.admin.service.internalNote.add} class="space-y-4">
+    <form method="POST" action={`${actions.admin.service.internalNote.add}${sectionHash}`} class="space-y-4">
       <input type="hidden" name="serviceId" value={serviceId} />
       <InputTextArea
         label="Note Content"
