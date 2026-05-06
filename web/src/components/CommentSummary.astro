@@ -1,13 +1,14 @@
 ---
 import { Icon } from 'astro-icon/components'
 import { Schema } from 'astro-seo-schema'
-import { clamp, round, sum, sumBy } from 'lodash-es'
+import { clamp, round, sum } from 'lodash-es'
 
 import { cn } from '../lib/cn'
 import { prisma } from '../lib/prisma'
 
 import Tooltip from './Tooltip.astro'
 
+import type { CommentStatus, Prisma } from '@prisma/client'
 import type { HTMLAttributes } from 'astro/types'
 
 const MIN_TRUSTED_RATING_WEIGHT = 0.5
@@ -34,40 +35,48 @@ const {
   ...htmlProps
 } = Astro.props
 
-const ratingsFromDb = await prisma.comment.findMany({
-  where: {
-    serviceId,
-    ratingActive: true,
-    status: {
-      in: ['APPROVED', 'VERIFIED'],
-    },
-    parentId: null,
-    suspicious: false,
-    rating: { not: null },
+const approvedCommentStatuses = ['APPROVED', 'VERIFIED'] satisfies CommentStatus[]
+const ratingWhere = {
+  serviceId,
+  ratingActive: true,
+  status: {
+    in: approvedCommentStatuses,
   },
-  select: {
-    rating: true,
+  parentId: null,
+  suspicious: false,
+  rating: { not: null },
+} satisfies Prisma.CommentWhereInput
+
+const ratingsFromDb = await prisma.comment.groupBy({
+  by: ['rating'],
+  where: ratingWhere,
+  _count: true,
+  _sum: {
     ratingWeight: true,
+  },
+})
+const trustedUserRatingCountFromQuery = await prisma.comment.count({
+  where: {
+    ...ratingWhere,
+    ratingWeight: { gte: MIN_TRUSTED_RATING_WEIGHT },
   },
 })
 
 const ratings = ([5, 4, 3, 2, 1] as const).map((rating) => ({
   rating,
-  count: ratingsFromDb.filter((stat) => stat.rating === rating).length,
+  count: ratingsFromDb.find((stat) => stat.rating === rating)?._count ?? 0,
+  weight: ratingsFromDb.find((stat) => stat.rating === rating)?._sum.ratingWeight ?? 0,
 }))
 
-const userRatingCountFromQuery = ratingsFromDb.length
-const trustedUserRatingCountFromQuery = ratingsFromDb.filter(
-  (stat) => stat.ratingWeight >= MIN_TRUSTED_RATING_WEIGHT
-).length
-const userRatingWeightFromQuery = sumBy(ratingsFromDb, 'ratingWeight')
+const userRatingCountFromQuery = sum(ratings.map((stat) => stat.count))
+const userRatingWeightFromQuery = sum(ratings.map((stat) => stat.weight))
 const averageUserRatingFromQuery =
   userRatingCountFromQuery > 0
-    ? sum(ratingsFromDb.map((stat) => stat.rating ?? 0)) / userRatingCountFromQuery
+    ? sum(ratings.map((stat) => stat.rating * stat.count)) / userRatingCountFromQuery
     : null
 const trustWeightedUserRatingFromQuery =
   userRatingWeightFromQuery >= MIN_TRUSTED_RATING_WEIGHT
-    ? sum(ratingsFromDb.map((stat) => (stat.rating ?? 0) * stat.ratingWeight)) / userRatingWeightFromQuery
+    ? sum(ratings.map((stat) => stat.rating * stat.weight)) / userRatingWeightFromQuery
     : null
 
 if (averageUserRatingFromProps !== undefined) {
