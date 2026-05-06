@@ -86,18 +86,18 @@ BEGIN
         RETURN;
     END IF;
 
-    IF author_record."totalKarma" >= 500 THEN
+    IF author_record."totalKarma" >= 150 THEN
         RETURN QUERY SELECT 0.8::DOUBLE PRECISION, 'Trusted user'::TEXT, 'Author has high karma'::TEXT;
         RETURN;
     END IF;
 
-    IF author_record."totalKarma" >= 10 THEN
-        RETURN QUERY SELECT 0.35::DOUBLE PRECISION, 'Active user'::TEXT, 'Author has account activity'::TEXT;
+    IF author_record."totalKarma" >= 25 THEN
+        RETURN QUERY SELECT 0.45::DOUBLE PRECISION, 'Active user'::TEXT, 'Author has account activity'::TEXT;
         RETURN;
     END IF;
 
-    IF author_record."totalKarma" > 0 THEN
-        RETURN QUERY SELECT 0.2::DOUBLE PRECISION, 'Returning user'::TEXT, 'Author has some account activity'::TEXT;
+    IF author_record."totalKarma" >= 5 THEN
+        RETURN QUERY SELECT 0.2::DOUBLE PRECISION, NULL::TEXT, 'Author has some account activity'::TEXT;
         RETURN;
     END IF;
 
