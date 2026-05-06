@@ -80,6 +80,12 @@ const isRatingActive =
   comment.ratingActive &&
   !comment.suspicious &&
   (comment.status === 'APPROVED' || comment.status === 'VERIFIED')
+const shouldShowRatingTrustBadge =
+  comment.rating !== null &&
+  !comment.parentId &&
+  !!comment.ratingTrustLabel &&
+  comment.ratingTrustLabel !== 'Not counted' &&
+  comment.ratingTrustLabel !== 'Verified customer'
 
 // Skip rendering if comment is not approved/verified and user is not the author or admin/moderator
 const shouldShow =
@@ -285,12 +291,12 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
     }
 
     {
-      comment.rating !== null && !comment.parentId && comment.ratingTrustLabel && (
+      shouldShowRatingTrustBadge && (
         <Tooltip text={comment.ratingTrustReason ?? 'Review trust weight'} position="right">
           <BadgeSmall
             icon={comment.ratingWeight >= 0.5 ? 'ri:shield-check-line' : 'ri:shield-flash-line'}
-            color={comment.ratingWeight >= 0.9 ? 'green' : comment.ratingWeight >= 0.5 ? 'lime' : 'yellow'}
-            text={comment.ratingTrustLabel}
+            color={comment.ratingWeight >= 0.5 ? 'lime' : 'yellow'}
+            text={comment.ratingTrustLabel ?? ''}
             inlineIcon
           />
         </Tooltip>
