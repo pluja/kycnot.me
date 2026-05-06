@@ -1,0 +1,130 @@
+---
+import { karmaUnlocksById } from '../constants/karmaUnlocks'
+import { getServiceUserRoleInfo } from '../constants/serviceUserRoles'
+import { computeKarmaUnlocks } from '../lib/karmaUnlocks'
+import { formatDateShort } from '../lib/timeAgo'
+
+import BadgeSmall from './BadgeSmall.astro'
+import Tooltip from './Tooltip.astro'
+
+import type { CommentWithRepliesPopulated } from '../lib/commentsWithReplies'
+
+type Props = {
+  comment: CommentWithRepliesPopulated
+  serviceSlug: string
+}
+
+const { comment, serviceSlug } = Astro.props
+const authorUnlocks = computeKarmaUnlocks(comment.author.totalKarma)
+const authorCommentCount = comment.author._count.comments
+const authorActivityText = `${authorCommentCount.toLocaleString()} ${authorCommentCount === 1 ? 'comment' : 'comments'}`
+
+const isNewUser =
+  new Date().getTime() - new Date(comment.author.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000
+const shouldShowNewUserAgeBadge = isNewUser && !comment.author.admin && !comment.author.moderator
+const isUserRatingTrustLabel = ['New user', 'Active user', 'Trusted user'].includes(
+  comment.ratingTrustLabel ?? ''
+)
+const shouldShowUserRatingTrustBadge =
+  comment.rating !== null &&
+  !comment.parentId &&
+  !!comment.ratingTrustLabel &&
+  isUserRatingTrustLabel &&
+  !comment.author.admin &&
+  !comment.author.moderator &&
+  !comment.author.verified
+---
+
+<div class="flex w-min grow flex-wrap items-center gap-1">
+  {
+    comment.author.admin && (
+      <BadgeSmall icon="ri:shield-star-fill" color="green" text="Admin" variant="faded" inlineIcon />
+    )
+  }
+  {
+    comment.author.moderator && !comment.author.admin && (
+      <BadgeSmall icon="ri:graduation-cap-fill" color="teal" text="Moderator" variant="faded" inlineIcon />
+    )
+  }
+
+  {
+    shouldShowNewUserAgeBadge && (
+      <Tooltip
+        text={`Joined ${formatDateShort(comment.author.createdAt, { hourPrecision: true })}. ${authorActivityText}.`}
+      >
+        <BadgeSmall icon="ri:user-add-fill" color="purple" text="New user" variant="faded" inlineIcon />
+      </Tooltip>
+    )
+  }
+  {
+    shouldShowUserRatingTrustBadge &&
+      comment.ratingTrustLabel === 'New user' &&
+      !shouldShowNewUserAgeBadge && (
+        <Tooltip text={`${comment.ratingTrustReason ?? 'New user'}. ${authorActivityText}.`}>
+          <BadgeSmall icon="ri:user-add-fill" color="purple" text="New user" variant="faded" inlineIcon />
+        </Tooltip>
+      )
+  }
+  {
+    shouldShowUserRatingTrustBadge && comment.ratingTrustLabel === 'Active user' && (
+      <Tooltip text={`${comment.ratingTrustReason ?? 'Active user'}. ${authorActivityText}.`}>
+        <BadgeSmall icon="ri:user-follow-line" color="lime" text="Active user" variant="faded" inlineIcon />
+      </Tooltip>
+    )
+  }
+  {
+    shouldShowUserRatingTrustBadge && comment.ratingTrustLabel === 'Trusted user' && (
+      <Tooltip text={`${comment.ratingTrustReason ?? 'Trusted user'}. ${authorActivityText}.`}>
+        <BadgeSmall icon="ri:shield-star-line" color="lime" text="Trusted user" variant="faded" inlineIcon />
+      </Tooltip>
+    )
+  }
+  {
+    authorUnlocks.highKarmaBadge && !comment.author.admin && !comment.author.moderator && (
+      <BadgeSmall
+        icon={karmaUnlocksById.highKarmaBadge.icon}
+        color="lime"
+        text="High Karma"
+        variant="faded"
+        inlineIcon
+      />
+    )
+  }
+  {
+    authorUnlocks.negativeKarmaBadge && !authorUnlocks.untrustedBadge && (
+      <BadgeSmall
+        icon={karmaUnlocksById.negativeKarmaBadge.icon}
+        color="orange"
+        text="Negative Karma"
+        variant="faded"
+        inlineIcon
+      />
+    )
+  }
+
+  {
+    (authorUnlocks.untrustedBadge || comment.author.spammer) && (
+      <BadgeSmall
+        icon={karmaUnlocksById.untrustedBadge.icon}
+        color="red"
+        text="Untrusted User"
+        variant="faded"
+        inlineIcon
+      />
+    )
+  }
+
+  {
+    comment.author.serviceAffiliations
+      .filter((affiliation) => affiliation.service.slug === serviceSlug)
+      .map((affiliation) => {
+        const roleInfo = getServiceUserRoleInfo(affiliation.role)
+        return (
+          <BadgeSmall icon={roleInfo.icon} color={roleInfo.color} variant="faded" inlineIcon>
+            {roleInfo.label} at{' '}
+            <a href={`/service/${affiliation.service.slug}`}>{affiliation.service.name}</a>
+          </BadgeSmall>
+        )
+      })
+  }
+</div>

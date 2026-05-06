@@ -4,19 +4,16 @@ import { Schema } from 'astro-seo-schema'
 import { actions } from 'astro:actions'
 
 import { commentStatusById } from '../constants/commentStatus'
-import { karmaUnlocksById } from '../constants/karmaUnlocks'
-import { getServiceUserRoleInfo } from '../constants/serviceUserRoles'
 import { cn } from '../lib/cn'
 import {
   makeCommentUrl,
   MAX_COMMENT_DEPTH,
   type CommentWithRepliesPopulated,
 } from '../lib/commentsWithReplies'
-import { computeKarmaUnlocks } from '../lib/karmaUnlocks'
-import { formatDateShort } from '../lib/timeAgo'
 import { absoluteSiteUrl, siteOrigin, urlDomain } from '../lib/urls'
 
 import BadgeSmall from './BadgeSmall.astro'
+import CommentAuthorBadges from './CommentAuthorBadges.astro'
 import CommentModeration from './CommentModeration.astro'
 import CommentReply from './CommentReply.astro'
 import Markdown from './Markdown.astro'
@@ -51,9 +48,6 @@ const {
 } = Astro.props
 const user = Astro.locals.user
 const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
-const authorUnlocks = computeKarmaUnlocks(comment.author.totalKarma)
-const authorCommentCount = comment.author._count.comments
-const authorActivityText = `${authorCommentCount.toLocaleString()} ${authorCommentCount === 1 ? 'comment' : 'comments'}`
 
 function checkIsHighlightParent(c: CommentWithRepliesPopulated, highlight: number | null): boolean {
   if (!highlight) return false
@@ -72,21 +66,9 @@ const isAdminOrModerator = !!user && (user.admin || user.moderator)
 const canSeeOrderId = isAdminOrModerator || viewerIsAffiliated
 const isAuthorOrPrivileged = isAuthor || isAdminOrModerator
 
-// Check if user is new (less than 1 week old)
-const isNewUser =
-  new Date().getTime() - new Date(comment.author.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000
-const shouldShowNewUserAgeBadge = isNewUser && !comment.author.admin && !comment.author.moderator
 const isUserRatingTrustLabel = ['New user', 'Active user', 'Trusted user'].includes(
   comment.ratingTrustLabel ?? ''
 )
-const shouldShowUserRatingTrustBadge =
-  comment.rating !== null &&
-  !comment.parentId &&
-  !!comment.ratingTrustLabel &&
-  isUserRatingTrustLabel &&
-  !comment.author.admin &&
-  !comment.author.moderator &&
-  !comment.author.verified
 
 const isRatingActive =
   comment.rating !== null &&
@@ -198,118 +180,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
       }
     </span>
 
-    {/* User badges - more compact but still with text */}
-    <div class="flex w-min grow flex-wrap items-center gap-1">
-      {
-        comment.author.admin && (
-          <BadgeSmall icon="ri:shield-star-fill" color="green" text="Admin" variant="faded" inlineIcon />
-        )
-      }
-      {
-        comment.author.moderator && !comment.author.admin && (
-          <BadgeSmall
-            icon="ri:graduation-cap-fill"
-            color="teal"
-            text="Moderator"
-            variant="faded"
-            inlineIcon
-          />
-        )
-      }
-
-      {
-        shouldShowNewUserAgeBadge && (
-          <Tooltip
-            text={`Joined ${formatDateShort(comment.author.createdAt, { hourPrecision: true })}. ${authorActivityText}.`}
-          >
-            <BadgeSmall icon="ri:user-add-fill" color="purple" text="New user" variant="faded" inlineIcon />
-          </Tooltip>
-        )
-      }
-      {
-        shouldShowUserRatingTrustBadge &&
-          comment.ratingTrustLabel === 'New user' &&
-          !shouldShowNewUserAgeBadge && (
-            <Tooltip text={`${comment.ratingTrustReason ?? 'New user'}. ${authorActivityText}.`}>
-              <BadgeSmall icon="ri:user-add-fill" color="purple" text="New user" variant="faded" inlineIcon />
-            </Tooltip>
-          )
-      }
-      {
-        shouldShowUserRatingTrustBadge && comment.ratingTrustLabel === 'Active user' && (
-          <Tooltip text={`${comment.ratingTrustReason ?? 'Active user'}. ${authorActivityText}.`}>
-            <BadgeSmall
-              icon="ri:user-follow-line"
-              color="lime"
-              text="Active user"
-              variant="faded"
-              inlineIcon
-            />
-          </Tooltip>
-        )
-      }
-      {
-        shouldShowUserRatingTrustBadge && comment.ratingTrustLabel === 'Trusted user' && (
-          <Tooltip text={`${comment.ratingTrustReason ?? 'Trusted user'}. ${authorActivityText}.`}>
-            <BadgeSmall
-              icon="ri:shield-star-line"
-              color="lime"
-              text="Trusted user"
-              variant="faded"
-              inlineIcon
-            />
-          </Tooltip>
-        )
-      }
-      {
-        authorUnlocks.highKarmaBadge && !comment.author.admin && !comment.author.moderator && (
-          <BadgeSmall
-            icon={karmaUnlocksById.highKarmaBadge.icon}
-            color="lime"
-            text="High Karma"
-            variant="faded"
-            inlineIcon
-          />
-        )
-      }
-      {
-        authorUnlocks.negativeKarmaBadge && !authorUnlocks.untrustedBadge && (
-          <BadgeSmall
-            icon={karmaUnlocksById.negativeKarmaBadge.icon}
-            color="orange"
-            text="Negative Karma"
-            variant="faded"
-            inlineIcon
-          />
-        )
-      }
-
-      {
-        (authorUnlocks.untrustedBadge || comment.author.spammer) && (
-          <BadgeSmall
-            icon={karmaUnlocksById.untrustedBadge.icon}
-            color="red"
-            text="Untrusted User"
-            variant="faded"
-            inlineIcon
-          />
-        )
-      }
-
-      {
-        comment.author.serviceAffiliations
-          .filter((affiliation) => affiliation.service.slug === serviceSlug)
-          .map((affiliation) => {
-            const roleInfo = getServiceUserRoleInfo(affiliation.role)
-            return (
-              <BadgeSmall icon={roleInfo.icon} color={roleInfo.color} variant="faded" inlineIcon>
-                {roleInfo.label} at
-                <a href={`/service/${affiliation.service.slug}`}>{affiliation.service.name}</a>
-              </BadgeSmall>
-            )
-          })
-      }
-    </div>
+    <CommentAuthorBadges comment={comment} serviceSlug={serviceSlug} />
   </div>
 
   <div class="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-zinc-400">
