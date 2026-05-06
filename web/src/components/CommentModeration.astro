@@ -31,13 +31,22 @@ type Props = HTMLAttributes<'div'> & {
 
 const { comment, class: className, ...divProps } = Astro.props
 
+const communityNotePresets = [
+  'Private proof was verified by KYCnot.me.',
+  'Private proof was not sufficient to verify this claim.',
+  'This comment is from a new account and has limited score impact.',
+  'The service disputes this claim.',
+  'This appears to be part of a coordinated review wave.',
+  'KYCnot.me could not independently verify this claim.',
+] as const
+
 const user = Astro.locals.user
 
 // Only render for admin/moderator users
 if (!user || (!user.admin && !user.moderator)) return null
 ---
 
-<div {...divProps} class={cn('text-xs', className)}>
+<div {...divProps} class={cn('text-xs', className)} data-comment-moderation>
   <input type="checkbox" id={`mod-toggle-${String(comment.id)}`} class="peer sr-only" />
   <label
     for={`mod-toggle-${String(comment.id)}`}
@@ -204,17 +213,33 @@ if (!user || (!user.admin && !user.moderator)) return null
         )
       }
 
-      <div class="flex items-center gap-1.5">
-        <span class="text-[10px] text-day-500">Community:</span>
-        <input
-          type="text"
-          placeholder="Public note..."
-          value={comment.communityNote}
-          class="flex-1 rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
-          data-action="community-note"
-          data-comment-id={comment.id}
-          data-user-id={user.id}
-        />
+      <div class="space-y-1.5">
+        <div class="flex items-center gap-1.5">
+          <span class="text-[10px] text-day-500">Community:</span>
+          <input
+            type="text"
+            placeholder="Public note..."
+            value={comment.communityNote}
+            class="flex-1 rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
+            data-action="community-note"
+            data-comment-id={comment.id}
+            data-user-id={user.id}
+          />
+        </div>
+        <div class="flex flex-wrap gap-1">
+          {
+            communityNotePresets.map((preset) => (
+              <button
+                type="button"
+                class="rounded-sm bg-night-700 px-1.5 py-0.5 text-[10px] text-day-400 transition-colors hover:bg-blue-500/20 hover:text-blue-300"
+                data-community-note-preset={preset}
+                data-comment-id={comment.id}
+              >
+                {preset}
+              </button>
+            ))
+          }
+        </div>
       </div>
 
       <div class="flex items-center gap-1.5">
@@ -411,6 +436,19 @@ if (!user || (!user.admin && !user.moderator)) return null
         } catch (error) {
           console.error('Error moderating comment:', error)
         }
+      })
+    })
+
+    document.querySelectorAll<HTMLButtonElement>('button[data-community-note-preset]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const preset = button.getAttribute('data-community-note-preset')
+        const moderationRoot = button.closest('[data-comment-moderation]')
+        const input = moderationRoot?.querySelector<HTMLInputElement>('input[data-action="community-note"]')
+
+        if (!preset || !input) return
+
+        input.value = preset
+        input.dispatchEvent(new Event('input', { bubbles: true }))
       })
     })
 
