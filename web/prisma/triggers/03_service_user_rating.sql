@@ -184,6 +184,30 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION refresh_user_comment_rating_trust()
 RETURNS TRIGGER AS $$
 BEGIN
+    IF OLD.spammer = NEW.spammer
+    AND OLD.verified = NEW.verified
+    AND OLD.admin = NEW.admin
+    AND OLD.moderator = NEW.moderator
+    AND (
+        CASE
+            WHEN OLD."totalKarma" <= -30 THEN -1
+            WHEN OLD."totalKarma" < 5 THEN 0
+            WHEN OLD."totalKarma" < 25 THEN 1
+            WHEN OLD."totalKarma" < 150 THEN 2
+            ELSE 3
+        END
+    ) = (
+        CASE
+            WHEN NEW."totalKarma" <= -30 THEN -1
+            WHEN NEW."totalKarma" < 5 THEN 0
+            WHEN NEW."totalKarma" < 25 THEN 1
+            WHEN NEW."totalKarma" < 150 THEN 2
+            ELSE 3
+        END
+    ) THEN
+        RETURN NEW;
+    END IF;
+
     UPDATE "Comment"
     SET "ratingWeight" = "ratingWeight"
     WHERE "authorId" = NEW.id AND rating IS NOT NULL;
@@ -224,7 +248,7 @@ CREATE TRIGGER comment_rating_trust_before_write_trigger
     EXECUTE FUNCTION set_comment_rating_trust_before_write();
 
 CREATE TRIGGER comment_average_rating_trigger
-    AFTER INSERT OR UPDATE OR DELETE
+    AFTER INSERT OR DELETE OR UPDATE OF rating, "ratingActive", status, suspicious, "parentId", "serviceId", "authorId", "orderIdStatus", "ratingWeight"
     ON "Comment"
     FOR EACH ROW
     EXECUTE FUNCTION calculate_average_rating();
