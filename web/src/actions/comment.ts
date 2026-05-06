@@ -164,19 +164,15 @@ export const commentActions = {
       })
 
       const isRootComment = !input.parentId
-      const hasPrivateProof = !!input.orderId?.trim()
-      const accountAgeMs = Date.now() - context.locals.user.createdAt.getTime()
+      const userCreatedAt = new Date(context.locals.user.createdAt)
+      const accountAgeMs = Date.now() - userCreatedAt.getTime()
       const minimumAccountAgeMs = ROOT_COMMENT_ACCOUNT_AGE_HOURS * 60 * 60 * 1000
+      const isOldEnoughForRootComment = Number.isFinite(accountAgeMs) && accountAgeMs >= minimumAccountAgeMs
 
-      if (
-        isRootComment &&
-        !hasPrivateProof &&
-        !isRootCommentAgeGateExempt(context.locals.user) &&
-        accountAgeMs < minimumAccountAgeMs
-      ) {
+      if (isRootComment && !isRootCommentAgeGateExempt(context.locals.user) && !isOldEnoughForRootComment) {
         throw new ActionError({
           code: 'FORBIDDEN',
-          message: `New accounts can reply immediately, but reviews require a ${ROOT_COMMENT_ACCOUNT_AGE_HOURS.toLocaleString()} hour old account or private proof of being a customer.`,
+          message: `New accounts can reply immediately, but reviews require a ${ROOT_COMMENT_ACCOUNT_AGE_HOURS.toLocaleString()} hour old account.`,
         })
       }
 

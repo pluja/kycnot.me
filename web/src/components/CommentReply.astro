@@ -54,14 +54,15 @@ const user = Astro.locals.user
 const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
 const isRootComment = !parentId
 const rootCommentAccountAgeMs = ROOT_COMMENT_ACCOUNT_AGE_HOURS * 60 * 60 * 1000
-const rootCommentNeedsPrivateProof =
+const userAccountAgeMs = user ? Date.now() - new Date(user.createdAt).getTime() : null
+const rootCommentBlockedByAccountAge =
   !!user &&
   isRootComment &&
   !user.admin &&
   !user.moderator &&
   !user.verified &&
   user.totalKarma < ROOT_COMMENT_ACCOUNT_AGE_BYPASS_KARMA &&
-  Date.now() - user.createdAt.getTime() < rootCommentAccountAgeMs
+  (!Number.isFinite(userAccountAgeMs) || (userAccountAgeMs ?? 0) < rootCommentAccountAgeMs)
 ---
 
 <form
@@ -91,6 +92,12 @@ const rootCommentNeedsPrivateProof =
             <Icon name="ri:forbid-line" class="mr-1 inline size-4 align-[-0.2em]" />
             You cannot comment due to low karma.
           </div>
+        ) : rootCommentBlockedByAccountAge ? (
+          <div class="rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-center text-sm text-blue-200">
+            <Icon name="ri:information-line" class="mr-1 inline size-4 align-[-0.2em]" />
+            New accounts can reply immediately. Reviews require a{' '}
+            {ROOT_COMMENT_ACCOUNT_AGE_HOURS.toLocaleString()} hour old account.
+          </div>
         ) : (
           <>
             <div class="flex items-center gap-2 text-xs text-day-400 peer-checked/use-form-secret-token:hidden">
@@ -99,15 +106,6 @@ const rootCommentNeedsPrivateProof =
                 Commenting as: <UserBadge user={user} size="sm" class="text-green-400" />
               </span>
             </div>
-
-            {isRootComment && (
-              <div class="rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-200">
-                <Icon name="ri:information-line" class="mr-1 inline size-4 align-[-0.2em]" />
-                New accounts can reply immediately. Reviews require a{' '}
-                {ROOT_COMMENT_ACCOUNT_AGE_HOURS.toLocaleString()} hour old account or private proof of being a
-                customer.
-              </div>
-            )}
 
             <InputHoneypotTrap name="message" />
 
@@ -155,9 +153,9 @@ const rootCommentNeedsPrivateProof =
                         maxlength: COMMENT_ORDER_ID_MAX_LENGTH,
                         placeholder: 'Order ID / URL / proof',
                         class: 'bg-night-800',
-                        required: rootCommentNeedsPrivateProof ? true : (strictCommentingEnabled ?? false),
+                        required: strictCommentingEnabled,
                       }}
-                      descriptionLabel="Only visible to admins. Used to verify your review and bypass the new account review limit."
+                      descriptionLabel="Only visible to admins. Used to verify your review."
                       class="grow"
                     />
                   </div>
