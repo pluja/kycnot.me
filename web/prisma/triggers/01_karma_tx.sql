@@ -69,7 +69,16 @@ DECLARE
     is_user_related_to_service BOOLEAN;
     is_user_admin_or_moderator BOOLEAN;
 BEGIN
-    IF OLD.status = 'PENDING' AND NEW.status = 'APPROVED' THEN
+    IF NEW.status = 'APPROVED'
+        AND OLD.status IS DISTINCT FROM 'APPROVED'
+        AND OLD.status IS DISTINCT FROM 'VERIFIED'
+        AND NOT EXISTS (
+            SELECT 1
+            FROM "KarmaTransaction" kt
+            WHERE kt."commentId" = NEW.id
+            AND kt.action = 'COMMENT_APPROVED'
+        )
+    THEN
         -- Check if the user is related to the service (e.g., owns/manages it)
         SELECT EXISTS(
             SELECT 1 FROM "ServiceUser" 

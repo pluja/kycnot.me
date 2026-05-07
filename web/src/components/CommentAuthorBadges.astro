@@ -22,7 +22,7 @@ const authorActivityText = `${authorCommentCount.toLocaleString()} ${authorComme
 const isNewUser =
   new Date().getTime() - new Date(comment.author.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000
 const shouldShowNewUserAgeBadge = isNewUser && !comment.author.admin && !comment.author.moderator
-const isUserRatingTrustLabel = ['New user', 'Active user', 'Trusted user'].includes(
+const isUserRatingTrustLabel = ['Limited history', 'Active user', 'Trusted user'].includes(
   comment.ratingTrustLabel ?? ''
 )
 const shouldShowUserRatingTrustBadge =
@@ -58,10 +58,16 @@ const shouldShowUserRatingTrustBadge =
   }
   {
     shouldShowUserRatingTrustBadge &&
-      comment.ratingTrustLabel === 'New user' &&
+      comment.ratingTrustLabel === 'Limited history' &&
       !shouldShowNewUserAgeBadge && (
-        <Tooltip text={`${comment.ratingTrustReason ?? 'New user'}. ${authorActivityText}.`}>
-          <BadgeSmall icon="ri:user-add-fill" color="purple" text="New user" variant="faded" inlineIcon />
+        <Tooltip text={`${comment.ratingTrustReason ?? 'Limited history'}. ${authorActivityText}.`}>
+          <BadgeSmall
+            icon="ri:user-search-line"
+            color="purple"
+            text="Limited history"
+            variant="faded"
+            inlineIcon
+          />
         </Tooltip>
       )
   }

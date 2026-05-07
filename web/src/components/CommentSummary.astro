@@ -11,7 +11,7 @@ import Tooltip from './Tooltip.astro'
 import type { CommentStatus, Prisma } from '@prisma/client'
 import type { HTMLAttributes } from 'astro/types'
 
-const MIN_TRUSTED_RATING_WEIGHT = 0.5
+const MIN_TRUSTED_RATING_WEIGHT = 0.45
 
 type Props = HTMLAttributes<'div'> & {
   serviceId: number

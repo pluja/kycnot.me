@@ -1,15 +1,108 @@
-DROP TRIGGER IF EXISTS comment_rating_trust_before_write_trigger ON "Comment";
-DROP TRIGGER IF EXISTS comment_average_rating_trigger ON "Comment";
-DROP TRIGGER IF EXISTS user_rating_trust_trigger ON "User";
-DROP TRIGGER IF EXISTS service_user_rating_trust_trigger ON "ServiceUser";
+CREATE OR REPLACE FUNCTION handle_comment_approval(
+    NEW RECORD,
+    OLD RECORD
+) RETURNS VOID AS $$
+DECLARE
+    is_user_related_to_service BOOLEAN;
+    is_user_admin_or_moderator BOOLEAN;
+BEGIN
+    IF NEW.status = 'APPROVED'
+        AND OLD.status IS DISTINCT FROM 'APPROVED'
+        AND OLD.status IS DISTINCT FROM 'VERIFIED'
+        AND NOT EXISTS (
+            SELECT 1
+            FROM "KarmaTransaction" kt
+            WHERE kt."commentId" = NEW.id
+            AND kt.action = 'COMMENT_APPROVED'
+        )
+    THEN
+        SELECT EXISTS(
+            SELECT 1 FROM "ServiceUser"
+            WHERE "userId" = NEW."authorId" AND "serviceId" = NEW."serviceId"
+        ) INTO is_user_related_to_service;
 
-DROP FUNCTION IF EXISTS calculate_comment_rating_trust(INT, BOOLEAN, BOOLEAN, INT, "CommentStatus", BOOLEAN, "OrderIdStatus", INT, INT);
-DROP FUNCTION IF EXISTS calculate_comment_rating_trust(INT, BOOLEAN, INT, "CommentStatus", BOOLEAN, "OrderIdStatus", INT, INT);
-DROP FUNCTION IF EXISTS set_comment_rating_trust_before_write();
-DROP FUNCTION IF EXISTS recalculate_service_user_rating(INT);
-DROP FUNCTION IF EXISTS calculate_average_rating();
-DROP FUNCTION IF EXISTS refresh_user_comment_rating_trust();
-DROP FUNCTION IF EXISTS refresh_service_user_comment_rating_trust();
+        SELECT (admin = true OR moderator = true)
+        FROM "User"
+        WHERE id = NEW."authorId"
+        INTO is_user_admin_or_moderator;
+
+        IF NOT is_user_related_to_service AND NOT COALESCE(is_user_admin_or_moderator, false) THEN
+            PERFORM insert_karma_transaction(
+                NEW."authorId",
+                1,
+                'COMMENT_APPROVED',
+                NEW.id,
+                format('Your comment #comment-%s in %s has been approved!',
+                    NEW.id,
+                    (SELECT name FROM "Service" WHERE id = NEW."serviceId"))
+            );
+            PERFORM update_user_karma(NEW."authorId", 1);
+        END IF;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+WITH missing_approval_karma AS (
+    SELECT
+        c.id AS "commentId",
+        c."authorId",
+        format('Your comment #comment-%s in %s has been approved!', c.id, s.name) AS description,
+        c."updatedAt" AS "createdAt"
+    FROM "Comment" c
+    JOIN "Service" s ON s.id = c."serviceId"
+    JOIN "User" u ON u.id = c."authorId"
+    WHERE c.status = 'APPROVED'
+    AND NOT u.admin
+    AND NOT u.moderator
+    AND NOT EXISTS (
+        SELECT 1
+        FROM "ServiceUser" su
+        WHERE su."userId" = c."authorId"
+        AND su."serviceId" = c."serviceId"
+    )
+    AND NOT EXISTS (
+        SELECT 1
+        FROM "KarmaTransaction" kt
+        WHERE kt."commentId" = c.id
+        AND kt.action = 'COMMENT_APPROVED'
+    )
+)
+INSERT INTO "KarmaTransaction" (
+    "userId",
+    points,
+    action,
+    "commentId",
+    description,
+    processed,
+    "createdAt"
+)
+SELECT
+    "authorId",
+    1,
+    'COMMENT_APPROVED'::"KarmaTransactionAction",
+    "commentId",
+    description,
+    true,
+    "createdAt"
+FROM missing_approval_karma;
+
+UPDATE "User" u
+SET "totalKarma" = COALESCE(t.points, 0)
+FROM (
+    SELECT "userId", SUM(points)::INT AS points
+    FROM "KarmaTransaction"
+    GROUP BY "userId"
+) t
+WHERE u.id = t."userId";
+
+UPDATE "User" u
+SET "totalKarma" = 0
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM "KarmaTransaction" kt
+    WHERE kt."userId" = u.id
+);
+
 
 CREATE OR REPLACE FUNCTION calculate_comment_rating_trust(
     p_rating INT,
@@ -177,113 +270,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION calculate_average_rating()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF TG_OP = 'DELETE' THEN
-        PERFORM recalculate_service_user_rating(OLD."serviceId");
-        RETURN OLD;
-    END IF;
-
-    IF TG_OP = 'UPDATE' AND OLD."serviceId" <> NEW."serviceId" THEN
-        PERFORM recalculate_service_user_rating(OLD."serviceId");
-    END IF;
-
-    PERFORM recalculate_service_user_rating(NEW."serviceId");
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION refresh_user_comment_rating_trust()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF OLD.spammer = NEW.spammer
-    AND OLD.verified = NEW.verified
-    AND OLD.admin = NEW.admin
-    AND OLD.moderator = NEW.moderator
-    AND (
-        CASE
-            WHEN OLD."totalKarma" <= -30 THEN -1
-            WHEN OLD."totalKarma" < 5 THEN 0
-            WHEN OLD."totalKarma" < 25 THEN 1
-            WHEN OLD."totalKarma" < 150 THEN 2
-            ELSE 3
-        END
-    ) = (
-        CASE
-            WHEN NEW."totalKarma" <= -30 THEN -1
-            WHEN NEW."totalKarma" < 5 THEN 0
-            WHEN NEW."totalKarma" < 25 THEN 1
-            WHEN NEW."totalKarma" < 150 THEN 2
-            ELSE 3
-        END
-    ) THEN
-        RETURN NEW;
-    END IF;
-
-    UPDATE "Comment"
-    SET "ratingWeight" = "ratingWeight"
-    WHERE "authorId" = NEW.id AND rating IS NOT NULL;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION refresh_service_user_comment_rating_trust()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF TG_OP = 'DELETE' THEN
-        UPDATE "Comment"
-        SET "ratingWeight" = "ratingWeight"
-        WHERE "authorId" = OLD."userId" AND "serviceId" = OLD."serviceId" AND rating IS NOT NULL;
-
-        RETURN OLD;
-    END IF;
-
-    IF TG_OP = 'UPDATE' AND (OLD."userId" <> NEW."userId" OR OLD."serviceId" <> NEW."serviceId") THEN
-        UPDATE "Comment"
-        SET "ratingWeight" = "ratingWeight"
-        WHERE "authorId" = OLD."userId" AND "serviceId" = OLD."serviceId" AND rating IS NOT NULL;
-    END IF;
-
-    UPDATE "Comment"
-    SET "ratingWeight" = "ratingWeight"
-    WHERE "authorId" = NEW."userId" AND "serviceId" = NEW."serviceId" AND rating IS NOT NULL;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER comment_rating_trust_before_write_trigger
-    BEFORE INSERT OR UPDATE
-    ON "Comment"
-    FOR EACH ROW
-    EXECUTE FUNCTION set_comment_rating_trust_before_write();
-
-CREATE TRIGGER comment_average_rating_trigger
-    AFTER INSERT OR DELETE OR UPDATE OF rating, "ratingActive", "ratingDisabledByModerator", status, suspicious, "parentId", "serviceId", "authorId", "orderIdStatus", "ratingWeight"
-    ON "Comment"
-    FOR EACH ROW
-    EXECUTE FUNCTION calculate_average_rating();
-
-CREATE TRIGGER user_rating_trust_trigger
-    AFTER UPDATE OF "totalKarma", spammer, verified, admin, moderator
-    ON "User"
-    FOR EACH ROW
-    WHEN (
-        OLD."totalKarma" <> NEW."totalKarma"
-        OR OLD.spammer <> NEW.spammer
-        OR OLD.verified <> NEW.verified
-        OR OLD.admin <> NEW.admin
-        OR OLD.moderator <> NEW.moderator
-    )
-    EXECUTE FUNCTION refresh_user_comment_rating_trust();
-
-CREATE TRIGGER service_user_rating_trust_trigger
-    AFTER INSERT OR UPDATE OR DELETE
-    ON "ServiceUser"
-    FOR EACH ROW
-    EXECUTE FUNCTION refresh_service_user_comment_rating_trust();
 
 UPDATE "Comment"
 SET "ratingWeight" = "ratingWeight"
