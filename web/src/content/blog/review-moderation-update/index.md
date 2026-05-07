@@ -26,7 +26,7 @@ User ratings are now trust weighted. A five star review from a long-time active 
 
 Reviews from established users count more. Verified reviews and reviews with approved private proof count more too. New accounts, low activity accounts, suspicious comments, and service-affiliated accounts have less influence. Some ratings, like spam comments, do not count at all.
 
-The comment can still stay visible. That part matters. A weak or disabled rating does not always mean the comment is useless. Sometimes it means the claim is hard to verify. Sometimes the user is new. Sometimes the account is related to the service. Readers can still look at the comment and decide what to do with it.
+The comment can still stay visible. That part matters. A weak or disabled rating does not always mean the comment is useless. Sometimes it means the claim is hard to verify. Sometimes the user is new. Sometimes the account is related to the service. Readers can still look at the comment and decide what to do with it. Each review shows its rating weight next to the stars.
 
 The score should be harder to manipulate than the comment section.
 
@@ -46,7 +46,7 @@ User badges now add simple context too. New account means the account was create
 
 ## New account limits
 
-New accounts can reply to other comments right away, but they need to wait before posting a new "root" review.
+New accounts can reply to other comments right away, but they need to wait before posting a new "root" review. For urgent reports, [contact us directly](/about#contact).
 
 This is a small delay, currently 24 hours, but I may reduce or increase it in the future. It is not meant to punish real users. It is there because throwaway accounts were being used too easily and too often. If someone only wants to create an account, drop a rating, and disappear, waiting a bit makes that less useful.
 

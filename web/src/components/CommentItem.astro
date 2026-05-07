@@ -65,6 +65,7 @@ const isAuthor = user?.id === comment.author.id
 const isAdminOrModerator = !!user && (user.admin || user.moderator)
 const canSeeOrderId = isAdminOrModerator || viewerIsAffiliated
 const isAuthorOrPrivileged = isAuthor || isAdminOrModerator
+const ratingWeightPercent = `${Math.round(comment.ratingWeight * 100).toLocaleString()}%`
 
 const isUserRatingTrustLabel = ['Active user', 'Trusted user'].includes(comment.ratingTrustLabel ?? '')
 
@@ -207,6 +208,15 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
           <span class={cn(!isRatingActive && 'line-through decoration-day-500/70')}>
             {comment.rating.toLocaleString()}/5
           </span>
+          <a
+            href="/about#trust-weighted-ratings"
+            class="inline-flex items-center gap-0.5 text-[10px] text-day-500 hover:text-day-300"
+            title={`Rating weight: ${ratingWeightPercent}`}
+            aria-label={`Rating weight: ${ratingWeightPercent}. Learn about trust weighted ratings.`}
+          >
+            <Icon name="ri:scales-3-line" class="size-3" />
+            {ratingWeightPercent}
+          </a>
         </Tooltip>
       )
     }

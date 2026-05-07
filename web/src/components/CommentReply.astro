@@ -96,7 +96,11 @@ const rootCommentBlockedByAccountAge =
           <div class="rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-center text-sm text-blue-200">
             <Icon name="ri:information-line" class="mr-1 inline size-4 align-[-0.2em]" />
             You can only reply. You need to wait {ROOT_COMMENT_ACCOUNT_AGE_HOURS.toLocaleString()} hours to
-            add reviews.
+            add reviews. For urgent reports,{' '}
+            <a href="/about#contact" class="underline hover:text-blue-100">
+              contact us directly
+            </a>
+            .
           </div>
         ) : (
           <>
