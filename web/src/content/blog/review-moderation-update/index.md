@@ -14,7 +14,9 @@ draft: false
 
 User feedback on KYCnot.me is important. Admin checks help, but users often see things first: frozen funds, surprise KYC, bad support, strange terms, good experiences too. That feedback is useful, and I want to keep it visible.
 
-The problem is obvious, as with any online review system: reviews are easy to abuse.
+The problem is obvious, as with any online review system: reviews are easy to abuse. Review sites are gamed all the time. Fake praise, fake complaints, brigades, angry customers, paid comments, competitor attacks, and service owners defending themselves all get mixed together.
+
+That makes reviews hard to handle fairly. Users should be able to warn others, and services should not be damaged by throwaway accounts or vague claims. We cannot pretend this is easy or perfectly solvable.
 
 Creating an account on KYCnot.me takes almost no effort. That is intentional. I do not want email verification, phone numbers, or anything that turns a privacy site into another identity gate. But easy accounts have a cost. Over time we have seen people create accounts to push a service, bury a complaint, attack a competitor, or win an argument in the comments.
 
@@ -28,7 +30,7 @@ Reviews from established users count more. Verified reviews and reviews with app
 
 The comment can still stay visible. That part matters. A weak or disabled rating does not always mean the comment is useless. Sometimes it means the claim is hard to verify. Sometimes the user is new. Sometimes the account is related to the service. Readers can still look at the comment and decide what to do with it. Each review shows its rating weight next to the stars.
 
-The score should be harder to manipulate than the comment section.
+The user rating should be harder to manipulate than the comment section. It also does not affect the main service score. The main score still comes from KYCnot.me service attributes and checks, because user reviews are useful context, but they are too easy to game to decide the service score.
 
 ## One user, one active rating
 
@@ -79,6 +81,8 @@ Ratings have an extra rule: the star rating should reflect your own experience w
 The old system treated most accepted ratings too equally. That was too easy to game.
 
 The new system keeps comments readable, keeps moderation transparent, and makes the final user rating less fragile. A single new account should not be able to move a score much. A handful of throwaway accounts should not decide whether a service looks safe.
+
+This is also why the user rating is separate from the main service score. Reviews can reveal real problems fast, but they are also the easiest part of the site to manipulate. They should inform readers, not quietly rewrite the service score.
 
 This will not catch everything. Human moderation still matters. Users still need to read the comments and do their own research.
 
