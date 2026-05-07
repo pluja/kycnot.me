@@ -931,7 +931,7 @@ const verificationStatusDate =
   }
 
   {
-    !!isSwapSupported && (
+    isSwapSupported && (
       <SwapCTA
         class="mt-4"
         heading="Compare rates"
@@ -1260,9 +1260,9 @@ const verificationStatusDate =
 
             <p class="mt-4 text-center text-xs text-day-400">
               Reviewed <TimeFormatted date={service.tosReviewAt} hourPrecision />
-              {service.tosUrls.length > 0 && 'from'}
+              {service.tosUrls.length > 0 && <span> from </span>}
               {service.tosUrls.map((url) => (
-                <a href={url} class="cursor-pointer hover:underline">
+                <a href={url} class="break-all hover:underline">
                   {urlDomain(url)}
                 </a>
               ))}
@@ -1279,9 +1279,9 @@ const verificationStatusDate =
             </p>
             <p class="mt-2 text-xs">
               Reviewed <TimeFormatted date={service.tosReviewAt} hourPrecision />
-              {service.tosUrls.length > 0 && 'from'}
+              {service.tosUrls.length > 0 && <span> from </span>}
               {service.tosUrls.map((url) => (
-                <a href={url} class="hover:underline">
+                <a href={url} class="break-all hover:underline">
                   {urlDomain(url)}
                 </a>
               ))}
@@ -1294,7 +1294,7 @@ const verificationStatusDate =
           {service.tosUrls.length > 0 && (
             <p class="mt-2 text-xs">
               {service.tosUrls.map((url) => (
-                <a href={url} class="hover:underline">
+                <a href={url} class="break-all hover:underline">
                   {urlDomain(url)}
                 </a>
               ))}
@@ -1308,7 +1308,7 @@ const verificationStatusDate =
         {service.tosUrls.length > 0 && (
           <p class="mt-2 text-xs">
             {service.tosUrls.map((url) => (
-              <a href={url} class="hover:underline">
+              <a href={url} class="break-all hover:underline">
                 {urlDomain(url)}
               </a>
             ))}

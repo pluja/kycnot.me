@@ -70,15 +70,20 @@ const getSortUrl = (sortOption: CommentSortOption) => {
 const user = Astro.locals.user
 const canSortByStatus = !!user && (user.admin || user.moderator)
 const activeSort = params.sort === 'status' && !canSortByStatus ? 'newest' : params.sort
-const sortOptions: { id: CommentSortOption; label: string; icon: string; adminOnly?: boolean }[] = [
+const sortOptions: {
+  id: CommentSortOption
+  label: string
+  accessibleLabel?: string
+  icon: string
+  adminOnly?: boolean
+}[] = [
   { id: 'newest', label: 'Newest', icon: 'ri:time-line' },
-  { id: 'upvotes', label: 'Helpful', icon: 'ri:arrow-up-line' },
-  { id: 'lowest-rating', label: 'Lowest rating', icon: 'ri:star-line' },
-  { id: 'highest-rating', label: 'Highest rating', icon: 'ri:star-fill' },
+  { id: 'upvotes', label: 'Upvoted', icon: 'ri:arrow-up-line' },
+  { id: 'lowest-rating', label: 'Lowest', accessibleLabel: 'Lowest rating', icon: 'ri:star-line' },
+  { id: 'highest-rating', label: 'Highest', accessibleLabel: 'Highest rating', icon: 'ri:star-fill' },
   { id: 'trusted', label: 'Trusted', icon: 'ri:shield-check-line' },
   { id: 'status', label: 'Status', icon: 'ri:filter-line', adminOnly: true },
 ]
-const visibleSortOptions = sortOptions.filter((option) => !option.adminOnly || canSortByStatus)
 
 const viewerIsAffiliated = user
   ? !!(await prisma.serviceUser.findUnique({
@@ -87,49 +92,63 @@ const viewerIsAffiliated = user
     }))
   : false
 
-const [dbComments, pendingCommentsCount, activeRatingComment] = await Astro.locals.banners.tryMany([
-  [
-    'Failed to fetch comments',
-    async () =>
-      await prisma.comment.findMany(
-        await makeCommentsNestedQuery({
-          depth: MAX_COMMENT_DEPTH,
-          user,
-          showPending: params.showPending,
-          serviceId: service.id,
-          sort: activeSort,
-          highlightedCommentId: params.comment,
-        })
-      ),
-    [],
-  ],
-  [
-    'Failed to count unmoderated comments',
-    async () =>
-      prisma.comment.count({
-        where: {
-          serviceId: service.id,
-          status: { in: ['PENDING', 'HUMAN_PENDING'] },
-        },
-      }),
-    0,
-  ],
-  [
-    "Failed to fetch user's service rating",
-    async () =>
-      user
-        ? await prisma.comment.findFirst({
-            where: { serviceId: service.id, authorId: user.id, ratingActive: true },
-            orderBy: { createdAt: 'desc' },
-            select: {
-              id: true,
-              rating: true,
-            },
+const [dbComments, pendingCommentsCount, activeRatingComment, upvotedRootCommentsCount] =
+  await Astro.locals.banners.tryMany([
+    [
+      'Failed to fetch comments',
+      async () =>
+        await prisma.comment.findMany(
+          await makeCommentsNestedQuery({
+            depth: MAX_COMMENT_DEPTH,
+            user,
+            showPending: params.showPending,
+            serviceId: service.id,
+            sort: activeSort,
+            highlightedCommentId: params.comment,
           })
-        : null,
-    null,
-  ],
-])
+        ),
+      [],
+    ],
+    [
+      'Failed to count unmoderated comments',
+      async () =>
+        prisma.comment.count({
+          where: {
+            serviceId: service.id,
+            status: { in: ['PENDING', 'HUMAN_PENDING'] },
+          },
+        }),
+      0,
+    ],
+    [
+      "Failed to fetch user's service rating",
+      async () =>
+        user
+          ? await prisma.comment.findFirst({
+              where: { serviceId: service.id, authorId: user.id, ratingActive: true },
+              orderBy: { createdAt: 'desc' },
+              select: {
+                id: true,
+                rating: true,
+              },
+            })
+          : null,
+      null,
+    ],
+    [
+      'Failed to count upvoted comments',
+      async () =>
+        prisma.comment.count({
+          where: {
+            serviceId: service.id,
+            parentId: null,
+            status: { in: ['APPROVED', 'VERIFIED'] },
+            upvotes: { gt: 0 },
+          },
+        }),
+      0,
+    ],
+  ])
 
 const notiPref = user
   ? await getOrCreateNotificationPreferences(user.id, {
@@ -143,6 +162,11 @@ const populateComment = (comment: CommentWithReplies): CommentWithRepliesPopulat
   replies: comment.replies?.map(populateComment),
 })
 const comments = dbComments.map(populateComment)
+const hasHelpfulSort = upvotedRootCommentsCount > 0
+const displayActiveSort = activeSort === 'upvotes' && !hasHelpfulSort ? 'newest' : activeSort
+const visibleSortOptions = sortOptions.filter(
+  (option) => (!option.adminOnly || canSortByStatus) && (option.id !== 'upvotes' || hasHelpfulSort)
+)
 
 function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
   const statusInfo = getCommentStatusInfo(comment.status)
@@ -209,9 +233,11 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
           visibleSortOptions.map((option) => (
             <a
               href={getSortUrl(option.id)}
+              aria-label={option.accessibleLabel ? `Sort comments by ${option.accessibleLabel}` : undefined}
+              title={option.accessibleLabel}
               class={cn([
                 'rounded-md px-2 py-1 text-sm',
-                activeSort === option.id
+                displayActiveSort === option.id
                   ? 'bg-blue-500/20 text-blue-400'
                   : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300',
               ])}
