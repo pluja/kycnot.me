@@ -84,7 +84,9 @@ export type CommentWithRepliesPopulated = CommentWithReplies<{
   isWatchingReplies: boolean
 }>
 
-export const commentSortSchema = z.enum(['newest', 'upvotes', 'status']).default('newest')
+export const commentSortSchema = z
+  .enum(['newest', 'upvotes', 'lowest-rating', 'highest-rating', 'trusted', 'status'])
+  .default('newest')
 export type CommentSortOption = z.infer<typeof commentSortSchema>
 
 export async function makeCommentsNestedQuery({
@@ -110,12 +112,26 @@ export async function makeCommentsNestedQuery({
 
   switch (sort) {
     case 'upvotes':
-      orderByClause.push({ upvotes: 'desc' })
+      orderByClause.push({ upvotes: 'desc' }, { createdAt: 'desc' })
+      break
+    case 'lowest-rating':
+      orderByClause.push({ rating: { sort: 'asc', nulls: 'last' } }, { createdAt: 'desc' })
+      break
+    case 'highest-rating':
+      orderByClause.push({ rating: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' })
+      break
+    case 'trusted':
+      orderByClause.push(
+        { ratingWeight: 'desc' },
+        { ratingActive: 'desc' },
+        { upvotes: 'desc' },
+        { createdAt: 'desc' }
+      )
       break
     case 'status':
-      orderByClause.push({ status: 'asc' }) // PENDING, APPROVED, VERIFIED, REJECTED
+      orderByClause.push({ status: 'asc' }, { createdAt: 'desc' })
       break
-    case 'newest': // Default
+    case 'newest':
     default:
       orderByClause.push({ createdAt: 'desc' })
       break

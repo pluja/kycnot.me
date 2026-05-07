@@ -40,6 +40,8 @@ Pending reviews do not replace the old rating yet. If your new review is rejecte
 
 This keeps review history without letting one person stack five ratings on the same service.
 
+The comment section also has better sorting now. You can still use newest first, which remains the default, but you can also sort by helpful comments, low ratings, high ratings, or trusted reviews.
+
 ## New account limits
 
 New accounts can reply to other comments right away, but they need to wait before posting a new "root" review.

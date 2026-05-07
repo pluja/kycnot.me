@@ -68,6 +68,17 @@ const getSortUrl = (sortOption: CommentSortOption) => {
 }
 
 const user = Astro.locals.user
+const canSortByStatus = !!user && (user.admin || user.moderator)
+const activeSort = params.sort === 'status' && !canSortByStatus ? 'newest' : params.sort
+const sortOptions: { id: CommentSortOption; label: string; icon: string; adminOnly?: boolean }[] = [
+  { id: 'newest', label: 'Newest', icon: 'ri:time-line' },
+  { id: 'upvotes', label: 'Helpful', icon: 'ri:arrow-up-line' },
+  { id: 'lowest-rating', label: 'Lowest rating', icon: 'ri:star-line' },
+  { id: 'highest-rating', label: 'Highest rating', icon: 'ri:star-fill' },
+  { id: 'trusted', label: 'Trusted', icon: 'ri:shield-check-line' },
+  { id: 'status', label: 'Status', icon: 'ri:filter-line', adminOnly: true },
+]
+const visibleSortOptions = sortOptions.filter((option) => !option.adminOnly || canSortByStatus)
 
 const viewerIsAffiliated = user
   ? !!(await prisma.serviceUser.findUnique({
@@ -86,7 +97,7 @@ const [dbComments, pendingCommentsCount, activeRatingComment] = await Astro.loca
           user,
           showPending: params.showPending,
           serviceId: service.id,
-          sort: params.sort,
+          sort: activeSort,
           highlightedCommentId: params.comment,
         })
       ),
@@ -193,46 +204,22 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
 
   <div class="mb-6 flex flex-wrap items-center justify-between gap-2">
     <div class="flex items-center">
-      <div class="flex items-center space-x-1">
-        <a
-          href={getSortUrl('newest')}
-          class={cn([
-            'rounded-md px-2 py-1 text-sm',
-            params.sort === 'newest'
-              ? 'bg-blue-500/20 text-blue-400'
-              : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300',
-          ])}
-        >
-          <Icon name="ri:time-line" class="mr-1 inline size-3.5" />
-          Newest
-        </a>
-        <a
-          href={getSortUrl('upvotes')}
-          class={cn([
-            'rounded-md px-2 py-1 text-sm',
-            params.sort === 'upvotes'
-              ? 'bg-blue-500/20 text-blue-400'
-              : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300',
-          ])}
-        >
-          <Icon name="ri:arrow-up-line" class="mr-1 inline size-3.5" />
-          Most Upvotes
-        </a>
+      <div class="flex flex-wrap items-center gap-1">
         {
-          user && (user.admin || user.moderator) && (
+          visibleSortOptions.map((option) => (
             <a
-              href={getSortUrl('status')}
+              href={getSortUrl(option.id)}
               class={cn([
                 'rounded-md px-2 py-1 text-sm',
-                params.sort === 'status'
+                activeSort === option.id
                   ? 'bg-blue-500/20 text-blue-400'
                   : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300',
               ])}
             >
-              <Icon name="ri:filter-line" class="mr-1 inline size-3.5" />
-              Status
+              <Icon name={option.icon} class="mr-1 inline size-3.5" />
+              {option.label}
             </a>
-          )
+          ))
         }
       </div>
     </div>
