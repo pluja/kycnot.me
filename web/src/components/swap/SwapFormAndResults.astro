@@ -86,6 +86,9 @@ const parseCompound = (v: string) => {
 }
 const fromOption = currencies.byValue.get(input.from) ?? parseCompound(input.from)
 const toOption = currencies.byValue.get(input.to) ?? parseCompound(input.to)
+const hasExplicitQuoteRequest =
+  Astro.request.headers.get('hx-request') === 'true' ||
+  ['from', 'to', 'sendAmount', 'receiveAmount'].some((key) => Astro.url.searchParams.has(key))
 
 const REQUEST_MAX_WAIT_MS = 6_000
 
@@ -102,6 +105,7 @@ const result = await Astro.locals.banners.try(
     // Bump only inside the success path; banners.try swallows gRPC errors
     // into a [] fallback that would otherwise inflate the counter.
     if (
+      hasExplicitQuoteRequest &&
       fromOption.value &&
       toOption.value &&
       (input.sendAmount !== undefined || input.receiveAmount !== undefined)

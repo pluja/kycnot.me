@@ -24,6 +24,22 @@ const isCountableNavigation = (request: Request): boolean => {
   return dest === null || dest === 'document'
 }
 
+const destinationHasReferral = (destination: string, referral: string | null): boolean => {
+  if (!referral) return false
+
+  try {
+    const referralParams = new URLSearchParams(referral.trim().replace(/^[?&]/, ''))
+    if (referralParams.size === 0) return false
+
+    const destinationParams = new URL(destination).searchParams
+    return [...referralParams.entries()].every(([key, value]) =>
+      destinationParams.getAll(key).includes(value)
+    )
+  } catch {
+    return false
+  }
+}
+
 export const GET: APIRoute = async ({ params, url, request }) => {
   const slug = params.slug ?? ''
   if (!SLUG_RE.test(slug)) return errorResponse(404)
@@ -34,9 +50,7 @@ export const GET: APIRoute = async ({ params, url, request }) => {
   })
   if (!service || service.serviceUrls.length === 0) return errorResponse(404)
 
-  const allowedHosts = service.serviceUrls
-    .map(normalizeHost)
-    .filter((host): host is string => host !== null)
+  const allowedHosts = service.serviceUrls.map(normalizeHost).filter((host): host is string => host !== null)
   if (allowedHosts.length === 0) return errorResponse(404)
 
   const destination = url.searchParams.get('to')
@@ -55,7 +69,9 @@ export const GET: APIRoute = async ({ params, url, request }) => {
       serviceId: service.id,
       fromCurrency: validPair ? fromRaw : undefined,
       toCurrency: validPair ? toRaw : undefined,
-      refCode: service.referral ?? undefined,
+      refCode: destinationHasReferral(destination, service.referral)
+        ? (service.referral ?? undefined)
+        : undefined,
     }).catch(() => null)
   }
 
