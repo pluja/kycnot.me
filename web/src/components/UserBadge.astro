@@ -46,15 +46,22 @@ const userBadge = tv({
   },
 })
 
+type UserBadgeUser = Prisma.UserGetPayload<{
+  select: {
+    name: true
+    displayName: true
+    picture: true
+  }
+}> & {
+  totalKarma?: number
+  _count?: {
+    comments?: number
+  }
+}
+
 type Props = O.Optional<HTMLAttributes<'a'>, 'href'> &
   VariantProps<typeof userBadge> & {
-    user: Prisma.UserGetPayload<{
-      select: {
-        name: true
-        displayName: true
-        picture: true
-      }
-    }>
+    user: UserBadgeUser
     classNames?: {
       image?: string
       text?: string
@@ -62,17 +69,33 @@ type Props = O.Optional<HTMLAttributes<'a'>, 'href'> &
     children?: never
   }
 
-const { user, href, class: className, size = 'sm', classNames, noLink = false, ...htmlProps } = Astro.props
+const {
+  user,
+  href,
+  class: className,
+  size = 'sm',
+  classNames,
+  noLink = false,
+  title,
+  ...htmlProps
+} = Astro.props
 const { base, image, text } = userBadge({ size, noLink })
 
 const imageClassName = image({ class: classNames?.image })
 const imageSizePx = getSizePxFromTailwindClasses(imageClassName, 16)
+
+const commentCount = user._count?.comments
+const userStatsTitle =
+  typeof commentCount === 'number' && typeof user.totalKarma === 'number'
+    ? `${commentCount.toLocaleString()} ${commentCount === 1 ? 'comment' : 'comments'}, ${user.totalKarma.toLocaleString()} karma`
+    : undefined
 
 const Tag = noLink ? 'span' : 'a'
 ---
 
 <Tag
   href={Tag === 'a' ? (href ?? `/u/${user.name}`) : undefined}
+  title={title ?? userStatsTitle}
   class={base({ class: className })}
   {...htmlProps}
 >
