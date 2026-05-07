@@ -113,7 +113,7 @@ BEGIN
         RETURN;
     END IF;
 
-    RETURN QUERY SELECT 0.1::DOUBLE PRECISION, 'Limited history'::TEXT, 'Author has little account activity'::TEXT;
+    RETURN QUERY SELECT 0.1::DOUBLE PRECISION, NULL::TEXT, 'Author has little account activity'::TEXT;
 END;
 $$ LANGUAGE plpgsql;
 

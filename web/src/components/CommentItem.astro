@@ -66,9 +66,7 @@ const isAdminOrModerator = !!user && (user.admin || user.moderator)
 const canSeeOrderId = isAdminOrModerator || viewerIsAffiliated
 const isAuthorOrPrivileged = isAuthor || isAdminOrModerator
 
-const isUserRatingTrustLabel = ['Limited history', 'Active user', 'Trusted user'].includes(
-  comment.ratingTrustLabel ?? ''
-)
+const isUserRatingTrustLabel = ['Active user', 'Trusted user'].includes(comment.ratingTrustLabel ?? '')
 
 const isRatingActive =
   comment.rating !== null &&
