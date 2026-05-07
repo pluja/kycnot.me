@@ -167,21 +167,19 @@ const rootCommentBlockedByAccountAge =
                         data-show-if-rating
                       >
                         <Icon name="ri:information-line" class="mr-1 inline size-3.5" />
+                        If approved, this replaces your previous
                         <a
                           href={`${siteOrigin}${Astro.url.pathname}#comment-${activeRatingComment.id}`}
                           class="inline-flex items-center gap-1 underline"
                           target="_blank"
                           rel="noopener"
                         >
-                          Your previous rating
+                          {activeRatingComment.rating.toLocaleString()}
+                          <Icon name="ri:star-fill" class="inline size-3 align-[-0.1em]" />
+                          rating
                           <Icon name="ri:external-link-line" class="inline size-2.5 align-[-0.1em]" />
                         </a>
-                        of
-                        {[
-                          activeRatingComment.rating.toLocaleString(),
-                          <Icon name="ri:star-fill" class="inline size-3 align-[-0.1em]" />,
-                        ]}
-                        won't count for the total.
+                        .
                       </div>
                     )}
 

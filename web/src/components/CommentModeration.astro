@@ -389,17 +389,8 @@ if (!user || (!user.admin && !user.moderator)) return null
 
           if (!error) {
             // Update button state based on new value
-            if (action === 'status') {
+            if (action === 'status' || action === 'suspicious' || action === 'toggle-rating-active') {
               window.location.reload()
-            } else if (action === 'suspicious') {
-              const span = btn.querySelector('span')
-              if (span) span.textContent = value === 'true' ? 'Not Spam' : 'Spam'
-              btn.classList.toggle('bg-yellow-500/20')
-              btn.classList.toggle('text-yellow-400')
-              btn.classList.toggle('border-yellow-500/30')
-              btn.classList.toggle('border')
-              btn.classList.toggle('bg-night-700')
-              btn.setAttribute('data-value', value === 'true' ? 'false' : 'true')
             } else if (action === 'requires-admin-review') {
               const span = btn.querySelector('span')
               if (span) span.textContent = value === 'true' ? 'No Admin Review' : 'Needs Admin Review'
@@ -427,15 +418,6 @@ if (!user || (!user.admin && !user.moderator)) return null
               btn.classList.toggle('bg-red-500/20')
               btn.classList.toggle('text-red-400')
               btn.classList.toggle('border-red-500/30')
-              btn.classList.toggle('border')
-              btn.classList.toggle('bg-night-700')
-              btn.setAttribute('data-value', value === 'true' ? 'false' : 'true')
-            } else if (action === 'toggle-rating-active') {
-              const span = btn.querySelector('span')
-              if (span) span.textContent = value === 'true' ? 'Disable Rating' : 'Enable Rating'
-              btn.classList.toggle('bg-blue-500/20')
-              btn.classList.toggle('text-blue-400')
-              btn.classList.toggle('border-blue-500/30')
               btn.classList.toggle('border')
               btn.classList.toggle('bg-night-700')
               btn.setAttribute('data-value', value === 'true' ? 'false' : 'true')

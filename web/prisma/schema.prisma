@@ -29,42 +29,43 @@ enum OrderIdStatus {
 }
 
 model Comment {
-  id                  Int                @id @default(autoincrement())
+  id                        Int                @id @default(autoincrement())
   /// Computed via trigger. Do not update through prisma.
-  upvotes             Int                @default(0)
-  status              CommentStatus      @default(PENDING)
-  suspicious          Boolean            @default(false)
-  requiresAdminReview Boolean            @default(false)
-  communityNote       String?
-  verificationNote    String?
-  internalNote        String?
-  privateContext      String?
-  orderId             String?            @db.VarChar(100)
-  orderIdStatus       OrderIdStatus?     @default(PENDING)
-  kycRequested        Boolean            @default(false)
-  fundsBlocked        Boolean            @default(false)
-  content             String
-  rating              Int?               @db.SmallInt
-  ratingActive        Boolean            @default(false)
+  upvotes                   Int                @default(0)
+  status                    CommentStatus      @default(PENDING)
+  suspicious                Boolean            @default(false)
+  requiresAdminReview       Boolean            @default(false)
+  communityNote             String?
+  verificationNote          String?
+  internalNote              String?
+  privateContext            String?
+  orderId                   String?            @db.VarChar(100)
+  orderIdStatus             OrderIdStatus?     @default(PENDING)
+  kycRequested              Boolean            @default(false)
+  fundsBlocked              Boolean            @default(false)
+  content                   String
+  rating                    Int?               @db.SmallInt
+  ratingActive              Boolean            @default(false)
+  ratingDisabledByModerator Boolean            @default(false)
   /// Computed via trigger. Do not update through prisma.
-  ratingWeight        Float              @default(0)
+  ratingWeight              Float              @default(0)
   /// Computed via trigger. Do not update through prisma.
-  ratingTrustLabel    String?
+  ratingTrustLabel          String?
   /// Computed via trigger. Do not update through prisma.
-  ratingTrustReason   String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @default(now()) @updatedAt
+  ratingTrustReason         String?
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @default(now()) @updatedAt
   /// Computed via trigger when the status is APPROVED or VERIFIED. Do not update through prisma.
-  approvedAt          DateTime?
-  author              User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  authorId            Int
-  service             Service            @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  serviceId           Int
-  parentId            Int?
-  parent              Comment?           @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies             Comment[]          @relation("CommentReplies")
-  karmaTransactions   KarmaTransaction[]
-  votes               CommentVote[]
+  approvedAt                DateTime?
+  author                    User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId                  Int
+  service                   Service            @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId                 Int
+  parentId                  Int?
+  parent                    Comment?           @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies                   Comment[]          @relation("CommentReplies")
+  karmaTransactions         KarmaTransaction[]
+  votes                     CommentVote[]
 
   notificationPreferenceswatchedComments NotificationPreferences[] @relation("watchedComments")
   Notification                           Notification[]
@@ -78,6 +79,7 @@ model Comment {
   @@index([upvotes])
   @@index([rating])
   @@index([ratingActive])
+  @@index([ratingDisabledByModerator])
   @@index([ratingWeight])
 }
 

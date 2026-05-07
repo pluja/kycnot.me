@@ -3,6 +3,7 @@ DROP TRIGGER IF EXISTS comment_average_rating_trigger ON "Comment";
 DROP TRIGGER IF EXISTS user_rating_trust_trigger ON "User";
 DROP TRIGGER IF EXISTS service_user_rating_trust_trigger ON "ServiceUser";
 
+DROP FUNCTION IF EXISTS calculate_comment_rating_trust(INT, BOOLEAN, BOOLEAN, INT, "CommentStatus", BOOLEAN, "OrderIdStatus", INT, INT);
 DROP FUNCTION IF EXISTS calculate_comment_rating_trust(INT, BOOLEAN, INT, "CommentStatus", BOOLEAN, "OrderIdStatus", INT, INT);
 DROP FUNCTION IF EXISTS set_comment_rating_trust_before_write();
 DROP FUNCTION IF EXISTS recalculate_service_user_rating(INT);
@@ -13,6 +14,7 @@ DROP FUNCTION IF EXISTS refresh_service_user_comment_rating_trust();
 CREATE OR REPLACE FUNCTION calculate_comment_rating_trust(
     p_rating INT,
     p_rating_active BOOLEAN,
+    p_rating_disabled_by_moderator BOOLEAN,
     p_parent_id INT,
     p_status "CommentStatus",
     p_suspicious BOOLEAN,
@@ -25,8 +27,13 @@ DECLARE
     author_record RECORD;
     is_service_affiliated BOOLEAN;
 BEGIN
-    IF p_rating IS NULL OR p_parent_id IS NOT NULL OR p_rating_active IS NOT TRUE THEN
+    IF p_rating IS NULL OR p_parent_id IS NOT NULL THEN
         RETURN QUERY SELECT 0::DOUBLE PRECISION, 'Not counted'::TEXT, 'No active root rating'::TEXT;
+        RETURN;
+    END IF;
+
+    IF p_rating_disabled_by_moderator IS TRUE THEN
+        RETURN QUERY SELECT 0::DOUBLE PRECISION, 'Not counted'::TEXT, 'Rating was disabled by a moderator'::TEXT;
         RETURN;
     END IF;
 
@@ -37,6 +44,11 @@ BEGIN
 
     IF p_status NOT IN ('APPROVED'::"CommentStatus", 'VERIFIED'::"CommentStatus") THEN
         RETURN QUERY SELECT 0::DOUBLE PRECISION, 'Not counted'::TEXT, 'Comment is not approved'::TEXT;
+        RETURN;
+    END IF;
+
+    IF p_rating_active IS NOT TRUE THEN
+        RETURN QUERY SELECT 0::DOUBLE PRECISION, 'Not counted'::TEXT, 'Older rating replaced by a newer review'::TEXT;
         RETURN;
     END IF;
 
@@ -113,6 +125,7 @@ BEGIN
     FROM calculate_comment_rating_trust(
         NEW.rating,
         NEW."ratingActive",
+        NEW."ratingDisabledByModerator",
         NEW."parentId",
         NEW.status,
         NEW.suspicious,
@@ -248,7 +261,7 @@ CREATE TRIGGER comment_rating_trust_before_write_trigger
     EXECUTE FUNCTION set_comment_rating_trust_before_write();
 
 CREATE TRIGGER comment_average_rating_trigger
-    AFTER INSERT OR DELETE OR UPDATE OF rating, "ratingActive", status, suspicious, "parentId", "serviceId", "authorId", "orderIdStatus", "ratingWeight"
+    AFTER INSERT OR DELETE OR UPDATE OF rating, "ratingActive", "ratingDisabledByModerator", status, suspicious, "parentId", "serviceId", "authorId", "orderIdStatus", "ratingWeight"
     ON "Comment"
     FOR EACH ROW
     EXECUTE FUNCTION calculate_average_rating();

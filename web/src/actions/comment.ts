@@ -21,6 +21,82 @@ export const ROOT_COMMENT_ACCOUNT_AGE_HOURS = 24
 export const ROOT_COMMENT_ACCOUNT_AGE_BYPASS_KARMA = karmaUnlocksById.voteComments.karma
 export const COMMENT_ORDER_ID_MAX_LENGTH = 100
 
+const activeRatingStatuses = ['APPROVED', 'VERIFIED'] satisfies CommentStatus[]
+
+type RefreshActiveRatingOptions = {
+  preferredCommentId?: number
+}
+
+type CommentRatingTransaction = Pick<typeof prisma, 'comment'>
+
+function isActiveRatingStatus(status: CommentStatus) {
+  return status === 'APPROVED' || status === 'VERIFIED'
+}
+
+async function refreshActiveRatingForUserService(
+  tx: CommentRatingTransaction,
+  authorId: number,
+  serviceId: number,
+  options: RefreshActiveRatingOptions = {}
+) {
+  const activeRatingWhere = {
+    authorId,
+    serviceId,
+    rating: { not: null },
+    parentId: null,
+    status: { in: activeRatingStatuses },
+    suspicious: false,
+    ratingDisabledByModerator: false,
+  } satisfies Prisma.CommentWhereInput
+
+  const preferredRating = options.preferredCommentId
+    ? await tx.comment.findFirst({
+        where: {
+          ...activeRatingWhere,
+          id: options.preferredCommentId,
+        },
+        select: {
+          id: true,
+          ratingActive: true,
+        },
+      })
+    : null
+
+  const ratingToActivate =
+    preferredRating ??
+    (await tx.comment.findFirst({
+      where: activeRatingWhere,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: {
+        id: true,
+        ratingActive: true,
+      },
+    }))
+
+  await tx.comment.updateMany({
+    where: {
+      authorId,
+      serviceId,
+      rating: { not: null },
+      parentId: null,
+      ratingActive: true,
+      ...(ratingToActivate ? { id: { not: ratingToActivate.id } } : {}),
+    },
+    data: {
+      ratingActive: false,
+    },
+  })
+
+  if (ratingToActivate && !ratingToActivate.ratingActive) {
+    await tx.comment.update({
+      where: { id: ratingToActivate.id },
+      data: {
+        ratingActive: true,
+      },
+    })
+  }
+}
+
 function isRootCommentAgeGateExempt(user: {
   admin: boolean
   moderator: boolean
@@ -273,20 +349,6 @@ export const commentActions = {
 
       try {
         await prisma.$transaction(async (tx) => {
-          // First deactivate any existing ratings if providing a new rating
-          if (input.rating) {
-            await tx.comment.updateMany({
-              where: {
-                serviceId: input.serviceId,
-                authorId: context.locals.user.id,
-                rating: { not: null },
-              },
-              data: {
-                ratingActive: false,
-              },
-            })
-          }
-
           // Check for existing orderId for this service if provided
           if (input.orderId?.trim()) {
             const existingOrderId = await tx.comment.findFirst({
@@ -317,6 +379,13 @@ export const commentActions = {
             },
           }))
 
+          const commentStatus: CommentStatus =
+            context.locals.user.admin || context.locals.user.moderator || isRelatedToService
+              ? 'APPROVED'
+              : isIssueReport
+                ? 'HUMAN_PENDING'
+                : 'PENDING'
+
           // Prepare data object with proper type safety
           const commentData: Prisma.CommentCreateInput = {
             content: input.content,
@@ -324,12 +393,7 @@ export const commentActions = {
             author: { connect: { id: context.locals.user.id } },
 
             // Change status to HUMAN_PENDING if there's an issue report, this is so that the AI worker does not pick it up for review
-            status:
-              context.locals.user.admin || context.locals.user.moderator || isRelatedToService
-                ? 'APPROVED'
-                : isIssueReport
-                  ? 'HUMAN_PENDING'
-                  : 'PENDING',
+            status: commentStatus,
             requiresAdminReview,
             orderId: input.orderId?.trim() ?? null,
             kycRequested: input.issueKycRequested === true,
@@ -342,7 +406,7 @@ export const commentActions = {
 
           if (input.rating) {
             commentData.rating = input.rating
-            commentData.ratingActive = true
+            commentData.ratingActive = false
           }
 
           if (formattedInternalNote) {
@@ -366,6 +430,10 @@ export const commentActions = {
                 watchedComments: { connect: { id: newComment.id } },
               },
             })
+          }
+
+          if (input.rating && isActiveRatingStatus(commentStatus)) {
+            await refreshActiveRatingForUserService(tx, context.locals.user.id, input.serviceId)
           }
         })
 
@@ -414,7 +482,6 @@ export const commentActions = {
             id: true,
             rating: true,
             serviceId: true,
-            createdAt: true,
             authorId: true,
           },
         })
@@ -432,25 +499,9 @@ export const commentActions = {
           case 'status':
             updateData.status = input.value as CommentStatus
             break
-          case 'suspicious': {
-            const isSpam = !!input.value
-            updateData.suspicious = isSpam
-            updateData.ratingActive = false
-
-            if (!isSpam && comment.rating) {
-              const newestRatingOrActiveRating = await prisma.comment.findFirst({
-                where: {
-                  serviceId: comment.serviceId,
-                  authorId: comment.authorId,
-                  id: { not: input.commentId },
-                  rating: { not: null },
-                  OR: [{ createdAt: { gt: comment.createdAt } }, { ratingActive: true }],
-                },
-              })
-              updateData.ratingActive = !newestRatingOrActiveRating
-            }
+          case 'suspicious':
+            updateData.suspicious = !!input.value
             break
-          }
           case 'requires-admin-review':
             updateData.requiresAdminReview = !!input.value
             break
@@ -476,14 +527,30 @@ export const commentActions = {
             updateData.fundsBlocked = !!input.value
             break
           case 'toggle-rating-active':
-            updateData.ratingActive = !!input.value
+            updateData.ratingDisabledByModerator = !input.value
             break
         }
 
-        // Update the comment
-        await prisma.comment.update({
-          where: { id: input.commentId },
-          data: updateData,
+        const shouldRefreshActiveRating =
+          comment.rating !== null &&
+          (input.action === 'status' ||
+            input.action === 'suspicious' ||
+            input.action === 'order-id-status' ||
+            input.action === 'toggle-rating-active')
+        const preferredCommentId =
+          input.action === 'toggle-rating-active' && input.value === true ? input.commentId : undefined
+
+        await prisma.$transaction(async (tx) => {
+          await tx.comment.update({
+            where: { id: input.commentId },
+            data: updateData,
+          })
+
+          if (shouldRefreshActiveRating) {
+            await refreshActiveRatingForUserService(tx, comment.authorId, comment.serviceId, {
+              preferredCommentId,
+            })
+          }
         })
 
         return { success: true }
