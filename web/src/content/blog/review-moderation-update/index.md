@@ -42,6 +42,8 @@ This keeps review history without letting one person stack five ratings on the s
 
 The comment section also has better sorting now. Newest remains the default. You can also sort by Upvoted, Lowest, Highest, or Trusted. Upvoted appears only when comments have upvotes. Trusted sorts by review trust weight.
 
+User badges now add simple context too. New account means the account was created recently. Single review means the user has only made that comment. Active user and Trusted user are based on account activity.
+
 ## New account limits
 
 New accounts can reply to other comments right away, but they need to wait before posting a new "root" review.
