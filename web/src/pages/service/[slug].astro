@@ -128,6 +128,10 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
               label: true,
             },
           },
+          affiliatedUsers: {
+            where: { userId: user?.id ?? -1 },
+            select: { id: true },
+          },
           attributes: {
             select: {
               attribute: {
@@ -402,6 +406,10 @@ const statusInfo = getVerificationStatusInfo(service.verificationStatus)
 
 const hasRequestedVerification =
   !!user && service.verificationRequests.some((request) => request.userId === user.id)
+const canEmbedServiceBadge =
+  isEmbeddableBadgeStatus(service.verificationStatus) &&
+  !!user &&
+  (user.admin || service.affiliatedUsers.length > 0)
 
 const VerificationRequestElement = user ? 'button' : 'a'
 
@@ -466,7 +474,7 @@ const serviceFactsSummary = [
 ]
   .filter((sentence): sentence is string => !!sentence)
   .join(' ')
-const serviceDescriptionWithFacts = `${serviceFactsSummary} ${service.description}`.trim()
+const serviceSummary = transformCase(serviceFactsSummary, 'first-upper')
 
 const ogImageTemplateData = {
   template: 'service',
@@ -732,24 +740,44 @@ const verificationStatusDate =
         <MyPicture
           src={service.imageUrl}
           alt={service.name || "Service's logo"}
-          class="size-12 shrink-0 rounded-sm object-contain"
-          width={48}
-          height={48}
+          class="size-16 shrink-0 rounded-sm object-contain"
+          width={64}
+          height={64}
         />
       )
     }
-    <h1 class="flex-1 font-title text-2xl/tight font-bold tracking-wider text-white">
-      {service.name}{
-        !!statusIcon && (
-          <Tooltip text={statusIcon.label} position="right">
-            <Icon
-              name={statusIcon.icon}
-              class={cn('ms-2 box-content inline-block size-6 shrink-0 pb-0.5', statusIcon.classNames.icon)}
-            />
-          </Tooltip>
-        )
-      }
-    </h1>
+
+    <div class="flex min-w-0 flex-1 flex-col gap-2">
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <h1 class="font-title text-2xl/tight font-bold tracking-wider text-white">
+          {service.name}{
+            !!statusIcon && (
+              <Tooltip text={statusIcon.label} position="right">
+                <Icon
+                  name={statusIcon.icon}
+                  class={cn('ms-2 box-content inline-block size-6 shrink-0 pb-0.5', statusIcon.classNames.icon)}
+                />
+              </Tooltip>
+            )
+          }
+        </h1>
+
+        <ul class="flex flex-wrap gap-2" aria-label="Categories">
+          <li class="contents">
+            {
+              service.categories.map((category) => (
+                <BadgeStandard
+                  as="a"
+                  href={urlWithParams(new URL('/', Astro.url), { categories: [category.slug] })}
+                  icon={category.icon}
+                  text={category.name}
+                />
+              ))
+            }
+          </li>
+        </ul>
+      </div>
+    </div>
 
     <div class="flex items-center justify-center gap-2 sm:gap-4">
       {
@@ -889,59 +917,28 @@ const verificationStatusDate =
     </div>
   </div>
 
-  <div
-    class={cn('mt-2 flex flex-row items-start gap-2', {
-      'flex-col-reverse items-center xs:flex-row xs:items-start': service.categories.length >= 3,
-    })}
-    aria-label="Categories"
-  >
-    <ul
-      class={cn('flex flex-1 flex-wrap justify-start gap-2', {
-        'justify-center xs:justify-start': service.categories.length >= 3,
-      })}
-      aria-label="Categories"
-    >
-      <li class="contents">
-        {
-          service.categories.map((category) => (
-            <BadgeStandard
-              as="a"
-              href={urlWithParams(new URL('/', Astro.url), { categories: [category.slug] })}
-              icon={category.icon}
-              text={category.name}
+  <div class="mt-0 flex justify-end px-1 py-0">
+    {
+      currencies.map((currency) => {
+        const isAccepted = service.acceptedCurrencies.includes(currency.id)
+
+        return (
+          <Tooltip text={currency.name}>
+            <Icon
+              name={currency.icon}
+              class={cn('box-content size-4 p-1 text-day-600', {
+                'text-white': isAccepted,
+              })}
             />
-          ))
-        }
-      </li>
-    </ul>
-
-    <div class="flex px-1 py-0.5">
-      {
-        currencies.map((currency) => {
-          const isAccepted = service.acceptedCurrencies.includes(currency.id)
-
-          return (
-            <Tooltip text={currency.name}>
-              <Icon
-                name={currency.icon}
-                class={cn('box-content size-4 p-1 text-day-600', {
-                  'text-white': isAccepted,
-                })}
-              />
-            </Tooltip>
-          )
-        })
-      }
-    </div>
-  </div>
-
-  <div class="prose prose-sm mt-2 text-pretty text-day-400 prose-invert">
-    <Markdown content={serviceDescriptionWithFacts} />
+          </Tooltip>
+        )
+      })
+    }
   </div>
 
   {
     shownLinks.length + hiddenLinks.length > 0 && (
-      <ul aria-label="Service links" class="mt-4 flex flex-wrap justify-center gap-2 xs:justify-start">
+      <ul aria-label="Service links" class="mt-1 flex flex-wrap justify-center gap-2 xs:justify-start">
         {shownLinks.map((url) => (
           <li>
             <ServiceLinkButton
@@ -984,6 +981,19 @@ const verificationStatusDate =
       </ul>
     )
   }
+
+  <div class="prose prose-sm mt-4 text-pretty text-day-400 prose-invert">
+    <Markdown content={service.description} />
+    {
+      serviceSummary && (
+        <p class="!mt-4 text-day-500">
+          <span aria-hidden="true" class="font-bold tracking-wide text-day-600 uppercase">Summary</span>
+          <span aria-hidden="true" class="mx-1 font-bold text-day-600">•</span>
+          {serviceSummary}
+        </p>
+      )
+    }
+  </div>
 
   {
     isSwapSupported && (
@@ -1829,15 +1839,17 @@ const verificationStatusDate =
     </div>
   </div>
   {
-    isEmbeddableBadgeStatus(service.verificationStatus) && (
-      <a
-        href={`/service/${service.slug}/badge`}
-        class="mb-12 flex items-center gap-3 rounded-lg border border-day-500/10 bg-night-800/50 px-4 py-3 text-sm font-medium text-day-300 transition-colors hover:border-day-500/25 hover:text-day-100"
-      >
-        <Icon name="ri:code-s-slash-line" class="size-4 shrink-0" />
-        <span>Embed badge on your site</span>
-        <Icon name="ri:arrow-right-s-line" class="ml-auto size-4 shrink-0 text-day-500" />
-      </a>
+    canEmbedServiceBadge && (
+      <div class="mt-8 mb-12 flex justify-center">
+        <a
+          href={`/service/${service.slug}/badge`}
+          class="inline-flex items-center gap-2 rounded-md border border-day-500/10 px-3 py-1.5 text-xs text-day-500 transition-colors hover:border-day-500/20 hover:text-day-300"
+        >
+          <Icon name="ri:code-s-slash-line" class="size-3.5 shrink-0" />
+          <span>Embed badge on your site</span>
+          <Icon name="ri:arrow-right-s-line" class="size-3.5 shrink-0" />
+        </a>
+      </div>
     )
   }
   <CommentSection itemReviewedId={itemReviewedId} service={service} />
