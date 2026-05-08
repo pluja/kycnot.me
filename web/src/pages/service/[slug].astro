@@ -405,15 +405,68 @@ const hasRequestedVerification =
 
 const VerificationRequestElement = user ? 'button' : 'a'
 
-const itemReviewedId = absoluteSiteUrl(`/service/${service.slug}`)
+const pageUrl = absoluteSiteUrl(`/service/${service.slug}`)
+const webPageId = `${pageUrl}#webpage`
+const itemReviewedId = `${pageUrl}#service`
 
 const primaryCategoryName = service.categories[0]?.name
-const seoPageTitle = `${service.name}: review, KYC level & privacy score`
-const seoDescription =
-  service.description ||
-  (primaryCategoryName
-    ? `${service.name} review on KYCnot.me. Privacy score, KYC level, supported currencies, and user feedback for this ${primaryCategoryName.toLowerCase()} service.`
-    : `${service.name} review on KYCnot.me. Privacy score, KYC level, supported currencies, and user feedback.`)
+const kycTitlePhrase = kycLevelInfo.value === 0 ? 'No-KYC' : `KYC Level ${kycLevelInfo.value}`
+const categoryTitlePhrase = primaryCategoryName ? ` ${primaryCategoryName}` : ''
+const pageTitle =
+  [
+    `${service.name} Review: ${kycTitlePhrase}${categoryTitlePhrase} & Privacy Score`,
+    `${service.name} Review: ${kycTitlePhrase}${categoryTitlePhrase}`,
+    `${service.name} Review: KYC Policy & Privacy Score`,
+    `${service.name} Review`,
+  ].find((title) => title.length <= 62) ?? `${service.name} Review`
+const pageDescription =
+  [
+    `${service.name} review: ${kycTitlePhrase}${categoryTitlePhrase}, KYC policy notes, ${Math.round(service.privacyScore).toLocaleString()}% privacy score, ${Math.round(service.trustScore).toLocaleString()}% trust score, supported currencies, and user feedback.`,
+    `${service.name} review: ${kycTitlePhrase}${categoryTitlePhrase}, KYC policy notes, privacy score, trust score, supported currencies, and user feedback.`,
+    `Review ${service.name} on KYCnot.me. Check KYC policy notes, privacy score, trust score, supported currencies, and user feedback.`,
+  ].find((description) => description.length <= 160) ?? `Review ${service.name} on KYCnot.me. Check KYC policy, privacy score, trust score, supported currencies, and user feedback.`
+const sentenceListFormatter = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' })
+const formatRating = (rating: number) => {
+  const rounded = Math.round(rating * 10) / 10
+  return Number.isInteger(rounded) ? rounded.toLocaleString() : rounded.toFixed(1)
+}
+const formatLimitedList = (values: string[], maxVisible = 4) => {
+  if (values.length <= maxVisible) return sentenceListFormatter.format(values)
+  const hiddenCount = values.length - maxVisible
+  return sentenceListFormatter.format([...values.slice(0, maxVisible), `${hiddenCount.toLocaleString()} more`])
+}
+const getArticle = (text: string) => (/^[aeiou]/i.test(text) ? 'an' : 'a')
+const getKycPolicySummary = (kycLevel: number) => {
+  switch (kycLevel) {
+    case 0:
+      return 'has a guaranteed no-KYC policy'
+    case 1:
+      return 'has no mention of KYC policies'
+    case 2:
+      return 'may request KYC in rare cases'
+    case 3:
+      return 'may request KYC during risk checks'
+    case 4:
+      return 'requires KYC'
+    default:
+      return `has KYC Level ${kycLevel}`
+  }
+}
+
+const categorySummary = service.categories.length
+  ? `${sentenceListFormatter.format(service.categories.map((category) => category.name.toLowerCase()))} service`
+  : 'service'
+const acceptedCurrencyNames = service.acceptedCurrencies.map((currency) => getCurrencyInfo(currency).name)
+const serviceFactsSummary = [
+  `${service.name} is ${getArticle(categorySummary)} ${categorySummary}${acceptedCurrencyNames.length > 0 ? ` that accepts ${formatLimitedList(acceptedCurrencyNames)}` : ''}.`,
+  `It ${getKycPolicySummary(kycLevelInfo.value)} and has a score of ${formatRating(service.overallScore)}/10.`,
+  service.userRatingCount > 0 &&
+    service.averageUserRating !== null &&
+    `There ${service.userRatingCount === 1 ? 'is' : 'are'} ${service.userRatingCount.toLocaleString()} user ${pluralize('rating', service.userRatingCount)} averaging ${formatRating(service.averageUserRating)}/5.`,
+]
+  .filter((sentence): sentence is string => !!sentence)
+  .join(' ')
+const serviceDescriptionWithFacts = `${serviceFactsSummary} ${service.description}`.trim()
 
 const ogImageTemplateData = {
   template: 'service',
@@ -524,10 +577,11 @@ const verificationStatusDate =
 ---
 
 <BaseLayout
-  pageTitle={seoPageTitle}
-  description={seoDescription}
+  pageTitle={pageTitle}
+  description={pageDescription}
   ogImage={ogImageTemplateData}
   widthClassName="max-w-5xl"
+  noindex={serviceVisibilityInfo.value === 'UNLISTED' || serviceVisibilityInfo.value === 'HIDDEN'}
   htmx
   schemas={[
     {
@@ -538,7 +592,7 @@ const verificationStatusDate =
       sameAs: undefinedIfEmpty([...service.serviceUrls, ...service.onionUrls, ...service.i2pUrls]),
       description: service.description || undefined,
       image: service.imageUrl ?? undefined,
-      mainEntityOfPage: absoluteSiteUrl(`/service/${service.slug}`),
+      mainEntityOfPage: pageUrl,
       contactPoint: undefinedIfEmpty(
         service.contactMethods
           .map((method) => ({
@@ -573,8 +627,9 @@ const verificationStatusDate =
     {
       '@context': 'https://schema.org',
       '@type': 'WebPage',
-      name: service.name,
-      url: absoluteSiteUrl(Astro.url.pathname),
+      '@id': webPageId,
+      name: pageTitle,
+      url: pageUrl,
       mainEntity: {
         '@id': itemReviewedId,
       },
@@ -634,7 +689,7 @@ const verificationStatusDate =
         )}
       >
         <Icon name={activeEventToShow.typeInfo.icon} class="me-1.5 inline-block size-4 align-[-0.15em]" />
-        <span class="font-bold">{activeEventToShow.title}</span> — {activeEventToShow.content}
+        <span class="font-bold">{activeEventToShow.title}</span>: {activeEventToShow.content}
         {activeAlertOrWarningEvents.length >= 2 && <>+{activeAlertOrWarningEvents.length - 1} more events.</>}
         <span class="underline">Go to events</span>
       </a>
@@ -881,7 +936,7 @@ const verificationStatusDate =
   </div>
 
   <div class="prose prose-sm mt-2 text-pretty text-day-400 prose-invert">
-    <Markdown content={service.description} />
+    <Markdown content={serviceDescriptionWithFacts} />
   </div>
 
   {

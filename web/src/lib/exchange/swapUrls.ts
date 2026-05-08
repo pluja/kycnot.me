@@ -1,5 +1,5 @@
 export const SWAP_OOB_TARGETS =
-  '#swap-currency-from,#swap-currency-to,#swap-popular-pairs,#swap-flip,#swap-sort-state,#swap-approved-only-state'
+  '#swap-page-heading,#swap-page-description,#swap-currency-from,#swap-currency-to,#swap-popular-pairs,#swap-flip,#swap-sort-state,#swap-approved-only-state'
 
 // Only the flip action also rewrites the amount inputs; live typing must
 // not, or an in-flight response would stomp on the character the user just

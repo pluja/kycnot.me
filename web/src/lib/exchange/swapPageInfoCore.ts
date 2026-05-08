@@ -1,4 +1,4 @@
-// Pure /swap SEO helpers. Split from swapPageInfo.ts so node:test can import
+// Pure /swap page helpers. Split from swapPageInfo.ts so node:test can import
 // them without pulling in astro:env/client.
 
 import { currencyDisplayMetadata, FALLBACK_ICON } from './currencyMapping'
@@ -8,8 +8,8 @@ export type SwapPair = { from: string; to: string }
 export type FaqItem = { id?: string; q: string; a: string }
 export const SWAP_FAQ_GUARANTEE_ID = 'swap-faq-guarantee'
 
-// Indexable pair surface. Sitemap + canonical URLs derive from this exact
-// set so SEO behaviour is stable regardless of aggregator health.
+// Public pair surface. Sitemap + canonical URLs derive from this exact set so
+// page behaviour is stable regardless of aggregator health.
 export const POPULAR_SWAP_PAIRS: readonly SwapPair[] = [
   { from: 'btc', to: 'xmr' },
   { from: 'xmr', to: 'btc' },
@@ -102,19 +102,26 @@ export function buildCanonical(pair: SwapPair | null): string {
 }
 
 export function buildTitle(pair: SwapPair | null): string {
-  if (!pair) return 'Compare Crypto Exchange Rates: No KYC'
+  if (!pair) return 'No-KYC Crypto Swap Rate Comparison'
   const fromName = formatCurrencyHumanName(pair.from)
   const toName = formatCurrencyHumanName(pair.to)
-  return `Swap ${fromName} to ${toName}: KYC-Free Rate Comparison`
+  return `Swap ${fromName} to ${toName} Without KYC`
+}
+
+export function buildHeading(pair: SwapPair | null): string {
+  if (!pair) return 'Compare No-KYC Crypto Swap Rates'
+  const fromName = formatCurrencyHumanName(pair.from)
+  const toName = formatCurrencyHumanName(pair.to)
+  return `Swap ${fromName} to ${toName} Without KYC`
 }
 
 export function buildDescription(pair: SwapPair | null): string {
   if (!pair) {
-    return 'Compare live rates from privacy-respecting, KYC-free crypto exchanges. Find the best rate for Monero, Bitcoin, Ethereum, USDT, and more.'
+    return 'Compare no-KYC crypto swap rates from privacy-respecting exchanges. Find the best rate for Monero, Bitcoin, Ethereum, USDT, and more.'
   }
   const fromName = formatCurrencyHumanName(pair.from)
   const toName = formatCurrencyHumanName(pair.to)
-  return `Compare ${fromName} to ${toName} rates across KYC-free exchanges. KYCnot.me aggregates live quotes and sorts by best market rate, then hands the swap off to the provider you pick.`
+  return `Compare no-KYC ${fromName} to ${toName} swap rates across privacy-respecting exchanges. KYCnot.me sorts live quotes by best market rate and provider trust.`
 }
 
 export function buildOgImageProps(pair: SwapPair | null) {
