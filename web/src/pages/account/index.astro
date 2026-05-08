@@ -558,14 +558,9 @@ const daysUntilDeletion = user.scheduledDeletionAt
         Karma Unlocks
       </h2>
 
-      <div class="mb-4 rounded-md border border-night-500 bg-night-800/70 px-4 py-3">
-        <p class="text-day-300">
-          Earn karma to unlock features and privileges. <a
-            href="/docs/karma"
-            class="text-day-200 hover:underline">Learn about karma</a
-          >
-        </p>
-      </div>
+      <p class="mb-4 text-day-300">
+        Earn karma to unlock features and privileges. <a href="/docs/karma" class="text-day-200 hover:underline">Learn about karma</a>
+      </p>
     </header>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -582,7 +577,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
         <div class="mt-3 hidden space-y-3 peer-checked:block md:block">
           {
             sortBy(
-              karmaUnlocks.filter((unlock) => unlock.karma >= 0),
+              karmaUnlocks.filter((unlock) => unlock.karma >= 0 || unlock.unlockDirection === 'gte'),
               'karma'
             ).map((unlock) => (
               <div
@@ -606,7 +601,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                     >
                       {unlock.name}
                     </p>
-                    <p class="text-sm text-day-500">{unlock.karma.toLocaleString()} karma</p>
+                    <p class="text-sm text-day-500">{unlock.karmaLabel ?? `${unlock.karma.toLocaleString()} karma`}</p>
                   </div>
                 </div>
                 <div>
@@ -624,6 +619,11 @@ const daysUntilDeletion = user.scheduledDeletionAt
             ))
           }
         </div>
+
+        <p class="mt-4 rounded-md border border-night-500/30 bg-night-800/70 p-3 text-xs text-day-400">
+          <span class="font-bold text-day-300">*</span>
+          Reviews with approved usage proof get 90% weight. Verified reviews get 100%.
+        </p>
       </div>
 
       <div class="space-y-3">
@@ -640,7 +640,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
         <div class="mt-3 hidden space-y-3 peer-checked:block md:block">
           {
             sortBy(
-              karmaUnlocks.filter((unlock) => unlock.karma < 0),
+              karmaUnlocks.filter((unlock) => unlock.karma < 0 && unlock.unlockDirection !== 'gte'),
               'karma'
             )
               .reverse()
@@ -686,8 +686,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
 
           <p class="mt-4 rounded-md border border-night-500/30 bg-night-800/70 p-3 text-xs text-day-400">
             <Icon name="ri:information-line" class="inline-block size-4" />
-            Negative karma leads to restrictions. <br class="hidden sm:block" />Keep interactions positive to
-            avoid penalties.
+            Negative karma leads to restrictions. Keep interactions positive to avoid penalties.
           </p>
         </div>
       </div>

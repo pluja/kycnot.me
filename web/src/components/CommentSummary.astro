@@ -3,6 +3,7 @@ import { Icon } from 'astro-icon/components'
 import { Schema } from 'astro-seo-schema'
 import { clamp, round, sum } from 'lodash-es'
 
+import { MIN_TRUSTED_RATING_WEIGHT } from '../constants/karmaUnlocks'
 import { cn } from '../lib/cn'
 import { prisma } from '../lib/prisma'
 
@@ -10,8 +11,6 @@ import Tooltip from './Tooltip.astro'
 
 import type { CommentStatus, Prisma } from '@prisma/client'
 import type { HTMLAttributes } from 'astro/types'
-
-const MIN_TRUSTED_RATING_WEIGHT = 0.45
 
 type Props = HTMLAttributes<'div'> & {
   serviceId: number

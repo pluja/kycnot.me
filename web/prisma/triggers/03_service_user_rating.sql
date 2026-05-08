@@ -62,7 +62,7 @@ BEGIN
         RETURN;
     END IF;
 
-    IF author_record.spammer IS TRUE OR author_record."totalKarma" <= -30 THEN
+    IF author_record.spammer IS TRUE OR author_record."totalKarma" <= -5 THEN
         RETURN QUERY SELECT 0::DOUBLE PRECISION, 'Not counted'::TEXT, 'Author account is untrusted'::TEXT;
         RETURN;
     END IF;
@@ -88,6 +88,8 @@ BEGIN
         RETURN;
     END IF;
 
+    -- keep karma-based weights in sync with reviewWeight unlocks in src/constants/karmaUnlocks.ts.
+    -- changing thresholds also requires updating refresh_user_comment_rating_trust() below and the drift test.
     IF author_record.admin IS TRUE OR author_record.moderator IS TRUE THEN
         RETURN QUERY SELECT 0.9::DOUBLE PRECISION, 'Trusted user'::TEXT, 'Author is a KYCnot.me admin or moderator'::TEXT;
         RETURN;
@@ -203,7 +205,7 @@ BEGIN
     AND OLD.moderator = NEW.moderator
     AND (
         CASE
-            WHEN OLD."totalKarma" <= -30 THEN -1
+            WHEN OLD."totalKarma" <= -5 THEN -1
             WHEN OLD."totalKarma" < 5 THEN 0
             WHEN OLD."totalKarma" < 25 THEN 1
             WHEN OLD."totalKarma" < 150 THEN 2
@@ -211,7 +213,7 @@ BEGIN
         END
     ) = (
         CASE
-            WHEN NEW."totalKarma" <= -30 THEN -1
+            WHEN NEW."totalKarma" <= -5 THEN -1
             WHEN NEW."totalKarma" < 5 THEN 0
             WHEN NEW."totalKarma" < 25 THEN 1
             WHEN NEW."totalKarma" < 150 THEN 2

@@ -8,7 +8,12 @@ export type KarmaUnlockInfo<T extends string | null | undefined = string> = {
   description: string
   karma: number
   icon: string
+  reviewWeight?: number
+  unlockDirection?: 'gte' | 'lte'
+  karmaLabel?: string
 }
+
+export const APPROVED_ORDER_ID_REVIEW_WEIGHT = 0.9
 
 export const { dataArray: karmaUnlocks, dataObject: karmaUnlocksById } = makeHelpersForOptions(
   'id',
@@ -22,6 +27,26 @@ export const { dataArray: karmaUnlocks, dataObject: karmaUnlocksById } = makeHel
   }),
   [
     {
+      id: 'baseReviewWeight',
+      name: '10% review weight*',
+      verb: 'get 10% review weight',
+      description: 'Your ratings have limited impact on service scores',
+      karma: -4,
+      karmaLabel: 'above -5 karma',
+      icon: 'ri:scales-3-line',
+      reviewWeight: 0.1,
+      unlockDirection: 'gte',
+    },
+    {
+      id: 'someActivityReviewWeight',
+      name: '20% review weight*',
+      verb: 'get 20% review weight',
+      description: 'Your ratings count more after some account activity',
+      karma: 5,
+      icon: 'ri:scales-3-line',
+      reviewWeight: 0.2,
+    },
+    {
       id: 'voteComments',
       name: 'Vote on comments',
       verb: 'vote on comments',
@@ -30,12 +55,22 @@ export const { dataArray: karmaUnlocks, dataObject: karmaUnlocksById } = makeHel
       icon: 'ri:thumb-up-line',
     },
     {
-      id: 'websiteLink',
-      name: 'Website link',
-      verb: 'add a website link',
-      description: 'You can add a website link to your profile',
-      karma: 175,
-      icon: 'ri:link',
+      id: 'activeReviewWeight',
+      name: '45% review weight*',
+      verb: 'get 45% review weight',
+      description: 'Your ratings count as active-user feedback',
+      karma: 25,
+      icon: 'ri:scales-3-line',
+      reviewWeight: 0.45,
+    },
+    {
+      id: 'trustedReviewWeight',
+      name: '80% review weight*',
+      verb: 'get 80% review weight',
+      description: 'Your ratings count as high-karma feedback',
+      karma: 150,
+      icon: 'ri:scales-3-line',
+      reviewWeight: 0.8,
     },
     {
       id: 'displayName',
@@ -44,6 +79,14 @@ export const { dataArray: karmaUnlocks, dataObject: karmaUnlocksById } = makeHel
       description: 'You can change your display name',
       karma: 150,
       icon: 'ri:user-smile-line',
+    },
+    {
+      id: 'websiteLink',
+      name: 'Website link',
+      verb: 'add a website link',
+      description: 'You can add a website link to your profile',
+      karma: 175,
+      icon: 'ri:link',
     },
     {
       id: 'profilePicture',
@@ -60,6 +103,15 @@ export const { dataArray: karmaUnlocks, dataObject: karmaUnlocksById } = makeHel
       description: 'You are a high karma user',
       karma: 500,
       icon: 'ri:shield-star-line',
+    },
+    {
+      id: 'reviewsNotCounted',
+      name: '0% review weight*',
+      verb: 'get 0% review weight',
+      description: 'Your ratings do not affect service scores',
+      karma: -5,
+      icon: 'ri:scales-3-line',
+      reviewWeight: 0,
     },
     {
       id: 'negativeKarmaBadge',
@@ -87,3 +139,7 @@ export const { dataArray: karmaUnlocks, dataObject: karmaUnlocksById } = makeHel
     },
   ] as const satisfies KarmaUnlockInfo[]
 )
+
+// keep reviewWeight unlocks in sync with calculate_comment_rating_trust() in prisma/triggers/03_service_user_rating.sql.
+// changing review weight thresholds requires updating the trigger and its drift test.
+export const MIN_TRUSTED_RATING_WEIGHT = karmaUnlocksById.activeReviewWeight.reviewWeight

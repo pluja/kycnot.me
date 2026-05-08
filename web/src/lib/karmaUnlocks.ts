@@ -1,15 +1,17 @@
 import { karmaUnlocksById, type KarmaUnlockInfo } from '../constants/karmaUnlocks'
 
+const isKarmaUnlockUnlocked = (karma: number, unlock: KarmaUnlockInfo) => {
+  const direction = unlock.unlockDirection ?? (unlock.karma >= 0 ? 'gte' : 'lte')
+  return direction === 'gte' ? karma >= unlock.karma : karma <= unlock.karma
+}
+
 export type KarmaUnlocks = {
   [K in keyof typeof karmaUnlocksById]: boolean
 }
 
 export function computeKarmaUnlocks(karma: number) {
   return Object.fromEntries(
-    Object.entries(karmaUnlocksById).map(([key, value]) => [
-      key,
-      value.karma >= 0 ? karma >= value.karma : karma <= value.karma,
-    ])
+    Object.entries(karmaUnlocksById).map(([key, value]) => [key, isKarmaUnlockUnlocked(karma, value)])
   ) as KarmaUnlocks
 }
 
