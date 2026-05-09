@@ -40,6 +40,20 @@ jobs:
           git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" fetch --depth=1 origin "$FORGEJO_SHA"
           git checkout --detach FETCH_HEAD
 
+      - name: Login to Codeberg registry
+        run: |
+          set -euo pipefail
+
+          if [ -z "${{ secrets.CODEBERG_PACKAGE_USER }}" ] || [ -z "${{ secrets.CODEBERG_PACKAGE_TOKEN }}" ]; then
+            echo "Missing CODEBERG_PACKAGE_USER or CODEBERG_PACKAGE_TOKEN action secret." >&2
+            exit 1
+          fi
+
+          printf '%s' "${{ secrets.CODEBERG_PACKAGE_TOKEN }}" \
+            | docker login codeberg.org \
+              --username "${{ secrets.CODEBERG_PACKAGE_USER }}" \
+              --password-stdin
+
       - name: Build and push images
         id: images
         working-directory: ${{ forgejo.workspace }}
