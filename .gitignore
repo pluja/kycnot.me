@@ -24,3 +24,4 @@ sync-all.sh
 /deploykit/
 *.md
 !README.md
+!pyworker/pyworker/prompts/*.md
