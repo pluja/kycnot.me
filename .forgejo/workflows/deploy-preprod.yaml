@@ -1,0 +1,70 @@
+name: Deploy preprod
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+concurrency:
+  group: preprod-deploy
+  cancel-in-progress: false
+
+env:
+  ASTRO_IMAGE: codeberg.org/pluja/kycnot/astro
+  PYWORKER_IMAGE: codeberg.org/pluja/kycnot/pyworker
+
+jobs:
+  build-and-deploy:
+    runs-on: preprod
+    steps:
+      - name: Check branch
+        run: |
+          set -euo pipefail
+
+          if [ "$FORGEJO_REF_NAME" != "dev" ]; then
+            echo "Preprod deploys must run from dev. Current ref: $FORGEJO_REF_NAME" >&2
+            exit 1
+          fi
+
+      - name: Checkout
+        run: |
+          set -euo pipefail
+
+          rm -rf "$FORGEJO_WORKSPACE"
+          mkdir -p "$FORGEJO_WORKSPACE"
+          cd "$FORGEJO_WORKSPACE"
+
+          git init
+          git remote add origin "$FORGEJO_SERVER_URL/$FORGEJO_REPOSITORY.git"
+          git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" fetch --depth=1 origin "$FORGEJO_SHA"
+          git checkout --detach FETCH_HEAD
+
+      - name: Build and push images
+        id: images
+        working-directory: ${{ forgejo.workspace }}
+        run: |
+          set -euo pipefail
+
+          short_sha="$(printf '%s' "$FORGEJO_SHA" | cut -c1-8)"
+          image_tag="pre-${short_sha}"
+
+          docker build \
+            -f web/Dockerfile \
+            --build-arg ASTRO_BUILD_MODE=staging \
+            -t "${ASTRO_IMAGE}:${image_tag}" \
+            .
+          docker build \
+            -t "${PYWORKER_IMAGE}:${image_tag}" \
+            ./pyworker
+
+          docker push "${ASTRO_IMAGE}:${image_tag}"
+          docker push "${PYWORKER_IMAGE}:${image_tag}"
+
+          echo "image_tag=${image_tag}" >> "$FORGEJO_OUTPUT"
+
+      - name: Deploy preprod
+        run: |
+          set -euo pipefail
+
+          /opt/forgejo-runner/bin/deploy-pre "${{ steps.images.outputs.image_tag }}"
