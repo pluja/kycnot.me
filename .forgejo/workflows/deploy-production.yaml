@@ -14,8 +14,10 @@ env:
   PYWORKER_IMAGE: codeberg.org/pluja/kycnot/pyworker
 
 jobs:
-  build-and-deploy:
-    runs-on: prod
+  build:
+    runs-on: preprod
+    outputs:
+      image_tag: ${{ steps.images.outputs.image_tag }}
     steps:
       - name: Check release tag
         run: |
@@ -48,7 +50,7 @@ jobs:
           set -euo pipefail
 
           git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" fetch origin master
-          if ! git merge-base --is-ancestor "$FORGEJO_SHA" origin/main; then
+          if ! git merge-base --is-ancestor "$FORGEJO_SHA" origin/master; then
             echo "Production tag $FORGEJO_REF_NAME must point to a commit on master." >&2
             exit 1
           fi
@@ -92,8 +94,12 @@ jobs:
 
           echo "image_tag=${image_tag}" >> "$FORGEJO_OUTPUT"
 
+  deploy:
+    needs: build
+    runs-on: prod
+    steps:
       - name: Deploy production
         run: |
           set -euo pipefail
 
-          /opt/forgejo-runner/bin/deploy-prod "${{ steps.images.outputs.image_tag }}"
+          /opt/forgejo-runner/bin/deploy-prod "${{ needs.build.outputs.image_tag }}"
