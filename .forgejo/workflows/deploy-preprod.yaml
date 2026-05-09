@@ -1,9 +1,6 @@
 name: Deploy preprod
 
 on:
-  push:
-    branches:
-      - dev
   workflow_dispatch:
 
 concurrency:
@@ -43,6 +40,8 @@ jobs:
       - name: Login to Codeberg registry
         run: |
           set -euo pipefail
+          export DOCKER_CONFIG="$FORGEJO_WORKSPACE/.docker"
+          mkdir -p "$DOCKER_CONFIG"
 
           if [ -z "${{ secrets.CODEBERG_PACKAGE_USER }}" ] || [ -z "${{ secrets.CODEBERG_PACKAGE_TOKEN }}" ]; then
             echo "Missing CODEBERG_PACKAGE_USER or CODEBERG_PACKAGE_TOKEN action secret." >&2
@@ -59,6 +58,7 @@ jobs:
         working-directory: ${{ forgejo.workspace }}
         run: |
           set -euo pipefail
+          export DOCKER_CONFIG="$FORGEJO_WORKSPACE/.docker"
 
           short_sha="$(printf '%s' "$FORGEJO_SHA" | cut -c1-8)"
           image_tag="pre-${short_sha}"
