@@ -1,0 +1,99 @@
+name: Deploy production
+
+on:
+  push:
+    tags:
+      - v*
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+env:
+  ASTRO_IMAGE: codeberg.org/pluja/kycnot/astro
+  PYWORKER_IMAGE: codeberg.org/pluja/kycnot/pyworker
+
+jobs:
+  build-and-deploy:
+    runs-on: prod
+    steps:
+      - name: Check release tag
+        run: |
+          set -euo pipefail
+
+          case "$FORGEJO_REF_NAME" in
+            v*) ;;
+            *)
+              echo "Production deploy tags must start with v. Current tag: $FORGEJO_REF_NAME" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Checkout
+        run: |
+          set -euo pipefail
+
+          rm -rf "$FORGEJO_WORKSPACE"
+          mkdir -p "$FORGEJO_WORKSPACE"
+          cd "$FORGEJO_WORKSPACE"
+
+          git init
+          git remote add origin "$FORGEJO_SERVER_URL/$FORGEJO_REPOSITORY.git"
+          git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" fetch --depth=1 origin "$FORGEJO_SHA"
+          git checkout --detach FETCH_HEAD
+
+      - name: Verify tag is on main
+        working-directory: ${{ forgejo.workspace }}
+        run: |
+          set -euo pipefail
+
+          git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" fetch origin main
+          if ! git merge-base --is-ancestor "$FORGEJO_SHA" origin/main; then
+            echo "Production tag $FORGEJO_REF_NAME must point to a commit on main." >&2
+            exit 1
+          fi
+
+      - name: Login to Codeberg registry
+        run: |
+          set -euo pipefail
+          export DOCKER_CONFIG="$FORGEJO_WORKSPACE/.docker"
+          mkdir -p "$DOCKER_CONFIG"
+
+          if [ -z "${{ secrets.CODEBERG_PACKAGE_USER }}" ] || [ -z "${{ secrets.CODEBERG_PACKAGE_TOKEN }}" ]; then
+            echo "Missing CODEBERG_PACKAGE_USER or CODEBERG_PACKAGE_TOKEN action secret." >&2
+            exit 1
+          fi
+
+          printf '%s' "${{ secrets.CODEBERG_PACKAGE_TOKEN }}" \
+            | docker login codeberg.org \
+              --username "${{ secrets.CODEBERG_PACKAGE_USER }}" \
+              --password-stdin
+
+      - name: Build and push images
+        id: images
+        working-directory: ${{ forgejo.workspace }}
+        run: |
+          set -euo pipefail
+          export DOCKER_CONFIG="$FORGEJO_WORKSPACE/.docker"
+
+          image_tag="prod-${FORGEJO_REF_NAME}"
+
+          docker build \
+            -f web/Dockerfile \
+            --build-arg ASTRO_BUILD_MODE=production \
+            -t "${ASTRO_IMAGE}:${image_tag}" \
+            .
+          docker build \
+            -t "${PYWORKER_IMAGE}:${image_tag}" \
+            ./pyworker
+
+          docker push "${ASTRO_IMAGE}:${image_tag}"
+          docker push "${PYWORKER_IMAGE}:${image_tag}"
+
+          echo "image_tag=${image_tag}" >> "$FORGEJO_OUTPUT"
+
+      - name: Deploy production
+        run: |
+          set -euo pipefail
+
+          /opt/forgejo-runner/bin/deploy-prod "${{ steps.images.outputs.image_tag }}"
