@@ -42,14 +42,14 @@ jobs:
           git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" fetch --depth=1 origin "$FORGEJO_SHA"
           git checkout --detach FETCH_HEAD
 
-      - name: Verify tag is on main
+      - name: Verify tag is on master
         working-directory: ${{ forgejo.workspace }}
         run: |
           set -euo pipefail
 
-          git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" fetch origin main
+          git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" fetch origin master
           if ! git merge-base --is-ancestor "$FORGEJO_SHA" origin/main; then
-            echo "Production tag $FORGEJO_REF_NAME must point to a commit on main." >&2
+            echo "Production tag $FORGEJO_REF_NAME must point to a commit on master." >&2
             exit 1
           fi
 
