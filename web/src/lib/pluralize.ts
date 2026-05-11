@@ -21,6 +21,10 @@ const knownPlurals = {
     singular: 'Result',
     plural: 'Results',
   },
+  rating: {
+    singular: 'Rating',
+    plural: 'Ratings',
+  },
   request: {
     singular: 'Request',
     plural: 'Requests',
