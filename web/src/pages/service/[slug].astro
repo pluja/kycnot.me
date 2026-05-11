@@ -689,18 +689,22 @@ const verificationStatusDate =
 >
   {
     !!activeEventToShow && (
-      <a
-        href="#events"
+      <div
         class={cn(
-          'group mb-3 block rounded-lg border border-day-500/10 px-3 py-2 text-sm transition-colors duration-200 hover:border-day-500/25',
+          'group mb-3 rounded-lg border border-day-500/10 px-3 py-2 text-sm',
           activeEventToShow.typeInfo.classNames.banner
         )}
       >
         <Icon name={activeEventToShow.typeInfo.icon} class="me-1.5 inline-block size-4 align-[-0.15em]" />
-        <span class="font-bold">{activeEventToShow.title}</span>: {activeEventToShow.content}
-        {activeAlertOrWarningEvents.length >= 2 && <>+{activeAlertOrWarningEvents.length - 1} more events.</>}
-        <span class="underline">Go to events</span>
-      </a>
+        <span class="font-bold">{activeEventToShow.title}</span>:{' '}
+        <div class="inline [&_a]:underline [&_p]:inline">
+          <Markdown content={activeEventToShow.content} linkRel={['nofollow', 'noopener']} />
+        </div>
+        {activeAlertOrWarningEvents.length >= 2 && <> +{activeAlertOrWarningEvents.length - 1} more events.</>}{' '}
+        <a href="#events" class="underline hover:opacity-80">
+          Go to events
+        </a>
+      </div>
     )
   }
 
