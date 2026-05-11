@@ -13,9 +13,21 @@ export const GET: APIRoute = ({ request, locals }) => {
   let cleanup: (() => Promise<void>) | null = null
   let closed = false
 
+  async function runCleanup() {
+    const pending = cleanup
+    cleanup = null
+    if (!pending) return
+    try {
+      await pending()
+    } catch (error) {
+      console.error('Failed to cleanup SSE connection:', error)
+    }
+  }
+
   const stream = new ReadableStream({
     async start(controller) {
       function sendEvent(event: ServerEventsEvent) {
+        if (closed) return
         try {
           controller.enqueue(encodeSSE(event))
         } catch (error) {
@@ -23,44 +35,48 @@ export const GET: APIRoute = ({ request, locals }) => {
         }
       }
 
+      async function teardown() {
+        if (closed) return
+        closed = true
+        await runCleanup()
+        try {
+          controller.close()
+        } catch {
+          // already closed by runtime
+        }
+      }
+
+      // wire abort handling before any await so it also covers the addListener window
+      if (request.signal.aborted) {
+        await teardown()
+        return
+      }
+      request.signal.addEventListener('abort', () => void teardown(), { once: true })
+
       try {
         sendEvent({ type: 'new-connection', data: { timestamp: new Date().toISOString() } })
 
-        cleanup = user
-          ? await redisServerEvents.addListener('all', user.id, (event) => {
-              sendEvent(event)
+        if (user) {
+          const listenerCleanup = await redisServerEvents.addListener('all', user.id, sendEvent)
+          if (closed) {
+            // aborted during the addListener await; clean up the listener we just registered
+            await listenerCleanup().catch((error: unknown) => {
+              console.error('Failed to cleanup race SSE listener:', error)
             })
-          : null
-
-        async function abort() {
-          if (closed) return
-          closed = true
-          try {
-            await cleanup?.()
-            cleanup = null
-            controller.close()
-          } catch (error) {
-            console.error('Failed to cleanup SSE connection:', error)
+            return
           }
+          cleanup = listenerCleanup
         }
-
-        request.signal.addEventListener('abort', () => {
-          void abort()
-        })
       } catch (error) {
         console.error('Failed to start SSE stream:', error)
-        controller.error(error)
+        await teardown()
       }
     },
 
     async cancel() {
+      if (closed) return
       closed = true
-      try {
-        await cleanup?.()
-        cleanup = null
-      } catch (error) {
-        console.error('Failed to cleanup on cancel:', error)
-      }
+      await runCleanup()
     },
   })
 
