@@ -7,13 +7,21 @@ import type { APIRoute } from 'astro'
 
 const redisServerEvents = await getRedisServerEvents()
 
+// CF and other proxies cut idle SSE streams aggressively; an in-band comment line keeps the connection warm.
+const HEARTBEAT_INTERVAL_MS = 2_000
+
 export const GET: APIRoute = ({ request, locals }) => {
   const user = locals.user
 
   let cleanup: (() => Promise<void>) | null = null
+  let heartbeat: ReturnType<typeof setInterval> | null = null
   let closed = false
 
   async function runCleanup() {
+    if (heartbeat) {
+      clearInterval(heartbeat)
+      heartbeat = null
+    }
     const pending = cleanup
     cleanup = null
     if (!pending) return
@@ -32,6 +40,15 @@ export const GET: APIRoute = ({ request, locals }) => {
           controller.enqueue(encodeSSE(event))
         } catch (error) {
           console.error('Failed to send SSE event:', event.type, error)
+        }
+      }
+
+      function sendHeartbeat() {
+        if (closed) return
+        try {
+          controller.enqueue(heartbeatChunk)
+        } catch {
+          // controller is gone; abort/cancel will run teardown shortly
         }
       }
 
@@ -67,6 +84,8 @@ export const GET: APIRoute = ({ request, locals }) => {
           }
           cleanup = listenerCleanup
         }
+
+        heartbeat = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS)
       } catch (error) {
         console.error('Failed to start SSE stream:', error)
         await teardown()
@@ -92,6 +111,7 @@ export const GET: APIRoute = ({ request, locals }) => {
 }
 
 const encoder = new TextEncoder()
+const heartbeatChunk = encoder.encode(': heartbeat\n\n')
 function encodeSSE(event: ServerEventsEvent) {
   return encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
 }
