@@ -12,19 +12,6 @@ const checkboxBoolean = z
   .optional()
   .transform((value) => value === 'on' || value === 'true' || value === '1')
 
-const formNumberArray = z
-  .union([
-    z.array(z.coerce.number().int().positive()),
-    z.coerce.number().int().positive(),
-    z.literal(''),
-    z.null(),
-  ])
-  .optional()
-  .transform((value) => {
-    if (value === undefined || value === null || value === '') return []
-    return Array.isArray(value) ? value : [value]
-  })
-
 export const deepScanActions = {
   request: defineProtectedAction({
     accept: 'form',
@@ -72,8 +59,8 @@ export const deepScanActions = {
       acceptTosReview: checkboxBoolean,
       acceptKycLevel: checkboxBoolean,
       acceptKycPolicy: checkboxBoolean,
-      attributeAddIds: formNumberArray,
-      attributeRemoveIds: formNumberArray,
+      attributeAddIds: z.array(z.coerce.number().int().positive()),
+      attributeRemoveIds: z.array(z.coerce.number().int().positive()),
     }),
     handler: async (input) => {
       const suggestion = await prisma.serviceSuggestion.findUnique({
