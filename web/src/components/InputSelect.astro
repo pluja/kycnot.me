@@ -26,7 +26,6 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
 
 <InputWrapper inputId={inputId} required={selectProps?.required} {...wrapperProps}>
   <select
-    transition:persist
     {...omit(selectProps, ['class', 'id', 'name'])}
     id={inputId}
     class={cn(

@@ -69,7 +69,6 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
           )}
         >
           <input
-            transition:persist
             type={multiple ? 'checkbox' : 'radio'}
             name={wrapperProps.name}
             value={option.value}

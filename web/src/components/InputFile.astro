@@ -39,7 +39,6 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
         )}
       >
         <input
-          transition:persist
           type="checkbox"
           name={removeCheckbox.name}
           data-remove-checkbox
@@ -50,7 +49,6 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
     )
   }
   <input
-    transition:persist
     type="file"
     id={inputId}
     class={cn(

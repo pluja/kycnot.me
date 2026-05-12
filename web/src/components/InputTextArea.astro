@@ -21,7 +21,6 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
 
 <InputWrapper inputId={inputId} required={inputProps?.required} {...wrapperProps}>
   <textarea
-    transition:persist
     {...omit(inputProps, ['class', 'id', 'name'])}
     id={inputId}
     class={cn(

@@ -163,7 +163,6 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
       <div>
         <label for="title-create" class="block text-sm font-medium text-zinc-300">Title</label>
         <input
-          transition:persist
           type="text"
           name="title"
           id="title-create"
@@ -180,7 +179,6 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
       <div>
         <label for="description-create" class="block text-sm font-medium text-zinc-300">Description</label>
         <textarea
-          transition:persist
           name="description"
           id="description-create"
           required
@@ -199,7 +197,6 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
         <div>
           <label for="slug-create" class="block text-sm font-medium text-zinc-300">Slug</label>
           <input
-            transition:persist
             type="text"
             name="slug"
             id="slug-create"
@@ -211,7 +208,6 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
           <div>
             <label for="privacyPoints-create" class="block text-sm font-medium text-zinc-300">Privacy</label>
             <input
-              transition:persist
               type="number"
               name="privacyPoints"
               id="privacyPoints-create"
@@ -229,7 +225,6 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
           <div>
             <label for="trustPoints-create" class="block text-sm font-medium text-zinc-300">Trust</label>
             <input
-              transition:persist
               type="number"
               name="trustPoints"
               id="trustPoints-create"
@@ -251,7 +246,6 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
         <div>
           <label for="category-create" class="block text-sm font-medium text-zinc-300">Category</label>
           <select
-            transition:persist
             name="category"
             id="category-create"
             required
@@ -272,7 +266,6 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
         <div>
           <label for="type-create" class="block text-sm font-medium text-zinc-300">Type</label>
           <select
-            transition:persist
             name="type"
             id="type-create"
             required
