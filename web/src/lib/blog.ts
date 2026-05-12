@@ -12,25 +12,6 @@ export function calculateReadingTime(content: string): number {
 }
 
 /**
- * Sets HTTP cache headers on a blog page response.
- *
- * Anonymous requests get a short-lived public cache (Cloudflare honors
- * `s-maxage` at the edge so subsequent visitors hit the CDN instead of the
- * origin). `stale-while-revalidate` lets the CDN serve a stale copy while
- * refetching in the background, so visitors never wait on a cache miss.
- *
- * Authenticated requests get `no-store` so personalized HTML (admin badge,
- * draft posts, etc.) is never cached at any layer.
- */
-export function setBlogCacheHeaders(headers: Headers, { isAuthenticated }: { isAuthenticated: boolean }) {
-  if (isAuthenticated) {
-    headers.set('Cache-Control', 'private, no-store, no-cache, must-revalidate')
-  } else {
-    headers.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400')
-  }
-}
-
-/**
  * Returns blog posts sorted newest-first. By default, drafts are excluded.
  * Pass `includeDrafts: true` from admin contexts to include them inline.
  *

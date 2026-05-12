@@ -2,13 +2,8 @@
 import BlogPostContent from '../../components/BlogPostContent.astro'
 import Breadcrumbs from '../../components/Breadcrumbs.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
-import {
-  getPrevNextPosts,
-  getPublishedPosts,
-  getRelatedPosts,
-  postUrl,
-  setBlogCacheHeaders,
-} from '../../lib/blog'
+import { getPrevNextPosts, getPublishedPosts, getRelatedPosts, postUrl } from '../../lib/blog'
+import { setPublicPageCacheHeaders } from '../../lib/pageCacheHeaders'
 import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
 import { absoluteSiteUrl } from '../../lib/urls'
 
@@ -28,7 +23,7 @@ if (!post) return Astro.rewrite('/404')
 
 // Cache headers go AFTER the existence check so 404 rewrites don't inherit
 // the public cache and end up cached at the CDN.
-setBlogCacheHeaders(Astro.response.headers, { isAuthenticated: Astro.locals.user !== null })
+setPublicPageCacheHeaders(Astro.response.headers, { isAuthenticated: Astro.locals.user !== null })
 
 // Always use published-only for related and prev/next so drafts never appear
 // in the link graph (even in an admin preview of a draft).

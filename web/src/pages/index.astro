@@ -21,6 +21,7 @@ import { areEqualArraysWithoutOrder, zodEnumFromConstant } from '../lib/arrays'
 import { findServicesBySimilarity } from '../lib/findServicesBySimilarity'
 import { parseIntWithFallback } from '../lib/numbers'
 import { areEqualObjectsWithoutOrder } from '../lib/objects'
+import { setPublicPageCacheHeaders } from '../lib/pageCacheHeaders'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import {
@@ -412,6 +413,11 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
       [],
     ],
   ])
+
+setPublicPageCacheHeaders(Astro.response.headers, {
+  isAuthenticated: Astro.locals.user !== null,
+  hasErrors: Astro.locals.banners.errors.length > 0,
+})
 
 const filtersOptions = makeSearchFiltersOptions({
   filters,

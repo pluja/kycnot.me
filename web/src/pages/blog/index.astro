@@ -4,14 +4,15 @@ import { Icon } from 'astro-icon/components'
 import BlogPostCard from '../../components/BlogPostCard.astro'
 import Breadcrumbs from '../../components/Breadcrumbs.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
-import { getAllTags, getPublishedPosts, postUrl, setBlogCacheHeaders, tagUrl } from '../../lib/blog'
+import { getAllTags, getPublishedPosts, postUrl, tagUrl } from '../../lib/blog'
+import { setPublicPageCacheHeaders } from '../../lib/pageCacheHeaders'
 import { absoluteSiteUrl } from '../../lib/urls'
 
 import type { BreadcrumArray } from '../../components/BaseHead.astro'
 import type { BlogPosting, ItemList, ListItem, WithContext } from 'schema-dts'
 
 const isAdmin = Astro.locals.user?.admin ?? false
-setBlogCacheHeaders(Astro.response.headers, { isAuthenticated: Astro.locals.user !== null })
+setPublicPageCacheHeaders(Astro.response.headers, { isAuthenticated: Astro.locals.user !== null })
 
 // `displayPosts` is what the page actually renders: drafts inline for admins,
 // published-only for everyone else. `publishedPosts` is the canonical

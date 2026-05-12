@@ -4,14 +4,8 @@ import { Icon } from 'astro-icon/components'
 import BlogPostCard from '../../../components/BlogPostCard.astro'
 import Breadcrumbs from '../../../components/Breadcrumbs.astro'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
-import {
-  getAllTags,
-  getPublishedPosts,
-  postUrl,
-  setBlogCacheHeaders,
-  slugToTag,
-  tagToSlug,
-} from '../../../lib/blog'
+import { getAllTags, getPublishedPosts, postUrl, slugToTag, tagToSlug } from '../../../lib/blog'
+import { setPublicPageCacheHeaders } from '../../../lib/pageCacheHeaders'
 import { absoluteSiteUrl } from '../../../lib/urls'
 
 import type { BreadcrumArray } from '../../../components/BaseHead.astro'
@@ -31,7 +25,7 @@ if (!tag) return Astro.rewrite('/404')
 
 // Cache headers go AFTER the existence check so 404 rewrites don't inherit
 // the public cache and end up cached at the CDN.
-setBlogCacheHeaders(Astro.response.headers, { isAuthenticated: Astro.locals.user !== null })
+setPublicPageCacheHeaders(Astro.response.headers, { isAuthenticated: Astro.locals.user !== null })
 
 const allPosts = isAdmin ? await getPublishedPosts({ includeDrafts: true }) : publishedPosts
 const posts = allPosts.filter((post) => post.data.tags.includes(tag))
