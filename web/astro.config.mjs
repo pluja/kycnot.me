@@ -169,18 +169,22 @@ export default defineConfig({
     actionBodySizeLimit: 6 * 1024 * 1024,
   },
   image: {
-    // The /files/** pattern matches the loopback URL used by MyPicture.astro
-    // to transform user-uploaded service logos without a public network hop.
-    // localhost:4321 covers both `npm run dev` and the Node adapter in
-    // Docker (Astro listens on 4321 inside the container).
+    // /files/** uploads are served by `src/lib/imageEndpoint.ts`, which reads
+    // from `UPLOAD_DIR` on disk and never HTTP-fetches the public URL. The
+    // remotePattern below only exists to satisfy Astro's <Picture> URL
+    // validation; the public URL never gets dereferenced as a network call.
     remotePatterns: [
       {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '4321',
+        protocol: new URL(SITE_URL).protocol.slice(0, -1),
+        hostname: new URL(SITE_URL).hostname,
+        port: new URL(SITE_URL).port || undefined,
         pathname: '/files/**',
       },
     ],
+    endpoint: {
+      route: '/_image',
+      entrypoint: './src/lib/imageEndpoint.ts',
+    },
     service: {
       entrypoint: './src/lib/imageService.ts',
     },

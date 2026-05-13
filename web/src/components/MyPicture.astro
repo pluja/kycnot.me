@@ -3,16 +3,16 @@ import { Picture } from 'astro:assets'
 
 import defaultServiceImage from '../assets/fallback-service-image.jpg'
 import { cn } from '../lib/cn'
+import { siteOrigin } from '../lib/urls'
 
 import type { ComponentProps } from 'astro/types'
 
-// Astro's <Picture> needs a full URL string matching `remotePatterns` to run
-// the sharp WebP transform on remote uploads. Pointing at the public site
-// URL works in test/prod but breaks under preprod basic-auth and adds a
-// public CF/Caddy roundtrip for every cache miss. Using the loopback URL
-// instead keeps the transform's source fetch inside the same Node process:
-// Astro -> its own `/files/[...path]` route -> disk read -> sharp.
-const SELF_FETCH_BASE = 'http://localhost:4321'
+// Astro's <Picture> requires the `src` to match a `remotePatterns` entry to
+// run the WebP transform on a string URL. Database-backed image URLs come
+// in as relative `/files/...` paths, so we absolutize them to the canonical
+// public origin. No network roundtrip ever happens for these — the custom
+// image endpoint at `src/lib/imageEndpoint.ts` short-circuits and reads
+// the file from disk via UPLOAD_DIR.
 
 const fallbackImages = {
   service: defaultServiceImage,
@@ -36,8 +36,8 @@ const fallbackImage = fallback ? fallbackImages[fallback] : undefined
 
 const rawSrc = typeof src === 'string' ? src : (src ?? fallbackImage)
 const finalSrc =
-  typeof rawSrc === 'string' && rawSrc.startsWith('/files/')
-    ? `${SELF_FETCH_BASE}${rawSrc}`
+  typeof rawSrc === 'string' && rawSrc.startsWith('/')
+    ? `${siteOrigin}${rawSrc}`
     : rawSrc
 
 const isSvg =
