@@ -141,9 +141,9 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
       attributesWithInfo.map((attribute) => (
         <div class="space-y-2 rounded-lg border border-zinc-600 bg-zinc-800 p-4">
           <div class="flex flex-col items-center space-y-2">
-            <h3 class={cn('text-center text-lg font-bold', attribute.typeInfo.classNames.text)}>
+            <h2 class={cn('text-center text-lg font-bold', attribute.typeInfo.classNames.text)}>
               {attribute.title}
-            </h3>
+            </h2>
             <div class="flex space-x-2">
               <BadgeStandard
                 text={attribute.categoryInfo.label}
@@ -308,7 +308,7 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
             )}
             aria-label={`Show services for ${attribute.title}`}
           >
-            <h3 class={cn('text-lg font-bold', attribute.typeInfo.classNames.text)}>{attribute.title}</h3>
+            <h2 class={cn('text-lg font-bold', attribute.typeInfo.classNames.text)}>{attribute.title}</h2>
 
             <BadgeStandard
               text={attribute.categoryInfo.label}
