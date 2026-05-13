@@ -3,7 +3,6 @@ import { Picture } from 'astro:assets'
 
 import defaultServiceImage from '../assets/fallback-service-image.jpg'
 import { cn } from '../lib/cn'
-import { siteOrigin } from '../lib/urls'
 
 import type { ComponentProps } from 'astro/types'
 
@@ -27,13 +26,7 @@ const {
 
 const fallbackImage = fallback ? fallbackImages[fallback] : undefined
 
-// Astro's <Picture> only optimizes string srcs when they're full URLs
-// matching `remotePatterns` in astro.config.mjs. Relative paths like
-// `/files/...` fall through unchanged. Absolutize them so they match
-// the `/files/**` remote pattern and get WebP transform + resize.
-const rawSrc = typeof src === 'string' ? src : (src ?? fallbackImage)
-const finalSrc =
-  typeof rawSrc === 'string' && rawSrc.startsWith('/') ? `${siteOrigin}${rawSrc}` : rawSrc
+const finalSrc = typeof src === 'string' ? src : (src ?? fallbackImage)
 
 const isSvg =
   (typeof finalSrc === 'string' && finalSrc.toLowerCase().endsWith('.svg')) ||

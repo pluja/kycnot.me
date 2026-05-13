@@ -171,9 +171,8 @@ export default defineConfig({
   image: {
     remotePatterns: [
       {
-        protocol: new URL(SITE_URL).protocol.slice(0, -1),
+        protocol: 'https',
         hostname: new URL(SITE_URL).hostname,
-        port: new URL(SITE_URL).port || undefined,
         pathname: '/files/**',
       },
     ],
