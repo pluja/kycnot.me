@@ -114,8 +114,8 @@ _deploy env mode ssh_var dir_var confirm:
   docker push {{pyworker_image}}:{{env}}-{{sha}}
 
   echo
-  echo "Syncing justfile.prod to $ssh_target..."
-  rsync -a justfile.prod "$ssh_target:$app_dir/justfile"
+  echo "Syncing Makefile.prod to $ssh_target..."
+  rsync -a Makefile.prod "$ssh_target:$app_dir/Makefile"
 
   echo
   echo "Rolling out on $ssh_target..."
