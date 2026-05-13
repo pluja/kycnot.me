@@ -6,6 +6,14 @@ import { cn } from '../lib/cn'
 
 import type { ComponentProps } from 'astro/types'
 
+// Astro's <Picture> needs a full URL string matching `remotePatterns` to run
+// the sharp WebP transform on remote uploads. Pointing at the public site
+// URL works in test/prod but breaks under preprod basic-auth and adds a
+// public CF/Caddy roundtrip for every cache miss. Using the loopback URL
+// instead keeps the transform's source fetch inside the same Node process:
+// Astro -> its own `/files/[...path]` route -> disk read -> sharp.
+const SELF_FETCH_BASE = 'http://localhost:4321'
+
 const fallbackImages = {
   service: defaultServiceImage,
 } as const satisfies Record<string, typeof defaultServiceImage>
@@ -26,7 +34,11 @@ const {
 
 const fallbackImage = fallback ? fallbackImages[fallback] : undefined
 
-const finalSrc = typeof src === 'string' ? src : (src ?? fallbackImage)
+const rawSrc = typeof src === 'string' ? src : (src ?? fallbackImage)
+const finalSrc =
+  typeof rawSrc === 'string' && rawSrc.startsWith('/files/')
+    ? `${SELF_FETCH_BASE}${rawSrc}`
+    : rawSrc
 
 const isSvg =
   (typeof finalSrc === 'string' && finalSrc.toLowerCase().endsWith('.svg')) ||
