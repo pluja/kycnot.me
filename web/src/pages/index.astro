@@ -36,7 +36,7 @@ import { siteOrigin } from '../lib/urls'
 
 import type { Prisma } from '@prisma/client'
 
-const PAGE_SIZE = 30
+const PAGE_SIZE = 12
 
 export type AttributeOption = {
   value: string
@@ -595,18 +595,18 @@ const showFiltersId = 'show-filters'
         attributeOptions={attributeOptions}
         aria-label="Search results"
       />
+      {
+        totalServices > PAGE_SIZE && (
+          <Pagination
+            currentPage={filters.page}
+            totalPages={Math.ceil(totalServices / PAGE_SIZE)}
+            sortSeed={filters['sort-seed']}
+            class="mt-8 js:hidden"
+          />
+        )
+      }
     </div>
   </div>
-  {
-    totalServices > PAGE_SIZE && (
-      <Pagination
-        currentPage={filters.page}
-        totalPages={Math.ceil(totalServices / PAGE_SIZE)}
-        sortSeed={filters['sort-seed']}
-        class="mt-8 js:hidden"
-      />
-    )
-  }
 </BaseLayout>
 
 <script>
