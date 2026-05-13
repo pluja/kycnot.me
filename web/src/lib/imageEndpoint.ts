@@ -1,23 +1,19 @@
+// Custom `/_image` endpoint (wired via `image.endpoint` in astro.config).
+// Reads /files/* uploads from disk instead of HTTP-fetching the public URL,
+// avoiding a basic-auth/CF roundtrip. Other paths fall through to Astro.
+//
+// https://docs.astro.build/en/reference/configuration-reference/#imageendpoint
+// https://docs.astro.build/en/reference/image-service-reference/#custom-image-api-endpoint
+
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
 import { getConfiguredImageService, imageConfig } from 'astro:assets'
-// Astro's stock Node endpoint is reused for everything that isn't a
-// user-uploaded /files/* image (ESM-imported assets, the PWA fallbacks,
-// etc.). The package exposes it at this path via the `./assets/endpoint/*`
-// export map, so future Astro updates to the default handler flow through.
 import { GET as defaultImageEndpoint } from 'astro/assets/endpoint/node'
 import { UPLOAD_DIR } from 'astro:env/server'
 import * as mime from 'mrmime'
 
 import type { APIRoute } from 'astro'
-
-// Custom replacement for Astro's default `/_image` endpoint. Same contract
-// (GET /_image?href=...&w=...&h=...&f=...), but reads `/files/*` uploads
-// directly from `UPLOAD_DIR` on disk instead of HTTP-fetching the public
-// URL. Avoids the public-network roundtrip that breaks under preprod
-// basic-auth and adds latency / SSRF surface in prod. Non-/files/ hrefs
-// fall through to Astro's stock handler.
 
 const FILES_PREFIX = '/files/'
 
