@@ -1,6 +1,7 @@
 ---
 import LoadingIndicator from 'astro-loading-indicator/component'
 import { Schema } from 'astro-seo-schema'
+import { Font } from 'astro:assets'
 import { ONION_ADDRESS } from 'astro:env/server'
 import { ClientRouter } from 'astro:transitions'
 import { pwaAssetsHead } from 'virtual:pwa-assets/head'
@@ -108,6 +109,8 @@ const modeName = DEPLOYMENT_MODE === 'production' ? '' : DEPLOYMENT_MODE === 'st
 const fullTitle = [pageTitle, 'KYCnot.me', modeName].filter(Boolean).join(' | ')
 const ogImageUrl = makeOgImageUrl(ogImage, siteOrigin)
 ---
+
+<Font cssVariable="--font-title-base" preload />
 
 {/* Primary Meta Tags */}
 <meta name="generator" content={Astro.generator} />

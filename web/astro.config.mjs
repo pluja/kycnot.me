@@ -6,7 +6,7 @@ import sitemap from '@astrojs/sitemap'
 import tailwindcss from '@tailwindcss/vite'
 import { minimal2023Preset } from '@vite-pwa/assets-generator/config'
 import AstroPWA from '@vite-pwa/astro'
-import { defineConfig, envField } from 'astro/config'
+import { defineConfig, envField, fontProviders } from 'astro/config'
 import icon from 'astro-icon'
 import rehypeExternalLinks from 'rehype-external-links'
 import rehypeRaw from 'rehype-raw'
@@ -109,6 +109,17 @@ export default defineConfig({
   }),
   output: 'server',
   trailingSlash: 'never',
+  experimental: {
+    fonts: [
+      {
+        provider: fontProviders.fontsource(),
+        name: 'Space Grotesk',
+        cssVariable: '--font-title-base',
+        weights: [400, 500, 700],
+        styles: ['normal'],
+      },
+    ],
+  },
   markdown: {
     // `allowDangerousHtml` + `rehype-raw` make raw HTML inside markdown
     // (e.g. `<a rel="sponsored">` for Google-compliant sponsored review

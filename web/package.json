@@ -31,7 +31,6 @@
     "@astrojs/rss": "4.0.18",
     "@astrojs/sitemap": "3.7.2",
     "@bufbuild/protobuf": "2.11.0",
-    "@fontsource-variable/space-grotesk": "5.2.10",
     "@fontsource/inter": "5.2.8",
     "@fontsource/space-grotesk": "5.2.10",
     "@grpc/grpc-js": "1.14.3",

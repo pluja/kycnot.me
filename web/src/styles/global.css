@@ -43,7 +43,7 @@
 }
 
 @theme inline {
-  --font-title: 'Space Grotesk Variable', var(--font-sans), 'sans-serif';
+  --font-title: var(--font-title-base), var(--font-sans), 'sans-serif';
 }
 
 @theme {
