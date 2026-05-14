@@ -33,6 +33,10 @@ Disallow: /admin/
 Disallow: /internal-api/
 Disallow: /api/
 Disallow: /feeds/user/
+Disallow: /swap?*sendAmount=
+Disallow: /swap?*receiveAmount=
+Disallow: /swap?*sortBy=
+Disallow: /swap?*approvedOnly=
 
 Sitemap: ${sitemapUrl}
 `

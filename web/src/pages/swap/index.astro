@@ -26,6 +26,13 @@ const pageTitle = buildTitle(curatedPair)
 const heading = buildHeading(curatedPair)
 const description = buildDescription(curatedPair)
 const ogImage = buildOgImageProps(curatedPair)
+
+const params = Astro.url.searchParams
+const noindex =
+  params.has('sendAmount') ||
+  params.has('receiveAmount') ||
+  params.has('sortBy') ||
+  params.has('approvedOnly')
 const schemas = [
   buildOrganizationSchema(),
   buildWebApplicationSchema(canonical, description),
@@ -40,6 +47,7 @@ const schemas = [
   ogImage={ogImage}
   schemas={schemas}
   breadcrumbs={[{ name: 'Services', url: '/' }, { name: 'Compare Rates' }]}
+  noindex={noindex}
   htmx
 >
   <div class="mx-auto max-w-5xl px-2 pb-12 sm:px-4">
