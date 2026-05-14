@@ -144,11 +144,11 @@ const ogImageUrl = makeOgImageUrl(ogImage, siteOrigin)
 }
 
 {/* Twitter */}
-<meta property="twitter:card" content="summary_large_image" />
-<meta property="twitter:url" content={absoluteSiteUrl(canonical)} />
-<meta property="twitter:title" content={fullTitle} />
-<meta property="twitter:description" content={description} />
-{!!ogImageUrl && <meta property="twitter:image" content={ogImageUrl} />}
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:url" content={absoluteSiteUrl(canonical)} />
+<meta name="twitter:title" content={fullTitle} />
+<meta name="twitter:description" content={description} />
+{!!ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
 
 {/* Other */}
 <link rel="sitemap" href="/sitemaps/index.xml" />
