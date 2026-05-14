@@ -881,6 +881,7 @@ const verificationStatusDate =
           <a
             href={makeLoginUrl(Astro.url)}
             data-astro-reload
+            aria-label="Watch this service"
             class="inline-flex items-center gap-2 rounded-lg border border-night-500 bg-night-800 px-4 py-2 text-sm shadow-sm transition-colors duration-200 hover:bg-night-900 hover:text-day-200 focus-visible:bg-night-900 focus-visible:text-day-200"
             aria-haspopup="true"
           >
@@ -921,24 +922,26 @@ const verificationStatusDate =
     </div>
   </div>
 
-  <div class="mt-0 flex justify-end px-1 py-0">
+  <ul class="mt-0 flex justify-end px-1 py-0" aria-label="Supported currencies">
     {
       currencies.map((currency) => {
         const isAccepted = service.acceptedCurrencies.includes(currency.id)
 
         return (
-          <Tooltip text={currency.name}>
-            <Icon
-              name={currency.icon}
-              class={cn('box-content size-4 p-1 text-day-600', {
-                'text-white': isAccepted,
-              })}
-            />
-          </Tooltip>
+          <li aria-label={`${currency.name}: ${isAccepted ? 'supported' : 'not supported'}`}>
+            <Tooltip text={currency.name}>
+              <Icon
+                name={currency.icon}
+                class={cn('box-content size-5 p-1.5 text-day-600', {
+                  'text-white': isAccepted,
+                })}
+              />
+            </Tooltip>
+          </li>
         )
       })
     }
-  </div>
+  </ul>
 
   {
     shownLinks.length + hiddenLinks.length > 0 && (
@@ -965,7 +968,7 @@ const verificationStatusDate =
           <li class="rounded-full peer-checked:hidden peer-focus-visible:ring-4 peer-focus-visible:ring-orange-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-night-700">
             <label
               for="show-more-links"
-              class="inline-flex h-6 cursor-pointer items-center gap-1 rounded-full bg-day-800 px-2 text-xs whitespace-nowrap text-day-100 transition-colors duration-200 hover:bg-day-900 2xs:h-8 2xs:gap-2 2xs:px-4 2xs:text-sm"
+              class="inline-flex h-8 cursor-pointer items-center gap-2 rounded-full bg-day-800 px-3 text-sm whitespace-nowrap text-day-100 transition-colors duration-200 hover:bg-day-900 2xs:px-4"
             >
               +{hiddenLinks.length.toLocaleString()} more
             </label>
@@ -990,9 +993,9 @@ const verificationStatusDate =
     <Markdown content={service.description} />
     {
       serviceSummary && (
-        <p class="!mt-4 text-day-500">
-          <span aria-hidden="true" class="font-bold tracking-wide text-day-600 uppercase">Summary</span>
-          <span aria-hidden="true" class="mx-1 font-bold text-day-600">•</span>
+        <p class="!mt-4 text-day-300">
+          <span aria-hidden="true" class="font-bold tracking-wide text-day-500 uppercase">Summary</span>
+          <span aria-hidden="true" class="mx-1 font-bold text-day-500">•</span>
           {serviceSummary}
         </p>
       )
@@ -1096,6 +1099,8 @@ const verificationStatusDate =
       <ScoreSquare
         as="a"
         href="/about#service-scores"
+        role="link"
+        aria-label={`Overall score ${formatRating(service.overallScore)} out of 10. Learn how scores are calculated.`}
         score={service.overallScore}
         label="Overall"
         itemReviewedId={itemReviewedId}
@@ -1107,6 +1112,8 @@ const verificationStatusDate =
       <ScoreGauge
         as="a"
         href="/about#service-scores"
+        role="link"
+        aria-label={`Privacy score ${Math.round(service.privacyScore)} percent. Learn how scores are calculated.`}
         score={service.privacyScore}
         label="Privacy"
         itemReviewedId={itemReviewedId}
@@ -1116,6 +1123,8 @@ const verificationStatusDate =
       <ScoreGauge
         as="a"
         href="/about#service-scores"
+        role="link"
+        aria-label={`Trust score ${Math.round(service.trustScore)} percent. Learn how scores are calculated.`}
         score={service.trustScore}
         label="Trust"
         itemReviewedId={itemReviewedId}

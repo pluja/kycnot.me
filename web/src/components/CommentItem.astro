@@ -161,7 +161,10 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
       <UserBadge
         user={comment.author}
         size="md"
-        class={cn('text-day-300', isAuthor && 'font-medium text-green-500')}
+        class={cn(
+          '-my-1 rounded-sm px-1 py-1 text-day-300 hover:bg-zinc-800/50',
+          isAuthor && 'font-medium text-green-500'
+        )}
       />
 
       {
@@ -190,7 +193,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
 
     <span class="text-zinc-700">•</span>
 
-    <a href={commentUrl} class="hover:text-zinc-300">
+    <a href={commentUrl} class="rounded-sm px-1 py-1 hover:bg-zinc-800/50 hover:text-zinc-300">
       <TimeFormatted date={comment.createdAt} hourPrecision />
     </a>
 
@@ -210,7 +213,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
           </span>
           <a
             href="/about#trust-weighted-ratings"
-            class="inline-flex items-center gap-0.5 text-[10px] text-day-700 hover:text-day-500"
+            class="inline-flex items-center gap-0.5 rounded-sm px-1 py-1 text-xs text-day-700 hover:bg-zinc-800/50 hover:text-day-500"
             title={`Rating weight: ${ratingWeightPercent}`}
             aria-label={`Rating weight: ${ratingWeightPercent}. Learn about trust weighted ratings.`}
           >
