@@ -457,10 +457,11 @@ const searchPageTitle = makeSearchTitle({
   forPageTitle: true,
 })
 const searchPageDescription = makeSearchMetaDescription({
-  title: searchPageTitle,
-  total: totalServices,
   filters,
   hasDefaultFilters,
+  categories,
+  attributes,
+  attributeOptions,
 })
 
 const searchResultsId = 'search-results'

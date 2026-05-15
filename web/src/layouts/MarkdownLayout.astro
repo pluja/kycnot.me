@@ -15,6 +15,7 @@ type Props = ComponentProps<typeof BaseLayout> &
   MarkdownLayoutProps<{
     children: AstroChildren
     title: string
+    pageTitle?: string
     updatedAt?: string
     description: string
     icon?: string
@@ -32,7 +33,7 @@ const ogImageTemplateData = {
 
 <BaseLayout
   {...baseLayoutProps}
-  pageTitle={frontmatter.title}
+  pageTitle={frontmatter.pageTitle ?? frontmatter.title}
   description={frontmatter.description}
   ogImage={ogImageTemplateData}
   schemas={[

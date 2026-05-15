@@ -4,7 +4,6 @@ import { getCurrencyInfo } from '../constants/currencies'
 import { getVerificationStatusInfo } from '../constants/verificationStatus'
 
 import { areEqualArraysWithoutOrder } from './arrays'
-import { pluralize } from './pluralize'
 import { transformCase } from './strings'
 
 type SearchFilters = {
@@ -52,11 +51,15 @@ export function makeSearchTitle({
   attributeOptions,
   forPageTitle = false,
 }: SearchSeoInput & { forPageTitle?: boolean }) {
+  // Search query: surface the term immediately so users know they're in the right place
   if (filters.q) {
-    return `Search results for “${filters.q}”`
+    if (forPageTitle) return `Search "${filters.q}" - No-KYC Crypto Services`
+    return `Search results for "${filters.q}"`
   }
 
-  if (hasDefaultFilters && forPageTitle) {
+  // No filters: target "no KYC crypto" head terms
+  if (hasDefaultFilters) {
+    if (forPageTitle) return 'No-KYC Services Directory - Reviews & Privacy Scores'
     return 'No-KYC crypto services directory'
   }
 
@@ -153,30 +156,71 @@ export function makeSearchTitle({
     buildTitle([]),
   ]
 
-  return titleCandidates.find((candidate) => candidate.length <= MAX_TITLE_LENGTH) ?? titleCandidates.at(-1) ?? 'Services'
+  const bestTitle = titleCandidates.find((candidate) => candidate.length <= MAX_TITLE_LENGTH) ?? titleCandidates.at(-1) ?? 'Services'
+
+  if (!forPageTitle) return bestTitle
+
+  // When hasDefaultFilters=false but no meaningful custom filter is active (e.g. sort parameter
+  // differs from default), the title degenerates to "Approved and Verified services". Detect
+  // this "effectively homepage" state and use the custom main-page SEO title instead.
+  const hasNoCustomFilters =
+    !filters.categories.length &&
+    !filters.currencies.length &&
+    filters['max-kyc'] >= 4 &&
+    filters['min-score'] <= 0 &&
+    !attributesFilters.length &&
+    areEqualArraysWithoutOrder(filters.verification, ['APPROVED', 'VERIFICATION_SUCCESS'])
+  if (hasNoCustomFilters) return 'No-KYC Services Directory - Reviews & Privacy Scores'
+
+  // Build from raw filter parts: "No-KYC [category] [currencies] - Reviews & Privacy Scores"
+  // Preserve acronyms (VPNs, CEXs, DEXs, AI...) — only lowercase first char for non-acronyms.
+  const b0 = base[0] ?? ''
+  const b1 = base[1] ?? ''
+  const isAcronymBase = base.length >= 2 && b0 === b0.toUpperCase() && b1 === b1.toUpperCase()
+  const baseLabel = isAcronymBase ? base : base.charAt(0).toLowerCase() + base.slice(1)
+
+  // "without KYC" is already implied by the "No-KYC" prefix — skip it to avoid redundancy.
+  const kycLabelForTitle = kycLevel === 'without KYC' ? '' : kycLevel
+
+  const subjectParts = [baseLabel, currencies, kycLabelForTitle, attributesPart].filter(Boolean)
+  const subject = `No-KYC ${subjectParts.join(' ')}`
+
+  // Try suffixes from most to least descriptive. Cap pageTitle at 55 chars so the full
+  // "<title> | KYCnot.me" stays within ~68 chars and avoids SERP truncation.
+  // With extra filter context in the subject, "Privacy Scores" may not fit — fall back to shorter forms.
+  const hasExtraContext = !!(currencies || kycLabelForTitle || attributesPart)
+  const suffixes = hasExtraContext
+    ? [' - Reviews & Privacy Scores', ' - Reviews & Scores', ' - Reviews', '']
+    : [' - Reviews & Privacy Scores', ' - Reviews & Scores', '']
+  for (const suffix of suffixes) {
+    if ((subject + suffix).length <= 55) return subject + suffix
+  }
+  return subject.slice(0, 55)
 }
 
 export function makeSearchMetaDescription({
-  title,
-  total,
   filters,
   hasDefaultFilters,
-}: {
-  title: string
-  total: number
-  filters: SearchFilters
-  hasDefaultFilters: boolean
-}) {
+  categories,
+  attributes,
+  attributeOptions,
+}: SearchSeoInput) {
+  // Search query: confirm the result set and explain what they can compare
   if (filters.q) {
-    return `Search KYCnot.me for “${filters.q}” and compare privacy-focused services by score, trust, supported currencies, and KYC requirements.`
+    return `Search KYCnot.me for "${filters.q}" - compare no-KYC crypto services by privacy score, trust signals, and currencies accepted. Find verified options without identity verification.`
   }
 
+  // Default: match "no KYC crypto" / "buy crypto without ID" intent
   if (hasDefaultFilters) {
-    return "Find crypto exchanges, wallets, and services that don't require KYC verification. Browse privacy-focused alternatives with trust scores and detailed reviews."
+    return "Find no-KYC crypto exchanges, wallets, VPNs, and more - all verified and ranked by privacy score. Use crypto without identity verification or government-issued ID."
   }
 
-  const titleText = title.charAt(0).toLowerCase() + title.slice(1)
-  const resultText = `${total.toLocaleString()} ${pluralize('result', total)}`
+  // Filtered: describe what's on the page without a count (counts go stale in cached snippets)
+  const shortTitle = makeSearchTitle({ filters, hasDefaultFilters, categories, attributes, attributeOptions })
+  // Lowercase first char for prose, but preserve acronyms (VPNs, CEXs...)
+  const s0 = shortTitle[0] ?? '', s1 = shortTitle[1] ?? ''
+  const isAcronymShort = shortTitle.length >= 2 && s0 === s0.toUpperCase() && s1 === s1.toUpperCase()
+  const shortTitleProse = isAcronymShort ? shortTitle : shortTitle.charAt(0).toLowerCase() + shortTitle.slice(1)
 
-  return `Browse ${resultText} for ${titleText} on KYCnot.me. Compare privacy scores, trust signals, supported currencies, and KYC requirements.`
+  return `Browse no-KYC ${shortTitleProse} on KYCnot.me - all verified and ranked by privacy score, trust rating, and accepted currencies. Use crypto without identity verification.`
 }

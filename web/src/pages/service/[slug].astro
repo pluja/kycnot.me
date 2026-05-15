@@ -427,12 +427,6 @@ const pageTitle =
     `${service.name} Review: KYC Policy & Privacy Score`,
     `${service.name} Review`,
   ].find((title) => title.length <= 62) ?? `${service.name} Review`
-const pageDescription =
-  [
-    `${service.name} review: ${kycTitlePhrase}${categoryTitlePhrase}, KYC policy notes, ${Math.round(service.privacyScore).toLocaleString()}% privacy score, ${Math.round(service.trustScore).toLocaleString()}% trust score, supported currencies, and user feedback.`,
-    `${service.name} review: ${kycTitlePhrase}${categoryTitlePhrase}, KYC policy notes, privacy score, trust score, supported currencies, and user feedback.`,
-    `Review ${service.name} on KYCnot.me. Check KYC policy notes, privacy score, trust score, supported currencies, and user feedback.`,
-  ].find((description) => description.length <= 160) ?? `Review ${service.name} on KYCnot.me. Check KYC policy, privacy score, trust score, supported currencies, and user feedback.`
 const sentenceListFormatter = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' })
 const formatRating = (rating: number) => {
   const rounded = Math.round(rating * 10) / 10
@@ -475,6 +469,13 @@ const serviceFactsSummary = [
   .filter((sentence): sentence is string => !!sentence)
   .join(' ')
 const serviceSummary = transformCase(serviceFactsSummary, 'first-upper')
+const pageDescription =
+  [
+    serviceSummary,
+    `${service.name} review: ${kycTitlePhrase}${categoryTitlePhrase}, KYC policy notes, ${Math.round(service.privacyScore).toLocaleString()}% privacy score, ${Math.round(service.trustScore).toLocaleString()}% trust score, supported currencies, and user feedback.`,
+    `${service.name} review: ${kycTitlePhrase}${categoryTitlePhrase}, KYC policy notes, privacy score, trust score, supported currencies, and user feedback.`,
+    `Review ${service.name} on KYCnot.me. Check KYC policy notes, privacy score, trust score, supported currencies, and user feedback.`,
+  ].find((description) => description.length <= 200) ?? `Review ${service.name} on KYCnot.me. Check KYC policy, privacy score, trust score, supported currencies, and user feedback.`
 
 const ogImageTemplateData = {
   template: 'service',
