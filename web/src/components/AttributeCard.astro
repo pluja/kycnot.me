@@ -71,7 +71,7 @@ const weights = [
         <span class="mr-auto ml-1">{attribute.title}</span>
         {
           weights.map((w) => (
-            <span class={cn('ml-2 text-center text-sm', w.value === 0 ? 'text-current/30' : 'text-current/60')}>
+            <span class={cn('ml-2 text-center text-sm', w.value === 0 ? 'text-current/50' : 'text-current/80')}>
               {formatNumber(w.value, w.formatOptions)}
             </span>
           ))
@@ -88,7 +88,7 @@ const weights = [
       {
         excerpt && (
           <div class="mt-0.5 flex items-center gap-1 group-open/attribute:hidden">
-            <p class="ml-1 line-clamp-1 flex-1 text-xs font-normal text-current/60">{excerpt}</p>
+            <p class="ml-1 line-clamp-1 flex-1 text-xs font-normal text-current/80">{excerpt}</p>
             <Icon name="ri:arrow-down-s-line" class={cn('size-5 shrink-0', attribute.typeInfo.classNames.icon)} />
           </div>
         )

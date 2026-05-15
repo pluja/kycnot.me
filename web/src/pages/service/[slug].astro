@@ -1153,11 +1153,11 @@ const verificationStatusDate =
       />
       <div class="mr-2 flex h-full flex-col items-center justify-around @sm:mr-4">
         <Icon name={kycLevelInfo.icon} class="block size-13 @sm:size-16" />
-        <div class="h-4 text-center text-xs leading-none whitespace-nowrap text-day-600 @sm:text-sm">
+        <div class="h-4 text-center text-xs leading-none whitespace-nowrap text-zinc-600 @sm:text-sm">
           <span class="font-title">lvl.</span>
-          <span class="text-base leading-none font-bold tracking-wider text-day-700 @sm:text-lg"
+          <span class="text-base leading-none font-bold tracking-wider text-zinc-700 @sm:text-lg"
             >{kycLevelInfo.value}</span
-          ><span class="tracking-wider text-day-500">/<span>{kycLevels.length - 1}</span></span>
+          ><span class="tracking-wider text-zinc-600">/<span>{kycLevels.length - 1}</span></span>
         </div>
       </div>
 
@@ -1165,7 +1165,7 @@ const verificationStatusDate =
         <dt class="text-base font-bold text-pretty">
           {kycLevelInfo.name}
         </dt>
-        <dd class="mt-1 font-sans text-sm text-pretty text-day-700">
+        <dd class="mt-1 font-sans text-sm text-pretty text-zinc-600">
           {kycLevelInfo.description}
         </dd>
       </dl>
@@ -1345,7 +1345,7 @@ const verificationStatusDate =
                 </a>
               ))}
             </p>
-            <p class="mb-2 text-center text-xs text-day-600 duration-400 hover:text-day-400">
+            <p class="mb-2 text-center text-xs text-day-400 duration-400 hover:text-day-300">
               ToS reviews are AI-generated and should be used as a reference only.
             </p>
           </>
