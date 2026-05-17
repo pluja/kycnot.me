@@ -12,6 +12,12 @@ import type { ModerationAction, Prisma, RatingMuteReason } from '@prisma/client'
 import type { HTMLAttributes } from 'astro/types'
 
 type Props = HTMLAttributes<'div'> & {
+  /**
+   * When true, drops the outer toggle wrapper and any blocks the embedding
+   * parent already renders (author context, AI verdict block, Decide row).
+   * Layout becomes a tight grid so it fits inside an expanded admin row.
+   */
+  compact?: boolean
   comment: Prisma.CommentGetPayload<{
     select: {
       id: true
@@ -63,7 +69,7 @@ type Props = HTMLAttributes<'div'> & {
   }>
 }
 
-const { comment, class: className, ...divProps } = Astro.props
+const { comment, compact = false, class: className, ...divProps } = Astro.props
 
 const user = Astro.locals.user
 
@@ -119,24 +125,37 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
 ---
 
 <div {...divProps} class={cn('text-xs', className)} data-comment-moderation>
-  <input type="checkbox" id={`mod-toggle-${String(comment.id)}`} class="peer sr-only" />
-  <label
-    for={`mod-toggle-${String(comment.id)}`}
-    class="inline-flex cursor-pointer items-center gap-1 rounded-sm text-day-500 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-night-700 hover:text-day-300"
-  >
-    <Icon name="ri:shield-keyhole-line" class="size-3.5" />
-    <span class="text-xs">Moderation</span>
-    <Icon name="ri:arrow-down-s-line" class="size-3.5 transition-transform peer-checked:rotate-180" />
-  </label>
+  {
+    !compact && (
+      <>
+        <input type="checkbox" id={`mod-toggle-${String(comment.id)}`} class="peer sr-only" />
+        <label
+          for={`mod-toggle-${String(comment.id)}`}
+          class="inline-flex cursor-pointer items-center gap-1 rounded-sm text-day-500 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-night-700 hover:text-day-300"
+        >
+          <Icon name="ri:shield-keyhole-line" class="size-3.5" />
+          <span class="text-xs">Moderation</span>
+          <Icon
+            name="ri:arrow-down-s-line"
+            class="size-3.5 transition-transform peer-checked:rotate-180"
+          />
+        </label>
+      </>
+    )
+  }
 
   <div
-    class="mt-2 hidden rounded-md border border-night-500 bg-night-600 peer-checked:block peer-checked:p-2"
+    class={cn(
+      compact
+        ? 'space-y-2'
+        : 'mt-2 hidden rounded-md border border-night-500 bg-night-600 peer-checked:block peer-checked:p-2'
+    )}
   >
-    <AdminCommentContext comment={comment} class="mb-2 border-b border-night-500 pb-2" />
+    {!compact && <AdminCommentContext comment={comment} class="mb-2 border-b border-night-500 pb-2" />}
 
-    {/* AI verdict (read-only) */}
+    {/* AI verdict (read-only). Hidden in compact mode because the embedding row already shows it. */}
     {
-      hasAiVerdict && (
+      !compact && hasAiVerdict && (
         <div class="mb-2 rounded-sm border border-indigo-500/30 bg-indigo-500/10 px-2 py-1.5">
           <div class="mb-1 flex flex-wrap items-center gap-1.5 text-[10px] text-indigo-300">
             <Icon name="ri:robot-2-line" class="size-3.5" />
@@ -204,9 +223,10 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
       )
     }
 
-    {/* Moderation action buttons (audit-trailed). The effective action
-        falls back to status for legacy comments that pre-date humanAction
-        tracking, so the current state is visible without requiring a click. */}
+    {/* Moderation action buttons (audit-trailed). Shown in both modes; also
+        in compact (admin row), so a moderator can decide without scrolling
+        back up to the row's action rail. The effective action falls back
+        to status for legacy comments that pre-date humanAction tracking. */}
     <div class="mb-2 flex flex-wrap items-center gap-1 border-b border-night-500 pb-2">
       <span class="mr-1 text-[10px] text-day-500">Decide:</span>
       {
@@ -261,9 +281,12 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
     </div>
 
     {/* Rating controls. Only relevant when this comment has a rating that
-        currently counts (or could count) toward the service score. */}
+        currently counts (or could count) toward the service score.
+        Hidden in compact mode because the embedding row's Context panel
+        shows the same disable/enable button next to the star rating. */}
     {
-      comment.rating !== null &&
+      !compact &&
+        comment.rating !== null &&
         (comment.status === 'APPROVED' || comment.status === 'VERIFIED') && (
           <div class="mb-2 flex flex-wrap items-center gap-1.5 border-b border-night-500 pb-2">
             <button
@@ -305,8 +328,9 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
         )
     }
 
+    {/* Rating trust display. Hidden in compact mode (shown in Context panel). */}
     {
-      comment.rating !== null && (
+      !compact && comment.rating !== null && (
         <div class="mb-2 rounded-sm border border-night-500 bg-night-700 px-1.5 py-1 text-[10px] text-day-400">
           <span class="font-medium text-day-300">Rating trust:</span>{' '}
           {comment.ratingTrustLabel ?? 'Unknown'} · weight {comment.ratingWeight.toFixed(2)}
@@ -315,62 +339,70 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
       )
     }
 
-    {/* Notes */}
-    <div class="space-y-1.5">
-      <div class="space-y-1.5">
-        <div class="flex items-center gap-1.5">
-          <span class="w-14 shrink-0 text-[10px] text-day-500">Public:</span>
-          <input
-            type="text"
-            placeholder="Visible to everyone..."
-            value={comment.publicNote}
-            class="flex-1 rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
-            data-action="public-note"
-            data-comment-id={comment.id}
-            data-user-id={user.id}
-          />
-        </div>
-        <div class="flex flex-wrap gap-1 pl-14">
-          {
-            communityNotePresets.map((preset) => (
-              <button
-                type="button"
-                class="rounded-sm bg-night-700 px-1.5 py-0.5 text-[10px] text-day-400 transition-colors hover:bg-blue-500/20 hover:text-blue-300"
-                data-public-note-preset={preset}
-                data-comment-id={comment.id}
-              >
-                {preset}
-              </button>
-            ))
-          }
-        </div>
+    {/* Notes. In compact mode, three columns side-by-side. */}
+    <div class={cn('space-y-1.5', compact && 'md:grid md:grid-cols-3 md:gap-3 md:space-y-0')}>
+      <div class="space-y-1">
+        <label class="block text-[10px] font-medium text-day-400">
+          <Icon name="ri:global-line" class="mr-0.5 inline size-3 align-[-0.15em] text-emerald-400" />
+          Public note <span class="text-day-600">(visible to everyone)</span>
+        </label>
+        <textarea
+          rows="2"
+          placeholder="Add a context note..."
+          class="field-sizing-content w-full resize-y rounded-sm border border-night-500 bg-night-700 px-2 py-1 text-xs leading-snug outline-hidden focus:ring-1 focus:ring-blue-500"
+          data-action="public-note"
+          data-comment-id={comment.id}
+          data-user-id={user.id}>{comment.publicNote ?? ''}</textarea>
+        <details class="mt-1">
+          <summary class="cursor-pointer text-[10px] text-day-500 hover:text-day-300">
+            Presets
+          </summary>
+          <div class="mt-1 flex flex-wrap gap-1">
+            {
+              communityNotePresets.map((preset) => (
+                <button
+                  type="button"
+                  class="rounded-sm bg-night-700 px-1.5 py-0.5 text-[10px] text-day-400 transition-colors hover:bg-blue-500/20 hover:text-blue-300"
+                  data-public-note-preset={preset}
+                  data-comment-id={comment.id}
+                >
+                  {preset}
+                </button>
+              ))
+            }
+          </div>
+        </details>
       </div>
 
-      <div class="flex items-center gap-1.5">
-        <span class="w-14 shrink-0 text-[10px] text-day-500">Admin:</span>
-        <input
-          type="text"
-          placeholder="Mod-only note..."
-          value={comment.adminNote}
-          class="flex-1 rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
+      <div class="space-y-1">
+        <label class="block text-[10px] font-medium text-day-400">
+          <Icon name="ri:shield-keyhole-line" class="mr-0.5 inline size-3 align-[-0.15em] text-amber-400" />
+          Admin note <span class="text-day-600">(mods only)</span>
+        </label>
+        <textarea
+          rows="2"
+          placeholder="Internal note..."
+          class="field-sizing-content w-full resize-y rounded-sm border border-night-500 bg-night-700 px-2 py-1 text-xs leading-snug outline-hidden focus:ring-1 focus:ring-blue-500"
           data-action="admin-note"
           data-comment-id={comment.id}
-          data-user-id={user.id}
-        />
+          data-user-id={user.id}>{comment.adminNote ?? ''}</textarea>
       </div>
 
-      <div class="flex items-center gap-1.5">
-        <span class="w-14 shrink-0 text-[10px] text-day-500">Author:</span>
-        <input
-          type="text"
-          placeholder="Visible to author and admins..."
-          value={comment.authorNote}
-          class="flex-1 rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
+      <div class="space-y-1">
+        <label class="block text-[10px] font-medium text-day-400">
+          <Icon name="ri:user-line" class="mr-0.5 inline size-3 align-[-0.15em] text-sky-400" />
+          Author note <span class="text-day-600">(author + mods)</span>
+        </label>
+        <textarea
+          rows="2"
+          placeholder="Visible to comment author..."
+          class="field-sizing-content w-full resize-y rounded-sm border border-night-500 bg-night-700 px-2 py-1 text-xs leading-snug outline-hidden focus:ring-1 focus:ring-blue-500"
           data-action="author-note"
           data-comment-id={comment.id}
-          data-user-id={user.id}
-        />
+          data-user-id={user.id}>{comment.authorNote ?? ''}</textarea>
       </div>
+    </div>
+    <div class="space-y-1.5">
 
       {/* Private proof */}
       {
@@ -480,16 +512,14 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
         const action = btn.getAttribute('data-action')
         const rawValue = btn.getAttribute('data-value')
         const commentId = parseInt(btn.getAttribute('data-comment-id') || '0')
-        const userId = parseInt(btn.getAttribute('data-user-id') || '0')
 
-        if (!action || !rawValue || !commentId || !userId) return
+        if (!action || !rawValue || !commentId) return
 
         const value = BOOLEAN_ACTIONS.has(action) ? rawValue === 'true' : rawValue
 
         try {
           const { error } = await actions.comment.moderate({
             commentId,
-            userId,
             action: action as any,
             value: value as any,
           })
@@ -512,14 +542,12 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
       select.addEventListener('change', async () => {
         const action = select.getAttribute('data-action')
         const commentId = parseInt(select.getAttribute('data-comment-id') || '0')
-        const userId = parseInt(select.getAttribute('data-user-id') || '0')
 
-        if (!action || !commentId || !userId) return
+        if (!action || !commentId) return
 
         try {
           const { error } = await actions.comment.moderate({
             commentId,
-            userId,
             action: action as any,
             value: select.value,
           })
@@ -540,7 +568,9 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
       button.addEventListener('click', () => {
         const preset = button.getAttribute('data-public-note-preset')
         const moderationRoot = button.closest('[data-comment-moderation]')
-        const input = moderationRoot?.querySelector<HTMLInputElement>('input[data-action="public-note"]')
+        const input = moderationRoot?.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+          '[data-action="public-note"]'
+        )
 
         if (!preset || !input) return
 
@@ -549,12 +579,15 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
       })
     })
 
-    document.querySelectorAll<HTMLInputElement>('input[data-action]').forEach((input) => {
+    document
+      .querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+        'input[data-action], textarea[data-action]'
+      )
+      .forEach((input) => {
       const action = input.getAttribute('data-action')
       const commentId = parseInt(input.getAttribute('data-comment-id') || '0')
-      const userId = parseInt(input.getAttribute('data-user-id') || '0')
 
-      if (!action || !commentId || !userId) return
+      if (!action || !commentId) return
 
       let timeout: ReturnType<typeof setTimeout>
 
@@ -564,7 +597,6 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
           try {
             const { error } = await actions.comment.moderate({
               commentId,
-              userId,
               action: action as any,
               value: input.value,
             })

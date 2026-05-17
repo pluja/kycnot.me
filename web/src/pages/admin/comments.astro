@@ -2,15 +2,9 @@
 import { z } from 'astro/zod'
 import { Icon } from 'astro-icon/components'
 
-import AdminCommentContext from '../../components/admin/comments/AdminCommentContext.astro'
-import BadgeSmall from '../../components/BadgeSmall.astro'
-import CommentModeration from '../../components/CommentModeration.astro'
-import MyPicture from '../../components/MyPicture.astro'
+import AdminCommentRow from '../../components/admin/comments/AdminCommentRow.astro'
 import Pagination from '../../components/Pagination.astro'
 import SortArrowIcon from '../../components/SortArrowIcon.astro'
-import TimeFormatted from '../../components/TimeFormatted.astro'
-import Tooltip from '../../components/Tooltip.astro'
-import UserBadge from '../../components/UserBadge.astro'
 import {
   adminCommentSortOptions,
   adminCommentSortOptionsZodEnum,
@@ -20,7 +14,6 @@ import {
   commentStatusFilters,
   commentStatusFiltersZodEnum,
   getCommentStatusFilterInfo,
-  getCommentStatusFilterValue,
 } from '../../constants/commentStatusFilters'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
@@ -39,7 +32,9 @@ const DEFAULT_SORT_ORDER = 'desc'
 
 const { data: params } = zodParseQueryParamsStoringErrors(
   {
-    status: commentStatusFiltersZodEnum.default('all'),
+    // Default to the Mod Work queue: union of fresh AI-handoffs and any
+    // comments a mod has deferred (Hold). The full mod inbox in one view.
+    status: commentStatusFiltersZodEnum.default('mod-work'),
     page: z.coerce.number().int().positive().default(1),
     'priority-page': z.coerce.number().int().positive().default(1),
     'sort-by': adminCommentSortOptionsZodEnum.default('createdAt'),
@@ -47,8 +42,8 @@ const { data: params } = zodParseQueryParamsStoringErrors(
   },
   Astro
 )
-const PAGE_SIZE = 20
-const PRIORITY_PAGE_SIZE = 20
+const PAGE_SIZE = 30
+const PRIORITY_PAGE_SIZE = 30
 
 const statusFilter = getCommentStatusFilterInfo(params.status)
 const sortBy = getAdminCommentSortOptionInfo(params['sort-by'])
@@ -72,7 +67,38 @@ const regularWhere = {
   },
 }
 
-const commentInclude = {
+const commentSelect = {
+  id: true,
+  content: true,
+  status: true,
+  rating: true,
+  ratingActive: true,
+  ratingMuted: true,
+  ratingMuteReason: true,
+  ratingWeight: true,
+  ratingTrustLabel: true,
+  ratingTrustReason: true,
+  createdAt: true,
+  approvedAt: true,
+  privateProof: true,
+  privateProofStatus: true,
+  issues: true,
+  publicNote: true,
+  adminNote: true,
+  authorNote: true,
+  aiAction: true,
+  aiQuality: true,
+  aiIsSpam: true,
+  aiIsBrigade: true,
+  aiBrigadeConfidence: true,
+  aiReasoning: true,
+  aiDecidedAt: true,
+  humanAction: true,
+  humanDecidedAt: true,
+  humanReasoning: true,
+  humanDecidedBy: {
+    select: { id: true, name: true, displayName: true, picture: true },
+  },
   author: {
     select: {
       name: true,
@@ -83,11 +109,7 @@ const commentInclude = {
       totalKarma: true,
       verified: true,
       spammer: true,
-      _count: {
-        select: {
-          comments: true,
-        },
-      },
+      _count: { select: { comments: true } },
     },
   },
   service: {
@@ -98,19 +120,14 @@ const commentInclude = {
       verificationStatus: true,
     },
   },
-  humanDecidedBy: {
-    select: {
-      name: true,
-      displayName: true,
-      picture: true,
-    },
-  },
   parent: {
-    include: {
-      author: true,
+    select: {
+      content: true,
+      author: {
+        select: { name: true, displayName: true, picture: true },
+      },
     },
   },
-  votes: true,
 } as const
 
 const commentOrderBy = [
@@ -125,7 +142,7 @@ const [priorityComments = [], totalPriorityComments = 0] = await Astro.locals.ba
   async () =>
     prisma.comment.findManyAndCount({
       where: priorityWhere,
-      include: commentInclude,
+      select: commentSelect,
       orderBy: commentOrderBy,
       skip: (params['priority-page'] - 1) * PRIORITY_PAGE_SIZE,
       take: PRIORITY_PAGE_SIZE,
@@ -138,7 +155,7 @@ const [comments = [], totalComments = 0] = await Astro.locals.banners.try(
   async () =>
     prisma.comment.findManyAndCount({
       where: regularWhere,
-      include: commentInclude,
+      select: commentSelect,
       orderBy: commentOrderBy,
       skip: (params.page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -146,9 +163,44 @@ const [comments = [], totalComments = 0] = await Astro.locals.banners.try(
   []
 )
 
+// Header stats. Counts the global table since the user clicks them to jump
+// to that filter, which then applies its own where clause.
+const [headerStats] = await Astro.locals.banners.try(
+  'Error fetching dashboard stats',
+  async () => {
+    const totalPending = await prisma.comment.count({ where: { status: 'PENDING' } })
+    const modWork = await prisma.comment.count({
+      where: {
+        OR: [{ aiAction: 'HOLD', humanAction: null }, { humanAction: 'HOLD' }],
+      },
+    })
+    const brigade = await prisma.comment.count({
+      where: { aiIsBrigade: true, status: 'PENDING' },
+    })
+    const proofPending = await prisma.comment.count({
+      where: { privateProof: { not: null }, privateProofStatus: 'PENDING', status: 'PENDING' },
+    })
+    return [{ totalPending, modWork, brigade, proofPending }]
+  },
+  [{ totalPending: 0, modWork: 0, brigade: 0, proofPending: 0 }]
+)
+
 const totalPages = Math.ceil(totalComments / PAGE_SIZE)
 const priorityTotalPages = Math.ceil(totalPriorityComments / PRIORITY_PAGE_SIZE)
-const priorityCurrentPage = Math.min(Math.max(1, params['priority-page']), priorityTotalPages || 1)
+
+// If a user lands on an out-of-range page (e.g. they had ?page=6 and then
+// switched to a filter that only has 2 pages), bounce them to page 1 of the
+// same filter rather than showing an empty list. Keep all other params.
+const pageOutOfRange = params.page > 1 && (totalComments === 0 || params.page > totalPages)
+const priorityPageOutOfRange =
+  params['priority-page'] > 1 &&
+  (totalPriorityComments === 0 || params['priority-page'] > priorityTotalPages)
+if (pageOutOfRange || priorityPageOutOfRange) {
+  const fixed = new URL(Astro.url)
+  if (pageOutOfRange) fixed.searchParams.delete('page')
+  if (priorityPageOutOfRange) fixed.searchParams.delete('priority-page')
+  return Astro.redirect(fixed.pathname + fixed.search)
+}
 
 const makePriorityPageUrl = (page: number) => {
   const searchParams = new URLSearchParams(Astro.url.search)
@@ -157,465 +209,311 @@ const makePriorityPageUrl = (page: number) => {
 }
 ---
 
-<BaseLayout pageTitle="Comment Moderation" widthClassName="max-w-7xl">
-  <div class="mb-8">
-    <div class="mb-4 flex items-center gap-4">
-      <h1 class="font-title text-2xl text-green-500">&gt; comments.moderate</h1>
-      {
-        totalPriorityComments > 0 && (
-          <span class="text-sm text-amber-400">({totalPriorityComments} priority)</span>
-        )
-      }
-    </div>
-
-    <!-- Status Filters -->
-    <div class="flex flex-wrap gap-2">
-      {
-        commentStatusFilters.map((filter) => (
-          <a
-            href={urlWithParams(Astro.url, { status: filter.value })}
-            class={cn([
-              'flex items-center gap-2 rounded-md border px-3 py-1 font-title text-sm',
-              params.status === filter.value
-                ? filter.classNames.filter
-                : 'border-zinc-700 transition-colors hover:border-green-500/50',
-            ])}
-          >
-            <Icon name={filter.icon} class="size-4 shrink-0" />
-            {filter.label}
-          </a>
-        ))
-      }
-    </div>
-
-    <!-- Sorting Options -->
-    <div class="mt-4 flex flex-col gap-2">
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-sm text-zinc-400">Sort by:</span>
-        {
-          adminCommentSortOptions.map((o) => (
-            <a
-              href={urlWithParams(Astro.url, {
-                'sort-by': o.value,
-                'sort-order':
-                  sortBy.value === o.value
-                    ? params['sort-order'] === 'asc'
-                      ? 'desc'
-                      : 'asc'
-                    : DEFAULT_SORT_ORDER,
-              })}
-              class={cn([
-                'flex items-center gap-1 rounded-md border px-3 py-1 font-title text-sm transition-colors',
-                sortBy.value === o.value
-                  ? 'border-blue-500 bg-blue-500/10 text-blue-400'
-                  : 'border-zinc-700 hover:border-blue-500/50',
-              ])}
-            >
-              {o.label}
-              <SortArrowIcon active={sortBy.value === o.value} sortOrder={params['sort-order']} />
-            </a>
-          ))
-        }
-        <span class="text-xs text-zinc-500">
-          {params['sort-order'] === 'desc' ? 'Newest' : 'Oldest'} first
-        </span>
+<BaseLayout pageTitle="Comment Moderation" widthClassName="max-w-screen-2xl">
+  <div class="mb-4 flex items-baseline justify-between gap-3">
+    <h1 class="font-title text-2xl text-green-500">&gt; comments.moderate</h1>
+    <details id="hotkey-help" class="group relative">
+      <summary
+        class="inline-flex cursor-pointer list-none items-center gap-1 rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+      >
+        <Icon name="ri:keyboard-line" class="size-3.5" />
+        Shortcuts
+        <kbd class="ml-1 rounded-sm bg-night-700 px-1 font-mono">?</kbd>
+      </summary>
+      <div
+        class="absolute right-0 z-20 mt-1 w-72 rounded-md border border-zinc-700 bg-night-800 p-3 text-xs shadow-lg"
+      >
+        <div class="mb-2 font-medium text-zinc-200">Keyboard shortcuts</div>
+        <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-zinc-300">
+          <dt class="flex gap-1"><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">j</kbd><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">k</kbd></dt>
+          <dd class="text-zinc-400">Navigate rows</dd>
+          <dt><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">e</kbd></dt>
+          <dd class="text-zinc-400">Expand / collapse</dd>
+          <dt><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">a</kbd></dt>
+          <dd class="text-zinc-400">Approve focused</dd>
+          <dt><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">r</kbd></dt>
+          <dd class="text-zinc-400">Reject focused</dd>
+          <dt><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">h</kbd></dt>
+          <dd class="text-zinc-400">Hold focused</dd>
+          <dt><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">v</kbd></dt>
+          <dd class="text-zinc-400">Verify (toggle)</dd>
+          <dt><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">?</kbd></dt>
+          <dd class="text-zinc-400">Toggle this panel</dd>
+        </dl>
       </div>
-    </div>
+    </details>
   </div>
 
-  {/* Priority: pending comments from listed services */}
+  <!-- Header stats -->
+  <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <a
+      href={urlWithParams(Astro.url, { status: 'pending', page: null, 'priority-page': null })}
+      class="rounded-md border border-zinc-800 bg-night-800 px-3 py-2 transition-colors hover:border-blue-500/50"
+    >
+      <div class="text-xs text-zinc-400">Pending</div>
+      <div class="font-title text-2xl text-blue-300">{headerStats.totalPending}</div>
+    </a>
+    <a
+      href={urlWithParams(Astro.url, { status: 'mod-work', page: null, 'priority-page': null })}
+      class="rounded-md border border-zinc-800 bg-night-800 px-3 py-2 transition-colors hover:border-yellow-500/50"
+    >
+      <div class="text-xs text-zinc-400">Mod work</div>
+      <div class="font-title text-2xl text-yellow-300">{headerStats.modWork}</div>
+    </a>
+    <a
+      href={urlWithParams(Astro.url, { status: 'brigade', page: null, 'priority-page': null })}
+      class="rounded-md border border-zinc-800 bg-night-800 px-3 py-2 transition-colors hover:border-orange-500/50"
+    >
+      <div class="text-xs text-zinc-400">Brigade</div>
+      <div class="font-title text-2xl text-orange-300">{headerStats.brigade}</div>
+    </a>
+    <a
+      href={urlWithParams(Astro.url, { status: 'proof-pending', page: null, 'priority-page': null })}
+      class="rounded-md border border-zinc-800 bg-night-800 px-3 py-2 transition-colors hover:border-purple-500/50"
+    >
+      <div class="text-xs text-zinc-400">Proof pending</div>
+      <div class="font-title text-2xl text-purple-300">{headerStats.proofPending}</div>
+    </a>
+  </div>
+
+  <!-- Filters -->
+  <div class="mb-3 flex flex-wrap gap-1.5">
+    {
+      commentStatusFilters.map((filter) => (
+        <a
+          href={urlWithParams(Astro.url, {
+            status: filter.value,
+            page: null,
+            'priority-page': null,
+          })}
+          class={cn(
+            'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs',
+            params.status === filter.value
+              ? filter.classNames.filter
+              : 'border-zinc-700 transition-colors hover:border-green-500/50'
+          )}
+        >
+          <Icon name={filter.icon} class="size-3.5 shrink-0" />
+          {filter.label}
+        </a>
+      ))
+    }
+  </div>
+
+  <!-- Sort -->
+  <div class="mb-4 flex flex-wrap items-center gap-2 text-xs">
+    <span class="text-zinc-400">Sort:</span>
+    {
+      adminCommentSortOptions.map((o) => (
+        <a
+          href={urlWithParams(Astro.url, {
+            'sort-by': o.value,
+            'sort-order':
+              sortBy.value === o.value
+                ? params['sort-order'] === 'asc'
+                  ? 'desc'
+                  : 'asc'
+                : DEFAULT_SORT_ORDER,
+            page: null,
+            'priority-page': null,
+          })}
+          class={cn(
+            'flex items-center gap-1 rounded-md border px-2 py-1 transition-colors',
+            sortBy.value === o.value
+              ? 'border-blue-500 bg-blue-500/10 text-blue-400'
+              : 'border-zinc-700 hover:border-blue-500/50'
+          )}
+        >
+          {o.label}
+          <SortArrowIcon active={sortBy.value === o.value} sortOrder={params['sort-order']} />
+        </a>
+      ))
+    }
+    <span class="text-zinc-500">{params['sort-order'] === 'desc' ? 'newest' : 'oldest'} first</span>
+  </div>
+
+  <!-- Priority section: pending on listed services -->
   {
     totalPriorityComments > 0 && (
-      <div class="mb-6 rounded-lg border border-amber-600/50 bg-linear-to-br from-amber-900/20 to-orange-900/20 shadow-xl">
-        <div class="sticky top-0 z-10 border-b border-amber-700/50 bg-linear-to-r from-amber-800/90 to-orange-800/90 px-4 py-3 backdrop-blur-sm">
-          <div class="flex items-center gap-2">
-            <Icon name="ri:star-fill" class="size-5 text-amber-400" />
-            <h2 class="font-title font-semibold text-amber-300">
-              Priority: Pending Comments on Listed Services
-            </h2>
-            <span class="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-amber-950">
-              {totalPriorityComments}
-            </span>
-          </div>
-          <div class="mt-1 text-xs text-amber-200/80">
-            Comments awaiting review on APPROVED or VERIFIED services — Review these first!
-          </div>
-        </div>
-        <div class="space-y-6 p-4">
-          {priorityComments
-            .map((comment) => ({
-              ...comment,
-              statusFilterInfo: getCommentStatusFilterInfo(getCommentStatusFilterValue(comment)),
-            }))
-            .map((comment) => (
-              <div
-                id={`priority-comment-${comment.id.toString()}`}
-                class="rounded-lg border border-amber-700/30 bg-amber-950/10 p-6"
-              >
-                <div class="mb-4 flex flex-wrap items-center gap-2">
-                  <UserBadge user={comment.author} size="md" />
-
-                  <span class="text-xs text-zinc-500">•</span>
-                  <a
-                    href={`/service/${comment.service.slug}#comment-${comment.id.toString()}`}
-                    class="text-sm text-amber-400 transition-colors hover:text-amber-300"
-                  >
-                    {!!comment.service.imageUrl && (
-                      <MyPicture
-                        src={comment.service.imageUrl}
-                        height={16}
-                        width={16}
-                        class="inline-block size-4 rounded-full object-contain align-[-0.2em]"
-                        alt=""
-                      />
-                    )}
-                    {comment.service.name}
-                  </a>
-
-                  <span class="text-xs text-zinc-500">•</span>
-                  <TimeFormatted
-                    date={comment.createdAt}
-                    hourPrecision
-                    caseType="sentence"
-                    class="text-sm text-zinc-400"
-                  />
-
-                  {comment.approvedAt && (
-                    <>
-                      <span class="text-xs text-zinc-500">•</span>
-                      <Tooltip
-                        as="span"
-                        class="inline-flex items-center gap-1 text-zinc-500"
-                        text="Approved at"
-                      >
-                        <Icon name="ri:check-line" class="size-4" />
-                        <TimeFormatted
-                          date={comment.approvedAt}
-                          hourPrecision
-                          caseType="sentence"
-                          class="text-sm"
-                        />
-                      </Tooltip>
-                    </>
-                  )}
-
-                  <span class="text-xs text-zinc-500">•</span>
-
-                  <BadgeSmall
-                    color={comment.statusFilterInfo.color}
-                    text={comment.statusFilterInfo.label}
-                    icon={comment.statusFilterInfo.icon}
-                    inlineIcon
-                  />
-
-                  <span class="text-xs text-zinc-500">•</span>
-
-                  <a
-                    href={`/service/${comment.service.slug}?showPending=true#comment-${comment.id.toString()}`}
-                    class="flex items-center gap-1 text-sm text-white/50 transition-colors hover:underline"
-                  >
-                    <Icon name="ri:link" class="size-4" />
-                    Open
-                  </a>
-                </div>
-
-                <AdminCommentContext comment={comment} class="mb-4" />
-
-                {comment.parent && (
-                  <div class="mb-4 border-l-2 border-zinc-700 pl-4">
-                    <div class="mb-1 text-sm opacity-50">
-                      Replying to <UserBadge user={comment.parent.author} size="md" />
-                    </div>
-                    <div class="text-sm text-zinc-400">{comment.parent.content}</div>
-                  </div>
-                )}
-
-                <div class="mb-4 text-sm">{comment.content}</div>
-
-                {comment.publicNote && (
-                  <div class="mt-2">
-                    <div class="text-sm font-medium text-green-500">Public Note</div>
-                    <p class="text-sm text-gray-300">{comment.publicNote}</p>
-                  </div>
-                )}
-                {comment.adminNote && (
-                  <div class="mt-2">
-                    <div class="text-sm font-medium text-yellow-500">Admin Note</div>
-                    <p class="text-sm text-gray-300">{comment.adminNote}</p>
-                  </div>
-                )}
-                {comment.authorNote && (
-                  <div class="mt-2">
-                    <div class="text-sm font-medium text-blue-500">Author Note</div>
-                    <p class="text-sm text-gray-300">{comment.authorNote}</p>
-                  </div>
-                )}
-
-                {comment.privateProof && (
-                  <div class="mt-2">
-                    <div class="text-sm font-medium text-purple-500">Private proof</div>
-                    <div class="flex items-center gap-2">
-                      <p class="text-sm text-gray-300">{comment.privateProof}</p>
-                      {comment.privateProofStatus && (
-                        <span
-                          class={cn(
-                            'rounded-sm px-1.5 py-0.5 text-xs',
-                            comment.privateProofStatus === 'APPROVED' && 'bg-green-500/20 text-green-400',
-                            comment.privateProofStatus === 'REJECTED' && 'bg-red-500/20 text-red-400',
-                            comment.privateProofStatus === 'PENDING' && 'bg-blue-500/20 text-blue-400',
-                            comment.privateProofStatus === 'WITHDRAWN' && 'bg-zinc-500/20 text-zinc-400'
-                          )}
-                        >
-                          {comment.privateProofStatus}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {comment.issues.length > 0 && (
-                  <div class="mt-2">
-                    <div class="text-sm font-medium text-red-500">Issue Flags</div>
-                    <div class="flex flex-wrap gap-2">
-                      {comment.issues.map((issue) => (
-                        <span class="rounded-sm bg-red-500/20 px-1.5 py-0.5 text-xs text-red-400">
-                          {issue.replace('_', ' ')}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <CommentModeration class="mt-2" comment={comment} />
-              </div>
-            ))}
+      <section class="mb-6 rounded-lg border border-amber-600/40 bg-amber-950/10">
+        <header class="flex items-center gap-2 border-b border-amber-700/30 px-3 py-2">
+          <Icon name="ri:star-fill" class="size-4 text-amber-400" />
+          <h2 class="text-sm font-medium text-amber-300">
+            Priority: pending on listed services
+          </h2>
+          <span class="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-amber-950">
+            {totalPriorityComments}
+          </span>
+        </header>
+        <div class="space-y-1 p-2">
+          {priorityComments.map((comment) => (
+            <AdminCommentRow comment={comment} isPriority />
+          ))}
         </div>
         {priorityTotalPages > 1 && (
-          <div class="border-t border-amber-700/50 bg-amber-950/20 px-4 py-3">
-            <div class="flex items-center justify-between">
-              <div class="text-xs text-amber-200/80">
-                Showing {(priorityCurrentPage - 1) * PRIORITY_PAGE_SIZE + 1} to{' '}
-                {Math.min(priorityCurrentPage * PRIORITY_PAGE_SIZE, totalPriorityComments)} of{' '}
-                {totalPriorityComments} priority comments
-              </div>
-              <div class="flex gap-1">
-                {priorityCurrentPage > 1 && (
-                  <a
-                    href={makePriorityPageUrl(priorityCurrentPage - 1)}
-                    class="rounded-md bg-amber-800 px-3 py-1.5 text-sm font-medium text-amber-200 transition-colors hover:bg-amber-700"
-                  >
-                    <Icon name="ri:arrow-left-s-line" class="inline-block size-4 align-[-0.125em]" />
-                    Previous
-                  </a>
-                )}
-                <div class="flex gap-1">
-                  {Array.from({ length: priorityTotalPages }, (_, i) => i + 1)
-                    .filter(
-                      (page) =>
-                        page === 1 ||
-                        page === priorityTotalPages ||
-                        (page >= priorityCurrentPage - 1 && page <= priorityCurrentPage + 1)
-                    )
-                    .map((page, index, array) => (
-                      <>
-                        {index > 0 && array[index - 1] !== page - 1 && (
-                          <span class="flex items-center px-2 text-amber-400">...</span>
-                        )}
-                        <a
-                          href={makePriorityPageUrl(page)}
-                          class={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                            page === priorityCurrentPage
-                              ? 'bg-amber-500 text-amber-950'
-                              : 'bg-amber-800 text-amber-200 hover:bg-amber-700'
-                          }`}
-                        >
-                          {page}
-                        </a>
-                      </>
-                    ))}
-                </div>
-                {priorityCurrentPage < priorityTotalPages && (
-                  <a
-                    href={makePriorityPageUrl(priorityCurrentPage + 1)}
-                    class="rounded-md bg-amber-800 px-3 py-1.5 text-sm font-medium text-amber-200 transition-colors hover:bg-amber-700"
-                  >
-                    Next
-                    <Icon name="ri:arrow-right-s-line" class="inline-block size-4 align-[-0.125em]" />
-                  </a>
-                )}
-              </div>
+          <footer class="flex items-center justify-between border-t border-amber-700/30 px-3 py-2 text-xs text-amber-200/70">
+            <span>
+              Page {Math.min(Math.max(1, params['priority-page']), priorityTotalPages)} of{' '}
+              {priorityTotalPages}
+            </span>
+            <div class="flex gap-1">
+              {params['priority-page'] > 1 && (
+                <a
+                  href={makePriorityPageUrl(params['priority-page'] - 1)}
+                  class="rounded-md bg-amber-800 px-2 py-0.5 text-amber-200 hover:bg-amber-700"
+                >
+                  Prev
+                </a>
+              )}
+              {params['priority-page'] < priorityTotalPages && (
+                <a
+                  href={makePriorityPageUrl(params['priority-page'] + 1)}
+                  class="rounded-md bg-amber-800 px-2 py-0.5 text-amber-200 hover:bg-amber-700"
+                >
+                  Next
+                </a>
+              )}
             </div>
-          </div>
+          </footer>
         )}
-      </div>
+      </section>
     )
   }
 
   {
     totalPriorityComments === 0 && (
-      <div class="mb-4 rounded-md border border-zinc-700/60 bg-zinc-900/40 px-4 py-2 text-xs text-zinc-400">
-        No pending comments on listed services
+      <div class="mb-4 rounded-md border border-zinc-800 bg-night-800/50 px-3 py-2 text-xs text-zinc-500">
+        No pending comments on listed services.
       </div>
     )
   }
 
-  <div class="space-y-6">
-    {
-      comments
-        .map((comment) => ({
-          ...comment,
-          statusFilterInfo: getCommentStatusFilterInfo(getCommentStatusFilterValue(comment)),
-        }))
-        .map((comment) => (
-          <div
-            id={`comment-${comment.id.toString()}`}
-            class="rounded-lg border border-zinc-800 bg-black/40 p-6 backdrop-blur-xs"
-          >
-            <div class="mb-4 flex flex-wrap items-center gap-2">
-              {/* Author Info */}
-              <UserBadge user={comment.author} size="md" />
-
-              {/* Service Link */}
-              <span class="text-xs text-zinc-500">•</span>
-              <a
-                href={`/service/${comment.service.slug}#comment-${comment.id.toString()}`}
-                class="text-sm text-blue-400 transition-colors hover:text-blue-300"
-              >
-                {!!comment.service.imageUrl && (
-                  <MyPicture
-                    src={comment.service.imageUrl}
-                    height={16}
-                    width={16}
-                    class="inline-block size-4 rounded-full object-contain align-[-0.2em]"
-                    alt=""
-                  />
-                )}
-                {comment.service.name}
-              </a>
-
-              {/* Date */}
-              <span class="text-xs text-zinc-500">•</span>
-              <TimeFormatted
-                date={comment.createdAt}
-                hourPrecision
-                caseType="sentence"
-                class="text-sm text-zinc-400"
-              />
-
-              {/* Approved Date */}
-              {comment.approvedAt && (
-                <>
-                  <span class="text-xs text-zinc-500">•</span>
-                  <Tooltip as="span" class="inline-flex items-center gap-1 text-zinc-500" text="Approved at">
-                    <Icon name="ri:check-line" class="size-4" />
-                    <TimeFormatted
-                      date={comment.approvedAt}
-                      hourPrecision
-                      caseType="sentence"
-                      class="text-sm"
-                    />
-                  </Tooltip>
-                </>
-              )}
-
-              <span class="text-xs text-zinc-500">•</span>
-
-              {/* Status Badges */}
-              <BadgeSmall
-                color={comment.statusFilterInfo.color}
-                text={comment.statusFilterInfo.label}
-                icon={comment.statusFilterInfo.icon}
-                inlineIcon
-              />
-
-              <span class="text-xs text-zinc-500">•</span>
-
-              {/* Link to Comment */}
-              <a
-                href={`/service/${comment.service.slug}?showPending=true#comment-${comment.id.toString()}`}
-                class="flex items-center gap-1 text-sm text-white/50 transition-colors hover:underline"
-              >
-                <Icon name="ri:link" class="size-4" />
-                Open
-              </a>
-            </div>
-
-            <AdminCommentContext comment={comment} class="mb-4" />
-
-            {/* Parent Comment Context */}
-            {comment.parent && (
-              <div class="mb-4 border-l-2 border-zinc-700 pl-4">
-                <div class="mb-1 text-sm opacity-50">
-                  Replying to <UserBadge user={comment.parent.author} size="md" />
-                </div>
-                <div class="text-sm text-zinc-400">{comment.parent.content}</div>
-              </div>
-            )}
-
-            {/* Comment Content */}
-            <div class="mb-4 text-sm">{comment.content}</div>
-
-            {/* Notes */}
-            {comment.publicNote && (
-              <div class="mt-2">
-                <div class="text-sm font-medium text-green-500">Public Note</div>
-                <p class="text-sm text-gray-300">{comment.publicNote}</p>
-              </div>
-            )}
-            {comment.adminNote && (
-              <div class="mt-2">
-                <div class="text-sm font-medium text-yellow-500">Admin Note</div>
-                <p class="text-sm text-gray-300">{comment.adminNote}</p>
-              </div>
-            )}
-            {comment.authorNote && (
-              <div class="mt-2">
-                <div class="text-sm font-medium text-blue-500">Author Note</div>
-                <p class="text-sm text-gray-300">{comment.authorNote}</p>
-              </div>
-            )}
-
-            {comment.privateProof && (
-              <div class="mt-2">
-                <div class="text-sm font-medium text-purple-500">Private proof</div>
-                <div class="flex items-center gap-2">
-                  <p class="text-sm text-gray-300">{comment.privateProof}</p>
-                  {comment.privateProofStatus && (
-                    <span
-                      class={cn(
-                        'rounded-sm px-1.5 py-0.5 text-xs',
-                        comment.privateProofStatus === 'APPROVED' && 'bg-green-500/20 text-green-400',
-                        comment.privateProofStatus === 'REJECTED' && 'bg-red-500/20 text-red-400',
-                        comment.privateProofStatus === 'PENDING' && 'bg-blue-500/20 text-blue-400',
-                        comment.privateProofStatus === 'WITHDRAWN' && 'bg-zinc-500/20 text-zinc-400'
-                      )}
-                    >
-                      {comment.privateProofStatus}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {comment.issues.length > 0 && (
-              <div class="mt-2">
-                <div class="text-sm font-medium text-red-500">Issue Flags</div>
-                <div class="flex flex-wrap gap-2">
-                  {comment.issues.map((issue) => (
-                    <span class="rounded-sm bg-red-500/20 px-1.5 py-0.5 text-xs text-red-400">
-                      {issue.replace('_', ' ')}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <CommentModeration class="mt-2" comment={comment} />
-          </div>
-        ))
-    }
+  <!-- Main list -->
+  <div class="space-y-2">
+    {comments.length === 0 && (
+      <div class="rounded-md border border-zinc-800 bg-night-800/50 px-3 py-6 text-center text-sm text-zinc-500">
+        No comments match the current filter.
+      </div>
+    )}
+    {comments.map((comment) => <AdminCommentRow comment={comment} />)}
   </div>
 
-  <!-- Pagination -->
-  {totalPages > 1 && <Pagination currentPage={params.page} totalPages={totalPages} class="mt-8" />}
+  {totalPages > 1 && <Pagination currentPage={params.page} totalPages={totalPages} class="mt-6" />}
 </BaseLayout>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Keyboard navigation for the moderation dashboard.      //
+  // j/k move focus between comment rows, e toggles expand, //
+  // a/r/h dispatch human-action approve/reject/hold on the //
+  // focused row, v toggles verify when applicable. Ignored //
+  // while typing in inputs.                                //
+  ////////////////////////////////////////////////////////////
+  document.addEventListener('astro:page-load', () => {
+    const rows = Array.from(
+      document.querySelectorAll<HTMLDetailsElement>('details[data-comment-row]')
+    )
+    if (rows.length === 0) return
+
+    // Clicks inside an element marked [data-row-no-toggle] should not flip the
+    // parent details open/closed. But for actual links we MUST NOT call
+    // preventDefault (that would cancel their navigation). Buttons fire their
+    // own listener before this handler runs, so preventDefault on a button is
+    // safe (its action has already dispatched) and keeps the row from toggling.
+    rows.forEach((row) => {
+      const summary = row.querySelector<HTMLElement>(':scope > summary')
+      summary?.addEventListener('click', (e) => {
+        const t = e.target as HTMLElement | null
+        if (!t || !t.closest('[data-row-no-toggle]')) return
+        e.stopPropagation()
+        // Skip preventDefault for anchors so target="_blank" navigation works.
+        if (!t.closest('a')) {
+          e.preventDefault()
+        }
+      })
+
+      // Stop Enter/Space on action-rail buttons from also toggling the parent
+      // <details>. The button still receives the key event natively because
+      // focus is on the button, not the summary.
+      summary?.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return
+        const t = e.target as HTMLElement | null
+        if (!t || !t.closest('[data-row-no-toggle]')) return
+        e.stopPropagation()
+        if (!t.closest('a')) e.preventDefault()
+      })
+    })
+
+    let focusedIdx = -1
+
+    function focusRow(idx: number) {
+      if (idx < 0 || idx >= rows.length) return
+      focusedIdx = idx
+      const summary = rows[idx]?.querySelector<HTMLElement>(':scope > summary')
+      summary?.focus()
+      summary?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+
+    // Track which row the user's focus enters so j/k pick up where they are.
+    rows.forEach((row, idx) => {
+      row.addEventListener('focusin', () => {
+        focusedIdx = idx
+      })
+    })
+
+    document.addEventListener('keydown', (e) => {
+      const target = e.target as HTMLElement | null
+      if (!target) return
+      if (target.matches('input, textarea, select, [contenteditable="true"]')) return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+
+      const focused = rows[focusedIdx]
+
+      switch (e.key) {
+        case 'j': {
+          e.preventDefault()
+          focusRow(focusedIdx < 0 ? 0 : Math.min(rows.length - 1, focusedIdx + 1))
+          break
+        }
+        case 'k': {
+          e.preventDefault()
+          focusRow(focusedIdx < 0 ? 0 : Math.max(0, focusedIdx - 1))
+          break
+        }
+        case 'e': {
+          if (!focused) return
+          e.preventDefault()
+          focused.open = !focused.open
+          break
+        }
+        case 'a':
+        case 'r':
+        case 'h': {
+          if (!focused) return
+          e.preventDefault()
+          const value = e.key === 'a' ? 'APPROVE' : e.key === 'r' ? 'REJECT' : 'HOLD'
+          const btn = focused.querySelector<HTMLButtonElement>(
+            `:scope > summary button[data-action="human-action"][data-value="${value}"]`
+          )
+          btn?.click()
+          break
+        }
+        case 'v': {
+          if (!focused) return
+          e.preventDefault()
+          const btn = focused.querySelector<HTMLButtonElement>(
+            ':scope > summary button[data-action="status"]'
+          )
+          btn?.click()
+          break
+        }
+        case '?': {
+          e.preventDefault()
+          const help = document.getElementById('hotkey-help') as HTMLDetailsElement | null
+          if (help) help.open = !help.open
+          break
+        }
+      }
+    })
+  })
+</script>

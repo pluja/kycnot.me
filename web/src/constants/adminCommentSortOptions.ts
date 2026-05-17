@@ -36,6 +36,21 @@ export const {
       label: 'Approved',
       hasNulls: true satisfies HasNull<Comment['approvedAt']>,
     },
+    {
+      value: 'aiBrigadeConfidence',
+      label: 'Brigade conf.',
+      hasNulls: true satisfies HasNull<Comment['aiBrigadeConfidence']>,
+    },
+    {
+      value: 'aiQuality',
+      label: 'AI quality',
+      hasNulls: true satisfies HasNull<Comment['aiQuality']>,
+    },
+    {
+      value: 'aiDecidedAt',
+      label: 'AI decided',
+      hasNulls: true satisfies HasNull<Comment['aiDecidedAt']>,
+    },
   ] as const satisfies AdminCommentSortOptionInfo<keyof Comment>[]
 )
 

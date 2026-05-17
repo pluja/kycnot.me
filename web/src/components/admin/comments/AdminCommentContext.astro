@@ -1,15 +1,24 @@
 ---
+import { Icon } from 'astro-icon/components'
 import { differenceInDays } from 'date-fns'
 
 import BadgeSmall from '../../BadgeSmall.astro'
 import TimeFormatted from '../../TimeFormatted.astro'
 import Tooltip from '../../Tooltip.astro'
 
-import type { CommentIssueType, CommentStatus, PrivateProofStatus, RatingMuteReason } from '@prisma/client'
+import { cn } from '../../../lib/cn'
+
+import type {
+  CommentIssueType,
+  CommentStatus,
+  PrivateProofStatus,
+  RatingMuteReason,
+} from '@prisma/client'
 import type { HTMLAttributes } from 'astro/types'
 
 type Props = HTMLAttributes<'div'> & {
   comment: {
+    id: number
     rating: number | null
     ratingActive: boolean
     ratingMuted: boolean
@@ -27,17 +36,18 @@ type Props = HTMLAttributes<'div'> & {
       totalKarma: number
       verified: boolean
       spammer: boolean
-      _count: {
-        comments: number
-      }
+      _count: { comments: number }
     }
   }
 }
 
 const { comment, class: className, ...htmlProps } = Astro.props
 
+const user = Astro.locals.user
+const canModerate = !!user && (user.admin || user.moderator)
+
 const accountAgeDays = differenceInDays(new Date(), comment.author.createdAt)
-const accountAgeLabel = accountAgeDays === 0 ? 'Created today' : `${accountAgeDays.toLocaleString()} days old`
+const accountAgeLabel = accountAgeDays === 0 ? 'Today' : `${accountAgeDays.toLocaleString()}d old`
 const commentCount = comment.author._count.comments
 const commentCountLabel = `${commentCount.toLocaleString()} ${commentCount === 1 ? 'comment' : 'comments'}`
 const ratingInfluence = Math.round(comment.ratingWeight * 100)
@@ -61,99 +71,150 @@ const muteReasonLabels: Record<RatingMuteReason, string> = {
   CONFLICT_OF_INTEREST: 'Conflict of interest',
   MODERATOR_DISCRETION: 'Moderator discretion',
 }
+
+const proofColor: Record<PrivateProofStatus, TailwindColor> = {
+  APPROVED: 'green',
+  REJECTED: 'red',
+  PENDING: 'purple',
+  WITHDRAWN: 'gray',
+}
+
+type TailwindColor = Parameters<typeof BadgeSmall>[0]['color']
 ---
 
-<div {...htmlProps} class:list={['flex flex-wrap items-center gap-1 text-xs', className]}>
-  <Tooltip text={`Created ${comment.author.createdAt.toLocaleString()}`}>
+<div {...htmlProps} class:list={['space-y-2', className]}>
+  <!-- Top row: all author + comment metadata badges grouped together. -->
+  <div class="flex flex-wrap items-center gap-1.5 text-xs">
+    <Tooltip text={`Account created ${comment.author.createdAt.toLocaleString()}`}>
+      <BadgeSmall
+        icon="ri:user-line"
+        color={accountAgeDays < 7 ? 'purple' : 'gray'}
+        text={accountAgeLabel}
+        inlineIcon
+      />
+    </Tooltip>
+
+    <Tooltip text={`Last login ${comment.author.lastLoginAt.toLocaleString()}`}>
+      <BadgeSmall icon="ri:login-circle-line" color="gray" inlineIcon>
+        <TimeFormatted date={comment.author.lastLoginAt} hourPrecision />
+      </BadgeSmall>
+    </Tooltip>
+
     <BadgeSmall
-      icon="ri:user-line"
-      color={accountAgeDays < 7 ? 'purple' : 'gray'}
-      text={accountAgeLabel}
+      icon="ri:sparkling-2-line"
+      color={comment.author.totalKarma >= 25 ? 'lime' : comment.author.totalKarma < 0 ? 'red' : 'gray'}
+      inlineIcon
+    >
+      {comment.author.totalKarma.toLocaleString()} karma
+    </BadgeSmall>
+
+    <BadgeSmall
+      icon="ri:chat-3-line"
+      color={commentCount <= 1 ? 'yellow' : 'gray'}
+      text={commentCountLabel}
       inlineIcon
     />
-  </Tooltip>
 
-  <Tooltip text={`Last login ${comment.author.lastLoginAt.toLocaleString()}`}>
-    <BadgeSmall icon="ri:login-circle-line" color="gray" text="Last login" inlineIcon>
-      <TimeFormatted date={comment.author.lastLoginAt} hourPrecision />
-    </BadgeSmall>
-  </Tooltip>
+    {
+      comment.author.verified && (
+        <BadgeSmall icon="ri:verified-badge-fill" color="cyan" text="Verified" inlineIcon />
+      )
+    }
+    {comment.author.spammer && <BadgeSmall icon="ri:spam-2-fill" color="red" text="Spammer" inlineIcon />}
 
-  <BadgeSmall icon="ri:sparkling-2-line" color={comment.author.totalKarma >= 25 ? 'lime' : 'gray'} inlineIcon>
-    {comment.author.totalKarma.toLocaleString()} karma
-  </BadgeSmall>
+    {/* Issues and proof live in the same band so all metadata badges read as one group. */}
+    {
+      comment.issues.map((issue) => (
+        <BadgeSmall icon="ri:alert-line" color="red" text={issueLabels[issue]} inlineIcon />
+      ))
+    }
+    {
+      comment.privateProof && (
+        <BadgeSmall
+          icon="ri:key-2-line"
+          color={comment.privateProofStatus ? proofColor[comment.privateProofStatus] : 'purple'}
+          text={`Proof ${comment.privateProofStatus?.toLowerCase() ?? 'pending'}`}
+          inlineIcon
+        />
+      )
+    }
+  </div>
 
-  <BadgeSmall
-    icon="ri:chat-3-line"
-    color={commentCount <= 1 ? 'yellow' : 'gray'}
-    text={commentCountLabel}
-    inlineIcon
-  />
-
-  {
-    comment.author.verified && (
-      <BadgeSmall icon="ri:verified-badge-fill" color="cyan" text="Verified user" inlineIcon />
-    )
-  }
-  {comment.author.spammer && <BadgeSmall icon="ri:spam-2-fill" color="red" text="Spammer" inlineIcon />}
-
+  <!-- Rating row stands alone so the score is easy to read. -->
   {
     comment.rating !== null && (
-      <Tooltip text={comment.ratingTrustReason ?? 'Rating trust'}>
-        <BadgeSmall
-          icon={ratingCounts ? 'ri:star-fill' : 'ri:star-line'}
-          color={ratingCounts ? 'yellow' : 'gray'}
-          inlineIcon
+      <div class="flex flex-wrap items-center gap-2 rounded-md bg-night-800/60 px-2 py-1.5">
+        <div
+          class={cn(
+            'flex items-center gap-0.5',
+            ratingCounts ? 'text-yellow-400' : 'text-zinc-500 line-through decoration-zinc-600'
+          )}
+          title={`User rating: ${comment.rating}/5`}
         >
-          {ratingCounts ? `${ratingInfluence.toLocaleString()}% rating influence` : 'Rating not counted'}
-        </BadgeSmall>
-      </Tooltip>
-    )
-  }
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Icon
+              name={i < (comment.rating ?? 0) ? 'ri:star-fill' : 'ri:star-line'}
+              class="size-3.5"
+            />
+          ))}
+          <span class="ml-1 text-[11px] font-medium">{comment.rating}/5</span>
+        </div>
 
-  {
-    comment.ratingTrustLabel && comment.ratingTrustLabel !== 'Not counted' && (
-      <BadgeSmall icon="ri:shield-check-line" color="blue" text={comment.ratingTrustLabel} inlineIcon />
-    )
-  }
+        <span class="text-zinc-700">·</span>
 
-  {
-    comment.ratingMuted && (
-      <BadgeSmall
-        icon="ri:volume-mute-line"
-        color="orange"
-        text={
-          comment.ratingMuteReason
-            ? `Muted: ${muteReasonLabels[comment.ratingMuteReason]}`
-            : 'Rating muted'
+        <Tooltip text={comment.ratingTrustReason ?? 'Rating trust reason'}>
+          <span class="text-[11px] text-day-400">
+            {ratingCounts ? (
+              <>
+                weight <span class="font-medium text-day-200">{comment.ratingWeight.toFixed(2)}</span>
+                {' · '}
+                <span class="text-day-300">{comment.ratingTrustLabel ?? 'counted'}</span>
+                {' · '}
+                <span class="text-day-500">{ratingInfluence}% influence</span>
+              </>
+            ) : (
+              <span class="text-day-500">
+                Not counted
+                {comment.ratingMuted && comment.ratingMuteReason
+                  ? ` · ${muteReasonLabels[comment.ratingMuteReason]}`
+                  : comment.ratingTrustReason
+                    ? ` · ${comment.ratingTrustReason}`
+                    : ''}
+              </span>
+            )}
+          </span>
+        </Tooltip>
+
+        {
+          canModerate && (comment.status === 'APPROVED' || comment.status === 'VERIFIED') && (
+            <button
+              type="button"
+              class={cn(
+                'ml-auto inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] transition-colors',
+                comment.ratingMuted
+                  ? 'border border-orange-500/30 bg-orange-500/15 text-orange-300 hover:bg-orange-500/25'
+                  : 'bg-night-700 text-day-300 hover:bg-orange-500/20 hover:text-orange-300'
+              )}
+              data-action="rating-mute"
+              data-value={(!comment.ratingMuted).toString()}
+              data-comment-id={comment.id}
+              data-user-id={user!.id}
+              title={
+                comment.ratingMuted
+                  ? 'Re-enable this rating, restore its score contribution'
+                  : 'Disable this rating from counting toward the service score'
+              }
+            >
+              <Icon
+                name={comment.ratingMuted ? 'ri:star-fill' : 'ri:star-off-line'}
+                class="size-3.5"
+              />
+              <span>{comment.ratingMuted ? 'Enable rating' : 'Disable rating'}</span>
+            </button>
+          )
         }
-        inlineIcon
-      />
+      </div>
     )
   }
 
-  {
-    comment.issues.map((issue) => (
-      <BadgeSmall icon="ri:alert-line" color="red" text={issueLabels[issue]} inlineIcon />
-    ))
-  }
-
-  {
-    comment.privateProof && (
-      <BadgeSmall
-        icon="ri:key-2-line"
-        color={
-          comment.privateProofStatus === 'APPROVED'
-            ? 'green'
-            : comment.privateProofStatus === 'REJECTED'
-              ? 'red'
-              : comment.privateProofStatus === 'WITHDRAWN'
-                ? 'gray'
-                : 'purple'
-        }
-        text={`Proof ${comment.privateProofStatus?.toLowerCase() ?? 'pending'}`}
-        inlineIcon
-      />
-    )
-  }
 </div>

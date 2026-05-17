@@ -1,0 +1,482 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import BadgeSmall from '../../BadgeSmall.astro'
+import CommentModeration from '../../CommentModeration.astro'
+import MyPicture from '../../MyPicture.astro'
+import TimeFormatted from '../../TimeFormatted.astro'
+import Tooltip from '../../Tooltip.astro'
+import UserBadge from '../../UserBadge.astro'
+import AdminCommentContext from './AdminCommentContext.astro'
+
+import { commentStatusById } from '../../../constants/commentStatus'
+import { cn } from '../../../lib/cn'
+
+import type { TailwindColor } from '../../../lib/colors'
+import type { ModerationAction, Prisma } from '@prisma/client'
+
+type Props = {
+  comment: Prisma.CommentGetPayload<{
+    select: {
+      id: true
+      content: true
+      status: true
+      rating: true
+      ratingActive: true
+      ratingMuted: true
+      ratingMuteReason: true
+      ratingWeight: true
+      ratingTrustLabel: true
+      ratingTrustReason: true
+      createdAt: true
+      approvedAt: true
+      privateProof: true
+      privateProofStatus: true
+      issues: true
+      publicNote: true
+      adminNote: true
+      authorNote: true
+      aiAction: true
+      aiQuality: true
+      aiIsSpam: true
+      aiIsBrigade: true
+      aiBrigadeConfidence: true
+      aiReasoning: true
+      aiDecidedAt: true
+      humanAction: true
+      humanDecidedAt: true
+      humanReasoning: true
+      humanDecidedBy: {
+        select: {
+          id: true
+          name: true
+          displayName: true
+          picture: true
+        }
+      }
+      author: {
+        select: {
+          name: true
+          displayName: true
+          picture: true
+          createdAt: true
+          lastLoginAt: true
+          totalKarma: true
+          verified: true
+          spammer: true
+          _count: { select: { comments: true } }
+        }
+      }
+      service: {
+        select: {
+          name: true
+          slug: true
+          imageUrl: true
+          verificationStatus: true
+        }
+      }
+      parent: {
+        select: {
+          content: true
+          author: {
+            select: {
+              name: true
+              displayName: true
+              picture: true
+            }
+          }
+        }
+      }
+    }
+  }>
+  isPriority?: boolean
+  defaultOpen?: boolean
+}
+
+const { comment, isPriority = false, defaultOpen = false } = Astro.props
+
+const aiActionColor: Record<ModerationAction, TailwindColor> = {
+  APPROVE: 'green',
+  REJECT: 'red',
+  HOLD: 'yellow',
+}
+const aiActionLabel: Record<ModerationAction, string> = {
+  APPROVE: 'Approve',
+  REJECT: 'Reject',
+  HOLD: 'Hold',
+}
+
+const statusInfo = commentStatusById[comment.status]
+
+const proofStatusColor: Record<NonNullable<typeof comment.privateProofStatus>, string> = {
+  APPROVED: 'bg-green-500/20 text-green-300 border border-green-500/30',
+  REJECTED: 'bg-red-500/20 text-red-300 border border-red-500/30',
+  PENDING: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+  WITHDRAWN: 'bg-zinc-500/20 text-zinc-300 border border-zinc-500/30',
+}
+
+const ratingMutePenalty =
+  comment.ratingMuted &&
+  (comment.ratingMuteReason === 'SUSPICIOUS_PATTERN' || comment.ratingMuteReason === 'TEMPLATE_SPAM')
+
+// Left-border ribbon color reflects the comment's effective state.
+// `!` is required because the row's full `border-zinc-800` would otherwise
+// win the cascade and paint all four borders gray. Muted shades so the
+// ribbon reads as a status accent without stealing attention.
+const ribbonClass = ratingMutePenalty
+  ? '!border-l-orange-700'
+  : comment.status === 'PENDING'
+    ? '!border-l-yellow-600'
+    : comment.status === 'APPROVED'
+      ? '!border-l-green-700'
+      : comment.status === 'VERIFIED'
+        ? '!border-l-cyan-700'
+        : '!border-l-red-700'
+---
+
+<details
+  data-comment-row
+  data-comment-id={comment.id}
+  data-comment-status={comment.status}
+  open={defaultOpen}
+  class={cn(
+    'group rounded-md border border-l-4 bg-night-700 transition-colors',
+    ribbonClass,
+    isPriority ? 'border-amber-700/40' : 'border-zinc-800',
+    'hover:border-zinc-600',
+    'has-[summary:focus-visible]:ring-2 has-[summary:focus-visible]:ring-blue-500/60'
+  )}
+>
+  <summary
+    tabindex="0"
+    class="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm select-none"
+  >
+    <Icon
+      name="ri:arrow-right-s-line"
+      class="size-4 shrink-0 text-zinc-500 transition-transform group-open:rotate-90"
+    />
+
+    <!-- Author -->
+    <span class="shrink-0">
+      <UserBadge user={comment.author} size="sm" noLink class="-my-1" />
+    </span>
+
+    <span class="text-zinc-600">·</span>
+
+    <!-- Service. The ?comment param tells the service page to fold/highlight
+         the linked comment's branch (needed when the comment is a reply). -->
+    <a
+      href={`/service/${comment.service.slug}?comment=${comment.id}#comment-${comment.id.toString()}`}
+      target="_blank"
+      rel="noopener"
+      data-row-no-toggle
+      class="inline-flex shrink-0 items-center gap-1 text-blue-400 hover:underline"
+    >
+      {
+        comment.service.imageUrl && (
+          <MyPicture
+            src={comment.service.imageUrl}
+            height={14}
+            width={14}
+            class="inline size-3.5 rounded-full object-contain"
+            alt=""
+          />
+        )
+      }
+      {comment.service.name}
+    </a>
+
+    <span class="text-zinc-600">·</span>
+
+    <TimeFormatted date={comment.createdAt} hourPrecision class="shrink-0 text-zinc-400" />
+
+    {/* Status is conveyed by the left ribbon color and the highlighted
+        action-rail button. The full status badge lives in the expanded
+        Context section so the summary stays scannable. */}
+
+    <!-- AI verdict chip. Tooltip spells out the abbreviations. -->
+    {
+      comment.aiAction && (
+        <Tooltip
+          as="span"
+          text={`AI: ${aiActionLabel[comment.aiAction]}${
+            typeof comment.aiQuality === 'number'
+              ? `, quality ${comment.aiQuality}/10`
+              : ''
+          }. Click to expand for full reasoning.`}
+          class={cn(
+            'inline-flex shrink-0 items-center gap-0.5 rounded-sm px-1.5 py-0.5 text-[10px]',
+            aiActionColor[comment.aiAction] === 'green' &&
+              'bg-green-500/15 text-green-300',
+            aiActionColor[comment.aiAction] === 'red' && 'bg-red-500/15 text-red-300',
+            aiActionColor[comment.aiAction] === 'yellow' &&
+              'bg-yellow-500/15 text-yellow-300'
+          )}
+        >
+          <Icon name="ri:robot-2-line" class="size-3" />
+          {aiActionLabel[comment.aiAction]}
+          {typeof comment.aiQuality === 'number' && (
+            <span class="text-day-500">· q{comment.aiQuality}</span>
+          )}
+        </Tooltip>
+      )
+    }
+
+    <!-- Brigade chip -->
+    {
+      comment.aiIsBrigade && typeof comment.aiBrigadeConfidence === 'number' && (
+        <span class="shrink-0 rounded-sm bg-orange-500/15 px-1.5 py-0.5 text-[10px] text-orange-300">
+          Brigade {comment.aiBrigadeConfidence}/5
+        </span>
+      )
+    }
+
+    <!-- Spam chip -->
+    {
+      comment.aiIsSpam && (
+        <span class="shrink-0 rounded-sm bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">
+          Spam
+        </span>
+      )
+    }
+
+    <!-- Rating muted chip -->
+    {
+      comment.ratingMuted && (
+        <span
+          class={cn(
+            'shrink-0 rounded-sm px-1.5 py-0.5 text-[10px]',
+            ratingMutePenalty
+              ? 'bg-red-500/15 text-red-300'
+              : 'bg-yellow-500/15 text-yellow-300'
+          )}
+        >
+          {ratingMutePenalty ? 'Rating flagged' : 'Rating muted'}
+        </span>
+      )
+    }
+
+    <!-- Private proof chip -->
+    {
+      comment.privateProof && comment.privateProofStatus && (
+        <span
+          class={cn(
+            'shrink-0 rounded-sm px-1.5 py-0.5 text-[10px]',
+            proofStatusColor[comment.privateProofStatus]
+          )}
+        >
+          Proof {comment.privateProofStatus.toLowerCase()}
+        </span>
+      )
+    }
+
+    <!-- Issue chips -->
+    {
+      comment.issues.map((issue) => (
+        <span class="shrink-0 rounded-sm bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">
+          {issue.replace('_', ' ').toLowerCase()}
+        </span>
+      ))
+    }
+
+    <!-- Preview text -->
+    <span class="ml-1 hidden flex-1 truncate text-zinc-500 sm:inline">
+      {comment.content.slice(0, 140).replace(/\s+/g, ' ')}
+    </span>
+
+    <span class="grow sm:hidden"></span>
+
+    <!-- Action rail -->
+    <div class="flex shrink-0 gap-0.5" data-row-no-toggle>
+      {
+        (['APPROVE', 'REJECT', 'HOLD'] as const).map((act) => {
+          const effective =
+            comment.humanAction ??
+            (comment.status === 'APPROVED' || comment.status === 'VERIFIED'
+              ? 'APPROVE'
+              : comment.status === 'REJECTED'
+                ? 'REJECT'
+                : comment.status === 'PENDING'
+                  ? 'HOLD'
+                  : null)
+          const isActive = effective === act
+          const iconName =
+            act === 'APPROVE'
+              ? 'ri:check-line'
+              : act === 'REJECT'
+                ? 'ri:close-line'
+                : 'ri:pause-line'
+          const colorBase =
+            act === 'APPROVE' ? 'green' : act === 'REJECT' ? 'red' : 'yellow'
+          return (
+            <button
+              type="button"
+              data-action="human-action"
+              data-value={act}
+              data-comment-id={comment.id}
+              data-user-id={Astro.locals.user?.id}
+              title={`${act === 'APPROVE' ? 'Approve' : act === 'REJECT' ? 'Reject' : 'Hold'} (${act === 'APPROVE' ? 'a' : act === 'REJECT' ? 'r' : 'h'})`}
+              class={cn(
+                'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
+                isActive
+                  ? colorBase === 'green'
+                    ? 'border border-green-500/30 bg-green-500/20 text-green-400'
+                    : colorBase === 'red'
+                      ? 'border border-red-500/30 bg-red-500/20 text-red-400'
+                      : 'border border-yellow-500/30 bg-yellow-500/20 text-yellow-400'
+                  : colorBase === 'green'
+                    ? 'bg-night-600 hover:bg-green-500/20 hover:text-green-400'
+                    : colorBase === 'red'
+                      ? 'bg-night-600 hover:bg-red-500/20 hover:text-red-400'
+                      : 'bg-night-600 hover:bg-yellow-500/20 hover:text-yellow-400'
+              )}
+            >
+              <Icon name={iconName} class="size-3.5" />
+            </button>
+          )
+        })
+      }
+      {
+        (comment.status === 'APPROVED' || comment.status === 'VERIFIED') && (
+          <button
+            type="button"
+            data-action="status"
+            data-value={comment.status === 'VERIFIED' ? 'APPROVED' : 'VERIFIED'}
+            data-comment-id={comment.id}
+            data-user-id={Astro.locals.user?.id}
+            title={comment.status === 'VERIFIED' ? 'Unverify (v)' : 'Verify (v)'}
+            class={cn(
+              'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
+              comment.status === 'VERIFIED'
+                ? 'border border-blue-500/30 bg-blue-500/20 text-blue-400'
+                : 'bg-night-600 hover:bg-blue-500/20 hover:text-blue-400'
+            )}
+          >
+            <Icon name="ri:verified-badge-line" class="size-3.5" />
+          </button>
+        )
+      }
+    </div>
+  </summary>
+
+  <!-- Expanded content. Sections are visually bounded so the eye can find
+       each kind of information quickly. Order: who-is-this, what-AI-thinks,
+       mod-actions, parent-context-if-reply, the comment itself. -->
+  <div class="space-y-3 border-t border-zinc-800 bg-night-800/30 p-3">
+    <!-- Context section: author + rating + proof + issues in one panel -->
+    <section class="rounded-md border border-zinc-800 bg-night-700 p-2.5">
+      <header class="mb-1.5 flex flex-wrap items-center gap-2 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
+        <span class="flex items-center gap-1">
+          <Icon name="ri:information-line" class="size-3" />
+          Context
+        </span>
+        <BadgeSmall
+          icon={statusInfo.icon}
+          color={statusInfo.color as TailwindColor}
+          text={statusInfo.label}
+          inlineIcon
+        />
+      </header>
+      <AdminCommentContext comment={comment} />
+    </section>
+
+    <!-- AI verdict, only when present. Structured signals first, reasoning below. -->
+    {
+      comment.aiAction && (
+        <section class="rounded-md border border-indigo-500/30 bg-indigo-500/5 p-2.5">
+          <header class="mb-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold tracking-wider text-indigo-300 uppercase">
+            <Icon name="ri:robot-2-fill" class="size-3" />
+            AI verdict
+            {comment.aiDecidedAt && (
+              <TimeFormatted
+                date={comment.aiDecidedAt}
+                hourPrecision
+                class="font-normal normal-case text-indigo-400/70"
+              />
+            )}
+          </header>
+          <div class="mb-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+            <span
+              class={cn(
+                'rounded-sm px-1.5 py-0.5 font-medium',
+                aiActionColor[comment.aiAction] === 'green' && 'bg-green-500/20 text-green-300',
+                aiActionColor[comment.aiAction] === 'red' && 'bg-red-500/20 text-red-300',
+                aiActionColor[comment.aiAction] === 'yellow' && 'bg-yellow-500/20 text-yellow-300'
+              )}
+              title="The AI's recommended action for this comment."
+            >
+              {aiActionLabel[comment.aiAction]}
+            </span>
+            {typeof comment.aiQuality === 'number' && (
+              <span
+                class="rounded-sm bg-night-700 px-1.5 py-0.5 text-day-300"
+                title="Content quality score, 0 (worthless) to 10 (excellent)."
+              >
+                Quality {comment.aiQuality}/10
+              </span>
+            )}
+            <span
+              class={cn(
+                'rounded-sm px-1.5 py-0.5',
+                comment.aiIsSpam ? 'bg-red-500/20 text-red-300' : 'bg-night-700 text-day-500'
+              )}
+              title="Whether the AI judged this comment as spam."
+            >
+              {comment.aiIsSpam ? 'Spam' : 'Not spam'}
+            </span>
+            <span
+              class={cn(
+                'rounded-sm px-1.5 py-0.5',
+                comment.aiIsBrigade ? 'bg-orange-500/20 text-orange-300' : 'bg-night-700 text-day-500'
+              )}
+              title="Whether the AI detected this comment as part of a coordinated review wave."
+            >
+              {comment.aiIsBrigade ? 'Brigade' : 'No brigade'}
+              {typeof comment.aiBrigadeConfidence === 'number' && (
+                <span class="ml-1 text-day-500">{comment.aiBrigadeConfidence}/5</span>
+              )}
+            </span>
+          </div>
+          {comment.aiReasoning && (
+            <p class="text-[12px] leading-snug whitespace-pre-wrap text-day-300">
+              {comment.aiReasoning}
+            </p>
+          )}
+        </section>
+      )
+    }
+
+    <!-- Parent context if reply -->
+    {
+      comment.parent && (
+        <section class="rounded-md border border-zinc-800 bg-night-800/60 p-2.5">
+          <header class="mb-1 flex items-center gap-1 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
+            <Icon name="ri:reply-line" class="size-3" />
+            Replying to <UserBadge user={comment.parent.author} size="sm" noLink />
+          </header>
+          <div class="text-sm text-zinc-400">{comment.parent.content}</div>
+        </section>
+      )
+    }
+
+    <!-- The comment itself: the thing being judged. Read this, then act. -->
+    <section class="rounded-md border border-zinc-700 border-l-4 border-l-zinc-500 bg-night-900 p-3.5">
+      <header class="mb-1.5 flex items-center gap-1 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
+        <Icon name="ri:chat-quote-line" class="size-3" />
+        Comment
+      </header>
+      <div class="text-base leading-relaxed whitespace-pre-wrap text-day-100">
+        {comment.content}
+      </div>
+    </section>
+
+    <!-- Moderation tools last: act on what you just read. -->
+    <section class="rounded-md border border-zinc-800 bg-night-700 p-2.5">
+      <header class="mb-2 flex items-center gap-1 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
+        <Icon name="ri:shield-keyhole-line" class="size-3" />
+        Moderation tools
+      </header>
+      <CommentModeration comment={comment} compact />
+    </section>
+  </div>
+</details>
