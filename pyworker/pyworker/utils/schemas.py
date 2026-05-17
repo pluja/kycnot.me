@@ -110,22 +110,45 @@ def _validate_deep_scan(data: dict[str, Any]) -> None:
 
 
 def _validate_comment_moderation(data: dict[str, Any]) -> None:
-    required = {"isSpam", "requiresAdminReview", "contextNote", "internalNote", "commentQuality"}
+    required = {
+        "recommendedAction",
+        "reasoning",
+        "commentQuality",
+        "isSpam",
+        "isBrigade",
+        "brigadeConfidence",
+        "ratingShouldBeDisabled",
+        "contextNote",
+    }
     missing = required - data.keys()
     if missing:
         raise ValueError(f"Missing required fields: {missing}")
 
-    for bool_field in ("isSpam", "requiresAdminReview"):
+    if data["recommendedAction"] not in ("approve", "reject", "human_review"):
+        raise ValueError(
+            f"recommendedAction must be approve|reject|human_review, got {data['recommendedAction']!r}"
+        )
+
+    for bool_field in ("isSpam", "isBrigade", "ratingShouldBeDisabled"):
         if not isinstance(data[bool_field], bool):
             raise ValueError(f"{bool_field} must be a bool, got {type(data[bool_field])}")
 
-    for str_field in ("contextNote", "internalNote"):
+    for str_field in ("reasoning", "contextNote"):
         if not isinstance(data[str_field], str):
             raise ValueError(f"{str_field} must be a string")
 
     quality = data["commentQuality"]
     if not isinstance(quality, int) or quality not in range(11):
         raise ValueError(f"commentQuality must be an int in 0-10, got {quality!r}")
+
+    confidence = data["brigadeConfidence"]
+    if not isinstance(confidence, int) or confidence not in range(6):
+        raise ValueError(f"brigadeConfidence must be an int in 0-5, got {confidence!r}")
+
+    if data["isSpam"] and data["recommendedAction"] == "approve":
+        raise ValueError("isSpam cannot be true when recommendedAction is approve")
+    if data["isBrigade"] and confidence == 0:
+        raise ValueError("isBrigade cannot be true when brigadeConfidence is 0")
 
 
 def _validate_comment_sentiment(data: dict[str, Any]) -> None:
@@ -210,11 +233,22 @@ DEEP_SCAN = PromptSchema(
 
 COMMENT_MOD = PromptSchema(
     ts_type="""interface CommentModeration {
-  isSpam: boolean;
-  requiresAdminReview: boolean;
-  contextNote: string;
-  internalNote: string;
+  /** Top-level decision. Server may override for hard-gate cases (orderId, strictCommentingEnabled, kycRequested, fundsBlocked, high-confidence brigade). */
+  recommendedAction: 'approve' | 'reject' | 'human_review';
+  /** 1-3 sentences, internal-only. Cite the specific signals you used. */
+  reasoning: string;
+  /** 0=worthless, 10=excellent. */
   commentQuality: 0|1|2|3|4|5|6|7|8|9|10;
+  /** True only when the comment is spam outright. Cannot coexist with recommendedAction=approve. */
+  isSpam: boolean;
+  /** True when cluster signals indicate coordinated activity. */
+  isBrigade: boolean;
+  /** 0=no signal, 5=certain. Must be > 0 when isBrigade=true. */
+  brigadeConfidence: 0|1|2|3|4|5;
+  /** Only meaningful for root reviews with a rating. The comment may stay approved while the star rating is killed. */
+  ratingShouldBeDisabled: boolean;
+  /** User-visible. Empty string when no note is needed. */
+  contextNote: string;
 }""",
     validate=_validate_comment_moderation,
 )

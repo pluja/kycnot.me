@@ -109,11 +109,14 @@ class CommentSentimentSummaryType(TypedDict):
 
 
 class CommentModerationType(TypedDict):
-    isSpam: bool
-    requiresAdminReview: bool
-    contextNote: str
-    internalNote: str
+    recommendedAction: TypeLiteral["approve", "reject", "human_review"]
+    reasoning: str
     commentQuality: int
+    isSpam: bool
+    isBrigade: bool
+    brigadeConfidence: int
+    ratingShouldBeDisabled: bool
+    contextNote: str
 
 
 QueryType = Union[str, bytes, SQL, Composed, Literal]
@@ -834,80 +837,30 @@ def get_pending_comments(service_id: int) -> List[Dict[str, Any]]:
     return comments
 
 
-def get_comment_by_id(comment_id: int) -> Optional[Dict[str, Any]]:
-    """Fetch a single comment by ID."""
+def get_moderation_context(comment_id: int) -> Optional[Dict[str, Any]]:
+    """Fetch the structured moderation context for a comment.
+
+    Delegates to the SQL function get_comment_moderation_context, which returns a
+    single JSONB document with the comment, the service, and a context block
+    containing cluster signals, recent events, calibration samples, and recent
+    affiliated-team activity. Returns None if the comment does not exist.
+    """
     try:
         with get_db_connection() as conn:
-            with conn.cursor(row_factory=dict_row) as cursor:
+            with conn.cursor() as cursor:
                 cursor.execute(
-                    """
-                    SELECT c.id, c.content, c.status,
-                           u.name AS "authorName", u."displayName" AS "authorDisplayName"
-                    FROM "Comment" c
-                    JOIN "User" u ON c."authorId" = u.id
-                    WHERE c.id = %s
-                    """,
+                    "SELECT get_comment_moderation_context(%s)::text",
                     (comment_id,),
                 )
-                return cursor.fetchone()
+                row = cursor.fetchone()
+                if not row or row[0] is None:
+                    return None
+                import json
+
+                return json.loads(row[0])
     except Exception as e:
-        logger.error(f"Error fetching comment {comment_id}: {e}")
-    return None
-
-
-def get_recent_approved_comments(
-    service_id: int, limit: int = 10
-) -> List[Dict[str, Any]]:
-    """Fetch recent APPROVED/VERIFIED comments for a service (for AI context)."""
-    comments = []
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor(row_factory=dict_row) as cursor:
-                cursor.execute(
-                    """
-                    SELECT c.id, c.content, c.rating, c.upvotes, c."createdAt", c."parentId",
-                           u."displayName" AS "authorDisplayName"
-                    FROM "Comment" c
-                    JOIN "User" u ON c."authorId" = u.id
-                    WHERE c."serviceId" = %s AND c.status IN ('APPROVED', 'VERIFIED')
-                    ORDER BY c."createdAt" DESC
-                    LIMIT %s
-                    """,
-                    (service_id, limit),
-                )
-                comments = cursor.fetchall()
-    except Exception as e:
-        logger.error(
-            f"Error fetching recent approved comments for service {service_id}: {e}"
-        )
-    return comments
-
-
-def get_recent_approved_order_ids(service_id: int, limit: int = 5) -> List[str]:
-    """Fetch recent non-null orderIds from APPROVED/VERIFIED comments for a service."""
-    order_ids = []
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor(row_factory=dict_row) as cursor:
-                cursor.execute(
-                    """
-                    SELECT c."orderId"
-                    FROM "Comment" c
-                    WHERE c."serviceId" = %s
-                      AND c."orderId" IS NOT NULL
-                      AND c.status IN ('APPROVED', 'VERIFIED')
-                    ORDER BY COALESCE(c."approvedAt", c."updatedAt") DESC
-                    LIMIT %s
-                    """,
-                    (service_id, limit),
-                )
-                rows = cursor.fetchall()
-                order_ids = [row["orderId"] for row in rows]
-    except Exception as e:
-        logger.error(
-            f"Error fetching recent approved order IDs for service {service_id}: {e}"
-        )
-    return order_ids
+        logger.error(f"Error fetching moderation context for comment {comment_id}: {e}")
+        return None
 
 
 def get_max_comment_updated_at(
@@ -986,38 +939,53 @@ def save_user_sentiment(
         logger.error(f"Error saving user sentiment for service {service_id}: {e}")
 
 
-def update_comment_moderation(comment_data: CommentType):
-    """Write AI triage assessment to a comment without changing its status.
+def apply_moderation_decision(
+    comment_id: int,
+    status: str,
+    requires_admin_review: bool,
+    suspicious: bool,
+    rating_disabled_by_moderator: bool,
+    internal_note: str,
+    community_note: Optional[str],
+) -> bool:
+    """Apply the moderator/AI decision to a comment.
 
-    The AI worker populates requiresAdminReview, communityNote, and
-    internalNote so human moderators can make informed approve/reject
-    decisions. Status is intentionally NOT written here: only humans
-    change comment status.
+    Writes status, suspicious, requiresAdminReview, ratingDisabledByModerator,
+    and the two note fields. Existing triggers handle rating-weight zeroing
+    when suspicious flips and karma deltas when the status changes.
+    Returns True on success.
     """
-    comment_id = comment_data.get("id")
-    if not comment_id:
-        logger.error("Cannot update comment: 'id' is missing from comment_data.")
-        return
-
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
                     """
                     UPDATE "Comment"
-                    SET 
+                    SET
+                        "status" = %(status)s::"CommentStatus",
                         "requiresAdminReview" = %(requiresAdminReview)s,
-                        "communityNote" = %(communityNote)s,
+                        "suspicious" = %(suspicious)s,
+                        "ratingDisabledByModerator" = %(ratingDisabledByModerator)s,
                         "internalNote" = %(internalNote)s,
+                        "communityNote" = %(communityNote)s,
                         "updatedAt" = NOW()
                     WHERE id = %(id)s
-                """,
-                    comment_data,
+                    """,
+                    {
+                        "id": comment_id,
+                        "status": status,
+                        "requiresAdminReview": requires_admin_review,
+                        "suspicious": suspicious,
+                        "ratingDisabledByModerator": rating_disabled_by_moderator,
+                        "internalNote": internal_note,
+                        "communityNote": community_note,
+                    },
                 )
                 conn.commit()
-                logger.info(f"Successfully updated comment {comment_id}")
+                return True
     except Exception as e:
-        logger.error(f"Error updating comment {comment_id}: {e}")
+        logger.error(f"Error applying moderation decision for comment {comment_id}: {e}")
+        return False
 
 
 def touch_service_updated_at(service_id: int) -> bool:

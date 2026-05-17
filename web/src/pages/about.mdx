@@ -306,7 +306,9 @@ User ratings are trust weighted. A five star review from a long-time active user
 
 Reviews from established users, verified reviews, and comments with approved private proof carry more weight. New accounts, low activity accounts, suspicious comments, and service-affiliated accounts have less influence. Some ratings do not count at all.
 
-Creating an account is very easy and costs almost no effort. We have seen people create accounts only to push a service, attack a competitor, or win an argument. Because of that, some limits are automatic. New accounts can reply, but they must wait before posting a new review. For urgent reports, [contact us directly](/about#contact).
+Creating an account is very easy and costs almost no effort. We have seen people create accounts only to push a service, attack a competitor, or win an argument. Because of that, the trust weighting does most of the work: a fresh account can comment right away, but its rating barely moves the score until the account has some real history.
+
+When the system detects a coordinated wave of similar comments from many fresh accounts on the same service, those comments are marked as suspicious automatically. The text usually stays visible, but the star ratings are not counted. A moderator reviews each suspicious comment afterward.
 
 When possible, the comment stays visible even if the rating is disabled. You can still read it, check the context, and make up your own mind. Each review shows its rating weight next to the stars.
 
@@ -318,7 +320,9 @@ If a service does not have enough trusted feedback yet, KYCnot.me says so instea
 
 ### Moderation
 
-**All comments are moderated.** First, an **AI checks** each comment. If nothing is flagged, the comment is published right away. If something seems off, the comment is held for a **human review**. We only remove comments that do not follow the guidelines. KYCnot.me is not a forum; comments exist to help users understand services.
+**Every comment is checked.** An AI reads each new comment with the surrounding context: the service, recent activity, and signals like account age and comment similarity to others posted nearby. Most comments are useful, so the default is to publish quickly: if the AI sees no problems, the comment goes live. Obvious spam is rejected outright. Anything ambiguous, anything making serious claims (KYC issues, blocked funds, scam allegations), and anything that the AI detects as part of a coordinated wave is held for a human moderator. The AI never has the last word on a comment that includes private proof.
+
+We only remove comments that do not follow the guidelines. KYCnot.me is not a forum; comments exist to help users understand services.
 
 Comments from [**users affiliated with a service**](/about#verified-and-affiliated-users) are automatically approved on their own service page.
 
