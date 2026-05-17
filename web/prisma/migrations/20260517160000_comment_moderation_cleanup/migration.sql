@@ -71,14 +71,17 @@ ALTER TABLE "Comment" RENAME COLUMN "orderIdStatus" TO "privateProofStatus";
 ALTER INDEX "Comment_serviceId_orderId_key" RENAME TO "Comment_serviceId_privateProof_key";
 
 -- 4) Drop deprecated columns.
--- Forward any leftover requiresAdminReview=true rows to humanAction='HOLD' before drop.
--- The previous migration backfilled HUMAN_PENDING rows, but any other rows that
--- carried requiresAdminReview=true would lose that signal otherwise.
+-- Forward leftover requiresAdminReview=true rows on still-PENDING comments to
+-- humanAction='HOLD'. Already-decided rows (APPROVED/REJECTED/VERIFIED) don't
+-- get the flag carried over: the "needs review" signal isn't actionable once
+-- a comment is in a terminal state, and mapping it to HOLD would have those
+-- rows show up under the On Hold filter despite never being held by a mod.
 UPDATE "Comment"
    SET "humanAction" = 'HOLD',
        "humanDecidedAt" = COALESCE("humanDecidedAt", NOW())
  WHERE "requiresAdminReview" = true
-   AND "humanAction" IS NULL;
+   AND "humanAction" IS NULL
+   AND status = 'PENDING';
 
 DROP INDEX IF EXISTS "Comment_ratingDisabledByModerator_idx";
 ALTER TABLE "Comment" DROP COLUMN IF EXISTS "suspicious";

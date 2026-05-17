@@ -808,9 +808,9 @@ def get_comments(service_id: int, status: str = "APPROVED") -> List[Dict[str, An
 
 def get_pending_comments(service_id: int) -> List[Dict[str, Any]]:
     """
-    Get all PENDING comments for a specific service using a flat SELECT.
-    Unlike get_comments(), this does NOT use a recursive CTE, so PENDING replies
-    whose parent is APPROVED are correctly included.
+    Return the IDs of PENDING comments for a service, oldest first.
+    The full moderation context comes from get_moderation_context(); callers
+    only need the id to fan out per-comment work.
     """
     comments = []
     try:
@@ -818,13 +818,8 @@ def get_pending_comments(service_id: int) -> List[Dict[str, Any]]:
             with conn.cursor(row_factory=dict_row) as cursor:
                 cursor.execute(
                     """
-                    SELECT
-                        c.id, c.content, c.rating, c.upvotes, c."createdAt", c."parentId",
-                        c."orderId", c."privateContext", c.status,
-                        u.id AS "authorId", u.name AS "authorName",
-                        u."displayName" AS "authorDisplayName", u.verified AS "authorVerified"
+                    SELECT c.id
                     FROM "Comment" c
-                    JOIN "User" u ON c."authorId" = u.id
                     WHERE c."serviceId" = %s AND c.status = 'PENDING'
                     ORDER BY c."createdAt" ASC
                     """,

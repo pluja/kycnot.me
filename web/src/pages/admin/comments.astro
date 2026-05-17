@@ -21,7 +21,7 @@ import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
 import { prisma } from '../../lib/prisma'
 import { urlWithParams } from '../../lib/urls'
 
-import type { CommentStatus, VerificationStatus } from '@prisma/client'
+import type { CommentStatus, Prisma, VerificationStatus } from '@prisma/client'
 
 const user = Astro.locals.user
 if (!user || (!user.admin && !user.moderator)) {
@@ -51,21 +51,30 @@ const sortBy = getAdminCommentSortOptionInfo(params['sort-by'])
 const listedServiceStatuses = ['APPROVED', 'VERIFICATION_SUCCESS'] satisfies VerificationStatus[]
 const pendingCommentStatuses = ['PENDING'] satisfies CommentStatus[]
 
+// AND the conditions so a filter that pins status (e.g., Approved) and
+// the priority "must be PENDING" constraint don't silently overwrite each
+// other via object-spread. Incompatible combos return 0 rows naturally.
 const priorityWhere = {
-  ...statusFilter.whereClause,
-  status: { in: pendingCommentStatuses },
-  service: { verificationStatus: { in: [...listedServiceStatuses] } },
-}
+  AND: [
+    statusFilter.whereClause,
+    { status: { in: pendingCommentStatuses } },
+    { service: { verificationStatus: { in: [...listedServiceStatuses] } } },
+  ],
+} satisfies Prisma.CommentWhereInput
 
 const regularWhere = {
-  ...statusFilter.whereClause,
-  NOT: {
-    AND: [
-      { status: { in: pendingCommentStatuses } },
-      { service: { verificationStatus: { in: [...listedServiceStatuses] } } },
-    ],
-  },
-}
+  AND: [
+    statusFilter.whereClause,
+    {
+      NOT: {
+        AND: [
+          { status: { in: pendingCommentStatuses } },
+          { service: { verificationStatus: { in: [...listedServiceStatuses] } } },
+        ],
+      },
+    },
+  ],
+} satisfies Prisma.CommentWhereInput
 
 const commentSelect = {
   id: true,
