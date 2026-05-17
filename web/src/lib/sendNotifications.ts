@@ -31,7 +31,7 @@ export async function sendNotification(
           author: { select: { id: true } },
           status: true,
           content: true,
-          communityNote: true,
+          publicNote: true,
           parent: {
             select: {
               author: {

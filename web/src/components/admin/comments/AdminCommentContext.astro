@@ -5,20 +5,22 @@ import BadgeSmall from '../../BadgeSmall.astro'
 import TimeFormatted from '../../TimeFormatted.astro'
 import Tooltip from '../../Tooltip.astro'
 
-import type { CommentStatus, OrderIdStatus } from '@prisma/client'
+import type { CommentIssueType, CommentStatus, PrivateProofStatus, RatingMuteReason } from '@prisma/client'
 import type { HTMLAttributes } from 'astro/types'
 
 type Props = HTMLAttributes<'div'> & {
   comment: {
     rating: number | null
     ratingActive: boolean
+    ratingMuted: boolean
+    ratingMuteReason: RatingMuteReason | null
     ratingWeight: number
     ratingTrustLabel: string | null
     ratingTrustReason: string | null
     status: CommentStatus
-    suspicious: boolean
-    orderId: string | null
-    orderIdStatus: OrderIdStatus | null
+    privateProof: string | null
+    privateProofStatus: PrivateProofStatus | null
+    issues: CommentIssueType[]
     author: {
       createdAt: Date
       lastLoginAt: Date
@@ -41,10 +43,24 @@ const commentCountLabel = `${commentCount.toLocaleString()} ${commentCount === 1
 const ratingInfluence = Math.round(comment.ratingWeight * 100)
 const ratingCounts =
   comment.rating !== null &&
-  !comment.suspicious &&
+  !comment.ratingMuted &&
   comment.ratingActive &&
   (comment.status === 'APPROVED' || comment.status === 'VERIFIED') &&
   comment.ratingWeight > 0
+
+const issueLabels: Record<CommentIssueType, string> = {
+  KYC_REQUESTED: 'KYC requested',
+  FUNDS_BLOCKED: 'Funds blocked',
+}
+
+const muteReasonLabels: Record<RatingMuteReason, string> = {
+  AUTHOR_AFFILIATED: 'Author affiliated',
+  AUTHOR_LOW_TRUST: 'Author low trust',
+  SUSPICIOUS_PATTERN: 'Suspicious pattern',
+  TEMPLATE_SPAM: 'Template spam',
+  CONFLICT_OF_INTEREST: 'Conflict of interest',
+  MODERATOR_DISCRETION: 'Moderator discretion',
+}
 ---
 
 <div {...htmlProps} class:list={['flex flex-wrap items-center gap-1 text-xs', className]}>
@@ -102,17 +118,40 @@ const ratingCounts =
   }
 
   {
-    comment.orderId && (
+    comment.ratingMuted && (
+      <BadgeSmall
+        icon="ri:volume-mute-line"
+        color="orange"
+        text={
+          comment.ratingMuteReason
+            ? `Muted: ${muteReasonLabels[comment.ratingMuteReason]}`
+            : 'Rating muted'
+        }
+        inlineIcon
+      />
+    )
+  }
+
+  {
+    comment.issues.map((issue) => (
+      <BadgeSmall icon="ri:alert-line" color="red" text={issueLabels[issue]} inlineIcon />
+    ))
+  }
+
+  {
+    comment.privateProof && (
       <BadgeSmall
         icon="ri:key-2-line"
         color={
-          comment.orderIdStatus === 'APPROVED'
+          comment.privateProofStatus === 'APPROVED'
             ? 'green'
-            : comment.orderIdStatus === 'REJECTED'
+            : comment.privateProofStatus === 'REJECTED'
               ? 'red'
-              : 'purple'
+              : comment.privateProofStatus === 'WITHDRAWN'
+                ? 'gray'
+                : 'purple'
         }
-        text={`Proof ${comment.orderIdStatus?.toLowerCase() ?? 'pending'}`}
+        text={`Proof ${comment.privateProofStatus?.toLowerCase() ?? 'pending'}`}
         inlineIcon
       />
     )

@@ -63,55 +63,54 @@ export function defineProtectedAction<
         })
       }
 
-      if (permissions === 'not-spammer' && context.locals.user.spammer) {
+      const user = context.locals.user
+      if (user.spammer) {
         throw new ActionError({
           code: 'FORBIDDEN',
           message: 'Spammer users are not allowed to perform this action.',
         })
       }
 
-      if (
-        (permissions === 'verified' || (Array.isArray(permissions) && permissions.includes('verified'))) &&
-        !context.locals.user.verified
-      ) {
-        if (context.locals.user.spammer) {
+      if (permissions === 'not-spammer') {
+        return handler(input, context as ActionAPIContextWithUser)
+      }
+
+      // arrays grant access when ANY listed permission is satisfied (OR).
+      // single-string permissions require that one permission specifically.
+      if (Array.isArray(permissions)) {
+        const granted = permissions.some((p) =>
+          p === 'verified'
+            ? user.verified
+            : p === 'moderator'
+              ? user.moderator
+              : p === 'admin'
+                ? user.admin
+                : false
+        )
+        if (!granted) {
           throw new ActionError({
             code: 'FORBIDDEN',
-            message: 'Spammer users are not allowed to perform this action.',
+            message: 'You do not have the required privileges for this action.',
           })
         }
+        return handler(input, context as ActionAPIContextWithUser)
+      }
+
+      if (permissions === 'verified' && !user.verified) {
         throw new ActionError({
           code: 'FORBIDDEN',
           message: 'Verified user privileges required.',
         })
       }
 
-      if (
-        (permissions === 'moderator' || (Array.isArray(permissions) && permissions.includes('moderator'))) &&
-        !context.locals.user.moderator
-      ) {
-        if (context.locals.user.spammer) {
-          throw new ActionError({
-            code: 'FORBIDDEN',
-            message: 'Spammer users are not allowed to perform this action.',
-          })
-        }
+      if (permissions === 'moderator' && !user.moderator) {
         throw new ActionError({
           code: 'FORBIDDEN',
           message: 'Moderator privileges required.',
         })
       }
 
-      if (
-        (permissions === 'admin' || (Array.isArray(permissions) && permissions.includes('admin'))) &&
-        !context.locals.user.admin
-      ) {
-        if (context.locals.user.spammer) {
-          throw new ActionError({
-            code: 'FORBIDDEN',
-            message: 'Spammer users are not allowed to perform this action.',
-          })
-        }
+      if (permissions === 'admin' && !user.admin) {
         throw new ActionError({
           code: 'FORBIDDEN',
           message: 'Admin privileges required.',

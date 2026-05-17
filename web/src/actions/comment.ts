@@ -43,8 +43,7 @@ async function refreshActiveRatingForUserService(
     rating: { not: null },
     parentId: null,
     status: { in: activeRatingStatuses },
-    suspicious: false,
-    ratingDisabledByModerator: false,
+    ratingMuted: false,
   } satisfies Prisma.CommentWhereInput
 
   const preferredRating = options.preferredCommentId
@@ -299,44 +298,39 @@ export const commentActions = {
       }
       // --- Rate Limit Check End ---
 
-      // --- Format Internal Note from Issue Reports ---
-      let formattedInternalNote: string | null = null
-      // Track if this is an issue report
-      const isIssueReport =
-        input.issueKycRequested === true || input.issueFundsBlocked === true || input.issueScam === true
+      // --- Issue tags and admin-only note from user submission ---
+      const issueTypes: ('KYC_REQUESTED' | 'FUNDS_BLOCKED')[] = []
+      if (input.issueKycRequested) issueTypes.push('KYC_REQUESTED')
+      if (input.issueFundsBlocked) issueTypes.push('FUNDS_BLOCKED')
 
+      const isIssueReport = issueTypes.length > 0 || input.issueScam === true
+
+      let formattedAdminNote: string | null = null
       if (isIssueReport) {
-        const issueTypes = []
-        if (input.issueKycRequested) issueTypes.push('KYC REQUESTED')
-        if (input.issueFundsBlocked) issueTypes.push('FUNDS BLOCKED')
-        if (input.issueScam) issueTypes.push('POTENTIAL SCAM')
-
+        const tagLabels: string[] = [...issueTypes]
+        if (input.issueScam) tagLabels.push('POTENTIAL_SCAM')
         const details = input.issueDetails?.trim() ?? ''
-
-        formattedInternalNote = `[${issueTypes.join(', ')}]${details ? `: ${details}` : ''}`
+        formattedAdminNote = `[${tagLabels.join(', ')}]${details ? `: ${details}` : ''}`
       } else if (input.internalNote?.trim()) {
-        formattedInternalNote = input.internalNote.trim()
+        formattedAdminNote = input.internalNote.trim()
       }
-
-      // Determine if admin review is needed (always true for issue reports)
-      const requiresAdminReview = isIssueReport || !!(formattedInternalNote && !context.locals.user.admin)
 
       try {
         await prisma.$transaction(async (tx) => {
-          // Check for existing orderId for this service if provided
+          // Check for existing privateProof for this service if provided
           if (input.orderId?.trim()) {
-            const existingOrderId = await tx.comment.findFirst({
+            const existingProof = await tx.comment.findFirst({
               where: {
                 serviceId: input.serviceId,
-                orderId: input.orderId.trim(),
+                privateProof: input.orderId.trim(),
               },
               select: { id: true },
             })
 
-            if (existingOrderId) {
+            if (existingProof) {
               throw new ActionError({
                 code: 'BAD_REQUEST',
-                message: 'This Order ID has already been reported for this service.',
+                message: 'This proof has already been reported for this service.',
               })
             }
           }
@@ -356,22 +350,15 @@ export const commentActions = {
           const commentStatus: CommentStatus =
             context.locals.user.admin || context.locals.user.moderator || isRelatedToService
               ? 'APPROVED'
-              : isIssueReport
-                ? 'HUMAN_PENDING'
-                : 'PENDING'
+              : 'PENDING'
 
-          // Prepare data object with proper type safety
           const commentData: Prisma.CommentCreateInput = {
             content: input.content,
             service: { connect: { id: input.serviceId } },
             author: { connect: { id: context.locals.user.id } },
-
-            // Change status to HUMAN_PENDING if there's an issue report, this is so that the AI worker does not pick it up for review
             status: commentStatus,
-            requiresAdminReview,
-            orderId: input.orderId?.trim() ?? null,
-            kycRequested: input.issueKycRequested === true,
-            fundsBlocked: input.issueFundsBlocked === true,
+            privateProof: input.orderId?.trim() ?? null,
+            issues: issueTypes,
           }
 
           if (input.parentId) {
@@ -383,8 +370,8 @@ export const commentActions = {
             commentData.ratingActive = false
           }
 
-          if (formattedInternalNote) {
-            commentData.internalNote = formattedInternalNote
+          if (formattedAdminNote) {
+            commentData.adminNote = formattedAdminNote
           }
 
           const newComment = await tx.comment.create({
@@ -426,29 +413,46 @@ export const commentActions = {
 
   moderate: defineProtectedAction({
     permissions: ['admin', 'moderator'],
-    input: z.object({
-      commentId: z.number(),
-      userId: z.number(),
-      action: z.enum([
-        'status',
-        'suspicious',
-        'requires-admin-review',
-        'community-note',
-        'internal-note',
-        'private-context',
-        'order-id-status',
-        'kyc-requested',
-        'funds-blocked',
-        'toggle-rating-active',
-      ]),
-      value: z.union([
-        z.enum(['PENDING', 'APPROVED', 'VERIFIED', 'REJECTED']),
-        z.enum(['PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN']),
-        z.boolean(),
-        z.string(),
-      ]),
-    }),
-    handler: async (input) => {
+    input: z.discriminatedUnion('action', [
+      z.object({
+        commentId: z.number().int().positive(),
+        action: z.literal('status'),
+        value: z.enum(['PENDING', 'APPROVED', 'VERIFIED', 'REJECTED']),
+      }),
+      z.object({
+        commentId: z.number().int().positive(),
+        action: z.literal('human-action'),
+        value: z.enum(['APPROVE', 'REJECT', 'HOLD']),
+      }),
+      z.object({
+        commentId: z.number().int().positive(),
+        action: z.literal('rating-mute'),
+        value: z.boolean(),
+      }),
+      z.object({
+        commentId: z.number().int().positive(),
+        action: z.literal('rating-mute-reason'),
+        value: z.enum([
+          'AUTHOR_AFFILIATED',
+          'AUTHOR_LOW_TRUST',
+          'SUSPICIOUS_PATTERN',
+          'TEMPLATE_SPAM',
+          'CONFLICT_OF_INTEREST',
+          'MODERATOR_DISCRETION',
+        ]),
+      }),
+      z.object({
+        commentId: z.number().int().positive(),
+        action: z.literal('private-proof-status'),
+        value: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN']),
+      }),
+      z.object({
+        commentId: z.number().int().positive(),
+        action: z.enum(['public-note', 'admin-note', 'author-note']),
+        value: z.string().max(4000),
+      }),
+    ]),
+    handler: async (input, context) => {
       try {
         const comment = await prisma.comment.findUnique({
           where: { id: input.commentId },
@@ -471,48 +475,54 @@ export const commentActions = {
 
         switch (input.action) {
           case 'status':
-            updateData.status = input.value as CommentStatus
+            updateData.status = input.value
             break
-          case 'suspicious':
-            updateData.suspicious = !!input.value
+          case 'human-action': {
+            updateData.humanAction = input.value
+            updateData.humanDecidedAt = new Date()
+            updateData.humanDecidedBy = { connect: { id: context.locals.user.id } }
+            updateData.status =
+              input.value === 'APPROVE'
+                ? 'APPROVED'
+                : input.value === 'REJECT'
+                  ? 'REJECTED'
+                  : 'PENDING'
             break
-          case 'requires-admin-review':
-            updateData.requiresAdminReview = !!input.value
+          }
+          case 'rating-mute':
+            updateData.ratingMuted = input.value
+            updateData.ratingMuteReason = input.value ? 'MODERATOR_DISCRETION' : null
             break
-          case 'community-note':
-            updateData.communityNote = input.value as string
+          case 'rating-mute-reason':
+            updateData.ratingMuteReason = input.value
+            updateData.ratingMuted = true
             break
-          case 'internal-note':
-            updateData.internalNote = input.value as string
+          case 'public-note':
+            updateData.publicNote = input.value
             break
-          case 'private-context':
-            updateData.privateContext = input.value as string
+          case 'admin-note':
+            updateData.adminNote = input.value
             break
-          case 'order-id-status':
-            updateData.orderIdStatus = input.value as 'APPROVED' | 'PENDING' | 'REJECTED' | 'WITHDRAWN'
+          case 'author-note':
+            updateData.authorNote = input.value
+            break
+          case 'private-proof-status':
+            updateData.privateProofStatus = input.value
             if (input.value === 'APPROVED') {
               updateData.status = 'APPROVED'
             }
-            break
-          case 'kyc-requested':
-            updateData.kycRequested = !!input.value
-            break
-          case 'funds-blocked':
-            updateData.fundsBlocked = !!input.value
-            break
-          case 'toggle-rating-active':
-            updateData.ratingDisabledByModerator = !input.value
             break
         }
 
         const shouldRefreshActiveRating =
           comment.rating !== null &&
           (input.action === 'status' ||
-            input.action === 'suspicious' ||
-            input.action === 'order-id-status' ||
-            input.action === 'toggle-rating-active')
+            input.action === 'human-action' ||
+            input.action === 'rating-mute' ||
+            input.action === 'rating-mute-reason' ||
+            input.action === 'private-proof-status')
         const preferredCommentId =
-          input.action === 'toggle-rating-active' && input.value === true ? input.commentId : undefined
+          input.action === 'rating-mute' && input.value === false ? input.commentId : undefined
 
         await prisma.$transaction(async (tx) => {
           await tx.comment.update({

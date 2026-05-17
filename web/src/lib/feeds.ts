@@ -98,7 +98,7 @@ export async function getCommentsForService(slug: string | undefined): Promise<
     where: {
       serviceId: service.id,
       status: { in: ['APPROVED', 'VERIFIED'] },
-      suspicious: false,
+      ratingMuted: false,
       parentId: null, // Only root comments for the main feed
     },
     select: serviceCommentSelect,
@@ -205,7 +205,7 @@ const notificationSelect = {
     select: {
       id: true,
       content: true,
-      communityNote: true,
+      publicNote: true,
       status: true,
       author: {
         select: {

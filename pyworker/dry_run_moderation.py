@@ -25,7 +25,7 @@ def _summarize_context(ctx: Dict[str, Any]) -> str:
         f"  cluster fresh={cl['freshAccountsLast72h']} "
         f"simMax={cl['similarityMax']} userSpike={cl['newUserCreationSpikeNearAuthor']}\n"
         f"  events={len(ev)} "
-        f"submission rating={c['submission']['rating']} hasOrderId={c['submission']['hasOrderId']}"
+        f"submission rating={c['submission']['rating']} hasProof={c['submission']['hasPrivateProof']}"
     )
 
 
@@ -61,8 +61,8 @@ def run(comment_ids: List[int]) -> None:
         decision = _decide(ai, ctx)
         print(
             f"  DECISION: status={decision['status']} "
-            f"suspicious={decision['suspicious']} "
-            f"adminReview={decision['requires_admin_review']} "
+            f"aiAction={decision['ai_action']} "
+            f"ratingMuted={decision['rating_muted']}/{decision['rating_mute_reason']} "
             f"hardGate=({decision['hard_gate_reason'] or 'none'})"
         )
 

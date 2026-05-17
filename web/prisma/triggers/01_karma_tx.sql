@@ -5,6 +5,7 @@
 -- Drop existing triggers first
 DROP TRIGGER IF EXISTS comment_status_change_trigger ON "Comment";
 DROP TRIGGER IF EXISTS comment_suspicious_change_trigger ON "Comment";
+DROP TRIGGER IF EXISTS comment_rating_mute_change_trigger ON "Comment";
 DROP TRIGGER IF EXISTS comment_upvote_change_trigger ON "Comment";
 DROP TRIGGER IF EXISTS comment_vote_change_trigger ON "CommentVote";
 DROP TRIGGER IF EXISTS suggestion_status_change_trigger ON "ServiceSuggestion";
@@ -16,6 +17,7 @@ DROP FUNCTION IF EXISTS handle_comment_status_change();
 DROP FUNCTION IF EXISTS handle_comment_approval();
 DROP FUNCTION IF EXISTS handle_comment_verification();
 DROP FUNCTION IF EXISTS handle_comment_spam_status();
+DROP FUNCTION IF EXISTS handle_rating_mute_change();
 DROP FUNCTION IF EXISTS handle_comment_vote_change();
 DROP FUNCTION IF EXISTS insert_karma_transaction();
 DROP FUNCTION IF EXISTS update_user_karma();
@@ -140,33 +142,41 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Handle spam status changes
-CREATE OR REPLACE FUNCTION handle_comment_spam_status(
+-- Handle rating-mute changes that constitute spam (penalty-bearing reasons).
+-- Karma fires only for SUSPICIOUS_PATTERN and TEMPLATE_SPAM. Affiliation, conflict
+-- of interest, or moderator discretion do not penalize the author.
+CREATE OR REPLACE FUNCTION handle_rating_mute_change(
     NEW RECORD,
     OLD RECORD
 ) RETURNS VOID AS $$
+DECLARE
+    was_penalty BOOLEAN;
+    is_penalty  BOOLEAN;
 BEGIN
-    -- Handle marking as spam
-    IF NEW.suspicious = true AND OLD.suspicious = false THEN
+    was_penalty := COALESCE(OLD."ratingMuted", false)
+                   AND OLD."ratingMuteReason"::text IN ('SUSPICIOUS_PATTERN', 'TEMPLATE_SPAM');
+    is_penalty  := COALESCE(NEW."ratingMuted", false)
+                   AND NEW."ratingMuteReason"::text IN ('SUSPICIOUS_PATTERN', 'TEMPLATE_SPAM');
+
+    IF NOT was_penalty AND is_penalty THEN
         PERFORM insert_karma_transaction(
             NEW."authorId",
             -10,
             'COMMENT_SPAM',
             NEW.id,
-            format('Your comment #comment-%s in %s has been marked as spam.', 
-                NEW.id, 
+            format('Your comment #comment-%s in %s has been marked as spam.',
+                NEW.id,
                 (SELECT name FROM "Service" WHERE id = NEW."serviceId"))
         );
         PERFORM update_user_karma(NEW."authorId", -10);
-    -- Handle unmarking as spam
-    ELSIF NEW.suspicious = false AND OLD.suspicious = true THEN
+    ELSIF was_penalty AND NOT is_penalty THEN
         PERFORM insert_karma_transaction(
             NEW."authorId",
             10,
             'COMMENT_SPAM_REVERTED',
             NEW.id,
-            format('Your comment #comment-%s in %s is no longer marked as spam.', 
-                NEW.id, 
+            format('Your comment #comment-%s in %s is no longer marked as spam.',
+                NEW.id,
                 (SELECT name FROM "Service" WHERE id = NEW."serviceId"))
         );
         PERFORM update_user_karma(NEW."authorId", 10);
@@ -255,7 +265,7 @@ RETURNS TRIGGER AS $$
 BEGIN
     PERFORM handle_comment_approval(NEW, OLD);
     PERFORM handle_comment_verification(NEW, OLD);
-    PERFORM handle_comment_spam_status(NEW, OLD);
+    PERFORM handle_rating_mute_change(NEW, OLD);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -267,8 +277,8 @@ CREATE TRIGGER comment_status_change_trigger
     FOR EACH ROW
     EXECUTE FUNCTION handle_comment_status_change();
 
-CREATE TRIGGER comment_suspicious_change_trigger
-    AFTER UPDATE OF suspicious
+CREATE TRIGGER comment_rating_mute_change_trigger
+    AFTER UPDATE OF "ratingMuted", "ratingMuteReason"
     ON "Comment"
     FOR EACH ROW
     EXECUTE FUNCTION handle_comment_status_change();

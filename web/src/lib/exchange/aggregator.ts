@@ -83,7 +83,7 @@ const displayServiceSelect = {
           ratingActive: true,
           status: { in: [CommentStatus.APPROVED, CommentStatus.VERIFIED] },
           parentId: null,
-          suspicious: false,
+          ratingMuted: false,
         },
       },
     },

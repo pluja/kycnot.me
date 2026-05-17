@@ -54,7 +54,7 @@ const statusFilter = getCommentStatusFilterInfo(params.status)
 const sortBy = getAdminCommentSortOptionInfo(params['sort-by'])
 
 const listedServiceStatuses = ['APPROVED', 'VERIFICATION_SUCCESS'] satisfies VerificationStatus[]
-const pendingCommentStatuses = ['PENDING', 'HUMAN_PENDING'] satisfies CommentStatus[]
+const pendingCommentStatuses = ['PENDING'] satisfies CommentStatus[]
 
 const priorityWhere = {
   ...statusFilter.whereClause,
@@ -96,6 +96,13 @@ const commentInclude = {
       slug: true,
       imageUrl: true,
       verificationStatus: true,
+    },
+  },
+  humanDecidedBy: {
+    select: {
+      name: true,
+      displayName: true,
+      picture: true,
     },
   },
   parent: {
@@ -325,60 +332,56 @@ const makePriorityPageUrl = (page: number) => {
 
                 <div class="mb-4 text-sm">{comment.content}</div>
 
-                {comment.communityNote && (
+                {comment.publicNote && (
                   <div class="mt-2">
-                    <div class="text-sm font-medium text-green-500">Community Note</div>
-                    <p class="text-sm text-gray-300">{comment.communityNote}</p>
+                    <div class="text-sm font-medium text-green-500">Public Note</div>
+                    <p class="text-sm text-gray-300">{comment.publicNote}</p>
                   </div>
                 )}
-                {comment.internalNote && (
+                {comment.adminNote && (
                   <div class="mt-2">
-                    <div class="text-sm font-medium text-yellow-500">Internal Note</div>
-                    <p class="text-sm text-gray-300">{comment.internalNote}</p>
+                    <div class="text-sm font-medium text-yellow-500">Admin Note</div>
+                    <p class="text-sm text-gray-300">{comment.adminNote}</p>
                   </div>
                 )}
-                {comment.privateContext && (
+                {comment.authorNote && (
                   <div class="mt-2">
-                    <div class="text-sm font-medium text-blue-500">Private Context</div>
-                    <p class="text-sm text-gray-300">{comment.privateContext}</p>
+                    <div class="text-sm font-medium text-blue-500">Author Note</div>
+                    <p class="text-sm text-gray-300">{comment.authorNote}</p>
                   </div>
                 )}
 
-                {comment.orderId && (
+                {comment.privateProof && (
                   <div class="mt-2">
                     <div class="text-sm font-medium text-purple-500">Private proof</div>
                     <div class="flex items-center gap-2">
-                      <p class="text-sm text-gray-300">{comment.orderId}</p>
-                      {comment.orderIdStatus && (
+                      <p class="text-sm text-gray-300">{comment.privateProof}</p>
+                      {comment.privateProofStatus && (
                         <span
                           class={cn(
                             'rounded-sm px-1.5 py-0.5 text-xs',
-                            comment.orderIdStatus === 'APPROVED' && 'bg-green-500/20 text-green-400',
-                            comment.orderIdStatus === 'REJECTED' && 'bg-red-500/20 text-red-400',
-                            comment.orderIdStatus === 'PENDING' && 'bg-blue-500/20 text-blue-400'
+                            comment.privateProofStatus === 'APPROVED' && 'bg-green-500/20 text-green-400',
+                            comment.privateProofStatus === 'REJECTED' && 'bg-red-500/20 text-red-400',
+                            comment.privateProofStatus === 'PENDING' && 'bg-blue-500/20 text-blue-400',
+                            comment.privateProofStatus === 'WITHDRAWN' && 'bg-zinc-500/20 text-zinc-400'
                           )}
                         >
-                          {comment.orderIdStatus}
+                          {comment.privateProofStatus}
                         </span>
                       )}
                     </div>
                   </div>
                 )}
 
-                {(comment.kycRequested || comment.fundsBlocked) && (
+                {comment.issues.length > 0 && (
                   <div class="mt-2">
                     <div class="text-sm font-medium text-red-500">Issue Flags</div>
                     <div class="flex flex-wrap gap-2">
-                      {comment.kycRequested && (
+                      {comment.issues.map((issue) => (
                         <span class="rounded-sm bg-red-500/20 px-1.5 py-0.5 text-xs text-red-400">
-                          KYC Requested
+                          {issue.replace('_', ' ')}
                         </span>
-                      )}
-                      {comment.fundsBlocked && (
-                        <span class="rounded-sm bg-red-500/20 px-1.5 py-0.5 text-xs text-red-400">
-                          Funds Blocked
-                        </span>
-                      )}
+                      ))}
                     </div>
                   </div>
                 )}
@@ -553,60 +556,56 @@ const makePriorityPageUrl = (page: number) => {
             <div class="mb-4 text-sm">{comment.content}</div>
 
             {/* Notes */}
-            {comment.communityNote && (
+            {comment.publicNote && (
               <div class="mt-2">
-                <div class="text-sm font-medium text-green-500">Community Note</div>
-                <p class="text-sm text-gray-300">{comment.communityNote}</p>
+                <div class="text-sm font-medium text-green-500">Public Note</div>
+                <p class="text-sm text-gray-300">{comment.publicNote}</p>
               </div>
             )}
-            {comment.internalNote && (
+            {comment.adminNote && (
               <div class="mt-2">
-                <div class="text-sm font-medium text-yellow-500">Internal Note</div>
-                <p class="text-sm text-gray-300">{comment.internalNote}</p>
+                <div class="text-sm font-medium text-yellow-500">Admin Note</div>
+                <p class="text-sm text-gray-300">{comment.adminNote}</p>
               </div>
             )}
-            {comment.privateContext && (
+            {comment.authorNote && (
               <div class="mt-2">
-                <div class="text-sm font-medium text-blue-500">Private Context</div>
-                <p class="text-sm text-gray-300">{comment.privateContext}</p>
+                <div class="text-sm font-medium text-blue-500">Author Note</div>
+                <p class="text-sm text-gray-300">{comment.authorNote}</p>
               </div>
             )}
 
-            {comment.orderId && (
+            {comment.privateProof && (
               <div class="mt-2">
                 <div class="text-sm font-medium text-purple-500">Private proof</div>
                 <div class="flex items-center gap-2">
-                  <p class="text-sm text-gray-300">{comment.orderId}</p>
-                  {comment.orderIdStatus && (
+                  <p class="text-sm text-gray-300">{comment.privateProof}</p>
+                  {comment.privateProofStatus && (
                     <span
                       class={cn(
                         'rounded-sm px-1.5 py-0.5 text-xs',
-                        comment.orderIdStatus === 'APPROVED' && 'bg-green-500/20 text-green-400',
-                        comment.orderIdStatus === 'REJECTED' && 'bg-red-500/20 text-red-400',
-                        comment.orderIdStatus === 'PENDING' && 'bg-blue-500/20 text-blue-400'
+                        comment.privateProofStatus === 'APPROVED' && 'bg-green-500/20 text-green-400',
+                        comment.privateProofStatus === 'REJECTED' && 'bg-red-500/20 text-red-400',
+                        comment.privateProofStatus === 'PENDING' && 'bg-blue-500/20 text-blue-400',
+                        comment.privateProofStatus === 'WITHDRAWN' && 'bg-zinc-500/20 text-zinc-400'
                       )}
                     >
-                      {comment.orderIdStatus}
+                      {comment.privateProofStatus}
                     </span>
                   )}
                 </div>
               </div>
             )}
 
-            {(comment.kycRequested || comment.fundsBlocked) && (
+            {comment.issues.length > 0 && (
               <div class="mt-2">
                 <div class="text-sm font-medium text-red-500">Issue Flags</div>
                 <div class="flex flex-wrap gap-2">
-                  {comment.kycRequested && (
+                  {comment.issues.map((issue) => (
                     <span class="rounded-sm bg-red-500/20 px-1.5 py-0.5 text-xs text-red-400">
-                      KYC Requested
+                      {issue.replace('_', ' ')}
                     </span>
-                  )}
-                  {comment.fundsBlocked && (
-                    <span class="rounded-sm bg-red-500/20 px-1.5 py-0.5 text-xs text-red-400">
-                      Funds Blocked
-                    </span>
-                  )}
+                  ))}
                 </div>
               </div>
             )}

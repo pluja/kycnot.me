@@ -3,8 +3,17 @@ DROP TRIGGER IF EXISTS comment_average_rating_trigger ON "Comment";
 DROP TRIGGER IF EXISTS user_rating_trust_trigger ON "User";
 DROP TRIGGER IF EXISTS service_user_rating_trust_trigger ON "ServiceUser";
 
-DROP FUNCTION IF EXISTS calculate_comment_rating_trust(INT, BOOLEAN, BOOLEAN, INT, "CommentStatus", BOOLEAN, "OrderIdStatus", INT, INT);
-DROP FUNCTION IF EXISTS calculate_comment_rating_trust(INT, BOOLEAN, INT, "CommentStatus", BOOLEAN, "OrderIdStatus", INT, INT);
+-- Drop any prior signature (the function name is unique in our usage).
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN
+        SELECT oid::regprocedure::text AS sig FROM pg_proc WHERE proname = 'calculate_comment_rating_trust'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.sig;
+    END LOOP;
+END
+$$;
 DROP FUNCTION IF EXISTS set_comment_rating_trust_before_write();
 DROP FUNCTION IF EXISTS recalculate_service_user_rating(INT);
 DROP FUNCTION IF EXISTS calculate_average_rating();
@@ -14,11 +23,11 @@ DROP FUNCTION IF EXISTS refresh_service_user_comment_rating_trust();
 CREATE OR REPLACE FUNCTION calculate_comment_rating_trust(
     p_rating INT,
     p_rating_active BOOLEAN,
-    p_rating_disabled_by_moderator BOOLEAN,
+    p_rating_muted BOOLEAN,
+    p_rating_mute_reason "RatingMuteReason",
     p_parent_id INT,
     p_status "CommentStatus",
-    p_suspicious BOOLEAN,
-    p_order_id_status "OrderIdStatus",
+    p_private_proof_status "PrivateProofStatus",
     p_author_id INT,
     p_service_id INT
 )
@@ -32,13 +41,19 @@ BEGIN
         RETURN;
     END IF;
 
-    IF p_rating_disabled_by_moderator IS TRUE THEN
-        RETURN QUERY SELECT 0::DOUBLE PRECISION, 'Not counted'::TEXT, 'Rating was disabled by a moderator'::TEXT;
-        RETURN;
-    END IF;
-
-    IF p_suspicious IS TRUE THEN
-        RETURN QUERY SELECT 0::DOUBLE PRECISION, 'Not counted'::TEXT, 'Marked as suspicious'::TEXT;
+    IF p_rating_muted IS TRUE THEN
+        RETURN QUERY SELECT
+            0::DOUBLE PRECISION,
+            'Not counted'::TEXT,
+            CASE p_rating_mute_reason
+                WHEN 'AUTHOR_AFFILIATED'    THEN 'Author is affiliated with the service'
+                WHEN 'AUTHOR_LOW_TRUST'     THEN 'Author has low trust'
+                WHEN 'SUSPICIOUS_PATTERN'   THEN 'Marked as suspicious'
+                WHEN 'TEMPLATE_SPAM'        THEN 'Template spam pattern'
+                WHEN 'CONFLICT_OF_INTEREST' THEN 'Conflict of interest'
+                WHEN 'MODERATOR_DISCRETION' THEN 'Rating was disabled by a moderator'
+                ELSE 'Rating muted'
+            END;
         RETURN;
     END IF;
 
@@ -83,7 +98,7 @@ BEGIN
         RETURN;
     END IF;
 
-    IF p_order_id_status = 'APPROVED'::"OrderIdStatus" THEN
+    IF p_private_proof_status = 'APPROVED'::"PrivateProofStatus" THEN
         RETURN QUERY SELECT 0.9::DOUBLE PRECISION, 'Verified customer'::TEXT, 'Private proof was approved'::TEXT;
         RETURN;
     END IF;
@@ -127,11 +142,11 @@ BEGIN
     FROM calculate_comment_rating_trust(
         NEW.rating,
         NEW."ratingActive",
-        NEW."ratingDisabledByModerator",
+        NEW."ratingMuted",
+        NEW."ratingMuteReason",
         NEW."parentId",
         NEW.status,
-        NEW.suspicious,
-        NEW."orderIdStatus",
+        NEW."privateProofStatus",
         NEW."authorId",
         NEW."serviceId"
     ) AS t;
@@ -166,7 +181,7 @@ BEGIN
     AND c.rating IS NOT NULL
     AND (c.status = 'APPROVED'::"CommentStatus" OR c.status = 'VERIFIED'::"CommentStatus")
     AND c."ratingActive" = true
-    AND c.suspicious = false;
+    AND c."ratingMuted" = false;
 
     UPDATE "Service"
     SET
@@ -263,7 +278,7 @@ CREATE TRIGGER comment_rating_trust_before_write_trigger
     EXECUTE FUNCTION set_comment_rating_trust_before_write();
 
 CREATE TRIGGER comment_average_rating_trigger
-    AFTER INSERT OR DELETE OR UPDATE OF rating, "ratingActive", "ratingDisabledByModerator", status, suspicious, "parentId", "serviceId", "authorId", "orderIdStatus", "ratingWeight"
+    AFTER INSERT OR DELETE OR UPDATE OF rating, "ratingActive", "ratingMuted", "ratingMuteReason", status, "parentId", "serviceId", "authorId", "privateProofStatus", "ratingWeight"
     ON "Comment"
     FOR EACH ROW
     EXECUTE FUNCTION calculate_average_rating();

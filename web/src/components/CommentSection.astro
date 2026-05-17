@@ -115,7 +115,7 @@ const [dbComments, pendingCommentsCount, activeRatingComment, upvotedRootComment
         prisma.comment.count({
           where: {
             serviceId: service.id,
-            status: { in: ['PENDING', 'HUMAN_PENDING'] },
+            status: 'PENDING',
           },
         }),
       0,

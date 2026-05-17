@@ -1,24 +1,29 @@
 """
 Automated moderation for pending comments.
 
-Per pending comment, fetch the structured moderation context via the
-get_comment_moderation_context SQL function, ask the LLM for a decision,
-then apply server-side hard gates before writing back to the database.
+For each pending comment, fetch the structured moderation context via the
+get_comment_moderation_context SQL function, ask the LLM for a decision, then
+apply server-side hard gates before writing the verdict.
 
-Hard gates always force human review regardless of the LLM's recommendation:
-- the comment has an orderId (private proof needs human verification)
+Hard gates force HOLD (status PENDING) regardless of the AI recommendation:
+- the comment has a private proof (needs human verification)
 - the service has strictCommentingEnabled
-- the user flagged a KYC issue or funds-blocked claim
-- the LLM detected a brigade with confidence >= 4 (rating is auto-neutralized
-  via the suspicious flag, but visibility still needs a human)
+- the user flagged KYC_REQUESTED or FUNDS_BLOCKED
+- the AI detected a brigade with confidence >= 4 (rating gets auto-muted)
+
+Outcomes map to columns:
+- recommendedAction -> aiAction (APPROVE / REJECT / HOLD)
+- aiAction -> status (APPROVED / REJECTED / PENDING) unless overridden by hard gate
+- isBrigade && confidence >= 4 -> ratingMuted=true + ratingMuteReason=SUSPICIOUS_PATTERN
+- ratingShouldBeDisabled (affiliated puff, etc.) -> ratingMuted=true with reason
 """
 
 import json
 from datetime import datetime
-from typing import Any, Dict, List, Mapping
+from typing import Any, Dict, List, Mapping, Optional
 
 from pyworker.database import (  # type: ignore
-    apply_moderation_decision,
+    apply_ai_moderation_decision,
     get_moderation_context,
     get_pending_comments,
 )
@@ -26,6 +31,18 @@ from pyworker.tasks.base import Task  # type: ignore
 from pyworker.utils.ai import prompt_comment_moderation
 
 _BRIGADE_HARD_GATE_CONFIDENCE = 4
+
+_ACTION_TO_STATUS = {
+    "approve": "APPROVED",
+    "reject": "REJECTED",
+    "human_review": "PENDING",
+}
+
+_ACTION_TO_ENUM = {
+    "approve": "APPROVE",
+    "reject": "REJECT",
+    "human_review": "HOLD",
+}
 
 
 class _DateTimeEncoder(json.JSONEncoder):
@@ -35,9 +52,8 @@ class _DateTimeEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-def _build_internal_note(ai_result: Mapping[str, Any], hard_gate_reason: str) -> str:
-    """Compact audit line plus the AI's reasoning. Until the schema cleanup
-    adds dedicated AI columns, this is the only place the signals are recorded."""
+def _build_admin_note(ai_result: Mapping[str, Any], hard_gate_reason: str) -> str:
+    """Compact audit line plus the AI's reasoning."""
     header = (
         f"AI: {ai_result['recommendedAction']} "
         f"(quality={ai_result['commentQuality']}, "
@@ -51,28 +67,44 @@ def _build_internal_note(ai_result: Mapping[str, Any], hard_gate_reason: str) ->
     return f"{header}\n{reasoning}" if reasoning else header
 
 
-def _decide(ai_result: Mapping[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-    """Combine the AI recommendation with server-side hard gates.
+def _pick_mute_reason(
+    ai_result: Mapping[str, Any],
+    context: Mapping[str, Any],
+    is_brigade_hard_gate: bool,
+) -> Optional[str]:
+    if is_brigade_hard_gate:
+        return "SUSPICIOUS_PATTERN"
+    if not ai_result.get("ratingShouldBeDisabled"):
+        return None
+    author = context["comment"]["author"]
+    if author.get("isServiceAffiliated"):
+        return "AUTHOR_AFFILIATED"
+    karma = author.get("totalKarma")
+    if karma is not None and karma < 0:
+        return "AUTHOR_LOW_TRUST"
+    if int(ai_result.get("brigadeConfidence", 0)) >= 2:
+        return "SUSPICIOUS_PATTERN"
+    return "CONFLICT_OF_INTEREST"
 
-    Returns a dict with: status, requires_admin_review, suspicious,
-    rating_disabled_by_moderator, internal_note, community_note, hard_gate_reason.
-    """
+
+def _decide(ai_result: Mapping[str, Any], context: Mapping[str, Any]) -> Dict[str, Any]:
+    """Combine the AI recommendation with server-side hard gates."""
     submission = context["comment"]["submission"]
     service = context["service"]
 
     is_high_conf_brigade = (
-        ai_result["isBrigade"]
-        and ai_result["brigadeConfidence"] >= _BRIGADE_HARD_GATE_CONFIDENCE
+        bool(ai_result["isBrigade"])
+        and int(ai_result["brigadeConfidence"]) >= _BRIGADE_HARD_GATE_CONFIDENCE
     )
 
     hard_gate_reasons: List[str] = []
-    if submission["hasOrderId"]:
-        hard_gate_reasons.append("orderId present")
-    if service["strictCommentingEnabled"]:
+    if submission.get("hasPrivateProof"):
+        hard_gate_reasons.append("private proof present")
+    if service.get("strictCommentingEnabled"):
         hard_gate_reasons.append("strict commenting")
-    if submission["kycIssueClaimed"]:
+    if submission.get("kycIssueClaimed"):
         hard_gate_reasons.append("kyc issue claimed")
-    if submission["fundsBlockedClaimed"]:
+    if submission.get("fundsBlockedClaimed"):
         hard_gate_reasons.append("funds blocked claimed")
     if is_high_conf_brigade:
         hard_gate_reasons.append(
@@ -80,31 +112,42 @@ def _decide(ai_result: Mapping[str, Any], context: Dict[str, Any]) -> Dict[str, 
         )
 
     hard_gate_reason = ", ".join(hard_gate_reasons)
+    recommended_action = ai_result["recommendedAction"]
 
     if hard_gate_reasons:
         status = "PENDING"
-        requires_admin_review = True
-    elif ai_result["recommendedAction"] == "approve":
-        status = "APPROVED"
-        requires_admin_review = False
-    elif ai_result["recommendedAction"] == "reject":
-        status = "REJECTED"
-        requires_admin_review = False
+        ai_action_enum = "HOLD"
     else:
-        status = "PENDING"
-        requires_admin_review = True
+        status = _ACTION_TO_STATUS[recommended_action]
+        ai_action_enum = _ACTION_TO_ENUM[recommended_action]
 
-    community_note = ai_result.get("contextNote") or None
-    if community_note is not None and not community_note.strip():
-        community_note = None
+    rating_muted = (
+        is_high_conf_brigade or bool(ai_result.get("ratingShouldBeDisabled"))
+    )
+    rating_mute_reason = _pick_mute_reason(ai_result, context, is_high_conf_brigade)
+
+    public_note = ai_result.get("contextNote") or None
+    if public_note is not None and not public_note.strip():
+        public_note = None
+
+    ai_signals = {
+        "recommendedAction": ai_result["recommendedAction"],
+        "isSpam": bool(ai_result["isSpam"]),
+        "isBrigade": bool(ai_result["isBrigade"]),
+        "brigadeConfidence": int(ai_result["brigadeConfidence"]),
+        "commentQuality": int(ai_result["commentQuality"]),
+        "ratingShouldBeDisabled": bool(ai_result["ratingShouldBeDisabled"]),
+        "hardGateReason": hard_gate_reason or None,
+    }
 
     return {
         "status": status,
-        "requires_admin_review": requires_admin_review,
-        "suspicious": is_high_conf_brigade,
-        "rating_disabled_by_moderator": ai_result["ratingShouldBeDisabled"],
-        "internal_note": _build_internal_note(ai_result, hard_gate_reason),
-        "community_note": community_note,
+        "ai_action": ai_action_enum,
+        "ai_signals": ai_signals,
+        "rating_muted": rating_muted,
+        "rating_mute_reason": rating_mute_reason,
+        "admin_note": _build_admin_note(ai_result, hard_gate_reason),
+        "public_note": public_note,
         "hard_gate_reason": hard_gate_reason,
     }
 
@@ -155,14 +198,20 @@ class CommentModerationTask(Task):
 
             decision = _decide(ai_result, context)
 
-            ok = apply_moderation_decision(
+            ok = apply_ai_moderation_decision(
                 comment_id=comment_id,
                 status=decision["status"],
-                requires_admin_review=decision["requires_admin_review"],
-                suspicious=decision["suspicious"],
-                rating_disabled_by_moderator=decision["rating_disabled_by_moderator"],
-                internal_note=decision["internal_note"],
-                community_note=decision["community_note"],
+                ai_action=decision["ai_action"],
+                ai_quality=int(ai_result["commentQuality"]),
+                ai_is_spam=bool(ai_result["isSpam"]),
+                ai_is_brigade=bool(ai_result["isBrigade"]),
+                ai_brigade_confidence=int(ai_result["brigadeConfidence"]),
+                ai_signals=decision["ai_signals"],
+                ai_reasoning=(ai_result.get("reasoning") or "").strip(),
+                rating_muted=decision["rating_muted"],
+                rating_mute_reason=decision["rating_mute_reason"],
+                admin_note=decision["admin_note"],
+                public_note=decision["public_note"],
             )
 
             if ok:

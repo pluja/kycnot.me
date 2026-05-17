@@ -42,7 +42,7 @@ const ratingWhere = {
     in: approvedCommentStatuses,
   },
   parentId: null,
-  suspicious: false,
+  ratingMuted: false,
   rating: { not: null },
 } satisfies Prisma.CommentWhereInput
 

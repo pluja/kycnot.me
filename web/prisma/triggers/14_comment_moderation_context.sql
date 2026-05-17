@@ -51,8 +51,8 @@ DECLARE
 BEGIN
     SELECT
         c.id, c.content, c."authorId", c."serviceId", c."parentId",
-        c."createdAt", c.rating, c."orderId", c."privateContext",
-        c."kycRequested", c."fundsBlocked",
+        c."createdAt", c.rating, c."privateProof", c."authorNote",
+        c.issues,
         u."createdAt"   AS author_created,
         u."totalKarma"  AS author_karma,
         u.verified      AS author_verified,
@@ -104,14 +104,15 @@ BEGIN
         'submission', jsonb_build_object(
             'isRootReview', v_target."parentId" IS NULL,
             'rating', v_target.rating,
-            'hasOrderId', v_target."orderId" IS NOT NULL,
-            'orderIdValuePreview',
-                CASE WHEN v_target."orderId" IS NOT NULL
-                THEN LEFT(v_target."orderId", 12) || CASE WHEN LENGTH(v_target."orderId") > 12 THEN '...' ELSE '' END
+            'hasPrivateProof', v_target."privateProof" IS NOT NULL,
+            'privateProofPreview',
+                CASE WHEN v_target."privateProof" IS NOT NULL
+                THEN LEFT(v_target."privateProof", 12) || CASE WHEN LENGTH(v_target."privateProof") > 12 THEN '...' ELSE '' END
                 ELSE NULL END,
-            'kycIssueClaimed', v_target."kycRequested",
-            'fundsBlockedClaimed', v_target."fundsBlocked",
-            'privateContext', v_target."privateContext"
+            'issues', v_target.issues,
+            'kycIssueClaimed', 'KYC_REQUESTED' = ANY(v_target.issues),
+            'fundsBlockedClaimed', 'FUNDS_BLOCKED' = ANY(v_target.issues),
+            'authorNote', v_target."authorNote"
         ),
         'author', jsonb_build_object(
             'name', v_target.author_name,
@@ -208,7 +209,7 @@ BEGIN
           AND c.status IN ('APPROVED', 'VERIFIED')
           AND c."parentId" IS NULL
           AND c.id <> p_comment_id
-          AND c.suspicious = FALSE
+          AND c."ratingMuted" = FALSE
           AND c."createdAt" >= v_target."createdAt" - v_calibration_window
           AND c."createdAt" <= v_target."createdAt"
         ORDER BY c."createdAt" DESC

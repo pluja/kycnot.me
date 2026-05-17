@@ -5,8 +5,10 @@ import { communityNotePresets } from '../constants/communityNotePresets'
 import { cn } from '../lib/cn'
 
 import AdminCommentContext from './admin/comments/AdminCommentContext.astro'
+import TimeFormatted from './TimeFormatted.astro'
+import UserBadge from './UserBadge.astro'
 
-import type { Prisma } from '@prisma/client'
+import type { ModerationAction, Prisma, RatingMuteReason } from '@prisma/client'
 import type { HTMLAttributes } from 'astro/types'
 
 type Props = HTMLAttributes<'div'> & {
@@ -14,20 +16,35 @@ type Props = HTMLAttributes<'div'> & {
     select: {
       id: true
       status: true
-      suspicious: true
-      requiresAdminReview: true
-      kycRequested: true
-      fundsBlocked: true
-      communityNote: true
-      internalNote: true
-      privateContext: true
-      orderId: true
-      orderIdStatus: true
+      issues: true
+      publicNote: true
+      adminNote: true
+      authorNote: true
+      privateProof: true
+      privateProofStatus: true
       rating: true
       ratingActive: true
+      ratingMuted: true
+      ratingMuteReason: true
       ratingWeight: true
       ratingTrustLabel: true
       ratingTrustReason: true
+      aiAction: true
+      aiQuality: true
+      aiIsSpam: true
+      aiIsBrigade: true
+      aiBrigadeConfidence: true
+      aiReasoning: true
+      aiDecidedAt: true
+      humanAction: true
+      humanDecidedAt: true
+      humanDecidedBy: {
+        select: {
+          name: true
+          displayName: true
+          picture: true
+        }
+      }
       author: {
         select: {
           createdAt: true
@@ -52,6 +69,53 @@ const user = Astro.locals.user
 
 // Only render for admin/moderator users
 if (!user || (!user.admin && !user.moderator)) return null
+
+const muteReasonOptions: { value: RatingMuteReason; label: string }[] = [
+  { value: 'MODERATOR_DISCRETION', label: 'Moderator discretion' },
+  { value: 'AUTHOR_AFFILIATED', label: 'Author affiliated' },
+  { value: 'AUTHOR_LOW_TRUST', label: 'Author low trust' },
+  { value: 'SUSPICIOUS_PATTERN', label: 'Suspicious pattern' },
+  { value: 'TEMPLATE_SPAM', label: 'Template spam' },
+  { value: 'CONFLICT_OF_INTEREST', label: 'Conflict of interest' },
+]
+
+const humanActionMeta: Record<
+  ModerationAction,
+  { label: string; icon: string; activeClasses: string; hoverClasses: string }
+> = {
+  APPROVE: {
+    label: 'Approve',
+    icon: 'ri:check-line',
+    activeClasses: 'border border-green-500/30 bg-green-500/20 text-green-400',
+    hoverClasses: 'bg-night-700 hover:bg-green-500/20 hover:text-green-400',
+  },
+  REJECT: {
+    label: 'Reject',
+    icon: 'ri:close-line',
+    activeClasses: 'border border-red-500/30 bg-red-500/20 text-red-400',
+    hoverClasses: 'bg-night-700 hover:bg-red-500/20 hover:text-red-400',
+  },
+  HOLD: {
+    label: 'Hold',
+    icon: 'ri:pause-line',
+    activeClasses: 'border border-yellow-500/30 bg-yellow-500/20 text-yellow-400',
+    hoverClasses: 'bg-night-700 hover:bg-yellow-500/20 hover:text-yellow-400',
+  },
+}
+
+const aiActionLabels: Record<ModerationAction, string> = {
+  APPROVE: 'Approve',
+  REJECT: 'Reject',
+  HOLD: 'Hold',
+}
+
+const aiActionClasses: Record<ModerationAction, string> = {
+  APPROVE: 'bg-green-500/20 text-green-300',
+  REJECT: 'bg-red-500/20 text-red-300',
+  HOLD: 'bg-yellow-500/20 text-yellow-300',
+}
+
+const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
 ---
 
 <div {...divProps} class={cn('text-xs', className)} data-comment-moderation>
@@ -70,29 +134,121 @@ if (!user || (!user.admin && !user.moderator)) return null
   >
     <AdminCommentContext comment={comment} class="mb-2 border-b border-night-500 pb-2" />
 
-    <div class="flex flex-wrap items-center gap-1 border-b border-night-500 pb-2">
-      <button
-        class={cn(
-          'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-          comment.status === 'REJECTED'
-            ? 'border border-red-500/30 bg-red-500/20 text-red-400'
-            : 'bg-night-700 hover:bg-red-500/20 hover:text-red-400'
-        )}
-        data-action="status"
-        data-value={comment.status === 'REJECTED' ? 'PENDING' : 'REJECTED'}
-        data-comment-id={comment.id}
-        data-user-id={user.id}
-      >
-        <Icon name="ri:close-circle-line" class="size-3.5" />
-        <span>{comment.status === 'REJECTED' ? 'Unreject' : 'Reject'}</span>
-      </button>
+    {/* AI verdict (read-only) */}
+    {
+      hasAiVerdict && (
+        <div class="mb-2 rounded-sm border border-indigo-500/30 bg-indigo-500/10 px-2 py-1.5">
+          <div class="mb-1 flex flex-wrap items-center gap-1.5 text-[10px] text-indigo-300">
+            <Icon name="ri:robot-2-line" class="size-3.5" />
+            <span class="font-semibold uppercase tracking-wide">AI verdict</span>
+            {comment.aiDecidedAt && (
+              <span class="text-indigo-400/70">
+                <TimeFormatted date={comment.aiDecidedAt} hourPrecision />
+              </span>
+            )}
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+            {comment.aiAction && (
+              <span class={cn('rounded-sm px-1.5 py-0.5 font-medium', aiActionClasses[comment.aiAction])}>
+                {aiActionLabels[comment.aiAction]}
+              </span>
+            )}
+            {typeof comment.aiQuality === 'number' && (
+              <span class="rounded-sm bg-night-700 px-1.5 py-0.5 text-day-300">
+                Quality {comment.aiQuality}/10
+              </span>
+            )}
+            {comment.aiIsSpam && (
+              <span class="rounded-sm bg-red-500/20 px-1.5 py-0.5 text-red-300">Spam</span>
+            )}
+            {comment.aiIsBrigade && (
+              <span class="rounded-sm bg-orange-500/20 px-1.5 py-0.5 text-orange-300">
+                Brigade
+                {typeof comment.aiBrigadeConfidence === 'number' &&
+                  ` · conf ${comment.aiBrigadeConfidence}/5`}
+              </span>
+            )}
+          </div>
+          {comment.aiReasoning && (
+            <p class="mt-1 text-[11px] leading-snug whitespace-pre-wrap text-day-300">
+              {comment.aiReasoning}
+            </p>
+          )}
+        </div>
+      )
+    }
 
+    {/* Human verdict (read-only) */}
+    {
+      comment.humanAction && (
+        <div class="mb-2 flex flex-wrap items-center gap-1 rounded-sm bg-night-700 px-2 py-1 text-[11px] text-day-400">
+          <Icon name="ri:user-settings-line" class="size-3.5 shrink-0" />
+          <span>Last moderated</span>
+          {comment.humanDecidedBy && (
+            <>
+              <span>by</span>
+              <UserBadge user={comment.humanDecidedBy} size="sm" noLink />
+            </>
+          )}
+          {comment.humanDecidedAt && (
+            <>
+              <span>at</span>
+              <TimeFormatted date={comment.humanDecidedAt} hourPrecision />
+            </>
+          )}
+          <span>as</span>
+          <span class={cn('rounded-sm px-1.5 py-0.5 font-medium', aiActionClasses[comment.humanAction])}>
+            {aiActionLabels[comment.humanAction]}
+          </span>
+        </div>
+      )
+    }
+
+    {/* Moderation action buttons (audit-trailed). The effective action
+        falls back to status for legacy comments that pre-date humanAction
+        tracking, so the current state is visible without requiring a click. */}
+    <div class="mb-2 flex flex-wrap items-center gap-1 border-b border-night-500 pb-2">
+      <span class="mr-1 text-[10px] text-day-500">Decide:</span>
+      {
+        (['APPROVE', 'REJECT', 'HOLD'] as const).map((act) => {
+          const meta = humanActionMeta[act]
+          const effectiveAction: ModerationAction | null =
+            comment.humanAction ??
+            (comment.status === 'APPROVED' || comment.status === 'VERIFIED'
+              ? 'APPROVE'
+              : comment.status === 'REJECTED'
+                ? 'REJECT'
+                : comment.status === 'PENDING'
+                  ? 'HOLD'
+                  : null)
+          const isActive = effectiveAction === act
+          return (
+            <button
+              class={cn(
+                'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
+                isActive ? meta.activeClasses : meta.hoverClasses
+              )}
+              data-action="human-action"
+              data-value={act}
+              data-comment-id={comment.id}
+              data-user-id={user.id}
+            >
+              <Icon name={meta.icon} class="size-3.5" />
+              <span>{meta.label}</span>
+            </button>
+          )
+        })
+      }
+
+      <div class="h-5 w-px bg-night-500"></div>
+
+      {/* Verify is a mod-direct status elevation, no associated human action */}
       <button
         class={cn(
           'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
           comment.status === 'VERIFIED'
-            ? 'border border-green-500/30 bg-green-500/20 text-green-400'
-            : 'bg-night-700 hover:bg-green-500/20 hover:text-green-400'
+            ? 'border border-blue-500/30 bg-blue-500/20 text-blue-400'
+            : 'bg-night-700 hover:bg-blue-500/20 hover:text-blue-400'
         )}
         data-action="status"
         data-value={comment.status === 'VERIFIED' ? 'APPROVED' : 'VERIFIED'}
@@ -102,147 +258,85 @@ if (!user || (!user.admin && !user.moderator)) return null
         <Icon name="ri:verified-badge-line" class="size-3.5" />
         <span>{comment.status === 'VERIFIED' ? 'Unverify' : 'Verify'}</span>
       </button>
-
-      <button
-        class={cn(
-          'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-          comment.status === 'PENDING' || comment.status === 'HUMAN_PENDING'
-            ? 'border border-blue-500/30 bg-blue-500/20 text-blue-400'
-            : 'bg-night-700 hover:bg-blue-500/20 hover:text-blue-400'
-        )}
-        data-action="status"
-        data-value={comment.status === 'PENDING' || comment.status === 'HUMAN_PENDING'
-          ? 'APPROVED'
-          : 'PENDING'}
-        data-comment-id={comment.id}
-        data-user-id={user.id}
-      >
-        <Icon name="ri:checkbox-circle-line" class="size-3.5" />
-        <span>
-          {comment.status === 'PENDING' || comment.status === 'HUMAN_PENDING' ? 'Approve' : 'Pending'}
-        </span>
-      </button>
-
-      <div class="h-5 w-px bg-night-500"></div>
-
-      <button
-        class={cn(
-          'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-          comment.suspicious
-            ? 'border border-yellow-500/30 bg-yellow-500/20 text-yellow-400'
-            : 'bg-night-700 hover:bg-yellow-500/20 hover:text-yellow-400'
-        )}
-        data-action="suspicious"
-        data-value={!comment.suspicious}
-        data-comment-id={comment.id}
-        data-user-id={user.id}
-      >
-        <Icon name="ri:spam-2-line" class="size-3.5" />
-        <span>{comment.suspicious ? 'Not Spam' : 'Spam'}</span>
-      </button>
-
-      <button
-        class={cn(
-          'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-          comment.requiresAdminReview
-            ? 'border border-purple-500/30 bg-purple-500/20 text-purple-400'
-            : 'bg-night-700 hover:bg-purple-500/20 hover:text-purple-400'
-        )}
-        data-action="requires-admin-review"
-        data-value={!comment.requiresAdminReview}
-        data-comment-id={comment.id}
-        data-user-id={user.id}
-      >
-        <Icon name="ri:shield-user-line" class="size-3.5" />
-        <span>{comment.requiresAdminReview ? 'No Admin Review' : 'Needs Admin Review'}</span>
-      </button>
-
-      <button
-        class={cn(
-          'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-          comment.kycRequested
-            ? 'border border-red-500/30 bg-red-500/20 text-red-400'
-            : 'bg-night-700 hover:bg-red-500/20 hover:text-red-400'
-        )}
-        data-action="kyc-requested"
-        data-value={!comment.kycRequested}
-        data-comment-id={comment.id}
-        data-user-id={user.id}
-      >
-        <Icon name="ri:bank-card-line" class="size-3.5" />
-        <span>{comment.kycRequested ? 'No KYC Issue' : 'KYC Issue'}</span>
-      </button>
-
-      <button
-        class={cn(
-          'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-          comment.fundsBlocked
-            ? 'border border-red-500/30 bg-red-500/20 text-red-400'
-            : 'bg-night-700 hover:bg-red-500/20 hover:text-red-400'
-        )}
-        data-action="funds-blocked"
-        data-value={!comment.fundsBlocked}
-        data-comment-id={comment.id}
-        data-user-id={user.id}
-      >
-        <Icon name="ri:lock-line" class="size-3.5" />
-        <span>{comment.fundsBlocked ? 'No Funds Issue' : 'Funds Issue'}</span>
-      </button>
-
-      <div class="h-5 w-px bg-night-500"></div>
-
-      {
-        comment.rating && (
-          <button
-            class={cn(
-              'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-              comment.ratingActive
-                ? 'border border-blue-500/30 bg-blue-500/20 text-blue-400'
-                : 'bg-night-700 hover:bg-blue-500/20 hover:text-blue-400'
-            )}
-            data-action="toggle-rating-active"
-            data-value={!comment.ratingActive}
-            data-comment-id={comment.id}
-            data-user-id={user.id}
-          >
-            <Icon name="ri:star-line" class="size-3.5" />
-            <span>{comment.ratingActive ? 'Disable Rating' : 'Enable Rating'}</span>
-          </button>
-        )
-      }
     </div>
 
-    <div class="mt-2 space-y-1.5">
-      {
-        comment.rating && (
-          <div class="rounded-sm border border-night-500 bg-night-700 px-1.5 py-1 text-[10px] text-day-400">
-            <span class="font-medium text-day-300">Rating trust:</span>{' '}
-            {comment.ratingTrustLabel ?? 'Unknown'} · weight {comment.ratingWeight.toFixed(2)}
-            {comment.ratingTrustReason && <span> · {comment.ratingTrustReason}</span>}
+    {/* Rating controls. Only relevant when this comment has a rating that
+        currently counts (or could count) toward the service score. */}
+    {
+      comment.rating !== null &&
+        (comment.status === 'APPROVED' || comment.status === 'VERIFIED') && (
+          <div class="mb-2 flex flex-wrap items-center gap-1.5 border-b border-night-500 pb-2">
+            <button
+              class={cn(
+                'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
+                comment.ratingMuted
+                  ? 'border border-orange-500/30 bg-orange-500/20 text-orange-400'
+                  : 'bg-night-700 hover:bg-orange-500/20 hover:text-orange-400'
+              )}
+              data-action="rating-mute"
+              data-value={(!comment.ratingMuted).toString()}
+              data-comment-id={comment.id}
+              data-user-id={user.id}
+              title="When disabled, this rating no longer counts toward the service score. Pick a reason to determine whether the comment is also visually flagged."
+            >
+              <Icon name="ri:star-off-line" class="size-3.5" />
+              <span>{comment.ratingMuted ? 'Enable rating' : 'Disable rating'}</span>
+            </button>
+
+            {comment.ratingMuted && (
+              <label class="inline-flex items-center gap-1 text-[10px] text-day-500">
+                Reason:
+                <select
+                  class="rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
+                  data-action="rating-mute-reason"
+                  data-comment-id={comment.id}
+                  data-user-id={user.id}
+                  title="Suspicious pattern and Template spam additionally collapse and grey out the comment. Other reasons leave the comment displayed normally."
+                >
+                  {muteReasonOptions.map((opt) => (
+                    <option value={opt.value} selected={comment.ratingMuteReason === opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
         )
-      }
+    }
 
+    {
+      comment.rating !== null && (
+        <div class="mb-2 rounded-sm border border-night-500 bg-night-700 px-1.5 py-1 text-[10px] text-day-400">
+          <span class="font-medium text-day-300">Rating trust:</span>{' '}
+          {comment.ratingTrustLabel ?? 'Unknown'} · weight {comment.ratingWeight.toFixed(2)}
+          {comment.ratingTrustReason && <span> · {comment.ratingTrustReason}</span>}
+        </div>
+      )
+    }
+
+    {/* Notes */}
+    <div class="space-y-1.5">
       <div class="space-y-1.5">
         <div class="flex items-center gap-1.5">
-          <span class="text-[10px] text-day-500">Community:</span>
+          <span class="w-14 shrink-0 text-[10px] text-day-500">Public:</span>
           <input
             type="text"
-            placeholder="Public note..."
-            value={comment.communityNote}
+            placeholder="Visible to everyone..."
+            value={comment.publicNote}
             class="flex-1 rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
-            data-action="community-note"
+            data-action="public-note"
             data-comment-id={comment.id}
             data-user-id={user.id}
           />
         </div>
-        <div class="flex flex-wrap gap-1">
+        <div class="flex flex-wrap gap-1 pl-14">
           {
             communityNotePresets.map((preset) => (
               <button
                 type="button"
                 class="rounded-sm bg-night-700 px-1.5 py-0.5 text-[10px] text-day-400 transition-colors hover:bg-blue-500/20 hover:text-blue-300"
-                data-community-note-preset={preset}
+                data-public-note-preset={preset}
                 data-comment-id={comment.id}
               >
                 {preset}
@@ -253,38 +347,39 @@ if (!user || (!user.admin && !user.moderator)) return null
       </div>
 
       <div class="flex items-center gap-1.5">
-        <span class="text-[10px] text-day-500">Internal:</span>
+        <span class="w-14 shrink-0 text-[10px] text-day-500">Admin:</span>
         <input
           type="text"
-          placeholder="Mod note..."
-          value={comment.internalNote}
+          placeholder="Mod-only note..."
+          value={comment.adminNote}
           class="flex-1 rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
-          data-action="internal-note"
+          data-action="admin-note"
           data-comment-id={comment.id}
           data-user-id={user.id}
         />
       </div>
 
       <div class="flex items-center gap-1.5">
-        <span class="text-[10px] text-day-500">Private:</span>
+        <span class="w-14 shrink-0 text-[10px] text-day-500">Author:</span>
         <input
           type="text"
-          placeholder="Context..."
-          value={comment.privateContext}
+          placeholder="Visible to author and admins..."
+          value={comment.authorNote}
           class="flex-1 rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
-          data-action="private-context"
+          data-action="author-note"
           data-comment-id={comment.id}
           data-user-id={user.id}
         />
       </div>
 
+      {/* Private proof */}
       {
-        comment.orderId && (
+        comment.privateProof && (
           <div class="mt-3 space-y-1.5 border-t border-night-500 pt-2">
             <div class="flex min-w-0 items-start gap-1.5">
               <span class="shrink-0 text-[10px] text-day-500">Private proof:</span>
               <div class="min-w-0 flex-1 rounded-sm bg-night-700 px-1.5 py-0.5 text-xs break-all">
-                {comment.orderId}
+                {comment.privateProof}
               </div>
             </div>
 
@@ -294,11 +389,11 @@ if (!user || (!user.admin && !user.moderator)) return null
                 <button
                   class={cn(
                     'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-                    comment.orderIdStatus === 'APPROVED'
+                    comment.privateProofStatus === 'APPROVED'
                       ? 'border border-green-500/30 bg-green-500/20 text-green-400'
                       : 'bg-night-700 hover:bg-green-500/20 hover:text-green-400'
                   )}
-                  data-action="order-id-status"
+                  data-action="private-proof-status"
                   data-value="APPROVED"
                   data-comment-id={comment.id}
                   data-user-id={user.id}
@@ -309,11 +404,11 @@ if (!user || (!user.admin && !user.moderator)) return null
                 <button
                   class={cn(
                     'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-                    comment.orderIdStatus === 'REJECTED'
+                    comment.privateProofStatus === 'REJECTED'
                       ? 'border border-red-500/30 bg-red-500/20 text-red-400'
                       : 'bg-night-700 hover:bg-red-500/20 hover:text-red-400'
                   )}
-                  data-action="order-id-status"
+                  data-action="private-proof-status"
                   data-value="REJECTED"
                   data-comment-id={comment.id}
                   data-user-id={user.id}
@@ -324,11 +419,11 @@ if (!user || (!user.admin && !user.moderator)) return null
                 <button
                   class={cn(
                     'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-                    comment.orderIdStatus === 'PENDING'
+                    comment.privateProofStatus === 'PENDING'
                       ? 'border border-blue-500/30 bg-blue-500/20 text-blue-400'
                       : 'bg-night-700 hover:bg-blue-500/20 hover:text-blue-400'
                   )}
-                  data-action="order-id-status"
+                  data-action="private-proof-status"
                   data-value="PENDING"
                   data-comment-id={comment.id}
                   data-user-id={user.id}
@@ -339,11 +434,11 @@ if (!user || (!user.admin && !user.moderator)) return null
                 <button
                   class={cn(
                     'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-                    comment.orderIdStatus === 'WITHDRAWN'
+                    comment.privateProofStatus === 'WITHDRAWN'
                       ? 'border border-night-400 bg-night-500/50 text-night-300'
                       : 'bg-night-700 hover:bg-night-500/50 hover:text-night-300'
                   )}
-                  data-action="order-id-status"
+                  data-action="private-proof-status"
                   data-value="WITHDRAWN"
                   data-comment-id={comment.id}
                   data-user-id={user.id}
@@ -361,71 +456,51 @@ if (!user || (!user.admin && !user.moderator)) return null
 </div>
 
 <script>
+  ////////////////////////////////////////////////////////////
+  // Comment moderation controls.                           //
+  // Wires buttons, selects and text inputs to the          //
+  // comment.moderate action and refreshes on               //
+  // status-affecting changes.                              //
+  ////////////////////////////////////////////////////////////
   import { actions } from 'astro:actions'
 
+  const BOOLEAN_ACTIONS = new Set(['rating-mute'])
+  // Actions that change visible state in ways the local DOM can't easily reconcile.
+  const RELOAD_ACTIONS = new Set([
+    'status',
+    'human-action',
+    'rating-mute',
+    'rating-mute-reason',
+    'private-proof-status',
+  ])
+
   document.addEventListener('astro:page-load', () => {
-    // Handle button clicks
-    document.querySelectorAll('button[data-action]').forEach((btn) => {
+    document.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const action = btn.getAttribute('data-action')
-        const value = btn.getAttribute('data-value')
+        const rawValue = btn.getAttribute('data-value')
         const commentId = parseInt(btn.getAttribute('data-comment-id') || '0')
         const userId = parseInt(btn.getAttribute('data-user-id') || '0')
 
-        if (!value || !commentId || !userId) return
+        if (!action || !rawValue || !commentId || !userId) return
+
+        const value = BOOLEAN_ACTIONS.has(action) ? rawValue === 'true' : rawValue
 
         try {
           const { error } = await actions.comment.moderate({
             commentId,
             userId,
             action: action as any,
-            value:
-              action === 'suspicious' ||
-              action === 'requires-admin-review' ||
-              action === 'kyc-requested' ||
-              action === 'funds-blocked' ||
-              action === 'toggle-rating-active'
-                ? value === 'true'
-                : value,
+            value: value as any,
           })
 
-          if (!error) {
-            // Update button state based on new value
-            if (action === 'status' || action === 'suspicious' || action === 'toggle-rating-active') {
-              window.location.reload()
-            } else if (action === 'requires-admin-review') {
-              const span = btn.querySelector('span')
-              if (span) span.textContent = value === 'true' ? 'No Admin Review' : 'Needs Admin Review'
-              btn.classList.toggle('bg-purple-500/20')
-              btn.classList.toggle('text-purple-400')
-              btn.classList.toggle('border-purple-500/30')
-              btn.classList.toggle('border')
-              btn.classList.toggle('bg-night-700')
-              btn.setAttribute('data-value', value === 'true' ? 'false' : 'true')
-            } else if (action === 'order-id-status') {
-              // Refresh to show updated order ID status
-              window.location.reload()
-            } else if (action === 'kyc-requested') {
-              const span = btn.querySelector('span')
-              if (span) span.textContent = value === 'true' ? 'No KYC Issue' : 'KYC Issue'
-              btn.classList.toggle('bg-red-500/20')
-              btn.classList.toggle('text-red-400')
-              btn.classList.toggle('border-red-500/30')
-              btn.classList.toggle('border')
-              btn.classList.toggle('bg-night-700')
-              btn.setAttribute('data-value', value === 'true' ? 'false' : 'true')
-            } else if (action === 'funds-blocked') {
-              const span = btn.querySelector('span')
-              if (span) span.textContent = value === 'true' ? 'No Funds Issue' : 'Funds Issue'
-              btn.classList.toggle('bg-red-500/20')
-              btn.classList.toggle('text-red-400')
-              btn.classList.toggle('border-red-500/30')
-              btn.classList.toggle('border')
-              btn.classList.toggle('bg-night-700')
-              btn.setAttribute('data-value', value === 'true' ? 'false' : 'true')
-            }
-          } else {
+          if (error) {
             console.error('Error moderating comment:', error)
+            return
+          }
+
+          if (RELOAD_ACTIONS.has(action)) {
+            window.location.reload()
           }
         } catch (error) {
           console.error('Error moderating comment:', error)
@@ -433,11 +508,39 @@ if (!user || (!user.admin && !user.moderator)) return null
       })
     })
 
-    document.querySelectorAll<HTMLButtonElement>('button[data-community-note-preset]').forEach((button) => {
+    document.querySelectorAll<HTMLSelectElement>('select[data-action]').forEach((select) => {
+      select.addEventListener('change', async () => {
+        const action = select.getAttribute('data-action')
+        const commentId = parseInt(select.getAttribute('data-comment-id') || '0')
+        const userId = parseInt(select.getAttribute('data-user-id') || '0')
+
+        if (!action || !commentId || !userId) return
+
+        try {
+          const { error } = await actions.comment.moderate({
+            commentId,
+            userId,
+            action: action as any,
+            value: select.value,
+          })
+
+          if (error) {
+            console.error('Error updating mute reason:', error)
+            return
+          }
+
+          window.location.reload()
+        } catch (error) {
+          console.error('Error updating mute reason:', error)
+        }
+      })
+    })
+
+    document.querySelectorAll<HTMLButtonElement>('button[data-public-note-preset]').forEach((button) => {
       button.addEventListener('click', () => {
-        const preset = button.getAttribute('data-community-note-preset')
+        const preset = button.getAttribute('data-public-note-preset')
         const moderationRoot = button.closest('[data-comment-moderation]')
-        const input = moderationRoot?.querySelector<HTMLInputElement>('input[data-action="community-note"]')
+        const input = moderationRoot?.querySelector<HTMLInputElement>('input[data-action="public-note"]')
 
         if (!preset || !input) return
 
@@ -446,15 +549,14 @@ if (!user || (!user.admin && !user.moderator)) return null
       })
     })
 
-    // Handle text input changes
-    document.querySelectorAll('input[data-action]').forEach((input) => {
+    document.querySelectorAll<HTMLInputElement>('input[data-action]').forEach((input) => {
       const action = input.getAttribute('data-action')
       const commentId = parseInt(input.getAttribute('data-comment-id') || '0')
       const userId = parseInt(input.getAttribute('data-user-id') || '0')
 
       if (!action || !commentId || !userId) return
 
-      let timeout: NodeJS.Timeout
+      let timeout: ReturnType<typeof setTimeout>
 
       input.addEventListener('input', () => {
         clearTimeout(timeout)
@@ -464,7 +566,7 @@ if (!user || (!user.admin && !user.moderator)) return null
               commentId,
               userId,
               action: action as any,
-              value: (input as HTMLInputElement).value,
+              value: input.value,
             })
 
             if (error) {
@@ -473,7 +575,7 @@ if (!user || (!user.admin && !user.moderator)) return null
           } catch (error) {
             console.error('Error updating note:', error)
           }
-        }, 500) // Debounce for 500ms
+        }, 500)
       })
     })
   })

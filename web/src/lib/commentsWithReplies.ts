@@ -10,13 +10,15 @@ const commentReplyQuery = {
   select: {
     id: true,
     status: true,
-    suspicious: true,
+    ratingMuted: true,
+    ratingMuteReason: true,
     upvotes: true,
-    requiresAdminReview: true,
+    humanAction: true,
+    aiAction: true,
     createdAt: true,
-    communityNote: true,
-    internalNote: true,
-    privateContext: true,
+    publicNote: true,
+    adminNote: true,
+    authorNote: true,
     content: true,
     serviceId: true,
     parentId: true,
@@ -25,10 +27,25 @@ const commentReplyQuery = {
     ratingWeight: true,
     ratingTrustLabel: true,
     ratingTrustReason: true,
-    orderId: true,
-    orderIdStatus: true,
-    kycRequested: true,
-    fundsBlocked: true,
+    privateProof: true,
+    privateProofStatus: true,
+    issues: true,
+    aiDecidedAt: true,
+    aiQuality: true,
+    aiIsSpam: true,
+    aiIsBrigade: true,
+    aiBrigadeConfidence: true,
+    aiReasoning: true,
+    humanDecidedAt: true,
+    humanReasoning: true,
+    humanDecidedBy: {
+      select: {
+        id: true,
+        name: true,
+        displayName: true,
+        picture: true,
+      },
+    },
 
     author: {
       select: {
@@ -71,7 +88,7 @@ const commentReplyQuery = {
       },
     },
   },
-  orderBy: [{ suspicious: 'asc' }, { createdAt: 'desc' }],
+  orderBy: [{ ratingMuted: 'asc' }, { createdAt: 'desc' }],
 } as const satisfies Prisma.CommentFindManyArgs
 
 export type CommentWithReplies<T extends Record<string, unknown> = Record<never, never>> =
@@ -136,7 +153,7 @@ export async function makeCommentsNestedQuery({
       orderByClause.push({ createdAt: 'desc' })
       break
   }
-  orderByClause.unshift({ suspicious: 'asc' }) // Always put suspicious comments last within a sort group
+  orderByClause.unshift({ ratingMuted: 'asc' }) // put muted comments last within a sort group
 
   const highlightedBranchIds = highlightedCommentId ? await findAllParentIds(highlightedCommentId, depth) : []
 
@@ -148,7 +165,7 @@ export async function makeCommentsNestedQuery({
         ...(user ? [{ authorId: user.id } as const satisfies Prisma.CommentWhereInput] : []),
         showPending
           ? ({
-              status: { in: ['APPROVED', 'VERIFIED', 'PENDING', 'HUMAN_PENDING'] },
+              status: { in: ['APPROVED', 'VERIFIED', 'PENDING'] },
             } as const satisfies Prisma.CommentWhereInput)
           : ({
               status: { in: ['APPROVED', 'VERIFIED'] },

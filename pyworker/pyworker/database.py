@@ -28,12 +28,12 @@ logger = logging.getLogger(__name__)
 class CommentType(TypedDict):
     id: int
     upvotes: int
-    status: str  # Assuming CommentStatus Enum isn't used across modules yet
-    suspicious: bool
-    requiresAdminReview: bool
-    communityNote: Optional[str]
-    internalNote: Optional[str]
-    privateContext: Optional[str]
+    status: str
+    ratingMuted: bool
+    ratingMuteReason: Optional[str]
+    publicNote: Optional[str]
+    adminNote: Optional[str]
+    authorNote: Optional[str]
     content: str
     rating: Optional[float]
     createdAt: datetime
@@ -41,7 +41,6 @@ class CommentType(TypedDict):
     authorId: int
     serviceId: int
     parentId: Optional[int]
-    # Add author/service/reply fields if needed by update_comment
 
 
 # Moved from utils/ai.py
@@ -939,52 +938,113 @@ def save_user_sentiment(
         logger.error(f"Error saving user sentiment for service {service_id}: {e}")
 
 
-def apply_moderation_decision(
+def apply_ai_moderation_decision(
     comment_id: int,
     status: str,
-    requires_admin_review: bool,
-    suspicious: bool,
-    rating_disabled_by_moderator: bool,
-    internal_note: str,
-    community_note: Optional[str],
+    ai_action: str,
+    ai_quality: int,
+    ai_is_spam: bool,
+    ai_is_brigade: bool,
+    ai_brigade_confidence: int,
+    ai_signals: Optional[Dict[str, Any]],
+    ai_reasoning: str,
+    rating_muted: bool,
+    rating_mute_reason: Optional[str],
+    admin_note: str,
+    public_note: Optional[str],
 ) -> bool:
-    """Apply the moderator/AI decision to a comment.
+    """Persist the AI verdict to a comment row.
 
-    Writes status, suspicious, requiresAdminReview, ratingDisabledByModerator,
-    and the two note fields. Existing triggers handle rating-weight zeroing
-    when suspicious flips and karma deltas when the status changes.
-    Returns True on success.
+    Writes the ai* audit columns (never overwritten by humans), the status
+    derived from ai_action, the rating mute state when applicable, and the
+    admin-only audit note. publicNote is only touched when the AI returns a
+    new value; we never clear an existing publicNote when the LLM has nothing
+    to add (a prior AI run or a moderator may have set it). Status is set
+    directly; the BEFORE-WRITE rating-trust trigger picks up ratingMuted /
+    ratingMuteReason changes automatically. Returns True on success.
     """
+    import json as _json
+
+    base_assignments = [
+        '"status" = %(status)s::"CommentStatus"',
+        '"aiDecidedAt" = NOW()',
+        '"aiAction" = %(aiAction)s::"ModerationAction"',
+        '"aiQuality" = %(aiQuality)s',
+        '"aiIsSpam" = %(aiIsSpam)s',
+        '"aiIsBrigade" = %(aiIsBrigade)s',
+        '"aiBrigadeConfidence" = %(aiBrigadeConfidence)s',
+        '"aiSignals" = %(aiSignals)s::jsonb',
+        '"aiReasoning" = %(aiReasoning)s',
+        '"ratingMuted" = %(ratingMuted)s',
+        '"ratingMuteReason" = %(ratingMuteReason)s::"RatingMuteReason"',
+        '"adminNote" = %(adminNote)s',
+        '"updatedAt" = NOW()',
+    ]
+
+    params: Dict[str, Any] = {
+        "id": comment_id,
+        "status": status,
+        "aiAction": ai_action,
+        "aiQuality": ai_quality,
+        "aiIsSpam": ai_is_spam,
+        "aiIsBrigade": ai_is_brigade,
+        "aiBrigadeConfidence": ai_brigade_confidence,
+        "aiSignals": _json.dumps(ai_signals) if ai_signals else None,
+        "aiReasoning": ai_reasoning,
+        "ratingMuted": rating_muted,
+        "ratingMuteReason": rating_mute_reason,
+        "adminNote": admin_note,
+    }
+
+    if public_note is not None:
+        base_assignments.append('"publicNote" = %(publicNote)s')
+        params["publicNote"] = public_note
+
+    sql = f'UPDATE "Comment" SET {", ".join(base_assignments)} WHERE id = %(id)s'
+
+    # When the moderated comment is a root review (rating set, no parent),
+    # recompute which of the author's ratings on this service is active.
+    # Mirrors the web app's refreshActiveRatingForUserService.
+    refresh_active_sql = """
+        UPDATE "Comment"
+        SET "ratingActive" = COALESCE((id = (
+            SELECT id FROM "Comment"
+            WHERE "authorId" = %s
+              AND "serviceId" = %s
+              AND "parentId" IS NULL
+              AND rating IS NOT NULL
+              AND status IN ('APPROVED', 'VERIFIED')
+              AND "ratingMuted" = false
+            ORDER BY "createdAt" DESC, id DESC
+            LIMIT 1
+        )), false)
+        WHERE "authorId" = %s
+          AND "serviceId" = %s
+          AND "parentId" IS NULL
+          AND rating IS NOT NULL
+    """
+
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
+                cursor.execute(sql, params)
                 cursor.execute(
-                    """
-                    UPDATE "Comment"
-                    SET
-                        "status" = %(status)s::"CommentStatus",
-                        "requiresAdminReview" = %(requiresAdminReview)s,
-                        "suspicious" = %(suspicious)s,
-                        "ratingDisabledByModerator" = %(ratingDisabledByModerator)s,
-                        "internalNote" = %(internalNote)s,
-                        "communityNote" = %(communityNote)s,
-                        "updatedAt" = NOW()
-                    WHERE id = %(id)s
-                    """,
-                    {
-                        "id": comment_id,
-                        "status": status,
-                        "requiresAdminReview": requires_admin_review,
-                        "suspicious": suspicious,
-                        "ratingDisabledByModerator": rating_disabled_by_moderator,
-                        "internalNote": internal_note,
-                        "communityNote": community_note,
-                    },
+                    'SELECT "authorId", "serviceId", "parentId", rating '
+                    'FROM "Comment" WHERE id = %s',
+                    (comment_id,),
                 )
+                row = cursor.fetchone()
+                if row:
+                    author_id, service_id, parent_id, rating = row
+                    if parent_id is None and rating is not None:
+                        cursor.execute(
+                            refresh_active_sql,
+                            (author_id, service_id, author_id, service_id),
+                        )
                 conn.commit()
                 return True
     except Exception as e:
-        logger.error(f"Error applying moderation decision for comment {comment_id}: {e}")
+        logger.error(f"Error applying AI moderation decision for comment {comment_id}: {e}")
         return False
 
 

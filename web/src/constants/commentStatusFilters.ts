@@ -47,22 +47,12 @@ export const {
     },
     {
       value: 'pending',
-      label: 'AI pending',
+      label: 'Pending',
       color: commentStatusById.PENDING.color,
       icon: 'ri:robot-2-line',
       whereClause: {
-        OR: [{ status: 'PENDING' }, { status: 'HUMAN_PENDING' }],
+        status: 'PENDING',
       },
-      classNames: {
-        filter: 'border-blue-500 bg-blue-500/20 text-blue-400',
-      },
-    },
-    {
-      value: 'human-pending',
-      label: 'Human needed',
-      color: commentStatusById.HUMAN_PENDING.color,
-      icon: 'ri:user-search-line',
-      whereClause: { status: 'HUMAN_PENDING' },
       classNames: {
         filter: 'border-blue-500 bg-blue-500/20 text-blue-400',
       },
@@ -85,7 +75,8 @@ export const {
       color: 'red',
       icon: 'ri:close-circle-fill',
       whereClause: {
-        suspicious: true,
+        ratingMuted: true,
+        ratingMuteReason: { in: ['SUSPICIOUS_PATTERN', 'TEMPLATE_SPAM'] },
       },
       classNames: {
         filter: 'border-red-500 bg-red-500/20 text-red-400',
@@ -121,7 +112,7 @@ export const {
       color: 'yellow',
       icon: 'ri:question-line',
       whereClause: {
-        requiresAdminReview: true,
+        humanAction: 'HOLD',
       },
       classNames: {
         filter: 'border-yellow-500 bg-yellow-500/20 text-yellow-400',
@@ -136,20 +127,24 @@ export function getCommentStatusFilterValue(
   comment: Prisma.CommentGetPayload<{
     select: {
       status: true
-      suspicious: true
-      requiresAdminReview: true
+      ratingMuted: true
+      ratingMuteReason: true
+      humanAction: true
     }
   }>
 ): CommentStatusFilter {
-  if (comment.requiresAdminReview) return 'needs-review'
-  if (comment.suspicious) return 'suspicious'
+  if (comment.humanAction === 'HOLD') return 'needs-review'
+  if (
+    comment.ratingMuted &&
+    (comment.ratingMuteReason === 'SUSPICIOUS_PATTERN' ||
+      comment.ratingMuteReason === 'TEMPLATE_SPAM')
+  ) {
+    return 'suspicious'
+  }
 
   switch (comment.status) {
     case 'PENDING': {
       return 'pending'
-    }
-    case 'HUMAN_PENDING': {
-      return 'human-pending'
     }
     case 'VERIFIED': {
       return 'verified'

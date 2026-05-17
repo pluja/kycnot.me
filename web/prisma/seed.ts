@@ -7,10 +7,12 @@ import {
   AnnouncementType,
   AttributeCategory,
   AttributeType,
+  CommentIssueType,
   CommentStatus,
   Currency,
   EventType,
   PrismaClient,
+  RatingMuteReason,
   ServiceSuggestionStatus,
   ServiceUserRole,
   type Prisma,
@@ -913,13 +915,31 @@ const generateFakeComment = (userId: number, serviceId: number, parentId?: numbe
       ? faker.helpers.arrayElement([CommentStatus.APPROVED, CommentStatus.REJECTED, CommentStatus.VERIFIED])
       : CommentStatus.PENDING
 
+  const ratingMuted = Math.random() > 0.2 ? false : faker.datatype.boolean()
+  const ratingMuteReason = ratingMuted
+    ? faker.helpers.weightedArrayElement<RatingMuteReason>([
+        { weight: 40, value: RatingMuteReason.SUSPICIOUS_PATTERN },
+        { weight: 15, value: RatingMuteReason.AUTHOR_LOW_TRUST },
+        { weight: 15, value: RatingMuteReason.TEMPLATE_SPAM },
+        { weight: 10, value: RatingMuteReason.AUTHOR_AFFILIATED },
+        { weight: 10, value: RatingMuteReason.CONFLICT_OF_INTEREST },
+        { weight: 10, value: RatingMuteReason.MODERATOR_DISCRETION },
+      ])
+    : null
+
+  const issues: CommentIssueType[] = []
+  if (Math.random() < 0.08) issues.push(CommentIssueType.KYC_REQUESTED)
+  if (Math.random() < 0.05) issues.push(CommentIssueType.FUNDS_BLOCKED)
+
   return {
     upvotes: faker.number.int({ min: 0, max: 100 }),
     status,
-    suspicious: Math.random() > 0.2 ? false : faker.datatype.boolean(),
-    communityNote: Math.random() > 0.2 ? '' : faker.lorem.paragraph(),
-    internalNote: Math.random() > 0.2 ? '' : faker.lorem.paragraph(),
-    privateContext: Math.random() > 0.2 ? '' : faker.lorem.paragraph(),
+    ratingMuted,
+    ratingMuteReason,
+    issues,
+    publicNote: Math.random() > 0.2 ? '' : faker.lorem.paragraph(),
+    adminNote: Math.random() > 0.2 ? '' : faker.lorem.paragraph(),
+    authorNote: Math.random() > 0.2 ? '' : faker.lorem.paragraph(),
     content:
       parentId && Math.random() > 0.3
         ? faker.helpers.arrayElement(commentReplyList)

@@ -15,13 +15,12 @@ generator json {
 
 enum CommentStatus {
   PENDING
-  HUMAN_PENDING
   APPROVED
   VERIFIED
   REJECTED
 }
 
-enum OrderIdStatus {
+enum PrivateProofStatus {
   PENDING
   APPROVED
   REJECTED
@@ -54,80 +53,76 @@ enum CommentIssueType {
 }
 
 model Comment {
-  id                        Int                @id @default(autoincrement())
+  id                Int                @id @default(autoincrement())
   /// Computed via trigger. Do not update through prisma.
-  upvotes                   Int                @default(0)
-  status                    CommentStatus      @default(PENDING)
-  /// DEPRECATED: replaced by ratingMuted + ratingMuteReason. Kept until PR 2 drops it. Still triggered for karma changes during the transition.
-  suspicious                Boolean            @default(false)
-  /// DEPRECATED: replaced by humanAction=HOLD or aiAction=HOLD. Kept until PR 2 drops it.
-  requiresAdminReview       Boolean            @default(false)
-  communityNote             String?
-  /// DEPRECATED: never populated. Kept until PR 2 drops it.
-  verificationNote          String?
-  internalNote              String?
-  privateContext            String?
-  orderId                   String?            @db.VarChar(100)
-  orderIdStatus             OrderIdStatus?     @default(PENDING)
-  /// DEPRECATED: replaced by issues array entry KYC_REQUESTED. Kept until PR 2 drops it.
-  kycRequested              Boolean            @default(false)
-  /// DEPRECATED: replaced by issues array entry FUNDS_BLOCKED. Kept until PR 2 drops it.
-  fundsBlocked              Boolean            @default(false)
-  content                   String
-  rating                    Int?               @db.SmallInt
-  ratingActive              Boolean            @default(false)
-  /// DEPRECATED: replaced by ratingMuted + ratingMuteReason=MODERATOR_DISCRETION. Kept until PR 2 drops it.
-  ratingDisabledByModerator Boolean            @default(false)
-  /// Computed via trigger. Do not update through prisma.
-  ratingWeight              Float              @default(0)
-  /// Computed via trigger. Do not update through prisma.
-  ratingTrustLabel          String?
-  /// Computed via trigger. Do not update through prisma.
-  ratingTrustReason         String?
+  upvotes           Int                @default(0)
+  status            CommentStatus      @default(PENDING)
 
-  // --- Issue tags (replaces kycRequested + fundsBlocked) ---
-  issues                    CommentIssueType[] @default([])
+  content           String
+  rating            Int?               @db.SmallInt
 
-  // --- Rating mute (replaces suspicious + ratingDisabledByModerator) ---
-  ratingMuted               Boolean            @default(false)
-  ratingMuteReason          RatingMuteReason?
+  // --- Notes (named after audience, not source) ---
+  /// Visible to everyone.
+  publicNote        String?
+  /// Visible only to admins and moderators.
+  adminNote         String?
+  /// Submitted by the author; visible only to the author and admins.
+  authorNote        String?
+
+  // --- Private proof of usage ---
+  privateProof       String?             @db.VarChar(100)
+  privateProofStatus PrivateProofStatus? @default(PENDING)
+
+  // --- Issue tags ---
+  issues            CommentIssueType[] @default([])
+
+  // --- Rating ---
+  ratingActive      Boolean            @default(false)
+  ratingMuted       Boolean            @default(false)
+  ratingMuteReason  RatingMuteReason?
+  /// Computed via trigger. Do not update through prisma.
+  ratingWeight      Float              @default(0)
+  /// Computed via trigger. Do not update through prisma.
+  ratingTrustLabel  String?
+  /// Computed via trigger. Do not update through prisma.
+  ratingTrustReason String?
 
   // --- AI verdict (overwritten on re-run) ---
-  aiDecidedAt               DateTime?
-  aiAction                  ModerationAction?
-  aiQuality                 Int?
-  aiIsSpam                  Boolean?
-  aiIsBrigade               Boolean?
-  aiBrigadeConfidence       Int?
+  aiDecidedAt         DateTime?
+  aiAction            ModerationAction?
+  aiQuality           Int?
+  aiIsSpam            Boolean?
+  aiIsBrigade         Boolean?
+  aiBrigadeConfidence Int?
   /// Raw AI payload for forensics
-  aiSignals                 Json?
-  aiReasoning               String?
+  aiSignals           Json?
+  aiReasoning         String?
 
   // --- Human verdict (overrides AI) ---
-  humanDecidedAt            DateTime?
-  humanAction               ModerationAction?
-  humanReasoning            String?
-  humanDecidedById          Int?
-  humanDecidedBy            User?              @relation("humanDecidedBy", fields: [humanDecidedById], references: [id], onDelete: SetNull)
+  humanDecidedAt   DateTime?
+  humanAction      ModerationAction?
+  humanReasoning   String?
+  humanDecidedById Int?
+  humanDecidedBy   User?              @relation("humanDecidedBy", fields: [humanDecidedById], references: [id], onDelete: SetNull)
 
-  createdAt                 DateTime           @default(now())
-  updatedAt                 DateTime           @default(now()) @updatedAt
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @default(now()) @updatedAt
   /// Computed via trigger when the status is APPROVED or VERIFIED. Do not update through prisma.
-  approvedAt                DateTime?
-  author                    User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  authorId                  Int
-  service                   Service            @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  serviceId                 Int
-  parentId                  Int?
-  parent                    Comment?           @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies                   Comment[]          @relation("CommentReplies")
-  karmaTransactions         KarmaTransaction[]
-  votes                     CommentVote[]
+  approvedAt       DateTime?
+  author           User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId         Int
+  service          Service            @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId        Int
+  parentId         Int?
+  parent           Comment?           @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies          Comment[]          @relation("CommentReplies")
+  karmaTransactions KarmaTransaction[]
+  votes            CommentVote[]
 
   notificationPreferenceswatchedComments NotificationPreferences[] @relation("watchedComments")
   Notification                           Notification[]
 
-  @@unique([serviceId, orderId], name: "unique_orderId_per_service")
+  @@unique([serviceId, privateProof], name: "unique_privateProof_per_service")
   @@index([status])
   @@index([createdAt])
   @@index([approvedAt])
@@ -136,7 +131,6 @@ model Comment {
   @@index([upvotes])
   @@index([rating])
   @@index([ratingActive])
-  @@index([ratingDisabledByModerator])
   @@index([ratingMuted])
   @@index([ratingWeight])
   @@index([aiAction])

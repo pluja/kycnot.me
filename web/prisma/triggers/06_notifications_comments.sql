@@ -125,43 +125,49 @@ CREATE TRIGGER trg_notify_root_approved
   WHEN (NEW."parentId" IS NULL AND NEW.status IN ('APPROVED', 'VERIFIED') AND OLD.status NOT IN ('APPROVED', 'VERIFIED'))
   EXECUTE FUNCTION notify_root_approved();
 
--- Function & Trigger for Comment Status Changes (Status, Suspicious, AdminReview)
+-- Function & Trigger for Comment Status Changes (status, rating mute, humanAction)
 CREATE OR REPLACE FUNCTION notify_comment_status_changed()
 RETURNS TRIGGER AS $$
 DECLARE
   v_status_change "CommentStatusChange" := NULL;
+  v_was_penalty BOOLEAN;
+  v_is_penalty  BOOLEAN;
 BEGIN
-  -- Determine the status change type
+  -- Penalty-bearing mute states (SUSPICIOUS_PATTERN / TEMPLATE_SPAM) carry
+  -- "marked as spam" semantics; other mute reasons (affiliation, conflict,
+  -- moderator discretion) do not trigger user-facing spam notifications.
+  v_was_penalty := COALESCE(OLD."ratingMuted", false)
+                   AND OLD."ratingMuteReason"::text IN ('SUSPICIOUS_PATTERN', 'TEMPLATE_SPAM');
+  v_is_penalty  := COALESCE(NEW."ratingMuted", false)
+                   AND NEW."ratingMuteReason"::text IN ('SUSPICIOUS_PATTERN', 'TEMPLATE_SPAM');
+
   IF NEW.status <> OLD.status THEN
     IF NEW.status = 'APPROVED' THEN v_status_change := 'STATUS_CHANGED_TO_APPROVED';
     ELSIF NEW.status = 'VERIFIED' THEN v_status_change := 'STATUS_CHANGED_TO_VERIFIED';
     ELSIF NEW.status = 'REJECTED' THEN v_status_change := 'STATUS_CHANGED_TO_REJECTED';
-    ELSIF (NEW.status = 'PENDING' OR NEW.status = 'HUMAN_PENDING') AND (OLD.status <> 'PENDING' AND OLD.status <> 'HUMAN_PENDING') THEN v_status_change := 'STATUS_CHANGED_TO_PENDING';
+    ELSIF NEW.status = 'PENDING' AND OLD.status <> 'PENDING' THEN v_status_change := 'STATUS_CHANGED_TO_PENDING';
     END IF;
-  ELSIF NEW.suspicious <> OLD.suspicious THEN
-    IF NEW.suspicious = true THEN v_status_change := 'MARKED_AS_SPAM';
-    ELSE v_status_change := 'UNMARKED_AS_SPAM';
-    END IF;
-  ELSIF NEW."requiresAdminReview" <> OLD."requiresAdminReview" THEN
-    IF NEW."requiresAdminReview" = true THEN v_status_change := 'MARKED_FOR_ADMIN_REVIEW';
-    ELSE v_status_change := 'UNMARKED_FOR_ADMIN_REVIEW';
+  ELSIF v_was_penalty <> v_is_penalty THEN
+    v_status_change := CASE WHEN v_is_penalty THEN 'MARKED_AS_SPAM' ELSE 'UNMARKED_AS_SPAM' END;
+  ELSIF NEW."humanAction" IS DISTINCT FROM OLD."humanAction" THEN
+    IF NEW."humanAction" = 'HOLD' AND OLD."humanAction" IS DISTINCT FROM 'HOLD' THEN
+      v_status_change := 'MARKED_FOR_ADMIN_REVIEW';
+    ELSIF OLD."humanAction" = 'HOLD' AND NEW."humanAction" IS DISTINCT FROM 'HOLD' THEN
+      v_status_change := 'UNMARKED_FOR_ADMIN_REVIEW';
     END IF;
   END IF;
 
-  -- If a relevant status change occurred, notify watchers of THIS comment
   IF v_status_change IS NOT NULL THEN
     WITH watchers AS (
-      -- Get all watchers excluding author
       SELECT np."userId"
       FROM "_watchedComments" w
       JOIN "NotificationPreferences" np ON w."B" = np."id"
       WHERE w."A" = NEW."id"
         AND np."userId" <> NEW."authorId"
         AND np."enableOnMyCommentStatusChange"
-      
+
       UNION ALL
-      
-      -- Add author if they have enabled notifications for their own comments
+
       SELECT np."userId"
       FROM "NotificationPreferences" np
       WHERE np."userId" = NEW."authorId"
@@ -182,9 +188,14 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_notify_comment_status_changed ON "Comment";
 CREATE TRIGGER trg_notify_comment_status_changed
-  AFTER UPDATE OF status, suspicious, "requiresAdminReview" ON "Comment"
+  AFTER UPDATE OF status, "ratingMuted", "ratingMuteReason", "humanAction" ON "Comment"
   FOR EACH ROW
-  WHEN (NEW.status <> OLD.status OR NEW.suspicious <> OLD.suspicious OR NEW."requiresAdminReview" <> OLD."requiresAdminReview")
+  WHEN (
+    NEW.status <> OLD.status
+    OR NEW."ratingMuted" IS DISTINCT FROM OLD."ratingMuted"
+    OR NEW."ratingMuteReason" IS DISTINCT FROM OLD."ratingMuteReason"
+    OR NEW."humanAction" IS DISTINCT FROM OLD."humanAction"
+  )
   EXECUTE FUNCTION notify_comment_status_changed();
 
 -- Function & Trigger for Community Note Added
@@ -217,9 +228,9 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_notify_community_note_added ON "Comment";
 CREATE TRIGGER trg_notify_community_note_added
-  AFTER UPDATE OF "communityNote" ON "Comment"
+  AFTER UPDATE OF "publicNote" ON "Comment"
   FOR EACH ROW
-  WHEN (NEW."communityNote" IS NOT NULL AND NEW."communityNote" <> '' AND (OLD."communityNote" IS NULL OR OLD."communityNote" = ''))
+  WHEN (NEW."publicNote" IS NOT NULL AND NEW."publicNote" <> '' AND (OLD."publicNote" IS NULL OR OLD."publicNote" = ''))
   EXECUTE FUNCTION notify_community_note_added();
 
 -- Remove the old monolithic trigger and function definition if they still exist

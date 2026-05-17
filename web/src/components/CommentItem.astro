@@ -73,8 +73,17 @@ const isRatingActive =
   comment.rating !== null &&
   !comment.parentId &&
   comment.ratingActive &&
-  !comment.suspicious &&
+  !comment.ratingMuted &&
   (comment.status === 'APPROVED' || comment.status === 'VERIFIED')
+
+// Only penalty-bearing mute reasons visually suppress the comment.
+// Other mute reasons (affiliated, conflict of interest, moderator discretion,
+// low trust) just take the rating out of the score; the comment still
+// displays normally.
+const isPenaltyMute =
+  comment.ratingMuted &&
+  (comment.ratingMuteReason === 'SUSPICIOUS_PATTERN' || comment.ratingMuteReason === 'TEMPLATE_SPAM')
+
 const shouldShowRatingTrustBadge =
   comment.rating !== null &&
   !comment.parentId &&
@@ -88,7 +97,6 @@ const shouldShow =
   comment.status === 'APPROVED' ||
   comment.status === 'VERIFIED' ||
   ((showPending || isHighlightParent || isHighlighted) && comment.status === 'PENDING') ||
-  ((showPending || isHighlightParent || isHighlighted) && comment.status === 'HUMAN_PENDING') ||
   ((isHighlightParent || isHighlighted) && comment.status === 'REJECTED') ||
   isAuthorOrPrivileged
 if (!shouldShow) return null
@@ -104,10 +112,10 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
     depth > 0 && 'ml-3 border-b-0 border-l border-zinc-800 pt-2 pl-2 sm:ml-4',
     comment.author.serviceAffiliations.some((affiliation) => affiliation.service.slug === serviceSlug) &&
       'bg-[#182a1f]',
-    (comment.status === 'PENDING' || comment.status === 'HUMAN_PENDING') && 'bg-[#292815]',
+    comment.status === 'PENDING' && 'bg-[#292815]',
     comment.status === 'REJECTED' && 'bg-[#2f1f1f]',
     isHighlighted && 'bg-[#192633]',
-    comment.suspicious &&
+    isPenaltyMute &&
       'opacity-25 transition-opacity not-has-[[data-collapse-toggle]:checked]:opacity-100! focus-within:opacity-100 hover:opacity-100 focus:opacity-100',
     className,
   ])}
@@ -145,7 +153,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
     id={`collapse-${comment.id.toString()}`}
     data-collapse-toggle
     class="peer/collapse hidden"
-    checked={comment.suspicious}
+    checked={isPenaltyMute}
   />
 
   <div
@@ -197,7 +205,15 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
       <TimeFormatted date={comment.createdAt} hourPrecision />
     </a>
 
-    {comment.suspicious && <BadgeSmall icon="ri:spam-2-fill" color="red" text="Potential SPAM" inlineIcon />}
+    {
+      comment.ratingMuted &&
+        (comment.ratingMuteReason === 'SUSPICIOUS_PATTERN' ||
+        comment.ratingMuteReason === 'TEMPLATE_SPAM' ? (
+          <BadgeSmall icon="ri:spam-2-fill" color="red" text="Potential SPAM" inlineIcon />
+        ) : (
+          <BadgeSmall icon="ri:volume-mute-fill" color="yellow" text="Muted rating" inlineIcon />
+        ))
+    }
 
     {
       comment.rating !== null && !comment.parentId && (
@@ -252,7 +268,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
     }
 
     {
-      (comment.status === 'PENDING' || comment.status === 'HUMAN_PENDING') &&
+      comment.status === 'PENDING' &&
         (showPending || isHighlightParent || isAuthorOrPrivileged) && (
           <BadgeSmall
             icon={commentStatusById.PENDING.icon}
@@ -276,7 +292,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
     }
 
     {
-      comment.requiresAdminReview && isAuthorOrPrivileged && (
+      comment.humanAction === 'HOLD' && isAuthorOrPrivileged && (
         <BadgeSmall
           icon="ri:alert-fill"
           color="yellow"
@@ -289,23 +305,23 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
 
     {/* Service usage verification indicators */}
     {
-      comment.orderId && comment.orderIdStatus === 'APPROVED' && (
+      comment.privateProof && comment.privateProofStatus === 'APPROVED' && (
         <BadgeSmall icon="ri:verified-badge-fill" color="green" text="Verified customer" inlineIcon />
       )
     }
     {
-      comment.orderId && comment.orderIdStatus === 'REJECTED' && (
+      comment.privateProof && comment.privateProofStatus === 'REJECTED' && (
         <BadgeSmall icon="ri:close-circle-fill" color="red" text="Invalid order ID" inlineIcon />
       )
     }
 
     {
-      comment.kycRequested && (
+      comment.issues.includes('KYC_REQUESTED') && (
         <BadgeSmall icon="ri:user-forbid-fill" color="red" text="KYC issue" inlineIcon />
       )
     }
     {
-      comment.fundsBlocked && (
+      comment.issues.includes('FUNDS_BLOCKED') && (
         <BadgeSmall icon="ri:wallet-3-fill" color="orange" text="Funds blocked" inlineIcon />
       )
     }
@@ -332,11 +348,11 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
   </div>
 
   {
-    comment.communityNote && (
+    comment.publicNote && (
       <div class="mt-2 peer-checked/collapse:hidden">
         <div class="border-l-2 border-zinc-600 bg-zinc-900/30 py-0.5 pl-2 text-xs">
           <span class="prose prose-sm text-xs text-zinc-300 prose-invert prose-strong:text-zinc-300/90">
-            <Markdown content={`**Added context:** ${comment.communityNote}`} linkRel={['ugc', 'nofollow']} />
+            <Markdown content={`**Added context:** ${comment.publicNote}`} linkRel={['ugc', 'nofollow']} />
           </span>
         </div>
       </div>
@@ -344,35 +360,35 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
   }
 
   {
-    user && (user.admin || user.moderator) && comment.internalNote && (
+    user && (user.admin || user.moderator) && comment.adminNote && (
       <div class="mt-2 peer-checked/collapse:hidden">
         <div class="border-l-2 border-red-600 bg-red-900/20 py-0.5 pl-2 text-xs">
           <span class="font-medium text-red-400">Internal note:</span>
-          <span class="text-red-300">{comment.internalNote}</span>
+          <span class="text-red-300">{comment.adminNote}</span>
         </div>
       </div>
     )
   }
 
   {
-    user && (user.admin || user.moderator) && comment.privateContext && (
+    user && (user.admin || user.moderator) && comment.authorNote && (
       <div class="mt-2 peer-checked/collapse:hidden">
         <div class="border-l-2 border-blue-600 bg-blue-900/20 py-0.5 pl-2 text-xs">
           <span class="font-medium text-blue-400">Private context:</span>
-          <span class="text-blue-300">{comment.privateContext}</span>
+          <span class="text-blue-300">{comment.authorNote}</span>
         </div>
       </div>
     )
   }
 
   {
-    comment.orderId && canSeeOrderId && (
+    comment.privateProof && canSeeOrderId && (
       <div class="mt-2 peer-checked/collapse:hidden">
         <div class="flex min-w-0 items-start gap-1.5 border-l-2 border-purple-600 bg-purple-900/20 py-1 pl-2 text-xs">
           <Icon name="ri:key-2-line" class="mt-0.5 size-3 shrink-0 text-purple-400" />
           <span class="shrink-0 font-medium text-purple-400">Order ID:</span>
           <code class="min-w-0 rounded-sm bg-purple-950/50 px-1.5 py-0.5 font-mono break-all text-purple-300 select-all">
-            {comment.orderId}
+            {comment.privateProof}
           </code>
         </div>
       </div>

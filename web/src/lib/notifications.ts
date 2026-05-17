@@ -213,7 +213,7 @@ export function makeNotificationContent(
       aboutComment: {
         select: {
           content: true
-          communityNote: true
+          publicNote: true
         }
       }
       aboutServiceSuggestionMessage: {
@@ -253,7 +253,7 @@ export function makeNotificationContent(
     }
     case 'COMMUNITY_NOTE_ADDED': {
       if (!notification.aboutComment) return null
-      return notification.aboutComment.communityNote
+      return notification.aboutComment.publicNote
     }
     case 'SUGGESTION_MESSAGE': {
       if (!notification.aboutServiceSuggestionMessage) return null

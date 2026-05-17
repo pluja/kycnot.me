@@ -36,13 +36,6 @@ export const {
       creativeWorkStatus: 'Deleted',
     },
     {
-      id: 'HUMAN_PENDING',
-      icon: 'ri:question-line',
-      label: 'Unmoderated',
-      color: 'yellow',
-      creativeWorkStatus: 'Deleted',
-    },
-    {
       id: 'VERIFIED',
       icon: 'ri:verified-badge-fill',
       label: 'Verified',

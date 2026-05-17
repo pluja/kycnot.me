@@ -12,7 +12,7 @@ A JSON object with three top-level blocks:
 
 - `comment`: the submission itself, with three sub-blocks:
     - `content`, `contentLength`: the text and its length
-    - `submission`: structural attributes (`isRootReview`, `rating`, `hasOrderId`, `orderIdValuePreview`, `kycIssueClaimed`, `fundsBlockedClaimed`, `privateContext`)
+    - `submission`: structural attributes (`isRootReview`, `rating`, `hasPrivateProof`, `privateProofPreview`, `issues[]`, `kycIssueClaimed`, `fundsBlockedClaimed`, `authorNote`)
     - `author`: trust signals (`accountAgeMinutes`, `totalKarma`, `isVerified`, `isServiceAffiliated`, `priorApprovedCommentsOnThisService`, `priorApprovedCommentsTotal`, `priorRejectedCommentsTotal`, `lastCommentOnThisServiceDaysAgo`)
     - `thread` (only when the comment is a reply): `depth` and an ordered `ancestors` array (`position: root|ancestor-N|parent`, each with its own author block, rating, `minutesBefore`, content)
 - `service`: the listing being commented on (`name`, `description`, `kycLevel`, `verificationStatus`, `strictCommentingEnabled`)
@@ -50,7 +50,7 @@ When `brigadeConfidence >= 4`, set `isBrigade: true` and `recommendedAction: hum
 **2b. Single-user template spam.** The brigade detector looks at many users on one service. Some attackers do the opposite: one user spreads templated promotional content across many services. Inspect `context.authorCrossServicePattern`:
 
 - `distinctOtherServicesLast7d >= 4` is unusual for a real user. `distinctOtherServicesLast7d >= 8` or `distinctOtherServicesLast30d >= 15` is almost always spam.
-- Combine with the `samples[]`: if the author's recent comments on other services are stylistically uniform (same opener, same emoji bursts, same ad-copy phrasing, similar structure) — even when topical words differ across services — the author is running a template.
+- Combine with the `samples[]`: if the author's recent comments on other services are stylistically uniform (same opener, same emoji bursts, same ad-copy phrasing, similar structure), even when topical words differ across services, the author is running a template.
 - `rejectedOnOtherServicesLast30d` is a direct signal: a user with many recent rejections on other services is a known offender.
 - `similarityMaxOnOtherServices` will often be low (0.1-0.3) for template spam because each comment swaps in service-specific words, but the *shape* is identical. Do not dismiss template spam just because the numeric similarity is moderate; read the sample contents.
 
@@ -70,13 +70,13 @@ These need a human to weigh evidence and decide between visible-with-warning vs.
 **4. Rating-specific judgment.** Only when `submission.isRootReview` and `submission.rating` is present. Set `ratingShouldBeDisabled: true` (the comment can still be approved) when any of:
 - The review is generic or vague: a rating without a real first-hand account, no specifics, no reasoning behind the score.
 - It reads like advertising or attacks a competitor without evidence.
-- The account is service-affiliated (`author.isServiceAffiliated: true`) and the rating is positive — this is a conflict of interest. Affiliated accounts can comment, but their stars should not move the score.
+- The account is service-affiliated (`author.isServiceAffiliated: true`) and the rating is positive. This is a conflict of interest: affiliated accounts can comment, but their stars should not move the score.
 - It is mostly about platform drama, another user, or moderation decisions rather than the service.
 - It is part of a moderate-confidence brigade (`brigadeConfidence` 2-3) where the content is plausible but the cluster is suspicious.
 
 Disabling the rating is NOT a punishment, it is a "do not weigh this star count toward the public score" signal. The comment text usually stays approved.
 
-**5. Calibration.** Use `calibration.samples[]` as the quality bar for *this* service: what kind of comments have been approved before, what rating distribution looks normal. Do not treat samples as current discussion — they may be days or weeks old (see each sample's `daysAgo`). If `lastApprovedCommentDaysAgo` is set instead of samples, the service has been quiet; do not invent context.
+**5. Calibration.** Use `calibration.samples[]` as the quality bar for *this* service: what kind of comments have been approved before, what rating distribution looks normal. Do not treat samples as current discussion: they may be days or weeks old (see each sample's `daysAgo`). If `lastApprovedCommentDaysAgo` is set instead of samples, the service has been quiet; do not invent context.
 
 **6. Thread context.** For replies, judge against `thread.ancestors[parent]` (and root when present). A short reply is fine when it answers, clarifies, or adds detail. Generic agreement ("yes, same!"), pile-on ("scam!!"), or off-topic chatter is rejectable spam. If the parent is a service-affiliated reply (role: SUPPORT/OWNER), a polite request for follow-up is acceptable even if short.
 
