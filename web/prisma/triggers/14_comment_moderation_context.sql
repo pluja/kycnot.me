@@ -42,8 +42,12 @@ DECLARE
     v_events_obj        JSONB;
     v_calibration_obj   JSONB;
     v_affiliated_obj    JSONB;
+    v_cross_service_obj JSONB;
     v_thread_obj        JSONB;
     v_new_user_spike    INT;
+    v_cross_service_window INTERVAL := '30 days'::INTERVAL;
+    v_max_cross_service_samples INT := 5;
+    v_cross_service_content_limit INT := 300;
 BEGIN
     SELECT
         c.id, c.content, c."authorId", c."serviceId", c."parentId",
@@ -289,6 +293,51 @@ BEGIN
     )
     INTO v_affiliated_obj;
 
+    WITH author_cross_service AS (
+        SELECT
+            c.id,
+            c."serviceId",
+            c.content,
+            c.status,
+            c."createdAt",
+            s.slug AS service_slug,
+            ROUND((EXTRACT(EPOCH FROM (v_target."createdAt" - c."createdAt"))/86400)::numeric, 1) AS days_ago,
+            similarity(c.content, v_target.content) AS sim
+        FROM "Comment" c
+        JOIN "Service" s ON s.id = c."serviceId"
+        WHERE c."authorId" = v_target."authorId"
+          AND c.id <> p_comment_id
+          AND c."serviceId" <> v_target."serviceId"
+          AND c."createdAt" >= v_target."createdAt" - v_cross_service_window
+          AND c."createdAt" <= v_target."createdAt"
+    ),
+    author_cross_top AS (
+        SELECT *
+        FROM author_cross_service
+        ORDER BY sim DESC NULLS LAST, "createdAt" DESC
+        LIMIT v_max_cross_service_samples
+    )
+    SELECT jsonb_build_object(
+        'commentsOnOtherServicesLast30d', (SELECT COUNT(*) FROM author_cross_service),
+        'commentsOnOtherServicesLast7d', (SELECT COUNT(*) FROM author_cross_service WHERE days_ago <= 7),
+        'distinctOtherServicesLast30d', (SELECT COUNT(DISTINCT "serviceId") FROM author_cross_service),
+        'distinctOtherServicesLast7d', (SELECT COUNT(DISTINCT "serviceId") FROM author_cross_service WHERE days_ago <= 7),
+        'rejectedOnOtherServicesLast30d', (SELECT COUNT(*) FROM author_cross_service WHERE status = 'REJECTED'),
+        'similarityMaxOnOtherServices', COALESCE((SELECT ROUND(MAX(sim)::numeric, 2) FROM author_cross_service), 0),
+        'samples', COALESCE((
+            SELECT jsonb_agg(jsonb_build_object(
+                'id', t.id,
+                'serviceSlug', t.service_slug,
+                'daysAgo', t.days_ago,
+                'similarity', ROUND(t.sim::numeric, 2),
+                'status', t.status::TEXT,
+                'content', LEFT(t.content, v_cross_service_content_limit)
+            ) ORDER BY t.sim DESC NULLS LAST, t.days_ago ASC)
+            FROM author_cross_top t
+        ), '[]'::jsonb)
+    )
+    INTO v_cross_service_obj;
+
     IF v_target."parentId" IS NOT NULL THEN
         WITH RECURSIVE ancestors AS (
             SELECT
@@ -356,6 +405,7 @@ BEGIN
         'service', v_service_obj,
         'context', jsonb_build_object(
             'clusterSignals', v_cluster_obj,
+            'authorCrossServicePattern', v_cross_service_obj,
             'recentEvents', v_events_obj,
             'calibration', v_calibration_obj,
             'affiliatedActivity', v_affiliated_obj

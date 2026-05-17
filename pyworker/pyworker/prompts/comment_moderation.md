@@ -17,7 +17,8 @@ A JSON object with three top-level blocks:
     - `thread` (only when the comment is a reply): `depth` and an ordered `ancestors` array (`position: root|ancestor-N|parent`, each with its own author block, rating, `minutesBefore`, content)
 - `service`: the listing being commented on (`name`, `description`, `kycLevel`, `verificationStatus`, `strictCommentingEnabled`)
 - `context`:
-    - `clusterSignals`: brigade indicators (`freshAccountsLast72h`, `similarCommentsCount`, `similarityMax`, `newUserCreationSpikeNearAuthor`, `siblings[]` with timing, ages, similarity, and content)
+    - `clusterSignals`: per-service brigade indicators (`freshAccountsLast72h`, `similarCommentsCount`, `similarityMax`, `newUserCreationSpikeNearAuthor`, `siblings[]` with timing, ages, similarity, and content)
+    - `authorCrossServicePattern`: per-author template-spam indicators (`commentsOnOtherServicesLast7d/30d`, `distinctOtherServicesLast7d/30d`, `rejectedOnOtherServicesLast30d`, `similarityMaxOnOtherServices`, `samples[]` of the author's recent comments on OTHER services)
     - `recentEvents`: service events in the last 30 days, each stamped with `daysAgo`
     - `calibration`: either `samples[]` of recent approved root comments on this service (each stamped `daysAgo`) or `lastApprovedCommentDaysAgo` set when the service has been quiet
     - `affiliatedActivity`: the service's team members and their recent comments, each stamped with `hoursBefore`
@@ -45,6 +46,17 @@ Score `brigadeConfidence` (0-5):
 - 4-5: strong (3+ similar siblings, all fresh accounts, tight temporal cluster, often coincides with an event or affiliated activity already addressing it)
 
 When `brigadeConfidence >= 4`, set `isBrigade: true` and `recommendedAction: human_review`. The server will auto-neutralize the rating impact; humans confirm visibility. Cite the cluster size and one or two sibling IDs in `reasoning`.
+
+**2b. Single-user template spam.** The brigade detector looks at many users on one service. Some attackers do the opposite: one user spreads templated promotional content across many services. Inspect `context.authorCrossServicePattern`:
+
+- `distinctOtherServicesLast7d >= 4` is unusual for a real user. `distinctOtherServicesLast7d >= 8` or `distinctOtherServicesLast30d >= 15` is almost always spam.
+- Combine with the `samples[]`: if the author's recent comments on other services are stylistically uniform (same opener, same emoji bursts, same ad-copy phrasing, similar structure) — even when topical words differ across services — the author is running a template.
+- `rejectedOnOtherServicesLast30d` is a direct signal: a user with many recent rejections on other services is a known offender.
+- `similarityMaxOnOtherServices` will often be low (0.1-0.3) for template spam because each comment swaps in service-specific words, but the *shape* is identical. Do not dismiss template spam just because the numeric similarity is moderate; read the sample contents.
+
+If you see template-spam signals AND the current comment fits the same pattern, set `recommendedAction: reject` with `isSpam: true`. If the cross-service pattern is suspicious but the current comment looks more genuine than the templates, escalate to `human_review` with cross-service signals in `reasoning`.
+
+Note: service-affiliated users (`author.isServiceAffiliated`) legitimately have multiple comments on their own service. The samples here are filtered to OTHER services, so an affiliated SUPPORT account replying on their own page does not contribute. If their other-service comments are still promotional templates, treat as spam.
 
 **3. Hard topics.** Recommend `human_review` whenever the comment makes serious operational claims that the directory cannot let auto-flow:
 - KYC requested without warning (when `kycIssueClaimed` is true OR the text alleges it)
