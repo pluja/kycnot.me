@@ -2,11 +2,7 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
-import {
-  COMMENT_ORDER_ID_MAX_LENGTH,
-  ROOT_COMMENT_ACCOUNT_AGE_BYPASS_KARMA,
-  ROOT_COMMENT_ACCOUNT_AGE_HOURS,
-} from '../actions/comment'
+import { COMMENT_ORDER_ID_MAX_LENGTH } from '../actions/comment'
 import { cn } from '../lib/cn'
 import { makeLoginUrl } from '../lib/redirectUrls'
 import { siteOrigin } from '../lib/urls'
@@ -52,17 +48,6 @@ const MIN_COMMENT_LENGTH = parentId ? 10 : 30
 
 const user = Astro.locals.user
 const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
-const isRootComment = !parentId
-const rootCommentAccountAgeMs = ROOT_COMMENT_ACCOUNT_AGE_HOURS * 60 * 60 * 1000
-const userAccountAgeMs = user ? Date.now() - new Date(user.createdAt).getTime() : null
-const rootCommentBlockedByAccountAge =
-  !!user &&
-  isRootComment &&
-  !user.admin &&
-  !user.moderator &&
-  !user.verified &&
-  user.totalKarma < ROOT_COMMENT_ACCOUNT_AGE_BYPASS_KARMA &&
-  (!Number.isFinite(userAccountAgeMs) || (userAccountAgeMs ?? 0) < rootCommentAccountAgeMs)
 ---
 
 <form
@@ -91,16 +76,6 @@ const rootCommentBlockedByAccountAge =
           <div class="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-sm text-red-400">
             <Icon name="ri:forbid-line" class="mr-1 inline size-4 align-[-0.2em]" />
             You cannot comment due to low karma.
-          </div>
-        ) : rootCommentBlockedByAccountAge ? (
-          <div class="rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-center text-sm text-blue-200">
-            <Icon name="ri:information-line" class="mr-1 inline size-4 align-[-0.2em]" />
-            You can only reply. You need to wait {ROOT_COMMENT_ACCOUNT_AGE_HOURS.toLocaleString()} hours to
-            add reviews. For urgent reports,{' '}
-            <a href="/about#contact" class="underline hover:text-blue-100">
-              contact us directly
-            </a>
-            .
           </div>
         ) : (
           <>

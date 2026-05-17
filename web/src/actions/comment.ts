@@ -17,8 +17,6 @@ import type { CommentStatus, Prisma } from '@prisma/client'
 const COMMENT_RATE_LIMIT_WINDOW_MINUTES = 2
 const MAX_COMMENTS_PER_WINDOW = 1
 const MAX_COMMENTS_PER_WINDOW_VERIFIED_USER = 10
-export const ROOT_COMMENT_ACCOUNT_AGE_HOURS = 24
-export const ROOT_COMMENT_ACCOUNT_AGE_BYPASS_KARMA = karmaUnlocksById.voteComments.karma
 export const COMMENT_ORDER_ID_MAX_LENGTH = 100
 
 const activeRatingStatuses = ['APPROVED', 'VERIFIED'] satisfies CommentStatus[]
@@ -95,17 +93,6 @@ async function refreshActiveRatingForUserService(
       },
     })
   }
-}
-
-function isRootCommentAgeGateExempt(user: {
-  admin: boolean
-  moderator: boolean
-  verified: boolean
-  totalKarma: number
-}) {
-  return (
-    user.admin || user.moderator || user.verified || user.totalKarma >= ROOT_COMMENT_ACCOUNT_AGE_BYPASS_KARMA
-  )
 }
 
 export const commentActions = {
@@ -238,19 +225,6 @@ export const commentActions = {
         location: `service with id ${input.serviceId.toString()}`,
         dontMarkAsSpammer: context.locals.user.admin,
       })
-
-      const isRootComment = !input.parentId
-      const userCreatedAt = new Date(context.locals.user.createdAt)
-      const accountAgeMs = Date.now() - userCreatedAt.getTime()
-      const minimumAccountAgeMs = ROOT_COMMENT_ACCOUNT_AGE_HOURS * 60 * 60 * 1000
-      const isOldEnoughForRootComment = Number.isFinite(accountAgeMs) && accountAgeMs >= minimumAccountAgeMs
-
-      if (isRootComment && !isRootCommentAgeGateExempt(context.locals.user) && !isOldEnoughForRootComment) {
-        throw new ActionError({
-          code: 'FORBIDDEN',
-          message: `You can only reply. You need to wait ${ROOT_COMMENT_ACCOUNT_AGE_HOURS.toLocaleString()} hours to add reviews. For urgent reports, contact us directly from the contact section.`,
-        })
-      }
 
       // --- Time Trap Validation Start ---
       try {
