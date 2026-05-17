@@ -1,5 +1,3 @@
-import { siteOrigin } from './urls'
-
 /**
  * Validates that a redirect URL is same-origin, returning '/' if not.
  * Prevents open redirect attacks via user-controlled Referer/redirect inputs.
@@ -15,6 +13,12 @@ export function makeSafeRedirectUrl(url: string | null | undefined, origin: stri
   }
 }
 
+/**
+ * Returns a relative path (`/account/login?...`) rather than an absolute URL so
+ * the browser stays on whatever origin the user is currently on (clearweb, Tor
+ * .onion, or I2P). Hardcoding the origin would push Tor/I2P visitors to the
+ * clearweb domain on every auth redirect.
+ */
 export function makeLoginUrl(
   currentUrl: URL,
   {
@@ -29,7 +33,7 @@ export function makeLoginUrl(
     message?: string | null
   } = {}
 ) {
-  const loginUrl = new URL('/account/login', siteOrigin)
+  const loginUrl = new URL('/account/login', currentUrl)
 
   if (error) {
     loginUrl.searchParams.set('error', error)
@@ -44,7 +48,7 @@ export function makeLoginUrl(
   }
 
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  const redirectUrl = new URL(redirect || currentUrl)
+  const redirectUrl = new URL(redirect || currentUrl, currentUrl)
   if (redirectUrl.pathname === '/account/login') {
     const redirectUrlRedirectParam = redirectUrl.searchParams.get('redirect')
     if (redirectUrlRedirectParam) {
@@ -54,7 +58,7 @@ export function makeLoginUrl(
     loginUrl.searchParams.set('redirect', redirectUrl.pathname + redirectUrl.search)
   }
 
-  return loginUrl.toString()
+  return loginUrl.pathname + loginUrl.search
 }
 
 export function makeUnimpersonateUrl(
@@ -65,12 +69,12 @@ export function makeUnimpersonateUrl(
     redirect?: URL | string | null
   } = {}
 ) {
-  const url = new URL('/account/impersonate', siteOrigin)
+  const url = new URL('/account/impersonate', currentUrl)
   url.searchParams.set('stop', 'true')
 
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  const redirectUrl = new URL(redirect || currentUrl)
+  const redirectUrl = new URL(redirect || currentUrl, currentUrl)
   url.searchParams.set('redirect', redirectUrl.pathname + redirectUrl.search)
 
-  return url.toString()
+  return url.pathname + url.search
 }

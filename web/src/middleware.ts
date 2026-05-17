@@ -150,15 +150,16 @@ const protectRoutes = defineMiddleware(async (context, next) => {
 
   if (context.url.pathname.startsWith('/admin')) {
     if (!user) {
-      const canonicalUrl = new URL(context.url.pathname + context.url.search, siteOrigin)
-      return Response.redirect(makeLoginUrl(canonicalUrl, { message: 'Login as admin to access this page' }))
+      return context.redirect(
+        makeLoginUrl(context.url, { message: 'Login as admin to access this page' })
+      )
     }
 
     if (!user.admin) {
-      const accessDeniedUrl = new URL('/access-denied', siteOrigin)
+      const accessDeniedUrl = new URL('/access-denied', context.url)
       accessDeniedUrl.searchParams.set('reasonType', 'admin-required')
-      accessDeniedUrl.searchParams.set('redirect', siteOrigin + context.url.pathname + context.url.search)
-      return Response.redirect(accessDeniedUrl.toString())
+      accessDeniedUrl.searchParams.set('redirect', context.url.pathname + context.url.search)
+      return context.redirect(accessDeniedUrl.pathname + accessDeniedUrl.search)
     }
   }
 
