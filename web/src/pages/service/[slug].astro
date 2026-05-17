@@ -188,6 +188,7 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
               description: true,
               status: true,
               evidenceMd: true,
+              showBanner: true,
               createdAt: true,
               updatedAt: true,
             },
@@ -532,6 +533,13 @@ const sortedVerificationSteps = orderBy(
   ['asc', 'desc'] // Priority ascending (failed first), date descending (newest first)
 )
 
+const bannerVerificationSteps = sortedVerificationSteps.filter(
+  (step) =>
+    step.showBanner &&
+    (step.status === VerificationStepStatus.WARNING ||
+      step.status === VerificationStepStatus.FAILED)
+)
+
 const exchangeSlugs = ['exchange', 'cex', 'dex'] as const satisfies string[]
 const isExchange = service.categories.some((c) => exchangeSlugs.includes(c.slug))
 
@@ -707,6 +715,29 @@ const verificationStatusDate =
         </a>
       </div>
     )
+  }
+
+  {
+    bannerVerificationSteps.map((step) => {
+      const statusInfo = getVerificationStepStatusInfo(step.status)
+      const isFailed = step.status === VerificationStepStatus.FAILED
+      return (
+        <div
+          class={cn(
+            'mb-3 rounded-lg border px-3 py-2 text-sm',
+            isFailed
+              ? 'border-red-500/30 bg-red-500/10 text-red-100'
+              : 'border-yellow-500/30 bg-yellow-500/10 text-yellow-100'
+          )}
+        >
+          <Icon name={statusInfo.icon} class={cn('me-1.5 inline-block size-4 align-[-0.15em]', statusInfo.iconClass)} />
+          <span class="font-bold">{statusInfo.label}: {step.title}.</span> {step.description}{' '}
+          <a href="#verification-steps" class="underline hover:opacity-80">
+            See verification
+          </a>
+        </div>
+      )
+    })
   }
 
   {

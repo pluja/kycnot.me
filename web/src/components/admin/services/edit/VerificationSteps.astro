@@ -8,6 +8,7 @@ import {
 import BadgeSmall from '../../../BadgeSmall.astro'
 import FormSection from '../../../FormSection.astro'
 import FormSubSection from '../../../FormSubSection.astro'
+import InputCheckbox from '../../../InputCheckbox.astro'
 import InputSelect from '../../../InputSelect.astro'
 import InputSubmitButton from '../../../InputSubmitButton.astro'
 import InputText from '../../../InputText.astro'
@@ -120,6 +121,13 @@ const sectionHash = `#${id}`
                       error={updateInputErrors.status}
                     />
 
+                    <InputCheckbox
+                      label="Show banner on service page"
+                      name="showBanner"
+                      checked={step.showBanner}
+                      descriptionInline="Only takes effect when status is Warning or Failed."
+                    />
+
                     <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
                   </form>
                 </Fragment>
@@ -162,6 +170,12 @@ const sectionHash = `#${id}`
         }))}
         selectProps={{ required: true }}
         error={createInputErrors.status}
+      />
+
+      <InputCheckbox
+        label="Show banner on service page"
+        name="showBanner"
+        descriptionInline="Only takes effect when status is Warning or Failed."
       />
 
       <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />

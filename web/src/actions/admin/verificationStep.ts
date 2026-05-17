@@ -14,6 +14,7 @@ const verificationStepSchemaBase = z.object({
   status: z.nativeEnum(VerificationStepStatus),
   serviceId: z.coerce.number().int().positive(),
   evidenceMd: z.string().optional().nullable().default(null),
+  showBanner: z.boolean().optional().default(false),
 })
 
 const verificationStepUpdateSchema = z.object({
@@ -26,6 +27,7 @@ const verificationStepUpdateSchema = z.object({
     .optional(),
   status: z.nativeEnum(VerificationStepStatus).optional(),
   evidenceMd: z.string().optional().nullable(),
+  showBanner: z.boolean().optional().default(false),
 })
 
 const verificationStepIdSchema = z.object({
@@ -38,7 +40,7 @@ export const verificationStep = {
     permissions: 'admin',
     input: verificationStepSchemaBase,
     handler: async (input) => {
-      const { serviceId, title, description, status, evidenceMd } = input
+      const { serviceId, title, description, status, evidenceMd, showBanner } = input
 
       const service = await prisma.service.findUnique({
         where: { id: serviceId },
@@ -57,6 +59,7 @@ export const verificationStep = {
           description,
           status,
           evidenceMd,
+          showBanner,
           service: {
             connect: { id: serviceId },
           },
