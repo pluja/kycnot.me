@@ -329,18 +329,10 @@ const hiddenLinks = [
   ...tail(shuffledLinks.i2p),
 ]
 
-if (typeof `${service.kycLevel}` !== 'string') {
-  // TODO: Remove this once we figure out where this is coming from
-  console.error(`[transformCase] Error is here: getKycLevelInfo ${JSON.stringify(service)}`)
-}
 const kycLevelInfo = getKycLevelInfo(`${service.kycLevel}`)
 
 const userSentiment = service.userSentiment
   ? (() => {
-      if (typeof service.userSentiment.sentiment !== 'string') {
-        // TODO: Remove this once we figure out where this is coming from
-        console.error(`[transformCase] Error is here: getUserSentimentInfo ${JSON.stringify(service)}`)
-      }
       return {
         ...service.userSentiment,
         whatUsersLike: Array.isArray(service.userSentiment.whatUsersLike)
@@ -381,14 +373,6 @@ const attributes = sortAttributes([
           ],
   })),
 ]).map((attribute) => {
-  if (typeof attribute.category !== 'string') {
-    // TODO: Remove this once we figure out where this is coming from
-    console.error(`[transformCase] Error is here: getAttributeCategoryInfo ${JSON.stringify(service)}`)
-  }
-  if (typeof attribute.type !== 'string') {
-    // TODO: Remove this once we figure out where this is coming from
-    console.error(`[transformCase] Error is here: getAttributeTypeInfo ${JSON.stringify(service)}`)
-  }
   return {
     ...attribute,
     categoryInfo: getAttributeCategoryInfo(attribute.category),
@@ -399,10 +383,6 @@ const attributes = sortAttributes([
 const kycAttributes = attributes.filter((a) => a.category === 'KYC')
 const nonKycAttributes = attributes.filter((a) => a.category !== 'KYC')
 
-if (typeof service.verificationStatus !== 'string') {
-  // TODO: Remove this once we figure out where this is coming from
-  console.error(`[transformCase] Error is here: getVerificationStatusInfo ${JSON.stringify(service)}`)
-}
 const statusInfo = getVerificationStatusInfo(service.verificationStatus)
 
 const hasRequestedVerification =
@@ -488,23 +468,13 @@ const ogImageTemplateData = {
   verificationStatus: service.verificationStatus,
 } satisfies OgImageAllTemplatesWithProps
 
-if (typeof service.serviceVisibility !== 'string') {
-  // TODO: Remove this once we figure out where this is coming from
-  console.error(`[transformCase] Error is here: getServiceVisibilityInfo ${JSON.stringify(service)}`)
-}
 const serviceVisibilityInfo = getServiceVisibilityInfo(service.serviceVisibility)
 
 const activeAlertOrWarningEvents = service.events
-  .map((event) => {
-    if (typeof event.type !== 'string') {
-      // TODO: Remove this once we figure out where this is coming from
-      console.error(`[transformCase] Error is here: getEventTypeInfo ${JSON.stringify(service)}`)
-    }
-    return {
-      ...event,
-      typeInfo: getEventTypeInfo(event.type),
-    }
-  })
+  .map((event) => ({
+    ...event,
+    typeInfo: getEventTypeInfo(event.type),
+  }))
   .filter((event) => event.typeInfo.showBanner && (event.endedAt === null || event.endedAt >= now))
 const activeEventToShow =
   activeAlertOrWarningEvents.find((event) => event.type === EventType.ALERT) ?? activeAlertOrWarningEvents[0]
@@ -674,10 +644,6 @@ const verificationStatusDate =
         ] satisfies BreadcrumArray
     ),
     ...service.acceptedCurrencies.map((currency) => {
-      if (typeof currency !== 'string') {
-        // TODO: Remove this once we figure out where this is coming from
-        console.error(`[transformCase] Error is here: getCurrencyInfo ${JSON.stringify(service)}`)
-      }
       const currencyInfo = getCurrencyInfo(currency)
       return [
         {
@@ -1449,10 +1415,6 @@ const verificationStatusDate =
           ['actualEndedAt', 'startedAt'],
           'desc'
         ).map((event) => {
-          if (typeof event.type !== 'string') {
-            // TODO: Remove this once we figure out where this is coming from
-            console.error(`[transformCase] Error is here: getEventTypeInfo ${JSON.stringify(service)}`)
-          }
           const typeInfo = getEventTypeInfo(event.type)
 
           return (
@@ -1702,12 +1664,6 @@ const verificationStatusDate =
         </h3>
         <ul class="mb-8 space-y-2">
           {sortedVerificationSteps.map((step) => {
-            if (typeof step.status !== 'string') {
-              // TODO: Remove this once we figure out where this is coming from
-              console.error(
-                `[transformCase] Error is here: getVerificationStepStatusInfo ${JSON.stringify(service)}`
-              )
-            }
             const statusInfo = getVerificationStepStatusInfo(step.status)
 
             return (

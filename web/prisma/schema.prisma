@@ -91,11 +91,6 @@ enum VerificationStatus {
   VERIFICATION_FAILED
 }
 
-enum ServiceInfoBanner {
-  NONE
-  NO_LONGER_OPERATIONAL
-}
-
 enum ServiceVisibility {
   PUBLIC
   UNLISTED
@@ -381,8 +376,6 @@ model Service {
   /// Computed via trigger. Do not update through prisma.
   userRatingWeight        Float                        @default(0)
   serviceVisibility       ServiceVisibility            @default(PUBLIC)
-  serviceInfoBanner       ServiceInfoBanner            @default(NONE)
-  serviceInfoBannerNotes  String?
   verificationStatus      VerificationStatus           @default(COMMUNITY_CONTRIBUTED)
   verificationSummary     String?
   verificationRequests    ServiceVerificationRequest[]
