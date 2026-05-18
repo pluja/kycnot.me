@@ -233,7 +233,7 @@ DEEP_SCAN = PromptSchema(
 
 COMMENT_MOD = PromptSchema(
     ts_type="""interface CommentModeration {
-  /** Top-level decision. Server may override for hard-gate cases (orderId, strictCommentingEnabled, kycRequested, fundsBlocked, high-confidence brigade). */
+  /** Top-level decision. Server may downgrade approve -> human_review when hard gates apply (privateProof present, strictCommentingEnabled on a root review, kycIssueClaimed, fundsBlockedClaimed, high-confidence brigade). Reject and human_review are always honored. */
   recommendedAction: 'approve' | 'reject' | 'human_review';
   /** 1-3 sentences, internal-only. Cite the specific signals you used. */
   reasoning: string;

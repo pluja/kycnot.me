@@ -5,9 +5,11 @@ For each pending comment, fetch the structured moderation context via the
 get_comment_moderation_context SQL function, ask the LLM for a decision, then
 apply server-side hard gates before writing the verdict.
 
-Hard gates force HOLD (status PENDING) regardless of the AI recommendation:
+Hard gates block auto-APPROVE but let REJECT pass through. Trash content
+shouldn't sit in a queue just because it can't be auto-approved.
 - the comment has a private proof (needs human verification)
-- the service has strictCommentingEnabled
+- the service has strictCommentingEnabled AND this is a root review
+  (replies don't need proof; strict-commenting only governs new reviews)
 - the user flagged KYC_REQUESTED or FUNDS_BLOCKED
 - the AI detected a brigade with confidence >= 4 (rating gets auto-muted)
 
@@ -97,10 +99,12 @@ def _decide(ai_result: Mapping[str, Any], context: Mapping[str, Any]) -> Dict[st
         and int(ai_result["brigadeConfidence"]) >= _BRIGADE_HARD_GATE_CONFIDENCE
     )
 
+    is_root_review = bool(submission.get("isRootReview"))
+
     hard_gate_reasons: List[str] = []
     if submission.get("hasPrivateProof"):
         hard_gate_reasons.append("private proof present")
-    if service.get("strictCommentingEnabled"):
+    if service.get("strictCommentingEnabled") and is_root_review:
         hard_gate_reasons.append("strict commenting")
     if submission.get("kycIssueClaimed"):
         hard_gate_reasons.append("kyc issue claimed")
@@ -114,7 +118,10 @@ def _decide(ai_result: Mapping[str, Any], context: Mapping[str, Any]) -> Dict[st
     hard_gate_reason = ", ".join(hard_gate_reasons)
     recommended_action = ai_result["recommendedAction"]
 
-    if hard_gate_reasons:
+    # Hard gates only block auto-APPROVE. REJECT and HOLD pass through so
+    # obvious trash gets removed and explicit human-review requests don't
+    # get masked behind a generic "hard gate" hold.
+    if hard_gate_reasons and recommended_action == "approve":
         status = "PENDING"
         ai_action_enum = "HOLD"
     else:
