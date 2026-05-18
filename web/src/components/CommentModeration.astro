@@ -280,6 +280,41 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
       </button>
     </div>
 
+    {/* Issue toggles. Mods can mark/unmark whether the user flagged KYC
+        or funds-blocked problems with the service. Pyworker treats these
+        as hard gates, so accuracy matters. */}
+    <div class="mb-2 flex flex-wrap items-center gap-1 border-b border-night-500 pb-2">
+      <span class="mr-1 text-[10px] text-day-500">Issues:</span>
+      {
+        (
+          [
+            { value: 'KYC_REQUESTED', label: 'KYC issue', icon: 'ri:bank-card-line' },
+            { value: 'FUNDS_BLOCKED', label: 'Funds blocked', icon: 'ri:lock-line' },
+          ] as const
+        ).map((issue) => {
+          const active = comment.issues.includes(issue.value)
+          return (
+            <button
+              class={cn(
+                'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
+                active
+                  ? 'border border-red-500/30 bg-red-500/20 text-red-400'
+                  : 'bg-night-700 hover:bg-red-500/20 hover:text-red-400'
+              )}
+              data-action={active ? 'remove-issue' : 'add-issue'}
+              data-value={issue.value}
+              data-comment-id={comment.id}
+              data-user-id={user.id}
+              title={active ? 'Click to clear this issue flag' : 'Mark this comment as reporting the issue'}
+            >
+              <Icon name={issue.icon} class="size-3.5" />
+              <span>{active ? issue.label : `Mark ${issue.label}`}</span>
+            </button>
+          )
+        })
+      }
+    </div>
+
     {/* Rating controls. Only relevant when this comment has a rating that
         currently counts (or could count) toward the service score.
         Hidden in compact mode because the embedding row's Context panel
@@ -504,6 +539,8 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
     'rating-mute',
     'rating-mute-reason',
     'private-proof-status',
+    'add-issue',
+    'remove-issue',
   ])
 
   document.addEventListener('astro:page-load', () => {

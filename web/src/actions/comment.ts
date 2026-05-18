@@ -451,6 +451,11 @@ export const commentActions = {
         action: z.enum(['public-note', 'admin-note', 'author-note']),
         value: z.string().max(4000),
       }),
+      z.object({
+        commentId: z.number().int().positive(),
+        action: z.enum(['add-issue', 'remove-issue']),
+        value: z.enum(['KYC_REQUESTED', 'FUNDS_BLOCKED']),
+      }),
     ]),
     handler: async (input, context) => {
       try {
@@ -512,6 +517,19 @@ export const commentActions = {
               updateData.status = 'APPROVED'
             }
             break
+          case 'add-issue':
+            updateData.issues = { push: input.value }
+            break
+          case 'remove-issue': {
+            const current = await prisma.comment.findUnique({
+              where: { id: input.commentId },
+              select: { issues: true },
+            })
+            updateData.issues = {
+              set: (current?.issues ?? []).filter((i) => i !== input.value),
+            }
+            break
+          }
         }
 
         const shouldRefreshActiveRating =
