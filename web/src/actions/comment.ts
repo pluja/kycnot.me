@@ -514,7 +514,13 @@ export const commentActions = {
           case 'private-proof-status':
             updateData.privateProofStatus = input.value
             if (input.value === 'APPROVED') {
+              // Proof approval is the mod approving the comment. Record the
+              // human action so audit trail captures who approved and the
+              // Mod Work queue stops surfacing the row.
               updateData.status = 'APPROVED'
+              updateData.humanAction = 'APPROVE'
+              updateData.humanDecidedAt = new Date()
+              updateData.humanDecidedBy = { connect: { id: context.locals.user.id } }
             }
             break
           case 'add-issue':

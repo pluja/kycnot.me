@@ -180,6 +180,7 @@ const [headerStats] = await Astro.locals.banners.try(
     const totalPending = await prisma.comment.count({ where: { status: 'PENDING' } })
     const modWork = await prisma.comment.count({
       where: {
+        status: 'PENDING',
         OR: [{ aiAction: 'HOLD', humanAction: null }, { humanAction: 'HOLD' }],
       },
     })

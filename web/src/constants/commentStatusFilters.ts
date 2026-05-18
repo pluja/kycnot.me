@@ -51,8 +51,11 @@ export const {
       color: 'yellow',
       icon: 'ri:shield-user-line',
       // The primary moderator queue: fresh AI handoffs plus mod-deferred items.
-      // Union of (aiAction=HOLD AND humanAction null) and (humanAction=HOLD).
+      // Pinned to status=PENDING so any code path that flips status without
+      // setting humanAction (e.g. proof-status side-channels) can't leave a
+      // finished row stuck in the queue.
       whereClause: {
+        status: 'PENDING',
         OR: [{ aiAction: 'HOLD', humanAction: null }, { humanAction: 'HOLD' }],
       },
       classNames: { filter: 'border-yellow-500 bg-yellow-500/20 text-yellow-400' },
