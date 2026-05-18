@@ -12,8 +12,11 @@
   // works without the cache; HTMX just re-fetches the previous URL.
   htmx.config.historyCacheSize = 0
 
+  // Only fires when ClientRouter is enabled on a page. Scope the walk to
+  // <main> so we don't traverse the whole document (was ~31ms of forced
+  // reflow on mobile when this ran against document.body).
   document.addEventListener('astro:after-swap', () => {
-    htmx.process(document.body)
+    htmx.process(document.querySelector('main') ?? document.body)
   })
 
   window.htmx = htmx
