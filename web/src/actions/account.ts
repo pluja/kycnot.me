@@ -103,7 +103,7 @@ export const accountActions = {
       }
 
       const { token, user: newUser } = await createAccount(input.token)
-      await setUserSessionIdCookie(context.cookies, newUser.secretTokenHash)
+      await setUserSessionIdCookie(context.cookies, context.url, newUser.secretTokenHash)
       context.locals.user = makeUserWithKarmaUnlocks(newUser)
 
       return {

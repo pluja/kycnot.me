@@ -9,6 +9,27 @@ import { escapeRegExp } from 'lodash-es'
  */
 export const siteOrigin: string = new URL(SITE_URL).origin
 
+/**
+ * `.onion` and `.i2p` are served over plain HTTP (the hidden-service layer
+ * provides confidentiality, not TLS). Browsers reject `Set-Cookie ...; Secure`
+ * on HTTP responses, which silently kills sessions for Tor/I2P users. Caddy
+ * terminates TLS for clearnet and reverse-proxies HTTP to Astro, so we can't
+ * trust the upstream scheme either; infer from the requested hostname instead.
+ */
+export function cookieSecureForUrl(url: URL): boolean {
+  return !url.hostname.endsWith('.onion') && !url.hostname.endsWith('.i2p')
+}
+
+/**
+ * Reconstructs the origin the browser actually sees for the current request.
+ * `context.url.origin` is always `http://...` inside the Docker network (Caddy
+ * terminates TLS upstream); use this when matching against browser-supplied
+ * values like Referer so onion/clearnet redirects don't fall back to `/`.
+ */
+export function browserOriginForUrl(url: URL): string {
+  return `${cookieSecureForUrl(url) ? 'https' : 'http'}://${url.host}`
+}
+
 export function absoluteSiteUrl(path: string): string {
   return new URL(path, siteOrigin).href
 }

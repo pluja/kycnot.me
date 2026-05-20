@@ -8,7 +8,7 @@ import { makeUserWithKarmaUnlocks } from './lib/karmaUnlocks'
 import { prisma } from './lib/prisma'
 import { makeLoginUrl, makeSafeRedirectUrl } from './lib/redirectUrls'
 import { getRedisActionsSessions } from './lib/redis/redisActionsSessions'
-import { siteOrigin } from './lib/urls'
+import { browserOriginForUrl, cookieSecureForUrl } from './lib/urls'
 import { getUserFromCookies } from './lib/userCookies'
 
 const ACTION_SESSION_COOKIE = 'action-session-id'
@@ -60,7 +60,7 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
       context.cookies.set(ACTION_SESSION_COOKIE, sessionId, {
         path: '/',
         httpOnly: true,
-        secure: true,
+        secure: cookieSecureForUrl(context.url),
         sameSite: 'strict',
         maxAge: redisActionsSessions.expirationTime,
       })
@@ -68,7 +68,7 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
       if (actionResult.error) {
         const referer = context.request.headers.get('Referer')
         return context.redirect(
-          referer ? makeSafeRedirectUrl(referer, siteOrigin) : context.originPathname
+          referer ? makeSafeRedirectUrl(referer, browserOriginForUrl(context.url)) : context.originPathname
         )
       }
       return context.redirect(context.originPathname)

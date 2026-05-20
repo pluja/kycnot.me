@@ -1,19 +1,22 @@
 import { stopImpersonating } from './impersonation'
 import { prisma } from './prisma'
 import { getRedisSessions } from './redis/redisSessions'
+import { cookieSecureForUrl } from './urls'
 
 import type { APIContext, AstroCookies, AstroCookieSetOptions } from 'astro'
 
 const COOKIE_NAME = 'user_session_id'
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7 // 1 week
 
-const defaultCookieOptions = {
-  path: '/',
-  secure: true,
-  httpOnly: true,
-  sameSite: 'strict',
-  maxAge: COOKIE_MAX_AGE,
-} as const satisfies AstroCookieSetOptions
+function defaultCookieOptions(url: URL): AstroCookieSetOptions {
+  return {
+    path: '/',
+    secure: cookieSecureForUrl(url),
+    httpOnly: true,
+    sameSite: 'strict',
+    maxAge: COOKIE_MAX_AGE,
+  }
+}
 
 export function getUserSessionIdCookie(cookies: AstroCookies) {
   return cookies.get(COOKIE_NAME)?.value
@@ -36,13 +39,14 @@ export async function getUserFromCookies(cookies: AstroCookies) {
 
 export async function setUserSessionIdCookie(
   cookies: AstroCookies,
+  url: URL,
   userSecretTokenHash: string,
   options: AstroCookieSetOptions = {}
 ) {
   const redisSessions = await getRedisSessions()
   const sessId = await redisSessions.createSession(userSecretTokenHash)
   cookies.set(COOKIE_NAME, sessId, {
-    ...defaultCookieOptions,
+    ...defaultCookieOptions(url),
     ...options,
   })
 }
@@ -66,12 +70,12 @@ export async function logout(context: Pick<APIContext, 'cookies' | 'locals' | 'r
 }
 
 export async function login(
-  context: Pick<APIContext, 'cookies' | 'locals'>,
+  context: Pick<APIContext, 'cookies' | 'locals' | 'url'>,
   user: NonNullable<APIContext['locals']['user']>
 ) {
   await stopImpersonating(context)
 
-  await setUserSessionIdCookie(context.cookies, user.secretTokenHash)
+  await setUserSessionIdCookie(context.cookies, context.url, user.secretTokenHash)
 
   await prisma.user.update({
     where: { id: user.id },

@@ -1,11 +1,12 @@
 import { getRedisImpersonationSessions } from './redis/redisImpersonationSessions'
+import { cookieSecureForUrl } from './urls'
 
 import type { APIContext, AstroCookies } from 'astro'
 
 const IMPERSONATION_SESSION_COOKIE = 'impersonation_session_id'
 
 export async function startImpersonating(
-  context: Pick<APIContext, 'cookies' | 'locals'>,
+  context: Pick<APIContext, 'cookies' | 'locals' | 'url'>,
   adminUser: NonNullable<APIContext['locals']['actualUser']>,
   targetUser: NonNullable<APIContext['locals']['user']>
 ) {
@@ -17,7 +18,7 @@ export async function startImpersonating(
 
   context.cookies.set(IMPERSONATION_SESSION_COOKIE, sessionId, {
     path: '/',
-    secure: true,
+    secure: cookieSecureForUrl(context.url),
     httpOnly: true,
     sameSite: 'strict',
     maxAge: redisImpersonationSessions.expirationTime,
