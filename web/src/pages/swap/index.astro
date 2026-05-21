@@ -1,10 +1,12 @@
 ---
 import { actions } from 'astro:actions'
 
+import type { BreadcrumArray } from '../../components/BaseHead.astro'
 import SwapFormAndResults from '../../components/swap/SwapFormAndResults.astro'
 import SwapPageFooter from '../../components/swap/SwapPageFooter.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import {
+  buildBreadcrumbs,
   buildCanonical,
   buildDescription,
   buildFaqSchema,
@@ -58,6 +60,7 @@ const pageTitle = buildTitle(curatedPair)
 const heading = buildHeading(curatedPair)
 const description = buildDescription(curatedPair)
 const ogImage = buildOgImageProps(curatedPair)
+const breadcrumbs = buildBreadcrumbs(curatedPair) as BreadcrumArray
 
 const params = Astro.url.searchParams
 const noindex =
@@ -78,7 +81,7 @@ const schemas = [
   canonical={canonical}
   ogImage={ogImage}
   schemas={schemas}
-  breadcrumbs={[{ name: 'Services', url: '/' }, { name: 'Compare Rates' }]}
+  breadcrumbs={breadcrumbs}
   noindex={noindex}
   htmx
 >

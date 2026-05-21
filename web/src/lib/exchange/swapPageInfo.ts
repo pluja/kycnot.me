@@ -5,7 +5,12 @@
 import { KYCNOTME_SCHEMA_MINI } from '../schema'
 import { absoluteSiteUrl } from '../urls'
 
-import { faqAnswerToPlainText, FAQ_ITEMS } from './swapPageInfoCore'
+import {
+  faqAnswerToPlainText,
+  FAQ_ITEMS,
+  formatCurrencyHumanName,
+  type SwapPair,
+} from './swapPageInfoCore'
 
 import type {
   FAQPage,
@@ -70,4 +75,22 @@ export function buildFaqSchema(): WithContext<FAQPage> {
         }) satisfies Question
     ),
   }
+}
+
+export type BreadcrumbItem = { name: string; url?: string }
+
+// Matches the blog convention: Home > Section > Item. Pair pages add a
+// third level naming the curated pair.
+export function buildBreadcrumbs(pair: SwapPair | null): BreadcrumbItem[] {
+  if (!pair) {
+    return [
+      { name: 'Home', url: '/' },
+      { name: 'Swap' },
+    ]
+  }
+  return [
+    { name: 'Home', url: '/' },
+    { name: 'Swap', url: '/swap' },
+    { name: `${formatCurrencyHumanName(pair.from)} to ${formatCurrencyHumanName(pair.to)}` },
+  ]
 }
