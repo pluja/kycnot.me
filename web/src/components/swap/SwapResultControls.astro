@@ -1,4 +1,5 @@
 ---
+import { actions } from 'astro:actions'
 import { Icon } from 'astro-icon/components'
 
 import { cn } from '../../lib/cn'
@@ -13,20 +14,23 @@ type Props = {
 
 const { input, resultsId } = Astro.props
 
+// POST keeps amount in the body; a GET form would redirect-strip the
+// user back to landing defaults when they change sort or approvedOnly.
+const submitAction = `/swap${actions.swap.quote}`
+
 const controlClass =
   'h-8 rounded-md border border-night-700 bg-night-900 text-xs text-day-100 outline-none transition-colors focus:border-green-500/40'
 ---
 
 <form
-  method="GET"
-  action="/swap"
-  hx-get="/swap"
+  method="POST"
+  action={submitAction}
+  hx-post={submitAction}
   hx-select={`#${resultsId}`}
   hx-target={`#${resultsId}`}
   hx-swap="outerHTML"
   hx-select-oob={SWAP_OOB_TARGETS}
   hx-trigger="change"
-  hx-push-url="true"
   hx-indicator={`#${resultsId}`}
   class="flex flex-wrap items-center gap-2"
 >
@@ -65,7 +69,7 @@ const controlClass =
 
   <button
     type="submit"
-    class="h-8 rounded-md border border-green-600 bg-green-500 px-3 text-xs font-bold text-black transition-colors hover:bg-green-400 js:hidden"
+    class="h-8 rounded-md border border-green-600 bg-green-500 px-3 text-xs font-bold text-black transition-colors hover:bg-green-400"
   >
     Apply
   </button>

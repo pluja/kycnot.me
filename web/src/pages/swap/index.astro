@@ -1,4 +1,6 @@
 ---
+import { actions } from 'astro:actions'
+
 import SwapFormAndResults from '../../components/swap/SwapFormAndResults.astro'
 import SwapPageFooter from '../../components/swap/SwapPageFooter.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
@@ -15,12 +17,33 @@ import {
 } from '../../lib/exchange/swapPageInfo'
 import { bump } from '../../lib/stats'
 
+// Amount params only arrive via POST. Strip them off any GET so bots
+// scraping ?sendAmount=... can't drive the aggregator. Caddy mirrors this.
+if (Astro.request.method === 'GET') {
+  const p = Astro.url.searchParams
+  if (p.has('sendAmount') || p.has('receiveAmount')) {
+    const clean = new URL(Astro.url)
+    clean.searchParams.delete('sendAmount')
+    clean.searchParams.delete('receiveAmount')
+    return Astro.redirect(clean.pathname + clean.search, 303)
+  }
+}
+
 const isHtmxRequest = Astro.request.headers.get('hx-request') === 'true'
 if (!isHtmxRequest) {
   void bump({ kind: 'swap.view' }).catch(() => null)
 }
 
-const curatedPair = resolveSwapPair(Astro.url.searchParams)
+const quoteResult = Astro.getActionResult(actions.swap.quote)
+const quoteData = quoteResult && !quoteResult.error ? quoteResult.data : null
+
+// After POST the URL has no from/to; fall back to the action input so
+// the title and canonical match the pair the user submitted.
+const seoSearchParams = quoteData
+  ? new URLSearchParams({ from: quoteData.input.from, to: quoteData.input.to })
+  : Astro.url.searchParams
+
+const curatedPair = resolveSwapPair(seoSearchParams)
 const canonical = buildCanonical(curatedPair)
 const pageTitle = buildTitle(curatedPair)
 const heading = buildHeading(curatedPair)
@@ -67,7 +90,7 @@ const schemas = [
       </p>
     </header>
 
-    <SwapFormAndResults />
+    <SwapFormAndResults quoteData={quoteData} />
 
     <SwapPageFooter />
   </div>

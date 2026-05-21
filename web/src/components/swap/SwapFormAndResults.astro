@@ -1,5 +1,6 @@
 ---
 import { VerificationStatus } from '@prisma/client'
+import { actions } from 'astro:actions'
 import { Icon } from 'astro-icon/components'
 import { z } from 'astro:content'
 
@@ -14,17 +15,25 @@ import {
 } from '../../lib/exchange/aggregator'
 import { getSwapCurrencies } from '../../lib/exchange/swapCurrencies'
 import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
-import { bump } from '../../lib/stats'
 
 import { formatSwapRate, sortSwapResults } from './swapResultUi'
 
+import type { SwapQuoteInput } from '../../actions/swap'
 import type { HTMLAttributes } from 'astro/types'
+
+type QuoteData = {
+  input: SwapQuoteInput
+  result: AggregatedResultWithService[]
+  aggregatorUnavailable: boolean
+}
 
 type Props = HTMLAttributes<'div'> & {
   highlightSlug?: string
+  /** When set (POST submission), render its result; otherwise fall back to default-amount aggregator call. */
+  quoteData?: QuoteData | null
 }
 
-const { class: className, highlightSlug, ...htmlProps } = Astro.props
+const { class: className, highlightSlug, quoteData, ...htmlProps } = Astro.props
 
 const currencies = await getSwapCurrencies()
 if (currencies.degraded) {
@@ -42,8 +51,6 @@ const { data: params } = zodParseQueryParamsStoringErrors(
   {
     from: coerceToKnownCurrency('btc'),
     to: coerceToKnownCurrency('xmr'),
-    sendAmount: z.coerce.number().positive().finite().optional(),
-    receiveAmount: z.coerce.number().positive().finite().optional(),
     sortBy: z.enum(['rate', 'score', 'kyc']).default('rate'),
     approvedOnly: z
       .string()
@@ -53,21 +60,19 @@ const { data: params } = zodParseQueryParamsStoringErrors(
   Astro
 )
 
-const input = (() => {
-  const from = params.from === params.to ? (params.to === 'xmr' ? 'btc' : 'xmr') : params.from
-  return {
-    ...params,
-    from,
-    sendAmount:
-      params.sendAmount !== undefined && params.receiveAmount !== undefined
-        ? undefined
-        : params.sendAmount === undefined && params.receiveAmount === undefined
-          ? from === 'btc'
-            ? 0.01
-            : 1
-          : params.sendAmount,
-  }
-})()
+// POST → use the action input. GET landing → defaults so the page still
+// renders a sample rate for SEO.
+const input = quoteData
+  ? quoteData.input
+  : (() => {
+      const from = params.from === params.to ? (params.to === 'xmr' ? 'btc' : 'xmr') : params.from
+      return {
+        ...params,
+        from,
+        sendAmount: from === 'btc' ? 0.01 : 1,
+        receiveAmount: undefined as number | undefined,
+      }
+    })()
 
 export type SwapFormInput = typeof input
 
@@ -84,45 +89,37 @@ const parseCompound = (v: string) => {
 }
 const fromOption = currencies.byValue.get(input.from) ?? parseCompound(input.from)
 const toOption = currencies.byValue.get(input.to) ?? parseCompound(input.to)
-const hasExplicitQuoteRequest =
-  Astro.request.headers.get('hx-request') === 'true' ||
-  ['from', 'to', 'sendAmount', 'receiveAmount'].some((key) => Astro.url.searchParams.has(key))
 
 const REQUEST_MAX_WAIT_MS = 6_000
 
 let result: AggregatedResultWithService[] = []
 let aggregatorUnavailable = false
-try {
-  result = await getAggregatedQuotesWithServices({
-    currencyFrom: fromOption.value,
-    currencyTo: toOption.value,
-    sendAmount: input.sendAmount,
-    receiveAmount: input.receiveAmount,
-    maxWaitMs: REQUEST_MAX_WAIT_MS,
-  })
-  if (
-    hasExplicitQuoteRequest &&
-    fromOption.value &&
-    toOption.value &&
-    (input.sendAmount !== undefined || input.receiveAmount !== undefined)
-  ) {
-    void bump({
-      kind: 'swap.quote-fetched',
-      fromCurrency: fromOption.value,
-      toCurrency: toOption.value,
-    }).catch(() => null)
-  }
-} catch (error) {
-  aggregatorUnavailable = true
-  const e = error as { code?: unknown; details?: unknown; message?: unknown } | null
-  if (e && typeof e.code === 'number') {
-    console.error(`[swap] aggregator unavailable: gRPC code=${e.code} ${e.details ?? e.message ?? ''}`)
-  } else {
-    console.error('[swap] aggregator unavailable', error)
+if (quoteData) {
+  result = quoteData.result
+  aggregatorUnavailable = quoteData.aggregatorUnavailable
+} else {
+  try {
+    result = await getAggregatedQuotesWithServices({
+      currencyFrom: fromOption.value,
+      currencyTo: toOption.value,
+      sendAmount: input.sendAmount,
+      receiveAmount: input.receiveAmount,
+      maxWaitMs: REQUEST_MAX_WAIT_MS,
+    })
+  } catch (error) {
+    aggregatorUnavailable = true
+    const e = error as { code?: unknown; details?: unknown; message?: unknown } | null
+    if (e && typeof e.code === 'number') {
+      console.error(`[swap] aggregator unavailable: gRPC code=${e.code} ${e.details ?? e.message ?? ''}`)
+    } else {
+      console.error('[swap] aggregator unavailable', error)
+    }
   }
 }
 
-const retryHref = `${Astro.url.pathname}${Astro.url.search}`
+// Retry re-POSTs the form to preserve the user's amount; a GET to the
+// current URL would redirect-strip or fall back to landing defaults.
+const retryAction = `/swap${actions.swap.quote}`
 
 function isApprovedOrVerified(status: VerificationStatus): boolean {
   return status === VerificationStatus.APPROVED || status === VerificationStatus.VERIFICATION_SUCCESS
@@ -151,19 +148,6 @@ const marketRate = deriveMarketRate()
 const showMarketData = bestQuote?.marketSpreadPercent != null
 const quotesCount = displayResult.filter((r) => r.quote !== null).length
 
-// After flip, the new send amount equals the old "to" side. Truncate to 2
-// decimals (product rule); if that collapses to 0, drop the amount and just
-// flip the pair.
-function truncateTo2(value: number): number {
-  return Math.floor(value * 100) / 100
-}
-
-const flipSendAmount = (() => {
-  const raw = amountSide === 'send' ? bestQuote?.amountReceived : input.receiveAmount
-  if (raw === undefined) return undefined
-  const truncated = truncateTo2(raw)
-  return truncated > 0 ? truncated : undefined
-})()
 ---
 
 <div {...htmlProps} class={cn('mx-auto max-w-5xl', className)}>
@@ -171,20 +155,12 @@ const flipSendAmount = (() => {
     <SwapPopularPairs
       currentFrom={input.from}
       currentTo={input.to}
-      sendAmount={input.sendAmount}
       sortBy={input.sortBy}
       approvedOnly={input.approvedOnly}
       resultsId={RESULTS_ID}
     />
 
-    <SwapForm
-      input={input}
-      currencies={currencies}
-      resultsId={RESULTS_ID}
-      flipSendAmount={flipSendAmount}
-      class="mt-3"
-      pushUrl
-    />
+    <SwapForm input={input} currencies={currencies} resultsId={RESULTS_ID} class="mt-3" />
   </div>
 
   <div id={RESULTS_ID} class="relative mt-5" aria-live="polite" aria-busy="false">
@@ -209,13 +185,15 @@ const flipSendAmount = (() => {
             Rates aggregator is having trouble right now. Please try again in a few minutes.
           </p>
           <button
-            type="button"
-            hx-get={retryHref}
+            type="submit"
+            form="swap-form"
+            formaction={retryAction}
+            hx-post={retryAction}
+            hx-include="#swap-form"
             hx-select={`#${RESULTS_ID}`}
             hx-target={`#${RESULTS_ID}`}
             hx-swap="outerHTML"
             hx-indicator={`#${RESULTS_ID}`}
-            onclick="if(!window.htmx) window.location.reload()"
             class="mt-5 inline-flex h-9 items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
           >
             <Icon name="ri:refresh-line" class="size-4" />

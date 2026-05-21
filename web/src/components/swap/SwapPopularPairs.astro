@@ -8,13 +8,12 @@ import { buildSwapUrl, SWAP_OOB_TARGETS } from '../../lib/exchange/swapUrls'
 type Props = {
   currentFrom: string
   currentTo: string
-  sendAmount?: number
   sortBy: 'kyc' | 'rate' | 'score'
   approvedOnly: boolean
   resultsId: string
 }
 
-const { currentFrom, currentTo, sendAmount, sortBy, approvedOnly, resultsId } = Astro.props
+const { currentFrom, currentTo, sortBy, approvedOnly, resultsId } = Astro.props
 ---
 
 <div id="swap-popular-pairs">
@@ -25,10 +24,8 @@ const { currentFrom, currentTo, sendAmount, sortBy, approvedOnly, resultsId } = 
         const isActive = from === currentFrom && to === currentTo
         return (
           <a
-            href={buildSwapUrl(from, to, { sendAmount, sortBy, approvedOnly })}
-            hx-get="/swap"
-            hx-vals={JSON.stringify({ from, to })}
-            hx-include="#swap-form"
+            href={buildSwapUrl(from, to, { sortBy, approvedOnly })}
+            hx-get={buildSwapUrl(from, to, { sortBy, approvedOnly })}
             hx-target={`#${resultsId}`}
             hx-select={`#${resultsId}`}
             hx-swap="outerHTML"
