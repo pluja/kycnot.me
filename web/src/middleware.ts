@@ -52,6 +52,17 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
     addActionBannerIfNeeded(context, actionResult.error)
 
     if (action.calledFrom === 'form') {
+      // HTMX manages its own state via XHR. The PRG dance returns a 302
+      // whose empty body HTMX swaps into the target, so the first click
+      // looks like a no-op and the result only surfaces on the second
+      // click (when the stored cookie is consumed). Render in place
+      // instead and let HTMX swap the rendered partial directly.
+      const isHtmx = context.request.headers.get('HX-Request') === 'true'
+      if (isHtmx) {
+        setActionResult(action.name, serializeActionResult(actionResult))
+        return next()
+      }
+
       const sessionId = await redisActionsSessions.store({
         actionName: action.name,
         actionResult: serializeActionResult(actionResult),
