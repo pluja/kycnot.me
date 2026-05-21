@@ -15,6 +15,7 @@ import {
   buildWebApplicationSchema,
   resolveSwapPair,
 } from '../../lib/exchange/swapPageInfo'
+import { setPublicPageCacheHeaders } from '../../lib/pageCacheHeaders'
 import { bump } from '../../lib/stats'
 
 // Amount params only arrive via POST. Strip them off any GET so bots
@@ -36,6 +37,14 @@ if (!isHtmxRequest) {
 
 const quoteResult = Astro.getActionResult(actions.swap.quote)
 const quoteData = quoteResult && !quoteResult.error ? quoteResult.data : null
+
+// Post-action renders are personalized (via the action-session cookie),
+// so they must not be cached. Anonymous landings render the same HTML
+// for everyone and can sit on the CDN.
+setPublicPageCacheHeaders(Astro.response.headers, {
+  isAuthenticated: Astro.locals.user !== null || quoteData !== null,
+  hasErrors: Astro.locals.banners.errors.length > 0,
+})
 
 // After POST the URL has no from/to; fall back to the action input so
 // the title and canonical match the pair the user submitted.

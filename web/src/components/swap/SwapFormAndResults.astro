@@ -9,10 +9,7 @@ import SwapPopularPairs from '../../components/swap/SwapPopularPairs.astro'
 import SwapResultControls from '../../components/swap/SwapResultControls.astro'
 import SwapResultsTable from '../../components/swap/SwapResultsTable.astro'
 import { cn } from '../../lib/cn'
-import {
-  getAggregatedQuotesWithServices,
-  type AggregatedResultWithService,
-} from '../../lib/exchange/aggregator'
+import { type AggregatedResultWithService } from '../../lib/exchange/aggregator'
 import { getSwapCurrencies } from '../../lib/exchange/swapCurrencies'
 import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
 
@@ -29,7 +26,7 @@ type QuoteData = {
 
 type Props = HTMLAttributes<'div'> & {
   highlightSlug?: string
-  /** When set (POST submission), render its result; otherwise fall back to default-amount aggregator call. */
+  /** Action result from a POST submission. URL params only pre-fill the form; the aggregator only runs via the action. */
   quoteData?: QuoteData | null
 }
 
@@ -60,8 +57,9 @@ const { data: params } = zodParseQueryParamsStoringErrors(
   Astro
 )
 
-// POST → use the action input. GET landing → defaults so the page still
-// renders a sample rate for SEO.
+// POST → action input drives the rendered state. GET → URL params pre-fill
+// the form only; we don't call the aggregator here so the landing stays
+// cacheable.
 const input = quoteData
   ? quoteData.input
   : (() => {
@@ -90,32 +88,8 @@ const parseCompound = (v: string) => {
 const fromOption = currencies.byValue.get(input.from) ?? parseCompound(input.from)
 const toOption = currencies.byValue.get(input.to) ?? parseCompound(input.to)
 
-const REQUEST_MAX_WAIT_MS = 6_000
-
-let result: AggregatedResultWithService[] = []
-let aggregatorUnavailable = false
-if (quoteData) {
-  result = quoteData.result
-  aggregatorUnavailable = quoteData.aggregatorUnavailable
-} else {
-  try {
-    result = await getAggregatedQuotesWithServices({
-      currencyFrom: fromOption.value,
-      currencyTo: toOption.value,
-      sendAmount: input.sendAmount,
-      receiveAmount: input.receiveAmount,
-      maxWaitMs: REQUEST_MAX_WAIT_MS,
-    })
-  } catch (error) {
-    aggregatorUnavailable = true
-    const e = error as { code?: unknown; details?: unknown; message?: unknown } | null
-    if (e && typeof e.code === 'number') {
-      console.error(`[swap] aggregator unavailable: gRPC code=${e.code} ${e.details ?? e.message ?? ''}`)
-    } else {
-      console.error('[swap] aggregator unavailable', error)
-    }
-  }
-}
+const result: AggregatedResultWithService[] = quoteData?.result ?? []
+const aggregatorUnavailable = quoteData?.aggregatorUnavailable ?? false
 
 // Retry re-POSTs the form to preserve the user's amount; a GET to the
 // current URL would redirect-strip or fall back to landing defaults.
@@ -171,6 +145,7 @@ const quotesCount = displayResult.filter((r) => r.quote !== null).length
       <div class="swap-progress-sweep h-full w-1/3 rounded-full bg-green-500"></div>
     </div>
 
+    {quoteData && (
     <div class="transition-opacity duration-75 htmx-request:pointer-events-none htmx-request:opacity-60">
       {aggregatorUnavailable ? (
         <div
@@ -273,6 +248,7 @@ const quotesCount = displayResult.filter((r) => r.quote !== null).length
         </>
       )}
     </div>
+    )}
   </div>
 </div>
 
