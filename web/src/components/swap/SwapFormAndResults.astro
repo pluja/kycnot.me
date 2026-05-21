@@ -8,7 +8,10 @@ import SwapPopularPairs from '../../components/swap/SwapPopularPairs.astro'
 import SwapResultControls from '../../components/swap/SwapResultControls.astro'
 import SwapResultsTable from '../../components/swap/SwapResultsTable.astro'
 import { cn } from '../../lib/cn'
-import { getAggregatedQuotesWithServices } from '../../lib/exchange/aggregator'
+import {
+  getAggregatedQuotesWithServices,
+  type AggregatedResultWithService,
+} from '../../lib/exchange/aggregator'
 import { getSwapCurrencies } from '../../lib/exchange/swapCurrencies'
 import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
 import { bump } from '../../lib/stats'
@@ -25,12 +28,7 @@ const { class: className, highlightSlug, ...htmlProps } = Astro.props
 
 const currencies = await getSwapCurrencies()
 if (currencies.degraded) {
-  Astro.locals.banners.add({
-    uiMessage: 'Currency list unavailable; showing a minimal set.',
-    type: 'error',
-    origin: 'custom_swap_currencies',
-    error: currencies.reason,
-  })
+  console.error('[swap] currency list degraded:', currencies.reason)
 }
 
 const coerceToKnownCurrency = (fallback: string) =>
@@ -92,34 +90,39 @@ const hasExplicitQuoteRequest =
 
 const REQUEST_MAX_WAIT_MS = 6_000
 
-const result = await Astro.locals.banners.try(
-  'Error fetching rates',
-  async () => {
-    const quotes = await getAggregatedQuotesWithServices({
-      currencyFrom: fromOption.value,
-      currencyTo: toOption.value,
-      sendAmount: input.sendAmount,
-      receiveAmount: input.receiveAmount,
-      maxWaitMs: REQUEST_MAX_WAIT_MS,
-    })
-    // Bump only inside the success path; banners.try swallows gRPC errors
-    // into a [] fallback that would otherwise inflate the counter.
-    if (
-      hasExplicitQuoteRequest &&
-      fromOption.value &&
-      toOption.value &&
-      (input.sendAmount !== undefined || input.receiveAmount !== undefined)
-    ) {
-      void bump({
-        kind: 'swap.quote-fetched',
-        fromCurrency: fromOption.value,
-        toCurrency: toOption.value,
-      }).catch(() => null)
-    }
-    return quotes
-  },
-  []
-)
+let result: AggregatedResultWithService[] = []
+let aggregatorUnavailable = false
+try {
+  result = await getAggregatedQuotesWithServices({
+    currencyFrom: fromOption.value,
+    currencyTo: toOption.value,
+    sendAmount: input.sendAmount,
+    receiveAmount: input.receiveAmount,
+    maxWaitMs: REQUEST_MAX_WAIT_MS,
+  })
+  if (
+    hasExplicitQuoteRequest &&
+    fromOption.value &&
+    toOption.value &&
+    (input.sendAmount !== undefined || input.receiveAmount !== undefined)
+  ) {
+    void bump({
+      kind: 'swap.quote-fetched',
+      fromCurrency: fromOption.value,
+      toCurrency: toOption.value,
+    }).catch(() => null)
+  }
+} catch (error) {
+  aggregatorUnavailable = true
+  const e = error as { code?: unknown; details?: unknown; message?: unknown } | null
+  if (e && typeof e.code === 'number') {
+    console.error(`[swap] aggregator unavailable: gRPC code=${e.code} ${e.details ?? e.message ?? ''}`)
+  } else {
+    console.error('[swap] aggregator unavailable', error)
+  }
+}
+
+const retryHref = `${Astro.url.pathname}${Astro.url.search}`
 
 function isApprovedOrVerified(status: VerificationStatus): boolean {
   return status === VerificationStatus.APPROVED || status === VerificationStatus.VERIFICATION_SUCCESS
@@ -193,74 +196,104 @@ const flipSendAmount = (() => {
     </div>
 
     <div class="transition-opacity duration-75 htmx-request:pointer-events-none htmx-request:opacity-60">
-      <div class="rounded-lg border border-night-700/50 bg-night-800/30 px-3 py-2 text-sm">
-        <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <div class="text-day-400">
-              <span class="font-semibold text-white tabular-nums">{quotesCount}</span>
-              {' '}
-              {quotesCount === 1 ? 'quote' : 'quotes'}
-            </div>
-
-            {
-              showMarketData && marketRate !== null && (
-                <div class="text-xs text-day-500">
-                  Market{' '}
-                  <span class="font-mono font-semibold text-day-200 tabular-nums">
-                    {formatSwapRate(marketRate)}
-                  </span>{' '}
-                  {toOption.code}/{fromOption.code}
-                  <span class="text-day-700"> · </span>
-                  <a
-                    href="https://coinpaprika.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-day-600 underline decoration-dotted underline-offset-2 hover:text-day-400"
-                  >
-                    CoinPaprika
-                  </a>
+      {aggregatorUnavailable ? (
+        <div
+          class="flex flex-col items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-500/5 px-6 py-14 text-center"
+          role="alert"
+        >
+          <div class="mb-4 flex size-16 items-center justify-center rounded-full bg-amber-500/10">
+            <Icon name="ri:tools-line" class="size-8 text-amber-300" />
+          </div>
+          <h3 class="mb-1 font-title text-lg text-white">Quotes temporarily unavailable</h3>
+          <p class="max-w-sm text-sm text-day-400">
+            Rates aggregator is having trouble right now. Please try again in a few minutes.
+          </p>
+          <button
+            type="button"
+            hx-get={retryHref}
+            hx-select={`#${RESULTS_ID}`}
+            hx-target={`#${RESULTS_ID}`}
+            hx-swap="outerHTML"
+            hx-indicator={`#${RESULTS_ID}`}
+            onclick="if(!window.htmx) window.location.reload()"
+            class="mt-5 inline-flex h-9 items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
+          >
+            <Icon name="ri:refresh-line" class="size-4" />
+            Try again
+          </button>
+        </div>
+      ) : (
+        <>
+          <div class="rounded-lg border border-night-700/50 bg-night-800/30 px-3 py-2 text-sm">
+            <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <div class="text-day-400">
+                  <span class="font-semibold text-white tabular-nums">{quotesCount}</span>
+                  {' '}
+                  {quotesCount === 1 ? 'quote' : 'quotes'}
                 </div>
-              )
-            }
+
+                {
+                  showMarketData && marketRate !== null && (
+                    <div class="text-xs text-day-500">
+                      Market{' '}
+                      <span class="font-mono font-semibold text-day-200 tabular-nums">
+                        {formatSwapRate(marketRate)}
+                      </span>{' '}
+                      {toOption.code}/{fromOption.code}
+                      <span class="text-day-700"> · </span>
+                      <a
+                        href="https://coinpaprika.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-day-600 underline decoration-dotted underline-offset-2 hover:text-day-400"
+                      >
+                        CoinPaprika
+                      </a>
+                    </div>
+                  )
+                }
+              </div>
+
+              <SwapResultControls input={input} resultsId={RESULTS_ID} />
+            </div>
           </div>
 
-          <SwapResultControls input={input} resultsId={RESULTS_ID} />
-        </div>
-      </div>
+          <details class="mt-4 px-2">
+            <summary
+              class="inline-flex cursor-pointer list-none items-center gap-1 text-xs text-day-500 hover:text-day-300"
+            >
+              <Icon name="ri:information-line" class="size-3.5" />
+              What do the icons mean?
+            </summary>
+            <ul class="mt-2 space-y-1.5 text-xs text-day-400">
+              <li class="flex items-start gap-2">
+                <Icon name="ri:shield-check-line" class="mt-0.5 size-3.5 shrink-0 text-green-400" />
+                <span>
+                  <strong class="text-day-200">OrangeFren Guarantee</strong>: your trade is protected if this
+                  provider violates its own stated policies. Read the FAQ below for more information.
+                </span>
+              </li>
+              <li class="flex items-start gap-2">
+                <Icon name="ri:scan-line" class="mt-0.5 size-3.5 shrink-0 text-cyan-400" />
+                <span>
+                  <strong class="text-day-200">AML pre-check</strong>: submit your wallet address to the
+                  provider's support before sending; if they give an OK, no KYC on this swap.
+                </span>
+              </li>
+            </ul>
+          </details>
 
-      <details class="mt-4 px-2">
-        <summary
-          class="inline-flex cursor-pointer list-none items-center gap-1 text-xs text-day-500 hover:text-day-300"
-        >
-          <Icon name="ri:information-line" class="size-3.5" />
-          What do the icons mean?
-        </summary>
-        <ul class="mt-2 space-y-1.5 text-xs text-day-400">
-          <li class="flex items-start gap-2">
-            <Icon name="ri:shield-check-line" class="mt-0.5 size-3.5 shrink-0 text-green-400" />
-            <span>
-              <strong class="text-day-200">OrangeFren Guarantee</strong>: your trade is protected if this
-              provider violates its own stated policies. Read the FAQ below for more information.
-            </span>
-          </li>
-          <li class="flex items-start gap-2">
-            <Icon name="ri:scan-line" class="mt-0.5 size-3.5 shrink-0 text-cyan-400" />
-            <span>
-              <strong class="text-day-200">AML pre-check</strong>: submit your wallet address to the
-              provider's support before sending; if they give an OK, no KYC on this swap.
-            </span>
-          </li>
-        </ul>
-      </details>
-
-      <SwapResultsTable
-        result={displayResult}
-        currencyFrom={fromOption}
-        currencyTo={toOption}
-        amountSide={amountSide}
-        highlightSlug={highlightSlug}
-        class=""
-      />
+          <SwapResultsTable
+            result={displayResult}
+            currencyFrom={fromOption}
+            currencyTo={toOption}
+            amountSide={amountSide}
+            highlightSlug={highlightSlug}
+            class=""
+          />
+        </>
+      )}
     </div>
   </div>
 </div>
