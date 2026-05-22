@@ -43,9 +43,6 @@ type Props = HTMLAttributes<'div'> & {
 
 const { comment, class: className, ...htmlProps } = Astro.props
 
-const user = Astro.locals.user
-const canModerate = !!user && (user.admin || user.moderator)
-
 const accountAgeDays = differenceInDays(new Date(), comment.author.createdAt)
 const accountAgeLabel = accountAgeDays === 0 ? 'Today' : `${accountAgeDays.toLocaleString()}d old`
 const commentCount = comment.author._count.comments
@@ -185,34 +182,6 @@ type TailwindColor = Parameters<typeof BadgeSmall>[0]['color']
           </span>
         </Tooltip>
 
-        {
-          canModerate && (comment.status === 'APPROVED' || comment.status === 'VERIFIED') && (
-            <button
-              type="button"
-              class={cn(
-                'ml-auto inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] transition-colors',
-                comment.ratingMuted
-                  ? 'border border-orange-500/30 bg-orange-500/15 text-orange-300 hover:bg-orange-500/25'
-                  : 'bg-night-700 text-day-300 hover:bg-orange-500/20 hover:text-orange-300'
-              )}
-              data-action="rating-mute"
-              data-value={(!comment.ratingMuted).toString()}
-              data-comment-id={comment.id}
-              data-user-id={user!.id}
-              title={
-                comment.ratingMuted
-                  ? 'Re-enable this rating, restore its score contribution'
-                  : 'Disable this rating from counting toward the service score'
-              }
-            >
-              <Icon
-                name={comment.ratingMuted ? 'ri:star-fill' : 'ri:star-off-line'}
-                class="size-3.5"
-              />
-              <span>{comment.ratingMuted ? 'Enable rating' : 'Disable rating'}</span>
-            </button>
-          )
-        }
       </div>
     )
   }

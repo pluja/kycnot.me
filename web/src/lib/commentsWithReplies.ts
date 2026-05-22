@@ -2,9 +2,36 @@ import { z } from 'astro/zod'
 
 import { prisma } from './prisma'
 
-import type { Prisma } from '@prisma/client'
+import type { Prisma, RatingMuteReason } from '@prisma/client'
 
 export const MAX_COMMENT_DEPTH = 12
+
+// Spam-class mutes are the only ones that sink to the bottom of a thread.
+// Other mute reasons (affiliated, low trust, COI, mod discretion) just take
+// the rating out of the score; the comment keeps its chronological slot.
+const SPAM_REASONS = new Set<RatingMuteReason>(['SUSPICIOUS_PATTERN', 'TEMPLATE_SPAM'])
+
+export function sinkSpamToBottom<
+  T extends {
+    ratingMuted: boolean
+    ratingMuteReason: RatingMuteReason | null
+    replies?: T[]
+  },
+>(comments: T[]): T[] {
+  const withSortedReplies = comments.map((c) =>
+    c.replies?.length ? { ...c, replies: sinkSpamToBottom(c.replies) } : c
+  )
+  const kept: T[] = []
+  const sunk: T[] = []
+  for (const c of withSortedReplies) {
+    if (c.ratingMuted && c.ratingMuteReason && SPAM_REASONS.has(c.ratingMuteReason)) {
+      sunk.push(c)
+    } else {
+      kept.push(c)
+    }
+  }
+  return [...kept, ...sunk]
+}
 
 const commentReplyQuery = {
   select: {
@@ -88,7 +115,7 @@ const commentReplyQuery = {
       },
     },
   },
-  orderBy: [{ ratingMuted: 'asc' }, { createdAt: 'desc' }],
+  orderBy: [{ createdAt: 'desc' }],
 } as const satisfies Prisma.CommentFindManyArgs
 
 export type CommentWithReplies<T extends Record<string, unknown> = Record<never, never>> =
@@ -153,7 +180,10 @@ export async function makeCommentsNestedQuery({
       orderByClause.push({ createdAt: 'desc' })
       break
   }
-  orderByClause.unshift({ ratingMuted: 'asc' }) // put muted comments last within a sort group
+  // No DB-level sink: only spam-class mutes go to the bottom, and that
+  // decision lives in sinkSpamToBottom which the caller runs over the
+  // populated tree. Non-spam mutes stay in their natural chronological
+  // slot (the strikethrough on the score conveys "doesn't count").
 
   const highlightedBranchIds = highlightedCommentId ? await findAllParentIds(highlightedCommentId, depth) : []
 

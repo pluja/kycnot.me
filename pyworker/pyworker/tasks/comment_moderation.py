@@ -17,6 +17,9 @@ Outcomes map to columns:
 - recommendedAction -> aiAction (APPROVE / REJECT / HOLD)
 - aiAction -> status (APPROVED / REJECTED / PENDING) unless overridden by hard gate
 - isBrigade && confidence >= 4 -> ratingMuted=true + ratingMuteReason=SUSPICIOUS_PATTERN
+- isSpam -> ratingMuted=true + ratingMuteReason=TEMPLATE_SPAM (drives the
+  "Potential SPAM" collapse + bottom-sort on the public side; brigade wins
+  over spam when both are set because brigade is the more specific signal)
 - ratingShouldBeDisabled (affiliated puff, etc.) -> ratingMuted=true with reason
 """
 
@@ -74,8 +77,15 @@ def _pick_mute_reason(
     context: Mapping[str, Any],
     is_brigade_hard_gate: bool,
 ) -> Optional[str]:
+    # Brigade is the most specific signal and wins. Then spam, since the
+    # spam call is a content judgement that doesn't depend on the author.
+    # Author-level reasons (affiliated / low trust / COI) come last because
+    # they only apply to rating-disable cases where the comment itself
+    # might still be fine.
     if is_brigade_hard_gate:
         return "SUSPICIOUS_PATTERN"
+    if ai_result.get("isSpam"):
+        return "TEMPLATE_SPAM"
     if not ai_result.get("ratingShouldBeDisabled"):
         return None
     author = context["comment"]["author"]
@@ -129,7 +139,9 @@ def _decide(ai_result: Mapping[str, Any], context: Mapping[str, Any]) -> Dict[st
         ai_action_enum = _ACTION_TO_ENUM[recommended_action]
 
     rating_muted = (
-        is_high_conf_brigade or bool(ai_result.get("ratingShouldBeDisabled"))
+        is_high_conf_brigade
+        or bool(ai_result.get("isSpam"))
+        or bool(ai_result.get("ratingShouldBeDisabled"))
     )
     rating_mute_reason = _pick_mute_reason(ai_result, context, is_high_conf_brigade)
 

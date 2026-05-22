@@ -115,6 +115,9 @@ const proofStatusColor: Record<NonNullable<typeof comment.privateProofStatus>, s
   WITHDRAWN: 'bg-zinc-500/20 text-zinc-300 border border-zinc-500/30',
 }
 
+// "Penalty" mute reasons: ratingMuted + one of these = the comment is
+// treated as spam (collapse, badge, bottom-sort). Other mute reasons just
+// disable the rating without suppressing the comment.
 const ratingMutePenalty =
   comment.ratingMuted &&
   (comment.ratingMuteReason === 'SUSPICIOUS_PATTERN' || comment.ratingMuteReason === 'TEMPLATE_SPAM')
@@ -231,9 +234,10 @@ const ribbonClass = ratingMutePenalty
       )
     }
 
-    <!-- Spam chip -->
+    <!-- Spam chip. Driven by the rating-mute reason since that's what
+         actually triggers the public-side collapse + badge + bottom-sort. -->
     {
-      comment.aiIsSpam && (
+      ratingMutePenalty && (
         <span class="shrink-0 rounded-sm bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">
           Spam
         </span>
@@ -420,9 +424,9 @@ const ribbonClass = ratingMutePenalty
                 'rounded-sm px-1.5 py-0.5',
                 comment.aiIsSpam ? 'bg-red-500/20 text-red-300' : 'bg-night-700 text-day-500'
               )}
-              title="Whether the AI judged this comment as spam."
+              title="The AI's spam call (informational only). Whether this drives behavior depends on ratingMuted + ratingMuteReason below."
             >
-              {comment.aiIsSpam ? 'Spam' : 'Not spam'}
+              {comment.aiIsSpam ? 'AI: spam' : 'AI: not spam'}
             </span>
             <span
               class={cn(

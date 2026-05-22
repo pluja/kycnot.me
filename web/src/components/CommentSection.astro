@@ -10,6 +10,7 @@ import { cn } from '../lib/cn'
 import {
   commentSortSchema,
   makeCommentsNestedQuery,
+  sinkSpamToBottom,
   MAX_COMMENT_DEPTH,
   type CommentSortOption,
   type CommentWithReplies,
@@ -161,7 +162,7 @@ const populateComment = (comment: CommentWithReplies): CommentWithRepliesPopulat
   isWatchingReplies: notiPref?.watchedComments.some((c) => c.id === comment.id) ?? false,
   replies: comment.replies?.map(populateComment),
 })
-const comments = dbComments.map(populateComment)
+const comments = sinkSpamToBottom(dbComments.map(populateComment))
 const hasHelpfulSort = upvotedRootCommentsCount > 0
 const displayActiveSort = activeSort === 'upvotes' && !hasHelpfulSort ? 'newest' : activeSort
 const visibleSortOptions = sortOptions.filter(

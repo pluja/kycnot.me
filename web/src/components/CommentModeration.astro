@@ -178,7 +178,12 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
               </span>
             )}
             {comment.aiIsSpam && (
-              <span class="rounded-sm bg-red-500/20 px-1.5 py-0.5 text-red-300">Spam</span>
+              <span
+                class="rounded-sm bg-red-500/20 px-1.5 py-0.5 text-red-300"
+                title="The AI judged this comment as spam. Behavior follows ratingMuted + reason; this badge just surfaces the AI's call."
+              >
+                AI: spam
+              </span>
             )}
             {comment.aiIsBrigade && (
               <span class="rounded-sm bg-orange-500/20 px-1.5 py-0.5 text-orange-300">
@@ -315,15 +320,29 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
       }
     </div>
 
-    {/* Rating controls. Only relevant when this comment has a rating that
-        currently counts (or could count) toward the service score.
-        Hidden in compact mode because the embedding row's Context panel
-        shows the same disable/enable button next to the star rating. */}
-    {
-      !compact &&
-        comment.rating !== null &&
-        (comment.status === 'APPROVED' || comment.status === 'VERIFIED') && (
-          <div class="mb-2 flex flex-wrap items-center gap-1.5 border-b border-night-500 pb-2">
+    {/* Mute controls. `ratingMuted` is the unified flag: when true it
+        always disables the rating from counting; when the reason is
+        SUSPICIOUS_PATTERN or TEMPLATE_SPAM it also collapses the comment,
+        adds the "Potential SPAM" badge, and sinks the row to the bottom of
+        the thread (see CommentItem.astro + commentsWithReplies.ts).
+
+        Mute Rating only shows for rated root comments — for replies and
+        unrated comments the only meaningful mute is spam, so the Spam
+        button stands alone there and doubles as a toggle (click an active
+        Spam button to clear the mute). */}
+    {(() => {
+      const canMuteRating = comment.rating !== null && !comment.parentId
+      const isSpamReason =
+        comment.ratingMuted &&
+        (comment.ratingMuteReason === 'TEMPLATE_SPAM' ||
+          comment.ratingMuteReason === 'SUSPICIOUS_PATTERN')
+      return (
+        <div class="mb-2 flex flex-wrap items-center gap-1.5 border-b border-night-500 pb-2">
+          <span class="mr-1 text-[10px] text-day-500">
+            {canMuteRating ? 'Rating:' : 'Mute:'}
+          </span>
+
+          {canMuteRating && (
             <button
               class={cn(
                 'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
@@ -335,33 +354,67 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
               data-value={(!comment.ratingMuted).toString()}
               data-comment-id={comment.id}
               data-user-id={user.id}
-              title="When disabled, this rating no longer counts toward the service score. Pick a reason to determine whether the comment is also visually flagged."
+              title="Mute the rating so it stops counting toward the service score. The comment stays visible unless the reason is also marked as spam."
             >
-              <Icon name="ri:star-off-line" class="size-3.5" />
-              <span>{comment.ratingMuted ? 'Enable rating' : 'Disable rating'}</span>
+              <Icon
+                name={comment.ratingMuted ? 'ri:volume-up-line' : 'ri:volume-mute-line'}
+                class="size-3.5"
+              />
+              <span>{comment.ratingMuted ? 'Unmute Rating' : 'Mute Rating'}</span>
             </button>
+          )}
 
-            {comment.ratingMuted && (
-              <label class="inline-flex items-center gap-1 text-[10px] text-day-500">
-                Reason:
-                <select
-                  class="rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
-                  data-action="rating-mute-reason"
-                  data-comment-id={comment.id}
-                  data-user-id={user.id}
-                  title="Suspicious pattern and Template spam additionally collapse and grey out the comment. Other reasons leave the comment displayed normally."
-                >
-                  {muteReasonOptions.map((opt) => (
-                    <option value={opt.value} selected={comment.ratingMuteReason === opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+          {/* Spam shortcut. In the rated-root context it's purely additive
+              (Mute Rating handles unmuting). In the reply / unrated context
+              it doubles as a toggle: clicking an active Spam button clears
+              the mute entirely, since there's no Mute Rating button to do
+              that job. */}
+          <button
+            class={cn(
+              'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
+              isSpamReason
+                ? 'border border-red-500/30 bg-red-500/20 text-red-400'
+                : 'bg-night-700 hover:bg-red-500/20 hover:text-red-400'
             )}
-          </div>
-        )
-    }
+            data-action={!canMuteRating && isSpamReason ? 'rating-mute' : 'rating-mute-reason'}
+            data-value={!canMuteRating && isSpamReason ? 'false' : 'TEMPLATE_SPAM'}
+            data-comment-id={comment.id}
+            data-user-id={user.id}
+            title={
+              isSpamReason
+                ? canMuteRating
+                  ? 'This comment is currently flagged as spam. Use Unmute Rating to clear, or pick a different reason below.'
+                  : 'Click to clear the spam flag on this comment.'
+                : 'Mark as spam: collapses the comment, adds the SPAM badge, sinks it to the bottom of the thread.'
+            }
+          >
+            <Icon name="ri:spam-2-line" class="size-3.5" />
+            <span>
+              {isSpamReason ? (canMuteRating ? 'Spam' : 'Unmark spam') : 'Mark spam'}
+            </span>
+          </button>
+
+          {comment.ratingMuted && (
+            <label class="inline-flex items-center gap-1 text-[10px] text-day-500">
+              Reason:
+              <select
+                class="rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
+                data-action="rating-mute-reason"
+                data-comment-id={comment.id}
+                data-user-id={user.id}
+                title="Suspicious pattern and Template spam additionally collapse and grey out the comment. Other reasons leave the comment displayed normally."
+              >
+                {muteReasonOptions.map((opt) => (
+                  <option value={opt.value} selected={comment.ratingMuteReason === opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+      )
+    })()}
 
     {/* Rating trust display. Hidden in compact mode (shown in Context panel). */}
     {

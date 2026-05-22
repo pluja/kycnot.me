@@ -79,10 +79,12 @@ const isRatingActive =
 // Only penalty-bearing mute reasons visually suppress the comment.
 // Other mute reasons (affiliated, conflict of interest, moderator discretion,
 // low trust) just take the rating out of the score; the comment still
-// displays normally.
+// displays normally. Pyworker maps the AI's isSpam=true into ratingMuted +
+// TEMPLATE_SPAM, so the AI-spam case flows through this same gate.
 const isPenaltyMute =
   comment.ratingMuted &&
-  (comment.ratingMuteReason === 'SUSPICIOUS_PATTERN' || comment.ratingMuteReason === 'TEMPLATE_SPAM')
+  (comment.ratingMuteReason === 'SUSPICIOUS_PATTERN' ||
+    comment.ratingMuteReason === 'TEMPLATE_SPAM')
 
 const shouldShowRatingTrustBadge =
   comment.rating !== null &&
@@ -91,6 +93,46 @@ const shouldShowRatingTrustBadge =
   !isUserRatingTrustLabel &&
   comment.ratingTrustLabel !== 'Not counted' &&
   comment.ratingTrustLabel !== 'Verified customer'
+
+// Why this rating isn't counting toward the service score. Reaches the
+// user as a tooltip on the strikethrough score so they understand the
+// disabling without us needing a separate badge.
+function ratingInactiveReason() {
+  if (comment.ratingMuted) {
+    switch (comment.ratingMuteReason) {
+      case 'TEMPLATE_SPAM':
+        return 'template spam'
+      case 'SUSPICIOUS_PATTERN':
+        return 'suspicious pattern'
+      case 'AUTHOR_AFFILIATED':
+        return 'author affiliated with this service'
+      case 'AUTHOR_LOW_TRUST':
+        return 'author has low trust'
+      case 'CONFLICT_OF_INTEREST':
+        return 'conflict of interest'
+      case 'MODERATOR_DISCRETION':
+        return 'moderator discretion'
+      default:
+        return null
+    }
+  }
+  // Root review that lost ratingActive: a newer review by the same
+  // author replaced it. The trigger only marks one review active per
+  // author/service pair.
+  if (
+    !comment.ratingActive &&
+    comment.rating !== null &&
+    !comment.parentId &&
+    (comment.status === 'APPROVED' || comment.status === 'VERIFIED')
+  ) {
+    return 'replaced by a newer review'
+  }
+  if (comment.status === 'PENDING') return 'pending moderation'
+  if (comment.status === 'REJECTED') return 'comment rejected'
+  return null
+}
+const ratingReason = ratingInactiveReason()
+const ratingTooltip = ratingReason ? `Rating Disabled: ${ratingReason}` : 'Rating Disabled'
 
 // Skip rendering if comment is not approved/verified and user is not the author or admin/moderator
 const shouldShow =
@@ -206,19 +248,15 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
     </a>
 
     {
-      comment.ratingMuted &&
-        (comment.ratingMuteReason === 'SUSPICIOUS_PATTERN' ||
-        comment.ratingMuteReason === 'TEMPLATE_SPAM' ? (
-          <BadgeSmall icon="ri:spam-2-fill" color="red" text="Potential SPAM" inlineIcon />
-        ) : (
-          <BadgeSmall icon="ri:volume-mute-fill" color="yellow" text="Muted rating" inlineIcon />
-        ))
+      isPenaltyMute && (
+        <BadgeSmall icon="ri:spam-2-fill" color="red" text="Potential SPAM" inlineIcon />
+      )
     }
 
     {
       comment.rating !== null && !comment.parentId && (
         <Tooltip
-          text="Not counting for the total"
+          text={ratingTooltip}
           position="right"
           enabled={!isRatingActive}
           class={cn('flex items-center gap-1', isRatingActive ? 'text-yellow-400' : 'text-day-500')}

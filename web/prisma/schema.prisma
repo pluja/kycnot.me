@@ -91,10 +91,13 @@ model Comment {
   aiDecidedAt         DateTime?
   aiAction            ModerationAction?
   aiQuality           Int?
+  /// Informational only: the AI's spam call, kept for moderator context
+  /// and dataset analysis. Behavior is driven by ratingMuted +
+  /// ratingMuteReason (pyworker maps isSpam=true into TEMPLATE_SPAM).
   aiIsSpam            Boolean?
   aiIsBrigade         Boolean?
   aiBrigadeConfidence Int?
-  /// Raw AI payload for forensics
+  /// Raw AI payload for forensics.
   aiSignals           Json?
   aiReasoning         String?
 
