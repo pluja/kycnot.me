@@ -2,34 +2,62 @@ set dotenv-load
 
 astro_image := env_var_or_default("ASTRO_IMAGE", "codeberg.org/pluja/kycnot/astro")
 pyworker_image := env_var_or_default("PYWORKER_IMAGE", "codeberg.org/pluja/kycnot/pyworker")
-sha := `git rev-parse --short HEAD`
 
 @default:
   just --list
 
-# Build, push, and roll out pre images. SSH target and app dir are read from .env.
-# Pass `nocache` to bypass the docker layer cache (forces fresh dependency fetch).
+# Build & roll out preprod from dev (image tag pre-<8-char-sha>). Mirrors deploy-preprod.yaml. Pass `nocache` to skip the docker layer cache.
 deploy-pre flag="":
   #!/usr/bin/env bash
+  set -euo pipefail
   if [ "{{flag}}" = "nocache" ]; then
     export NOCACHE=yes
   elif [ -n "{{flag}}" ]; then
     echo "Unknown flag: {{flag}} (expected: nocache)" >&2
     exit 1
   fi
-  exec just _deploy pre staging SSH_PRE_TARGET APP_DIR_PRE no
 
-# Build, push, and roll out prod images. Prompts for confirmation.
-# Pass `nocache` to bypass the docker layer cache.
+  current=$(git symbolic-ref --short HEAD)
+  if [ "$current" != "dev" ]; then
+    echo "Preprod deploys must run from dev (currently on $current)." >&2
+    exit 1
+  fi
+
+  short_sha=$(git rev-parse HEAD | cut -c1-8)
+  image_tag="pre-${short_sha}"
+
+  exec just _deploy pre staging SSH_PRE_TARGET APP_DIR_PRE no "$image_tag"
+
+# Build & roll out prod from a v* git tag on master (image tag prod-<tag>). Mirrors deploy-production.yaml. Pass `nocache` to skip the docker layer cache.
 deploy-prod flag="":
   #!/usr/bin/env bash
+  set -euo pipefail
   if [ "{{flag}}" = "nocache" ]; then
     export NOCACHE=yes
   elif [ -n "{{flag}}" ]; then
     echo "Unknown flag: {{flag}} (expected: nocache)" >&2
     exit 1
   fi
-  exec just _deploy prod production SSH_PROD_TARGET APP_DIR_PROD yes
+
+  tag=$(git tag --points-at HEAD | grep '^v' | head -n1 || true)
+  if [ -z "$tag" ]; then
+    next="v$(date +%Y%m%d).1"
+    echo "HEAD has no v* tag. Tag the release commit first, then re-run:" >&2
+    echo "  git tag ${next}    # bump the trailing number for same-day releases" >&2
+    echo "  git push origin ${next}" >&2
+    exit 1
+  fi
+
+  git fetch --quiet origin master
+  if ! git merge-base --is-ancestor "$tag" origin/master; then
+    echo "Tag $tag does not point to a commit on master." >&2
+    echo "Production tags must be on master. Run 'just promote-to-master' first." >&2
+    exit 1
+  fi
+
+  image_tag="prod-${tag}"
+
+  exec just _deploy prod production SSH_PROD_TARGET APP_DIR_PROD yes "$image_tag"
 
 # Fast-forward master to dev and push. Run after a verified prod deploy.
 promote-to-master:
@@ -50,7 +78,7 @@ promote-to-master:
   git push origin master
   git checkout dev
 
-_deploy env mode ssh_var dir_var confirm:
+_deploy env mode ssh_var dir_var confirm image_tag:
   #!/usr/bin/env bash
   set -euo pipefail
 
@@ -83,13 +111,12 @@ _deploy env mode ssh_var dir_var confirm:
     echo
     echo "============================================================"
     echo "  PRODUCTION DEPLOY"
-    echo "  Commit:  {{sha}}"
+    echo "  Tag:     {{image_tag}}"
     echo "  Target:  $ssh_target:$app_dir"
-    echo "  Tags:    {{env}}-{{sha}} (immutable)"
     echo "============================================================"
-    printf "Type 'deploy {{sha}} to prod' to continue: "
+    printf "Type 'deploy {{image_tag}} to prod' to continue: "
     read -r ans
-    if [ "$ans" != "deploy {{sha}} to prod" ]; then
+    if [ "$ans" != "deploy {{image_tag}} to prod" ]; then
       echo "Aborted."
       exit 1
     fi
@@ -105,13 +132,13 @@ _deploy env mode ssh_var dir_var confirm:
   docker build "${build_args[@]}" \
     -f web/Dockerfile \
     --build-arg ASTRO_BUILD_MODE={{mode}} \
-    -t {{astro_image}}:{{env}}-{{sha}} \
+    -t {{astro_image}}:{{image_tag}} \
     .
   docker build "${build_args[@]}" \
-    -t {{pyworker_image}}:{{env}}-{{sha}} \
+    -t {{pyworker_image}}:{{image_tag}} \
     ./pyworker
-  docker push {{astro_image}}:{{env}}-{{sha}}
-  docker push {{pyworker_image}}:{{env}}-{{sha}}
+  docker push {{astro_image}}:{{image_tag}}
+  docker push {{pyworker_image}}:{{image_tag}}
 
   echo
   echo "Syncing Makefile.prod to $ssh_target..."
@@ -119,10 +146,10 @@ _deploy env mode ssh_var dir_var confirm:
 
   echo
   echo "Rolling out on $ssh_target..."
-  ssh "$ssh_target" "bash -s -- '$app_dir' '{{env}}-{{sha}}'" < scripts/deploy-remote.sh
+  ssh "$ssh_target" "bash -s -- '$app_dir' '{{image_tag}}'" < scripts/deploy-remote.sh
 
   echo
-  echo "Deployed {{env}}-{{sha}} to $ssh_target:$app_dir"
+  echo "Deployed {{image_tag}} to $ssh_target:$app_dir"
 
 # Start the development database and redis services
 dev-database:
