@@ -1,5 +1,6 @@
 ---
 import { z } from 'astro/zod'
+import { Icon } from 'astro-icon/components'
 import { groupBy, omit, orderBy, sortBy, uniq } from 'lodash-es'
 import seedrandom from 'seedrandom'
 
@@ -577,8 +578,16 @@ const showFiltersId = 'show-filters'
     </div>
 
     <div class="min-w-0 flex-1">
-      <h1 class="mb-2 text-[11px] font-medium tracking-widest text-day-500 uppercase">
+      <h1 class="mb-2 flex items-center gap-0.5 text-[11px] font-medium tracking-widest text-day-500 uppercase">
         No-KYC crypto services directory
+        <a
+          href="/about"
+          aria-label="About this directory"
+          title="About this directory"
+          class="-m-1.5 rounded-sm p-1.5 text-day-500 transition-colors hover:text-day-300 focus-visible:ring-1 focus-visible:ring-day-300 focus-visible:outline-hidden"
+        >
+          <Icon name="ri:information-line" class="size-3" />
+        </a>
       </h1>
       <ServicesSearchResults
         services={services}

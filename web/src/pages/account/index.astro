@@ -474,7 +474,12 @@ const daysUntilDeletion = user.scheduledDeletionAt
             }
 
             <li>
-              <Button as="a" href="/about#account-verification" label="Request verification" size="sm" />
+              <Button
+                as="a"
+                href="/contact?category=ACCOUNT_VERIFICATION"
+                label="Request verification"
+                size="sm"
+              />
             </li>
           </ul>
         </div>
@@ -488,7 +493,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
         <Icon name="ri:building-4-line" class="mr-2 inline-block size-5" />
         Service Affiliations
       </h2>
-      <Button as="a" href="/contact#account-verification" label="Request" size="md" />
+      <Button as="a" href="/contact?category=ACCOUNT_VERIFICATION" label="Request" size="md" />
     </header>
 
     {

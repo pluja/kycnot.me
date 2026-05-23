@@ -650,9 +650,37 @@ model User {
   serviceAffiliations      ServiceUser[]                @relation("UserServices")
   pushSubscriptions        PushSubscription[]
   apiKeys                  ApiKey[]
+  contactMessages          ContactMessage[]
 
   @@index([createdAt])
   @@index([totalKarma])
+}
+
+enum ContactCategory {
+  ACCOUNT_VERIFICATION
+  SERVICE_REPORT_URGENT
+  BUG
+  OTHER
+}
+
+model ContactMessage {
+  id          Int             @id @default(autoincrement())
+  createdAt   DateTime        @default(now())
+  category    ContactCategory
+  message     String          @db.Text
+  /// Optional reply address provided by the user. Used out-of-band: admins
+  /// copy-paste into their own mail client. The platform does not send mail.
+  replyEmail  String?
+  readAt      DateTime?
+  repliedAt   DateTime?
+  adminNote   String?
+
+  author   User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId Int?
+
+  @@index([createdAt])
+  @@index([readAt])
+  @@index([authorId])
 }
 
 model ApiKey {

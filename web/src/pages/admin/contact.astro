@@ -1,0 +1,319 @@
+---
+import { z } from 'astro/zod'
+import { Icon } from 'astro-icon/components'
+
+import TimeFormatted from '../../components/TimeFormatted.astro'
+import UserBadge from '../../components/UserBadge.astro'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { cn } from '../../lib/cn'
+import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
+import { prisma } from '../../lib/prisma'
+import { urlWithParams } from '../../lib/urls'
+
+import type { ContactCategory, Prisma } from '@prisma/client'
+
+const user = Astro.locals.user
+if (!user || (!user.admin && !user.moderator)) {
+  return Astro.rewrite('/404')
+}
+
+const filterValues = ['unread', 'open', 'all', 'replied'] as const
+
+const { data: params } = zodParseQueryParamsStoringErrors(
+  {
+    filter: z.enum(filterValues).default('unread'),
+  },
+  Astro
+)
+
+const whereByFilter: Record<(typeof filterValues)[number], Prisma.ContactMessageWhereInput> = {
+  unread: { readAt: null },
+  open: { repliedAt: null },
+  all: {},
+  replied: { repliedAt: { not: null } },
+}
+
+const filterLabels: Record<(typeof filterValues)[number], string> = {
+  unread: 'Unread',
+  open: 'Open (no reply)',
+  all: 'All',
+  replied: 'Replied',
+}
+
+const categoryLabels: Record<ContactCategory, string> = {
+  ACCOUNT_VERIFICATION: 'Account verification',
+  SERVICE_REPORT_URGENT: 'Urgent service report',
+  BUG: 'Website bug',
+  OTHER: 'Other',
+}
+
+const categoryColors: Record<ContactCategory, string> = {
+  ACCOUNT_VERIFICATION: 'bg-cyan-500/15 text-cyan-300',
+  SERVICE_REPORT_URGENT: 'bg-red-500/15 text-red-300',
+  BUG: 'bg-amber-500/15 text-amber-300',
+  OTHER: 'bg-zinc-500/15 text-zinc-300',
+}
+
+const [messages = [], counts] = await Astro.locals.banners.tryMany([
+  [
+    'Failed to fetch contact messages',
+    () =>
+      prisma.contactMessage.findMany({
+        where: whereByFilter[params.filter],
+        orderBy: [{ readAt: { sort: 'asc', nulls: 'first' } }, { createdAt: 'desc' }],
+        take: 200,
+        select: {
+          id: true,
+          createdAt: true,
+          category: true,
+          message: true,
+          replyEmail: true,
+          readAt: true,
+          repliedAt: true,
+          adminNote: true,
+          author: {
+            select: {
+              id: true,
+              name: true,
+              displayName: true,
+              picture: true,
+              createdAt: true,
+              totalKarma: true,
+              spammer: true,
+            },
+          },
+        },
+      }),
+    [],
+  ],
+  [
+    'Failed to count contact messages',
+    async () => {
+      const [unread, open, all, replied] = await Promise.all([
+        prisma.contactMessage.count({ where: whereByFilter.unread }),
+        prisma.contactMessage.count({ where: whereByFilter.open }),
+        prisma.contactMessage.count({ where: whereByFilter.all }),
+        prisma.contactMessage.count({ where: whereByFilter.replied }),
+      ])
+      return { unread, open, all, replied }
+    },
+    { unread: 0, open: 0, all: 0, replied: 0 },
+  ],
+])
+---
+
+<BaseLayout pageTitle="Contact messages" widthClassName="max-w-screen-2xl">
+  <div class="mb-4 flex items-baseline justify-between gap-3">
+    <h1 class="font-title text-2xl text-rose-300">&gt; contact.queue</h1>
+  </div>
+
+  <div class="mb-4 flex flex-wrap gap-1.5">
+    {
+      filterValues.map((value) => (
+        <a
+          href={urlWithParams(Astro.url, { filter: value })}
+          class={cn(
+            'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs',
+            params.filter === value
+              ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+              : 'border-zinc-700 hover:border-rose-500/40'
+          )}
+        >
+          <span>{filterLabels[value]}</span>
+          <span class="rounded-sm bg-night-700 px-1.5 py-0.5 text-[10px] text-day-400">
+            {counts[value].toLocaleString()}
+          </span>
+        </a>
+      ))
+    }
+  </div>
+
+  {
+    messages.length === 0 ? (
+      <div class="rounded-md border border-zinc-800 bg-night-800/50 px-3 py-6 text-center text-sm text-zinc-500">
+        No messages in this view.
+      </div>
+    ) : (
+      <ol class="space-y-2">
+        {messages.map((m) => (
+          <li
+            data-contact-message
+            data-message-id={m.id}
+            class={cn(
+              'rounded-md border bg-night-700 p-3 transition-colors',
+              m.readAt ? 'border-zinc-800' : 'border-rose-500/30',
+              m.repliedAt && 'opacity-75'
+            )}
+          >
+            <header class="mb-2 flex flex-wrap items-center gap-2 text-xs">
+              <span class={cn('rounded-sm px-1.5 py-0.5 font-medium', categoryColors[m.category])}>
+                {categoryLabels[m.category]}
+              </span>
+              {m.author ? (
+                <UserBadge user={m.author} size="sm" />
+              ) : (
+                <span class="text-zinc-500">[deleted user]</span>
+              )}
+              <span class="text-zinc-600">·</span>
+              <TimeFormatted date={m.createdAt} hourPrecision class="text-zinc-400" />
+              {m.author && (
+                <span class="text-zinc-500">
+                  · karma {m.author.totalKarma.toLocaleString()}
+                </span>
+              )}
+              {m.replyEmail ? (
+                <span class="ml-auto inline-flex items-center gap-1 rounded-sm bg-night-800 px-2 py-0.5 font-mono text-[11px] text-day-200">
+                  <Icon name="ri:mail-line" class="size-3.5 text-day-500" />
+                  {/* encodeURIComponent on the address neutralizes any "?", "&",
+                      etc. that slipped past validation so the mail client
+                      cannot be tricked into pre-filling a subject or body. */}
+                  <a
+                    href={`mailto:${encodeURIComponent(m.replyEmail)}`}
+                    class="hover:text-rose-300 hover:underline"
+                  >
+                    {m.replyEmail}
+                  </a>
+                </span>
+              ) : (
+                <span class="ml-auto text-[11px] text-zinc-500">no reply email</span>
+              )}
+            </header>
+
+            <pre class="mb-3 whitespace-pre-wrap rounded-sm bg-night-900 p-3 text-sm leading-relaxed text-day-200 font-sans">{m.message}</pre>
+
+            <div class="mb-2 flex flex-wrap items-center gap-1">
+              <button
+                type="button"
+                class={cn(
+                  'inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs transition-colors',
+                  m.readAt
+                    ? 'border border-zinc-600 bg-night-800 text-zinc-300'
+                    : 'bg-night-800 hover:bg-rose-500/20 hover:text-rose-300'
+                )}
+                data-contact-action="mark-read"
+                data-value={(!m.readAt).toString()}
+                data-message-id={m.id}
+              >
+                <Icon name={m.readAt ? 'ri:check-double-line' : 'ri:check-line'} class="size-3.5" />
+                <span>{m.readAt ? 'Read' : 'Mark read'}</span>
+              </button>
+
+              <button
+                type="button"
+                class={cn(
+                  'inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs transition-colors',
+                  m.repliedAt
+                    ? 'border border-green-500/40 bg-green-500/10 text-green-300'
+                    : 'bg-night-800 hover:bg-green-500/20 hover:text-green-300'
+                )}
+                data-contact-action="mark-replied"
+                data-value={(!m.repliedAt).toString()}
+                data-message-id={m.id}
+              >
+                <Icon name="ri:reply-line" class="size-3.5" />
+                <span>{m.repliedAt ? 'Replied' : 'Mark replied'}</span>
+              </button>
+
+              <button
+                type="button"
+                class="ml-auto inline-flex items-center gap-1 rounded-sm bg-night-800 px-2 py-0.5 text-xs text-zinc-400 hover:bg-red-500/20 hover:text-red-300"
+                data-contact-action="delete"
+                data-message-id={m.id}
+              >
+                <Icon name="ri:delete-bin-line" class="size-3.5" />
+                <span>Delete</span>
+              </button>
+            </div>
+
+            <label class="block">
+              <span class="mb-1 block text-[10px] text-day-500">Admin note (internal)</span>
+              <textarea
+                rows="2"
+                placeholder="Notes for other moderators..."
+                class="field-sizing-content w-full resize-y rounded-sm border border-night-500 bg-night-800 px-2 py-1 text-xs leading-snug outline-hidden focus:ring-1 focus:ring-rose-500"
+                data-contact-note
+                data-message-id={m.id}>{m.adminNote ?? ''}</textarea>
+            </label>
+          </li>
+        ))}
+      </ol>
+    )
+  }
+</BaseLayout>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Contact queue controls. Wires the per-message buttons  //
+  // and admin-note textarea to admin.contact.update, then  //
+  // reloads on status-changing actions.                    //
+  ////////////////////////////////////////////////////////////
+  import { actions } from 'astro:actions'
+
+  const RELOAD_ACTIONS = new Set(['mark-read', 'mark-replied', 'delete'])
+
+  document.addEventListener('astro:page-load', () => {
+    document
+      .querySelectorAll<HTMLButtonElement>('button[data-contact-action]')
+      .forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const action = btn.getAttribute('data-contact-action')
+          const rawValue = btn.getAttribute('data-value')
+          const messageId = parseInt(btn.getAttribute('data-message-id') || '0')
+
+          if (!action || !messageId) return
+
+          if (action === 'delete') {
+            if (!confirm('Delete this message permanently?')) return
+            const { error } = await actions.admin.contact.update({
+              messageId,
+              action: 'delete',
+            })
+            if (error) {
+              console.error('Error deleting message:', error)
+              return
+            }
+            window.location.reload()
+            return
+          }
+
+          const value = rawValue === 'true'
+          const { error } = await actions.admin.contact.update({
+            messageId,
+            action: action as 'mark-read' | 'mark-replied',
+            value,
+          })
+
+          if (error) {
+            console.error('Error updating message:', error)
+            return
+          }
+
+          if (RELOAD_ACTIONS.has(action)) {
+            window.location.reload()
+          }
+        })
+      })
+
+    document
+      .querySelectorAll<HTMLTextAreaElement>('textarea[data-contact-note]')
+      .forEach((textarea) => {
+        const messageId = parseInt(textarea.getAttribute('data-message-id') || '0')
+        if (!messageId) return
+
+        let timeout: ReturnType<typeof setTimeout>
+        textarea.addEventListener('input', () => {
+          clearTimeout(timeout)
+          timeout = setTimeout(async () => {
+            const { error } = await actions.admin.contact.update({
+              messageId,
+              action: 'admin-note',
+              value: textarea.value,
+            })
+            if (error) {
+              console.error('Error saving admin note:', error)
+            }
+          }, 500)
+        })
+      })
+  })
+</script>

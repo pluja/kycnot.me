@@ -2,7 +2,7 @@
 layout: ../layouts/MarkdownLayout.astro
 title: About KYCnot.me
 pageTitle: No-KYC Crypto Directory - About & Our Mission
-updatedAt: 2026-05-07
+updatedAt: 2026-05-23
 description: 'Learn what KYCnot.me is, how we score and verify crypto services, what KYC verification means for users, and our ongoing mission to protect financial privacy.'
 icon: 'ri:information-line'
 ---
@@ -13,6 +13,7 @@ import DonationAddress from '../components/DonationAddress.astro'
 - [Why does this site exist?](#why-does-this-site-exist)
 - [Why only Bitcoin and Monero?](#why-only-bitcoin-and-monero)
 - [User Accounts](#user-accounts)
+  - [User Karma](#user-karma)
   - [Verified and Affiliated Users](#verified-and-affiliated-users)
 - [Listings](#listings)
   - [Suggesting a new listing](#suggesting-a-new-listing)
@@ -21,7 +22,7 @@ import DonationAddress from '../components/DonationAddress.astro'
   - [Trust weighted ratings](#trust-weighted-ratings)
   - [Moderation](#moderation)
 - [API](#api)
-- [Donate](#support)
+- [Donate](#donate)
 - [Contact](#contact)
 - [Social Networks](#social-networks)
 - [Downloads and Assets](#downloads-and-assets)
@@ -74,6 +75,16 @@ Users earn karma by participating in the community. When your comments get appro
 
 **Affiliated users** are users who represent a service listed in the directory, such as owners, support staff, or team members. If you represent a service and want to become affiliated, you can request it [in your profile](/account).
 
+#### Account verification
+
+To prove your account represents a listed service:
+
+1. Add a TXT record to the service's domain with the value `kycnotme-verify=<your-username>`, replacing `<your-username>` with your KYCnot.me username.
+2. [Send a verification request](/contact?category=ACCOUNT_VERIFICATION) including your KYCnot.me username and the domain where the TXT record is published.
+3. Once we confirm the TXT record matches your username, we'll mark your account as affiliated with the service.
+
+The TXT record can be removed after we confirm. The affiliation persists.
+
 ## Listings
 
 ### Suggesting a new listing
@@ -91,18 +102,20 @@ To list a new service, it must fulfill these requirements:
 - Terms of service or FAQ document
 - The service must have been operating for at least 6 months.
 
-KYCnot.me focuses on end-user services and tools, not meta-services. A plain directory, review site, or ranking page about other services is not eligible. We avoid recursive directory-of-directories listings because they can be confusing for users who come to KYCnot.me to search for a service.
+KYCnot.me focuses on end-user services and tools, not meta-services. We avoid recursive directory-of-directories listings because they confuse users who come here to find a service.
 
-Examples of non-valid services:
+**Not eligible:**
 
-- A cryptocurrency project
-- A cryptocurrency wallet
-- A plain directory, review page, ranking site, or other website whose main purpose is listing other services
-- A chat link, forum post, or similar page without any actual product or feature
+- A cryptocurrency project.
+- A cryptocurrency wallet.
+- A plain directory, review page, ranking site, or other website whose main purpose is listing other services.
+- A chat link, forum post, or similar page without any actual product or feature.
 
 #### Suggestion Review Process
 
 When you submit a new service, it gets the `COMMUNITY_CONTRIBUTED` status and the `unlisted` visibility level. The service **will not appear in search results**, but it can be viewed with a direct link.
+
+> **Reviews are not on a schedule.** Approvals and upgrades happen when we are confident in the evidence, not on a fixed cadence. That can take weeks or months, and some stages may sit untouched until we decide to revisit them. Asking about timing does not move a service forward.
 
 ##### First Review (Unlisted -> Public)
 
@@ -110,70 +123,56 @@ When you submit a new service, it gets the `COMMUNITY_CONTRIBUTED` status and th
 - If the listing passes this initial check, it becomes **publicly visible** to all users.
 - At this stage, the listing is **Community Contributed** and will show a disclaimer.
 
-> Allow up to a week for the initial review. As a small team of two volunteers, we have to handle a large number of suggestions alongside our other life commitments.
-
 ##### Second Review (Community Contributed -> Approved)
 
-`APPROVED` means we did a **limited, recent review** and found enough **public history** to treat the service as more than just an unknown listing. It does **not** mean the service is fully trusted, future-proof, or safe from later exit scams.
+**Approved** means we did a limited, recent review and found enough public history to treat the service as more than just an unknown listing. It does **not** mean the service is fully trusted, future-proof, or safe from a later exit scam.
 
-We are intentionally strict here. `APPROVED` services are shown more prominently, and many users naturally trust them more. Because of that, a clean-looking website is **not enough**, and a few recent successful tests are **not enough** either. If a service has **little or no public history**, it will usually stay `COMMUNITY_CONTRIBUTED` until more evidence exists.
+We are intentionally strict here. Approved services show more prominently and users naturally trust them more. Because of that, a clean-looking website is not enough, and a few recent successful tests are not enough either. If a service has little or no public history, it usually stays Community Contributed until more evidence exists.
 
-In simple terms: `APPROVED` is for services that look real **both on their own site and outside of it**.
+In short: Approved is for services that look real both on their own site and outside of it.
 
-To be upgraded to `APPROVED`, the service should generally meet these conditions:
+A service is generally eligible for Approved when all of the following hold:
 
-- The service is eligible for listing and clear enough for users to understand.
+- It meets the [listing requirements](#listing-requirements).
 - It has been operating for at least **6 months**.
-- It has **working public contact methods** when contact is claimed or expected.
+- Its public contact methods work, when contact is claimed or expected.
 - Its public information and ToS are clear enough to review and do not seriously contradict each other.
-- It has some **real public track record** over time, such as user feedback, public discussion, community mentions, or other independent signs that it is a real and active service.
-- We completed at least **3 successful core-service tests** on **3 non-consecutive dates**.
-- Those successful tests span at least **14 days**.
-- Support replied satisfactorily at least **once**, when support exists.
-- There are **no serious contradictions** between our review results and the service's public reputation or user feedback.
-- There are **no credible unresolved links** to scams, stolen funds, abuse, or other serious public red flags.
-- There are **no unresolved high-severity reports** at review time.
+- It has a real public track record over time: user feedback, public discussion, community mentions, or other independent signs that it is a real and active service.
+- We completed at least **3 successful core-service tests** on **3 non-consecutive dates**, spanning at least **14 days**.
+- Support replied satisfactorily at least once, when support exists.
+- There are no serious contradictions between our review results and the service's public reputation or user feedback.
+- There are no credible unresolved links to scams, stolen funds, abuse, or other serious public red flags.
+- There are no unresolved high-severity reports at review time.
 - Evidence for the checks is logged publicly in the service verification section.
 
-What we require is enough credible, organic evidence that the service is real, active, and not just a fresh listing with no public history. This does not need to come from one specific website or platform.
+For swaps and exchanges these tests will usually be swaps; for VPNs, VPS providers, AI providers, and other categories the tests should match the core user workflow.
 
-If a service works in a few tests but has almost no public history, no real user feedback, or unresolved serious red flags, it will usually stay `COMMUNITY_CONTRIBUTED` until more evidence exists.
-
-For swap or exchange services, these tests will often be swaps. For VPNs, VPS providers, AI providers, and other categories, the tests should match the core user workflow of that service.
-
-Public wording for `APPROVED`:
+Public wording for Approved:
 
 > Passed limited checks on specific dates and showed enough public history for approval. This does not guarantee future safety.
 
 ##### Final Review (Approved -> Verified)
 
-`VERIFIED` means the service showed **consistent behavior over time** and kept passing repeated checks. It does **not** mean the service is fully trusted, future-proof, or incapable of exit scamming later.
+**Verified** means the service showed consistent behavior over time and kept passing repeated checks. It does **not** mean the service is fully trusted, future-proof, or incapable of an exit scam later.
 
-This status is stricter than `APPROVED`. `APPROVED` means we saw enough evidence to move the service out of the "unknown" category. `VERIFIED` means the service kept behaving consistently over a longer period of time, both in our own checks and in what we can observe publicly.
+This status is stricter than Approved. Approved means we saw enough evidence to move the service out of the "unknown" bucket. Verified means the service kept behaving consistently over a longer period, both in our own checks and in what we can observe publicly.
 
-To be upgraded from `APPROVED` to `VERIFIED`, the service should generally meet these conditions:
+A service is generally eligible for Verified when all of the following hold:
 
-- It is already `APPROVED`.
-- At least **90 days** passed since the initial approval.
-- We completed at least **6 successful core-service tests** across at least **4 distinct dates**.
-- Those checks show **consistent behavior over time**, not just one good period.
+- It is already Approved.
+- At least **90 days** have passed since initial approval.
+- We completed at least **6 successful core-service tests** across at least **4 distinct dates**, showing consistent behavior over time rather than one good period.
 - We had at least **2 successful support interactions** on separate dates, when support is offered or expected.
-- The service still shows **ongoing public history**, user feedback, or other independent signs of active operation.
-- There are **no credible unresolved links** to scams, stolen funds, abuse, blocked-funds patterns, or other serious public red flags.
-- There are **no serious contradictions** between our review results and public user feedback.
+- The service still shows ongoing public history, user feedback, or other independent signs of active operation.
+- There are no credible unresolved links to scams, stolen funds, abuse, blocked-funds patterns, or other serious public red flags.
+- There are no serious contradictions between our review results and public user feedback.
 - Review evidence was refreshed recently and is logged publicly.
 
-For swap or exchange services, these tests will often be swaps. For VPNs, VPS providers, AI providers, and other categories, the tests should match the core user workflow of that service.
+Verified is not permanent. If serious new evidence appears later, the status can be removed or downgraded.
 
-`VERIFIED` is not permanent. If serious new evidence appears later, the status can be removed or downgraded.
-
-Public wording for `VERIFIED`:
+Public wording for Verified:
 
 > Passed repeated checks over time and kept showing consistent behavior. This is still not a guarantee.
-
-##### Failed Verifications (Scams)
-
-If the data is not accurate, the service is a scam, or any other checks fail, the service will be rejected and will appear with a disclaimer.
 
 #### Verification Steps
 
@@ -240,99 +239,81 @@ You can also take a look at the [global timeline](/events) where you will find a
 
 ### Listing Statuses
 
-> **Note on legacy listings**: Some services were listed and granted `Approved` or `Verified` under the site's earlier review standards, before the current check-publishing requirements existed. They remain listed because they have operated for years without scam reports, blocked-funds patterns, or other unresolved red flags, and have a recognized presence in the privacy community (sponsorships, mentions, long-term user base). **Published check history will be backfilled for these services over time.** Until then, treat the absence of evidence as missing information, not endorsement, and do your own research.
+Each service has one status. Upgrade criteria for **Approved** and **Verified** live in [Suggestion Review Process](#suggestion-review-process); the descriptions below summarize what the status means for a reader.
+
+> **Legacy listings.** Some services were granted Approved or Verified under earlier standards, before the current check-publishing requirements existed. They remain listed because they have a long, clean public history. Published check history will be backfilled over time. Until then, treat the absence of evidence as missing information, not endorsement.
 
 #### **Unlisted**
 
-Initial state after the service is submitted. The service will **not appear in the list or search results**. Only accessible with a **direct link**. An **initial review** is done by the team to ensure the service is **not spam or inappropriate**.
+Initial state after submission. The service does not appear in the list or search results and is only reachable via a direct link. We do an initial check for spam and basic eligibility before promoting it.
 
 #### **Community Contributed**
 
-The service is **listed** in the directory, but it has **not been reviewed** by our team. The information **may be inaccurate, incomplete, or fraudulent**. Users should use these services **with caution**.
+The service is listed but not yet reviewed by our team. The information may be inaccurate, incomplete, or fraudulent. Use with caution.
 
 #### **Approved**
 
-The service passed a **limited, recent review**. Upgrade requirements:
-
-- Meets the [listing requirements](/about#listing-requirements).
-- Operating for at least **6 months**.
-- At least **3 successful core-service tests** on **3 non-consecutive dates**.
-- Those tests span at least **14 days**.
-- Support replied satisfactorily at least **once**, when support exists.
-- No unresolved **high-severity reports** at review time.
-- Evidence logged publicly in the verification section.
-
-For swap or exchange services, these tests will often be swaps. For VPNs, VPS providers, AI providers, and other categories, they should match the core user workflow.
-
-This status reflects **specific checks on specific dates**, not a long-term safety guarantee.
+The service passed a limited, recent review (see [criteria](#second-review-community-contributed---approved)). This reflects specific checks on specific dates, not a long-term safety guarantee.
 
 #### **Verified**
 
-The service showed **consistent behavior over time** after already being approved. Upgrade requirements:
-
-- Already **Approved**.
-- At least **90 days** since initial approval.
-- At least **6 successful core-service tests** across **4 or more dates**.
-- At least **2 satisfactory support interactions** on separated dates, when support exists.
-- No unresolved **scam** or **blocked-funds** pattern.
-- No serious contradictions in public reports.
-- Review evidence refreshed recently and logged publicly.
-
-For swap or exchange services, these tests will often be swaps. For VPNs, VPS providers, AI providers, and other categories, they should match the core user workflow.
-
-This is **stronger than Approved**, but it is **still not a guarantee** against future problems or exit scams.
+The service kept passing checks and showing consistent behavior over a longer period (see [criteria](#final-review-approved---verified)). Stronger than Approved, but still not a guarantee against future problems or exit scams.
 
 #### **Scam**
 
-The service is a **scam**. User reports, negative reviews, or **failed internal testing** and other red flags were found. Evidence is provided in the **verification section** of the service page.
+The service is a scam. User reports, negative reviews, failed internal testing, or other red flags were found. Evidence lives in the service page's verification section.
 
 #### **Archived**
 
-The service is **no longer available**. It may have been **shut down, acquired, or otherwise discontinued**. Still **visible** in the directory **for reference**.
+The service is no longer available. It may have been shut down, acquired, or otherwise discontinued. Still visible in the directory for reference.
 
 ## Reviews and Comments
 
-Reviews are comments with a one to five star rating for the service. You can post more than one review for the same service, but only one rating per user counts. Usually, the latest approved review is the one that affects the score.
+A **comment** is any post on a service page. A **review** is a comment that also carries a one-to-five star rating. You can post multiple reviews for the same service; only the latest active one is shown as your current rating.
 
-You can also post regular comments to share your experience, ask questions, or discuss the service.
+If you've used the service, you can attach an **order ID** or other private proof, visible only to moderators. You can also **flag** a comment as reporting a KYC issue or blocked funds.
 
-If you've used the service, you can add an **order ID** or proof. This is only visible to admins for verification. You can also **flag** comments for issues like blocked funds or KYC requirements.
+### Reviews do not move the service score
 
-Some reviews may be unreliable. Read comments carefully and **always do your own research before making decisions**.
+This is important to understand:
 
-### Trust weighted ratings
+- The public **Privacy / Trust / Overall** scores come entirely from a service's **[attributes](/attributes)** and verification metadata. User reviews and ratings have no input into that formula.
+- User ratings are displayed separately on the service page, as a trust-weighted average. They give a community-driven signal alongside the score; they do not change the score.
 
-User ratings are trust weighted. A five star review from a long-time active user should not count the same as a five star review from an account created five minutes ago.
+Reviews are easy to game in both directions, by competitors, affiliates, or coordinated groups. We try to make abuse harder and we moderate, but a fake review is rarely something we can prove. **Read comments carefully and do your own research before deciding.**
 
-Reviews from established users, verified reviews, and comments with approved private proof carry more weight. New accounts, low activity accounts, suspicious comments, and service-affiliated accounts have less influence. Some ratings do not count at all.
+### Trust-weighted display rating
 
-Creating an account is very easy and costs almost no effort. We have seen people create accounts only to push a service, attack a competitor, or win an argument. Because of that, the trust weighting does most of the work: a fresh account can comment right away, but its rating barely moves the score until the account has some real history.
+The displayed average rating is weighted by per-reviewer trust, so a five-star review from a long-time active user counts more than a five-star review from an account created five minutes ago.
 
-When the system detects a coordinated wave of similar comments from many fresh accounts on the same service, those comments are marked as suspicious automatically. The text usually stays visible, but the star ratings are not counted. A moderator reviews each suspicious comment afterward.
+Reviews from established users, verified accounts, and comments with approved private proof carry more weight. New accounts, low-activity accounts, suspicious comments, and service-affiliated accounts carry less. Some ratings do not count at all.
 
-When possible, the comment stays visible even if the rating is disabled. You can still read it, check the context, and make up your own mind. Each review shows its rating weight next to the stars.
+When the system detects a coordinated wave of similar comments from fresh accounts on the same service, those comments are auto-muted: the text usually stays visible, but the star ratings are not counted. A human moderator reviews each one afterward.
 
-Comments can be sorted by Newest, Upvoted, Lowest, Highest, or Trusted. Upvoted appears only when comments have upvotes. Trusted sorts by review trust weight.
+If a service does not have enough trusted feedback yet, the page says so instead of showing a weak average.
 
-User badges add context. New account means the account was created recently. Single review means the user has only made that comment. Active user and Trusted user are based on account activity.
-
-If a service does not have enough trusted feedback yet, KYCnot.me says so instead of showing a weak score.
+Each review shows its rating weight next to the stars. Comments can be sorted by Newest, Upvoted, Lowest, Highest, or Trusted (sorted by review trust weight). User badges add context: New account, Single review, Active user, Trusted user.
 
 ### Moderation
 
-**Every comment is checked.** An AI reads each new comment with the surrounding context: the service, recent activity, and signals like account age and comment similarity to others posted nearby. Most comments are useful, so the default is to publish quickly: if the AI sees no problems, the comment goes live. Obvious spam is rejected outright. Anything ambiguous, anything making serious claims (KYC issues, blocked funds, scam allegations), and anything that the AI detects as part of a coordinated wave is held for a human moderator. The AI never has the last word on a comment that includes private proof.
+Moderation is **light and best-effort.** We do not promise to catch every bad comment, and we do not pretend to.
 
-We only remove comments that do not follow the guidelines. KYCnot.me is not a forum; comments exist to help users understand services.
+The flow is two-stage:
 
-Comments from [**users affiliated with a service**](/about#verified-and-affiliated-users) are automatically approved on their own service page.
+1. **AI first.** Every new comment is read by an AI with the surrounding context: the service, recent activity, account age, and similarity to other recent comments. The AI takes the decision when it is clearly safe to approve or clearly trash to reject.
+2. **Human on holds.** When the AI is not confident, or when the comment includes private proof, claims KYC issues, claims blocked funds, or looks like part of a coordinated wave, it is held for a human moderator.
 
-To **see comments waiting for moderation**, toggle the switch in the comments section. These comments show up with a yellow background and a "pending" label.
+The AI never has the last word on a comment that includes private proof.
+
+Comments from [users affiliated with a service](#verified-and-affiliated-users) are automatically approved on their own service page.
+
+To see comments waiting for moderation on a service, toggle the switch in the comments section. Pending comments show on a yellow background with a "pending" label.
 
 #### Comment Guidelines
 
-Moderation uses a simple rule: comments should help other users understand the service. First-hand experiences are best. Questions, corrections, and useful replies are also welcome.
+The rule is simple: comments should help other users understand the service. First-hand experiences are best. Questions, corrections, and useful replies are welcome.
 
-We reject comments that contain:
+Comments are rejected when they contain:
 
 - Spam, promotion, or coordinated campaigns.
 - Doxxing, threats, harassment, or private personal information.
@@ -341,27 +322,23 @@ We reject comments that contain:
 - Content unrelated to the service.
 - Personal fights or arguments that do not help other users.
 
-For reviews with a star rating, we apply an extra rule: the rating should reflect your own experience with the service.
-
-A fake or unreliable review is not always easy to prove. We usually treat a rating as unreliable when it looks like the user did not use the service, when the same story appears from several new accounts, when it reads like advertising, when it attacks a competitor without details, or when the account is affiliated with the service and does not say so.
-
-A rating may be disabled if:
+For reviews with a star rating, the rating should reflect your own experience with the service. A rating may be muted (the comment stays visible, the stars don't count) when:
 
 - The review is not based on first-hand use.
 - The review makes serious claims without enough detail.
 - The review is mainly about politics, drama, or another user.
-- The review is from an affiliated account.
-- The review looks coordinated, promotional, or made to manipulate the score.
+- The review comes from an affiliated account that did not disclose the relationship.
+- The review looks coordinated, promotional, or aimed at manipulating the average.
 
-Disabling a rating does not always mean the comment is bad. It means we do not want that star rating changing the public score.
+Muting a rating does not mean the comment is bad. It means we do not want that star rating shifting the public average.
 
 ## API
 
 You can access service data through our [API](/docs/api). An **API key** is required for all requests. You can create one from your [account settings](/account/api-keys) once an admin has granted you access.
 
-## Support
+## Donate
 
-You can **support** our work through these methods:
+You can **donate** to support our work:
 
 <DonationAddress
   cryptoName="Monero"
@@ -373,22 +350,22 @@ You can **support** our work through these methods:
 
 ## Contact
 
-The only official communication channel is via [Matrix](https://matrix.org) at:
+New approvals and verification upgrades happen only when I'm personally confident about a service, and that takes time. Pinging us about it does not move it forward.
 
-<pre class="select-all">@kycnot:4d2.org</pre>
+Use the right channel for what you need:
 
-<small>*Other communication channels (`XMPP, Mail, SimpleX`) have been removed due to spam and abuse.*</small>
+- **Suggest a new service**: [service suggestion form](/service-suggestion/new). Submissions get a tracking page where moderators reply. Use this channel for any inquiries about your service listing.
+- **Edit or report an issue with a listed service**: use the edit link on the service page itself and create an Edit Suggestion.
+- **Asking about listing, approval, or verification timing**: the answer is in [Listings](#listings). We can't give estimates.
+- **Anything else that genuinely needs a human**: [contact form](/contact). Expect a reply within a few days, or none if your question is already answered above.
 
-#### About Matrix
+### What we don't do
 
-Matrix is an open, decentralized protocol for secure, real-time communication. Much like email, it supports federation, allowing users on different servers to communicate seamlessly using end-to-end encryption.
+We don't mediate between you and a service. We can't recover funds, unlock accounts, push a service to refund you, or settle individual disputes. Those are between you and the service.
 
-- [List of open public Matrix instances](https://servers.joinmatrix.org/)
-- Recommended client: [Element](https://element.io/download)
+The only reports we act on are **exit scams** and **terms-of-service violations**. We have no leverage beyond what we publish.
 
-### Account verification
-
-To verify that your account is linked to one of the listed services, please [contact us](#contact) and provide supporting evidence that you are part of the team, or the admin of the service. Make sure you also share your username.
+> You may notice direct contact channels are gone. The pattern was always the same: services chasing us about when they'd be listed, approved, or reviewed, sometimes with offers to pay for priority, which will never be accepted. Our last email address was buried in spam, SimpleX was brigaded by anonymous accounts, and Element became the latest channel to fall to the same pattern.
 
 ## Social Networks
 

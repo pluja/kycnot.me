@@ -1,0 +1,234 @@
+---
+import { ContactCategory } from '@prisma/client'
+import { Icon } from 'astro-icon/components'
+import { actions, isInputError } from 'astro:actions'
+
+import Captcha from '../../components/Captcha.astro'
+import InputCardGroup from '../../components/InputCardGroup.astro'
+import InputCheckbox from '../../components/InputCheckbox.astro'
+import InputHoneypotTrap from '../../components/InputHoneypotTrap.astro'
+import InputSubmitButton from '../../components/InputSubmitButton.astro'
+import InputText from '../../components/InputText.astro'
+import InputTextArea from '../../components/InputTextArea.astro'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { makeLoginUrl } from '../../lib/redirectUrls'
+import { CONTACT_MESSAGE_MAX_LENGTH, CONTACT_MESSAGE_MIN_LENGTH } from '../../actions/contact'
+
+const user = Astro.locals.user
+if (!user) {
+  return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Log in to send us a message' }))
+}
+
+const result = Astro.getActionResult(actions.contact.send)
+if (result && !result.error) {
+  return Astro.redirect('/contact/sent')
+}
+const inputErrors = isInputError(result?.error) ? result.error.fields : {}
+const submitError = result?.error && !isInputError(result.error) ? result.error.message : null
+
+// Optional ?category=… deep-link pre-selects a category card so links from
+// other pages (account → verification, etc.) land on the right one and
+// surface its category-specific help panel immediately.
+const categoryParam = Astro.url.searchParams.get('category')
+const preselectedCategory =
+  categoryParam && categoryParam in ContactCategory ? categoryParam : undefined
+
+const categoryOptions = [
+  {
+    value: 'ACCOUNT_VERIFICATION',
+    label: 'Account verification',
+    icon: 'ri:verified-badge-line',
+    description:
+      'Mark your account as affiliated with a listed service. Publish a TXT record first ([how-to](/about#account-verification)) and include the domain in your message.',
+  },
+  {
+    value: 'SERVICE_REPORT_URGENT',
+    label: 'Urgent service report',
+    icon: 'ri:alarm-warning-line',
+    description: 'An active scam, exit, or compromise that **cannot wait** for an edit suggestion.',
+  },
+  {
+    value: 'BUG',
+    label: 'Website bug',
+    icon: 'ri:bug-line',
+    description: 'Something on the site is broken.',
+  },
+  {
+    value: 'OTHER',
+    label: 'Other',
+    icon: 'ri:question-line',
+    description: "Doesn't fit any of the above.",
+  },
+]
+---
+
+<BaseLayout
+  pageTitle="Contact"
+  description="Send a message to the KYCnot.me team. Read the rules before submitting."
+  noindex
+  ogImage={{
+    template: 'generic',
+    title: 'Contact',
+    description: 'Send a message to the KYCnot.me team',
+    icon: 'ri:mail-line',
+  }}
+  widthClassName="max-w-3xl"
+>
+  <h1 class="font-title mt-8 mb-6 text-center text-3xl font-bold">Contact</h1>
+
+  <section
+    class="mb-6 space-y-2 rounded-md border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm text-day-300"
+  >
+    <header class="flex items-center gap-2 text-yellow-300">
+      <Icon name="ri:alert-line" class="size-4" />
+      <span class="text-[11px] font-semibold tracking-wider uppercase">Rules</span>
+    </header>
+
+    <p class="flex items-start gap-2">
+      <Icon name="ri:close-circle-line" class="mt-0.5 size-4 shrink-0 text-yellow-400" />
+      <span>
+        <strong class="text-yellow-300">Repeated questions will be ignored.</strong>
+        Read the <a href="/about" class="underline hover:text-yellow-200">About page</a> before you write.
+      </span>
+    </p>
+    <p class="flex items-start gap-2">
+      <Icon name="ri:time-line" class="mt-0.5 size-4 shrink-0 text-yellow-400" />
+      <span>
+        <strong class="text-yellow-300">No timelines.</strong>
+        We don't estimate listings, approvals, or verifications. See the
+        <a href="/about#listings" class="underline hover:text-yellow-200">listing process</a>.
+      </span>
+    </p>
+    <p class="flex items-start gap-2">
+      <Icon name="ri:customer-service-2-line" class="mt-0.5 size-4 shrink-0 text-yellow-400" />
+      <span>
+        <strong class="text-yellow-300">No mediation.</strong> Only
+        <strong>exit scams</strong> and <strong>ToS violations</strong> get action. Otherwise, contact the service
+        provider.
+      </span>
+    </p>
+    <p class="flex items-start gap-2">
+      <Icon name="ri:add-circle-line" class="mt-0.5 size-4 shrink-0 text-yellow-400" />
+      <span>
+        <strong class="text-yellow-300">Suggesting a service?</strong>
+        Use the <a href="/service-suggestion/new" class="underline hover:text-yellow-200">suggestion form</a>,
+        not this one.
+      </span>
+    </p>
+    <p class="flex items-start gap-2">
+      <Icon name="ri:edit-line" class="mt-0.5 size-4 shrink-0 text-yellow-400" />
+      <span>
+        <strong class="text-yellow-300">Reporting a service issue?</strong>
+        Use the <strong>Edit</strong> link on the service page, or leave a comment.
+      </span>
+    </p>
+    <p class="flex items-start gap-2">
+      <Icon name="ri:mail-line" class="mt-0.5 size-4 shrink-0 text-yellow-400" />
+      <span>
+        <strong class="text-yellow-300">Want a reply?</strong>
+        Email is optional, but required if you want one back.
+      </span>
+    </p>
+  </section>
+
+  {
+    submitError && (
+      <div class="mb-4 rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+        {submitError}
+      </div>
+    )
+  }
+
+  <form method="POST" action={actions.contact.send} class="space-y-6" data-contact-form>
+    <InputCardGroup
+      name="category"
+      label="What is this about?"
+      options={categoryOptions}
+      selectedValue={preselectedCategory}
+      cardSize="md"
+      iconSize="md"
+      required
+      error={inputErrors.category}
+    />
+
+    {
+      /* Category-specific help. Hidden by default; the scoped <style>
+        below shows it via CSS :has() when the matching radio is
+        selected. No JS needed. */
+    }
+    <aside
+      data-category-help="ACCOUNT_VERIFICATION"
+      class="rounded-md border border-blue-500/30 bg-blue-500/5 p-4 text-sm text-day-300"
+    >
+      <header class="mb-2 flex items-center gap-2 text-blue-300">
+        <Icon name="ri:verified-badge-line" class="size-4" />
+        <span class="text-[11px] font-semibold tracking-wider uppercase">Before you send this</span>
+      </header>
+      <ol class="ml-5 list-decimal space-y-1">
+        <li>
+          Add a TXT record on your service's domain with value
+          <code class="rounded-sm bg-night-800 px-1 py-0.5 font-mono text-xs text-blue-200"
+            >kycnotme-verify=&lt;your-username&gt;</code
+          >.
+        </li>
+        <li>Include the domain in your message below.</li>
+      </ol>
+      <p class="mt-2 text-xs text-day-500">
+        <a href="/about#account-verification" class="underline hover:text-blue-200">Full how-to</a>.
+      </p>
+    </aside>
+
+    <InputTextArea
+      label="Message"
+      name="message"
+      description={`Minimum ${CONTACT_MESSAGE_MIN_LENGTH.toLocaleString()} characters. Be specific.`}
+      inputProps={{
+        rows: 10,
+        required: true,
+        minlength: CONTACT_MESSAGE_MIN_LENGTH,
+        maxlength: CONTACT_MESSAGE_MAX_LENGTH,
+        placeholder: 'Include service names, links, and any details needed to act on this.',
+      }}
+      error={inputErrors.message}
+    />
+
+    <InputText
+      label="Reply email (optional)"
+      name="replyEmail"
+      description="Required if you want a reply. Leave blank if you just want us to read."
+      inputProps={{
+        type: 'email',
+        autocomplete: 'email',
+        placeholder: 'you@example.com',
+        maxlength: 200,
+      }}
+      error={inputErrors.replyEmail}
+    />
+
+    <InputCheckbox
+      name="confirmRules"
+      label="I have read the rules above and my message follows them."
+      required
+      error={inputErrors.confirmRules}
+    />
+
+    <Captcha action={actions.contact.send} />
+
+    <InputHoneypotTrap name="website" />
+
+    <InputSubmitButton hideCancel />
+  </form>
+</BaseLayout>
+
+<style>
+  /* Category-specific help panels: hidden by default, shown only when the
+     matching radio inside the same form is selected. Pure CSS so the panel
+     works without JS. */
+  [data-category-help] {
+    display: none;
+  }
+  [data-contact-form]:has(input[name='category'][value='ACCOUNT_VERIFICATION']:checked)
+    [data-category-help='ACCOUNT_VERIFICATION'] {
+    display: block;
+  }
+</style>
