@@ -34,11 +34,9 @@ export const swapActions = {
     permissions: 'guest',
     input: inputSchema,
     handler: async (input) => {
-      // Drop both amounts when both are set; the aggregator otherwise
-      // picks one arbitrarily and the user's intent is unclear.
-      const bothSet = input.sendAmount !== undefined && input.receiveAmount !== undefined
-      const sendAmount = bothSet ? undefined : input.sendAmount
-      const receiveAmount = bothSet ? undefined : input.receiveAmount
+      // sendAmount wins when both sides are set; aggregator needs one direction.
+      const sendAmount = input.sendAmount
+      const receiveAmount = sendAmount !== undefined ? undefined : input.receiveAmount
 
       const cleanedInput = { ...input, sendAmount, receiveAmount }
 

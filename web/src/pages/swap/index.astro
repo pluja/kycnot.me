@@ -20,18 +20,6 @@ import {
 import { setPublicPageCacheHeaders } from '../../lib/pageCacheHeaders'
 import { bump } from '../../lib/stats'
 
-// Amount params only arrive via POST. Strip them off any GET so bots
-// scraping ?sendAmount=... can't drive the aggregator. Caddy mirrors this.
-if (Astro.request.method === 'GET') {
-  const p = Astro.url.searchParams
-  if (p.has('sendAmount') || p.has('receiveAmount')) {
-    const clean = new URL(Astro.url)
-    clean.searchParams.delete('sendAmount')
-    clean.searchParams.delete('receiveAmount')
-    return Astro.redirect(clean.pathname + clean.search, 303)
-  }
-}
-
 const isHtmxRequest = Astro.request.headers.get('hx-request') === 'true'
 if (!isHtmxRequest) {
   void bump({ kind: 'swap.view' }).catch(() => null)

@@ -48,7 +48,10 @@ const selectedOption = byValue.get(selected) ?? popular[0] ?? other[0] ?? FALLBA
     </span>
     {
       selectedOption.network && (
-        <span class="rounded-sm bg-night-700 px-1 py-px text-[9px] font-semibold tracking-wider text-day-200 uppercase">
+        <span
+          data-swap-network-badge
+          class="rounded-sm bg-night-700 px-1 py-px text-[9px] font-semibold tracking-wider text-day-200 uppercase"
+        >
           {selectedOption.network}
         </span>
       )
@@ -59,7 +62,7 @@ const selectedOption = byValue.get(selected) ?? popular[0] ?? other[0] ?? FALLBA
     />
   </summary>
 
-  <!-- Form submit fallback when JS is off; option clicks use full-state URLs. -->
+  <!-- Carries the selected pair when JS is off. -->
   <input type="hidden" name={name} value={selectedOption.value} data-swap-select-input />
 
   <div
@@ -135,134 +138,3 @@ const selectedOption = byValue.get(selected) ?? popular[0] ?? other[0] ?? FALLBA
   }
 </style>
 
-<script>
-  // Progressive enhancement for the <details>-based currency picker:
-  // search, keyboard nav, outside-click close, scroll-to-selection.
-  document.addEventListener('astro:page-load', () => {
-    const roots = document.querySelectorAll<HTMLDetailsElement>('details[data-swap-select]')
-    if (roots.length === 0) return
-
-    roots.forEach(wireRoot)
-
-    document.addEventListener('click', (event) => {
-      const target = event.target as Node
-      roots.forEach((root) => {
-        if (root.open && !root.contains(target)) root.open = false
-      })
-    })
-  })
-
-  function wireRoot(root: HTMLDetailsElement) {
-    const search = root.querySelector<HTMLInputElement>('[data-swap-select-search]')
-    const list = root.querySelector<HTMLElement>('[data-swap-select-list]')
-
-    root.addEventListener('toggle', () => {
-      if (!root.open) return
-      // Always reopen with the full list so arrow-key browsing works.
-      if (search) {
-        search.value = ''
-        applyFilter(root, '')
-      }
-      scrollSelectedIntoView(root, list)
-      requestAnimationFrame(() => search?.focus())
-    })
-
-    if (search) {
-      search.addEventListener('input', () => {
-        applyFilter(root, search.value)
-        if (list) list.scrollTop = 0
-      })
-    }
-
-    root.addEventListener('keydown', (event) => handleKeydown(root, search, event))
-  }
-
-  function handleKeydown(
-    root: HTMLDetailsElement,
-    search: HTMLInputElement | null,
-    event: KeyboardEvent
-  ) {
-    if (event.key === 'Escape') {
-      if (!root.open) return
-      event.preventDefault()
-      root.open = false
-      root.querySelector<HTMLElement>('summary')?.focus()
-      return
-    }
-    if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      moveFocus(root, 1)
-      return
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      moveFocus(root, -1)
-      return
-    }
-    if (event.key === 'Enter' && document.activeElement === search) {
-      const first = visibleOptions(root)[0]
-      if (first) {
-        event.preventDefault()
-        first.click()
-      }
-    }
-  }
-
-  function visibleOptions(root: HTMLElement): HTMLAnchorElement[] {
-    return Array.from(
-      root.querySelectorAll<HTMLAnchorElement>('[data-swap-select-option]:not([hidden])')
-    )
-  }
-
-  function moveFocus(root: HTMLDetailsElement, direction: 1 | -1) {
-    const options = visibleOptions(root)
-    if (options.length === 0) return
-    const active = document.activeElement as HTMLElement | null
-    const currentIdx = active ? options.indexOf(active as HTMLAnchorElement) : -1
-    let nextIdx: number
-    if (currentIdx === -1) {
-      nextIdx = direction > 0 ? 0 : options.length - 1
-    } else {
-      nextIdx = Math.max(0, Math.min(options.length - 1, currentIdx + direction))
-    }
-    const next = options[nextIdx]
-    if (!next) return
-    next.focus({ preventScroll: true })
-    next.scrollIntoView({ block: 'nearest' })
-  }
-
-  function scrollSelectedIntoView(root: HTMLElement, list: HTMLElement | null) {
-    if (!list) return
-    const selected = root.querySelector<HTMLAnchorElement>(
-      '[data-swap-select-option][aria-current="true"]'
-    )
-    if (!selected) {
-      list.scrollTop = 0
-      return
-    }
-    // 60px offset keeps a couple of rows above the selection visible.
-    list.scrollTop = selected.offsetTop - list.offsetTop - 60
-  }
-
-  function applyFilter(root: HTMLElement, raw: string) {
-    const query = raw.trim().toLowerCase()
-    const options = root.querySelectorAll<HTMLAnchorElement>('[data-swap-select-option]')
-    const visibleByGroup: Record<string, number> = {}
-    options.forEach((option) => {
-      const text = option.getAttribute('data-search-text') ?? ''
-      const group = option.getAttribute('data-group') ?? ''
-      const matches = query === '' || text.includes(query)
-      option.hidden = !matches
-      if (matches) visibleByGroup[group] = (visibleByGroup[group] ?? 0) + 1
-    })
-    root.querySelectorAll<HTMLElement>('[data-swap-select-heading]').forEach((heading) => {
-      const group = heading.getAttribute('data-group') ?? ''
-      heading.hidden = (visibleByGroup[group] ?? 0) === 0
-    })
-    const totalVisible = Object.values(visibleByGroup).reduce((a, b) => a + b, 0)
-    const empty = root.querySelector<HTMLElement>('[data-swap-select-empty]')
-    const queryEl = root.querySelector<HTMLElement>('[data-swap-select-query]')
-    if (empty) empty.hidden = totalVisible > 0
-    if (queryEl) queryEl.textContent = raw.trim()
-  }
-</script>

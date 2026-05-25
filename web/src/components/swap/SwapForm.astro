@@ -15,13 +15,13 @@ type Props = HTMLAttributes<'form'> & {
   input: SwapFormInput
   currencies: SwapCurrencies
   resultsId: string
+  flipSendAmount?: number
 }
 
-const { input, currencies, resultsId, class: className, ...htmlProps } = Astro.props
+const { input, currencies, resultsId, flipSendAmount, class: className, ...htmlProps } = Astro.props
 
-// Flip goes to the pair landing as a plain GET. Amount params would be
-// 303-stripped on the way through, so we don't propagate them.
 const swapHref = buildSwapUrl(input.to, input.from, {
+  sendAmount: flipSendAmount,
   sortBy: input.sortBy,
   approvedOnly: input.approvedOnly,
 })
@@ -39,6 +39,8 @@ const labelClass = 'text-[10px] font-semibold tracking-[0.2em] text-day-500 uppe
   method="POST"
   action={submitAction}
   hx-post={submitAction}
+  hx-trigger="submit, input[target.type==='number'] changed delay:500ms"
+  hx-sync="this:abort"
   hx-select={`#${resultsId}`}
   hx-target={`#${resultsId}`}
   hx-swap="outerHTML"
@@ -130,18 +132,5 @@ const labelClass = 'text-[10px] font-semibold tracking-[0.2em] text-day-500 uppe
 </form>
 
 <script>
-  // Typing in one leg clears the other so the server sees only the side the
-  // user meant to submit. Without this, a stale value on the hidden side
-  // would mismatch the visible form.
-  document.addEventListener('astro:page-load', () => {
-    const send = document.querySelector<HTMLInputElement>('#swap-send')
-    const receive = document.querySelector<HTMLInputElement>('#swap-receive')
-    if (!send || !receive) return
-    send.addEventListener('input', () => {
-      if (send.value !== '' && receive.value !== '') receive.value = ''
-    })
-    receive.addEventListener('input', () => {
-      if (receive.value !== '' && send.value !== '') send.value = ''
-    })
-  })
+  import './swap-client'
 </script>

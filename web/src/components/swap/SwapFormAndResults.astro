@@ -48,6 +48,8 @@ const { data: params } = zodParseQueryParamsStoringErrors(
   {
     from: coerceToKnownCurrency('btc'),
     to: coerceToKnownCurrency('xmr'),
+    sendAmount: z.coerce.number().positive().finite().optional(),
+    receiveAmount: z.coerce.number().positive().finite().optional(),
     sortBy: z.enum(['rate', 'score', 'kyc']).default('rate'),
     approvedOnly: z
       .string()
@@ -57,18 +59,25 @@ const { data: params } = zodParseQueryParamsStoringErrors(
   Astro
 )
 
-// POST → action input drives the rendered state. GET → URL params pre-fill
-// the form only; we don't call the aggregator here so the landing stays
-// cacheable.
+// BTC default avoids landing on a $1000 trade.
+function defaultSendAmountFor(currency: string): number {
+  return currency === 'btc' ? 0.01 : 1
+}
+
+// quoteData (POST action result) is the source of truth. GET URL params
+// only pre-fill the form; sendAmount wins when both sides are set.
 const input = quoteData
   ? quoteData.input
   : (() => {
       const from = params.from === params.to ? (params.to === 'xmr' ? 'btc' : 'xmr') : params.from
+      const urlHasAmount = params.sendAmount !== undefined || params.receiveAmount !== undefined
+      const sendAmount = params.sendAmount ?? (urlHasAmount ? undefined : defaultSendAmountFor(from))
+      const receiveAmount = sendAmount !== undefined ? undefined : params.receiveAmount
       return {
         ...params,
         from,
-        sendAmount: from === 'btc' ? 0.01 : 1,
-        receiveAmount: undefined as number | undefined,
+        sendAmount,
+        receiveAmount,
       }
     })()
 
@@ -91,8 +100,7 @@ const toOption = currencies.byValue.get(input.to) ?? parseCompound(input.to)
 const result: AggregatedResultWithService[] = quoteData?.result ?? []
 const aggregatorUnavailable = quoteData?.aggregatorUnavailable ?? false
 
-// Retry re-POSTs the form to preserve the user's amount; a GET to the
-// current URL would redirect-strip or fall back to landing defaults.
+// Retry re-POSTs so the user's amount survives; a GET would land without quoteData.
 const retryAction = `/swap${actions.swap.quote}`
 
 function isApprovedOrVerified(status: VerificationStatus): boolean {
@@ -122,6 +130,21 @@ const marketRate = deriveMarketRate()
 const showMarketData = bestQuote?.marketSpreadPercent != null
 const quotesCount = displayResult.filter((r) => r.quote !== null).length
 
+function truncateTo2(value: number): number {
+  return Math.floor(value * 100) / 100
+}
+
+// Post-flip send amount = current receive side, 2dp truncated (product rule).
+// Falls back to the per-currency default when there's no quote or it collapses
+// below 0.01, so the flipped form is always immediately submittable.
+const flipSendDefault = defaultSendAmountFor(input.to)
+const flipSendAmount = (() => {
+  if (!quoteData) return flipSendDefault
+  const raw = amountSide === 'send' ? bestQuote?.amountReceived : input.receiveAmount
+  if (raw === undefined) return flipSendDefault
+  const truncated = truncateTo2(raw)
+  return truncated > 0 ? truncated : flipSendDefault
+})()
 ---
 
 <div {...htmlProps} class={cn('mx-auto max-w-5xl', className)}>
@@ -134,7 +157,13 @@ const quotesCount = displayResult.filter((r) => r.quote !== null).length
       resultsId={RESULTS_ID}
     />
 
-    <SwapForm input={input} currencies={currencies} resultsId={RESULTS_ID} class="mt-3" />
+    <SwapForm
+      input={input}
+      currencies={currencies}
+      resultsId={RESULTS_ID}
+      flipSendAmount={flipSendAmount}
+      class="mt-3"
+    />
   </div>
 
   <div id={RESULTS_ID} class="relative mt-5" aria-live="polite" aria-busy="false">

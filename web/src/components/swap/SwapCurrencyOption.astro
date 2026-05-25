@@ -3,7 +3,7 @@ import { Icon } from 'astro-icon/components'
 
 import { cn } from '../../lib/cn'
 import { FALLBACK_ICON } from '../../lib/exchange/currencyMapping'
-import { buildSwapUrl, SWAP_OOB_TARGETS, SWAP_RESULTS_TARGET } from '../../lib/exchange/swapUrls'
+import { buildSwapUrl } from '../../lib/exchange/swapUrls'
 
 import type { SwapFormInput } from './SwapFormAndResults.astro'
 import type { SwapOption } from '../../lib/exchange/swapCurrencies'
@@ -23,6 +23,8 @@ const baseName = option.name && option.name !== option.code ? option.name : opti
 const displayName = option.network ? `${baseName} (${option.network})` : baseName
 const searchText = [option.code, option.name, option.network].filter(Boolean).join(' ').toLowerCase()
 
+// No-JS fallback href. The page never runs the aggregator on GET, so amount
+// params here only pre-fill the form.
 const href = buildSwapUrl(
   name === 'from' ? option.value : input.from,
   name === 'to' ? option.value : input.to,
@@ -37,16 +39,10 @@ const href = buildSwapUrl(
 
 <a
   href={href}
-  hx-get="/swap"
-  hx-vals={JSON.stringify({ [name]: option.value })}
-  hx-include="#swap-form"
-  hx-target={SWAP_RESULTS_TARGET}
-  hx-select={SWAP_RESULTS_TARGET}
-  hx-swap="outerHTML"
-  hx-select-oob={SWAP_OOB_TARGETS}
-  hx-push-url="true"
-  hx-indicator={SWAP_RESULTS_TARGET}
   data-swap-select-option
+  data-swap-option-value={option.value}
+  data-swap-option-code={option.code}
+  data-swap-option-network={option.network ?? ''}
   data-group={group}
   data-search-text={searchText}
   aria-current={isSelected ? 'true' : undefined}
