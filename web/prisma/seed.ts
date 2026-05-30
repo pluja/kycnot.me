@@ -7,6 +7,9 @@ import {
   AnnouncementType,
   AttributeCategory,
   AttributeType,
+  CaseEvidenceType,
+  CaseIssueType,
+  CaseStatus,
   CommentIssueType,
   CommentStatus,
   Currency,
@@ -589,6 +592,45 @@ const eventTitles = [
   'Holiday operating hours',
 ]
 
+const generateFakeCase = (serviceId: number, userIds: number[]) => {
+  const status = faker.helpers.arrayElement(Object.values(CaseStatus))
+  const isResolved = status === CaseStatus.RESOLVED
+  const evidenceCount = faker.number.int({ min: 1, max: 3 })
+
+  return {
+    title: faker.helpers.arrayElement([
+      'Withdrawal stuck pending for weeks',
+      'Funds frozen after a routine swap',
+      'Unexpected KYC demand mid-transaction',
+      'Account closed without explanation',
+      'Support unresponsive after failed payout',
+    ]),
+    issueType: faker.helpers.arrayElement(Object.values(CaseIssueType)),
+    status,
+    summaryMd: faker.lorem.paragraphs(2),
+    amountText: faker.helpers.maybe(
+      () => `${faker.number.float({ min: 0.01, max: 5, fractionDigits: 4 }).toFixed(4)} BTC`,
+      { probability: 0.6 }
+    ),
+    externalSource: faker.helpers.maybe(() => faker.internet.url(), { probability: 0.7 }),
+    resolvedAt: isResolved ? faker.date.recent({ days: 30 }) : null,
+    resolutionMd: isResolved ? faker.lorem.sentence() : null,
+    service: { connect: { id: serviceId } },
+    createdBy: { connect: { id: faker.helpers.arrayElement(userIds) } },
+    reportedBy: faker.helpers.maybe(() => ({ connect: { id: faker.helpers.arrayElement(userIds) } }), {
+      probability: 0.5,
+    }),
+    evidence: {
+      create: Array.from({ length: evidenceCount }, (_unused, index) => ({
+        type: faker.helpers.arrayElement(Object.values(CaseEvidenceType)),
+        label: faker.lorem.words({ min: 1, max: 3 }),
+        bodyMd: faker.lorem.sentence(),
+        order: index,
+      })),
+    },
+  } satisfies Prisma.CaseCreateInput
+}
+
 const generateFakeEvent = (serviceId: number) => {
   const type = faker.helpers.arrayElement(Object.values(EventType))
   const visible = faker.datatype.boolean(0.9) // 90% chance of being visible
@@ -1141,6 +1183,8 @@ async function cleanup() {
     await prisma.serviceContactMethod.deleteMany()
     await prisma.event.deleteMany()
     await prisma.verificationStep.deleteMany()
+    await prisma.caseEvidence.deleteMany()
+    await prisma.case.deleteMany()
     await prisma.serviceSuggestionMessage.deleteMany()
     await prisma.serviceSuggestion.deleteMany()
     await prisma.serviceVerificationRequest.deleteMany()
@@ -1371,6 +1415,18 @@ async function main() {
         Array.from({ length: faker.number.int({ min: 0, max: 5 }) }, () =>
           prisma.event.create({
             data: generateFakeEvent(service.id),
+          })
+        )
+      )
+
+      // Create cases for the service
+      await Promise.all(
+        Array.from({ length: faker.number.int({ min: 0, max: 3 }) }, () =>
+          prisma.case.create({
+            data: generateFakeCase(
+              service.id,
+              users.map((user) => user.id)
+            ),
           })
         )
       )

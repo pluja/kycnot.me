@@ -473,6 +473,7 @@ model Service {
   contactMethods          ServiceContactMethod[]       @relation("ServiceToContactMethod")
   attributes              ServiceAttribute[]
   verificationSteps       VerificationStep[]
+  cases                   Case[]
   suggestions             ServiceSuggestion[]
   internalNotes           InternalServiceNote[]        @relation("ServiceRecievedNotes")
 
@@ -655,6 +656,8 @@ model User {
   pushSubscriptions        PushSubscription[]
   apiKeys                  ApiKey[]
   contactMessages          ContactMessage[]
+  reportedCases            Case[]                       @relation("CaseReporter")
+  createdCases             Case[]                       @relation("CaseCreatedBy")
 
   @@index([createdAt])
   @@index([totalKarma])
@@ -776,6 +779,75 @@ model VerificationStep {
   @@index([serviceId])
   @@index([status])
   @@index([createdAt])
+}
+
+enum CaseStatus {
+  DRAFT
+  OPEN
+  RESOLVED
+  DISPUTED
+  REJECTED
+}
+
+enum CaseIssueType {
+  NON_PAYMENT
+  FROZEN_FUNDS
+  KYC_DEMAND
+  ACCOUNT_CLOSURE
+  UNRESPONSIVE_SUPPORT
+  OTHER
+}
+
+enum CaseEvidenceType {
+  LETTER_OF_GUARANTEE
+  TRANSACTION_ID
+  COMMUNICATION_LOG
+  SCREENSHOT
+  OTHER
+}
+
+model Case {
+  id             Int            @id @default(autoincrement())
+  /// Non-sequential id used in the public URL so cases can't be enumerated
+  /// while the feature is undiscoverable.
+  publicId       String         @unique @default(cuid(2))
+  title          String
+  issueType      CaseIssueType
+  status         CaseStatus     @default(DRAFT)
+  summaryMd      String
+  amountText     String?
+  externalSource String?
+  resolvedAt     DateTime?
+  resolutionMd   String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @default(now()) @updatedAt
+
+  service        Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId      Int
+  reportedBy     User?          @relation("CaseReporter", fields: [reportedById], references: [id], onDelete: SetNull)
+  reportedById   Int?
+  createdBy      User?          @relation("CaseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById    Int?
+  evidence       CaseEvidence[]
+
+  @@index([serviceId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model CaseEvidence {
+  id        Int              @id @default(autoincrement())
+  type      CaseEvidenceType
+  label     String?
+  bodyMd    String?
+  imageUrl  String?
+  order     Int              @default(0)
+  createdAt DateTime         @default(now())
+
+  case   Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId Int
+
+  @@index([caseId])
 }
 
 model Category {

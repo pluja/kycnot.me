@@ -4,6 +4,8 @@ import path from 'node:path'
 
 import { UPLOAD_DIR } from 'astro:env/server'
 
+import { watermarkImage } from './watermark'
+
 /**
  * Get the configured upload directory with a subdirectory
  */
@@ -35,36 +37,36 @@ function getUploadDir(subDir = ''): { fsPath: string; webPath: string } {
   }
 }
 
-/**
- * Generate a hash from file content
- */
-async function generateFileHash(file: File): Promise<string> {
-  const buffer = await file.arrayBuffer()
-  const hash = createHash('sha1')
-  hash.update(Buffer.from(buffer))
-  return hash.digest('hex').substring(0, 10) // Use first 10 chars of hash
+function hashContent(buffer: Buffer): string {
+  return createHash('sha1').update(buffer).digest('hex').substring(0, 10)
 }
 
 /**
- * Save a file locally and return its web-accessible URL path
+ * Save a file locally and return its web-accessible URL path. When
+ * `watermark` is set, the image is tiled with the KYCNOT.ME watermark before
+ * being written; the content hash (and therefore the filename) is derived from
+ * the final bytes, so an unwatermarked save keeps its previous filename.
  */
 export async function saveFileLocally(
   file: File,
   originalFileName: string,
-  subDir?: string
+  subDir?: string,
+  { watermark = false }: { watermark?: boolean } = {}
 ): Promise<string> {
-  const fileBuffer = await file.arrayBuffer()
-  const fileHash = await generateFileHash(file)
+  let buffer: Buffer = Buffer.from(await file.arrayBuffer())
+  if (watermark) {
+    buffer = await watermarkImage(buffer)
+  }
 
   const fileExtension = path.extname(originalFileName)
-  const fileName = `${fileHash}${fileExtension}`
+  const fileName = `${hashContent(buffer)}${fileExtension}`
 
   // Use the provided subDir or default to 'services/pictures'
   const { fsPath: uploadDir, webPath: webUploadPath } = getUploadDir(subDir ?? 'services/pictures')
 
   await fs.mkdir(uploadDir, { recursive: true })
   const filePath = path.join(uploadDir, fileName)
-  await fs.writeFile(filePath, Buffer.from(fileBuffer))
+  await fs.writeFile(filePath, buffer)
   const url = sanitizePath(`${webUploadPath}/${fileName}`)
   return url
 }
