@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/consistent-type-definitions */
 
+import type { Capability } from './constants/capabilities'
 import type { ErrorBanners } from './lib/errorBanners'
 import type { KarmaUnlocks } from './lib/karmaUnlocks'
 import type { Prisma } from '@prisma/client'
@@ -12,6 +13,7 @@ declare global {
       actualUser: (Prisma.UserGetPayload<true> & { karmaUnlocks: KarmaUnlocks }) | null
       apiKeyAuthenticated: boolean
       banners: ErrorBanners
+      userCan: (capability: Capability) => boolean
       makeId: <T extends string>(prefix: T) => `${T}-${number}-${string}`
     }
   }

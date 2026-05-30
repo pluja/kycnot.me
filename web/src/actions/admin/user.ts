@@ -2,6 +2,7 @@ import { type Prisma, type ServiceUserRole } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
+import { capabilitiesZodEnum } from '../../constants/capabilities'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { saveFileLocally } from '../../lib/fileStorage'
 import { prisma } from '../../lib/prisma'
@@ -15,6 +16,7 @@ const selectUserReturnFields = {
   admin: true,
   verified: true,
   moderator: true,
+  capabilities: true,
   canCreateApiKeys: true,
   verifiedLink: true,
   secretTokenHash: true,
@@ -55,6 +57,7 @@ export const adminUserActions = {
         .transform((val) => val || null),
       pictureFile: z.instanceof(File).optional(),
       type: z.array(z.enum(['admin', 'moderator', 'spammer'])),
+      capabilities: z.array(capabilitiesZodEnum).default([]),
       canCreateApiKeys: z.coerce.boolean().default(false),
       verifiedLink: z
         .string()
@@ -69,7 +72,7 @@ export const adminUserActions = {
         .default(null) // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         .transform((val) => val || null),
     }),
-    handler: async ({ id, pictureFile, type, canCreateApiKeys, ...valuesToUpdate }) => {
+    handler: async ({ id, pictureFile, type, capabilities, canCreateApiKeys, ...valuesToUpdate }) => {
       const user = await prisma.user.findUnique({
         where: {
           id,
@@ -103,6 +106,7 @@ export const adminUserActions = {
           admin: type.includes('admin'),
           moderator: type.includes('moderator'),
           spammer: type.includes('spammer'),
+          capabilities,
           canCreateApiKeys,
         },
         select: selectUserReturnFields,

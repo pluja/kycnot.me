@@ -6,11 +6,15 @@ import {
   type ActionHandler,
 } from 'astro:actions'
 
+import { userCan } from './permissions'
+
+import type { Capability } from '../constants/capabilities'
 import type { MaybePromise } from 'astro/actions/runtime/utils.js'
 import type { z } from 'astro/zod'
 
+type CapabilityPermission = { capability: Capability }
 type SpecialUserPermission = 'admin' | 'moderator' | 'verified'
-type Permission = SpecialUserPermission | 'guest' | 'not-spammer' | 'user'
+type Permission = CapabilityPermission | SpecialUserPermission | 'guest' | 'not-spammer' | 'user'
 
 type ActionAPIContextWithUser = ActionAPIContext & {
   locals: {
@@ -75,17 +79,21 @@ export function defineProtectedAction<
         return handler(input, context as ActionAPIContextWithUser)
       }
 
+      if (typeof permissions === 'object' && !Array.isArray(permissions)) {
+        if (!userCan(user, permissions.capability)) {
+          throw new ActionError({
+            code: 'FORBIDDEN',
+            message: 'You do not have the required privileges for this action.',
+          })
+        }
+        return handler(input, context as ActionAPIContextWithUser)
+      }
+
       // arrays grant access when ANY listed permission is satisfied (OR).
       // single-string permissions require that one permission specifically.
       if (Array.isArray(permissions)) {
         const granted = permissions.some((p) =>
-          p === 'verified'
-            ? user.verified
-            : p === 'moderator'
-              ? user.moderator
-              : p === 'admin'
-                ? user.admin
-                : false
+          p === 'verified' ? user.verified : p === 'moderator' ? user.moderator : user.admin
         )
         if (!granted) {
           throw new ActionError({

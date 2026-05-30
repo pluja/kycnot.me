@@ -11,7 +11,7 @@ const {
 } = zodParseQueryParamsStoringErrors(
   {
     reason: z.string().optional(),
-    reasonType: z.enum(['admin-required']).optional(),
+    reasonType: z.enum(['admin-required', 'capability-required']).optional(),
     redirect: z.string().optional(),
   },
   Astro

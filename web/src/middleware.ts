@@ -5,6 +5,7 @@ import { hashApiKey } from './lib/apiKey'
 import { ErrorBanners, getMessagesFromUrl } from './lib/errorBanners'
 import { getImpersonationInfo } from './lib/impersonation'
 import { makeUserWithKarmaUnlocks } from './lib/karmaUnlocks'
+import { adminRouteRequiredCapability, userCan } from './lib/permissions'
 import { prisma } from './lib/prisma'
 import { makeLoginUrl, makeSafeRedirectUrl } from './lib/redirectUrls'
 import { getRedisActionsSessions } from './lib/redis/redisActionsSessions'
@@ -156,19 +157,29 @@ const impersonate = defineMiddleware(async (context, next) => {
   return next()
 })
 
+const bindCapabilities = defineMiddleware(async (context, next) => {
+  context.locals.userCan = (capability) => userCan(context.locals.user, capability)
+  return next()
+})
+
 const protectRoutes = defineMiddleware(async (context, next) => {
   const user = context.locals.user
 
   if (context.url.pathname.startsWith('/admin')) {
     if (!user) {
-      return context.redirect(
-        makeLoginUrl(context.url, { message: 'Login as admin to access this page' })
-      )
+      return context.redirect(makeLoginUrl(context.url, { message: 'Login to access this page' }))
     }
 
-    if (!user.admin) {
+    const requiredCapability = adminRouteRequiredCapability(context.url.pathname)
+    // An unmapped admin route is superuser-only (default-deny).
+    const granted = requiredCapability ? userCan(user, requiredCapability) : user.admin
+
+    if (!granted) {
       const accessDeniedUrl = new URL('/access-denied', context.url)
-      accessDeniedUrl.searchParams.set('reasonType', 'admin-required')
+      accessDeniedUrl.searchParams.set(
+        'reasonType',
+        requiredCapability ? 'capability-required' : 'admin-required'
+      )
       accessDeniedUrl.searchParams.set('redirect', context.url.pathname + context.url.search)
       return context.redirect(accessDeniedUrl.pathname + accessDeniedUrl.search)
     }
@@ -202,6 +213,7 @@ export const onRequest = sequence(
   authenticate,
   apiKeyAuth,
   impersonate,
+  bindCapabilities,
   protectRoutes,
   preventFormResubmitAndStoreActionErrors,
   makeIds

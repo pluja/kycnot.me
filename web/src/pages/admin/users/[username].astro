@@ -14,6 +14,7 @@ import InputTextArea from '../../../components/InputTextArea.astro'
 import Markdown from '../../../components/Markdown.astro'
 import MyPicture from '../../../components/MyPicture.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
+import { capabilities } from '../../../constants/capabilities'
 import { getServiceUserRoleInfo, serviceUserRoles } from '../../../constants/serviceUserRoles'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { prisma } from '../../../lib/prisma'
@@ -56,6 +57,7 @@ const [user, allServices] = await Astro.locals.banners.tryMany([
           verified: true,
           moderator: true,
           spammer: true,
+          capabilities: true,
           canCreateApiKeys: true,
           verifiedLink: true,
           internalNotes: {
@@ -260,6 +262,22 @@ if (!user) return Astro.rewrite('/404')
         iconSize="sm"
         multiple
         error={updateInputErrors.type}
+      />
+
+      <InputCardGroup
+        name="capabilities"
+        label="Capabilities"
+        options={capabilities.map((capability) => ({
+          label: capability.label,
+          value: capability.value,
+          icon: capability.icon,
+          description: capability.description,
+        }))}
+        selectedValue={user.capabilities}
+        cardSize="sm"
+        iconSize="sm"
+        multiple
+        error={updateInputErrors.capabilities}
       />
 
       <div class="flex items-center gap-3 rounded-lg border border-night-400 bg-night-600 p-3">
