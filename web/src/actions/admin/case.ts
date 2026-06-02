@@ -24,6 +24,14 @@ function resolvedAtFor(status: CaseStatus, existing: Date | null): Date | null {
   return existing ?? new Date()
 }
 
+async function assertReporterExists(reportedById: number | null | undefined) {
+  if (!reportedById) return
+  const reporter = await prisma.user.findUnique({ where: { id: reportedById }, select: { id: true } })
+  if (!reporter) {
+    throw new ActionError({ code: 'BAD_REQUEST', message: 'Reporter user not found' })
+  }
+}
+
 export const adminCaseActions = {
   create: defineProtectedAction({
     accept: 'form',
@@ -46,6 +54,7 @@ export const adminCaseActions = {
       if (!service) {
         throw new ActionError({ code: 'BAD_REQUEST', message: 'Service not found' })
       }
+      await assertReporterExists(input.reportedById)
 
       const newCase = await prisma.case.create({
         data: {
@@ -91,6 +100,7 @@ export const adminCaseActions = {
       if (!existing) {
         throw new ActionError({ code: 'BAD_REQUEST', message: 'Case not found' })
       }
+      await assertReporterExists(input.reportedById)
 
       const updated = await prisma.case.update({
         where: { id: input.caseId },

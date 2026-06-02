@@ -3,6 +3,7 @@ import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
 import { caseEvidenceTypes, getCaseEvidenceTypeInfo } from '../../../constants/caseEvidenceTypes'
+import { cn } from '../../../lib/cn'
 import BadgeSmall from '../../BadgeSmall.astro'
 import InputImageFile from '../../InputImageFile.astro'
 import InputSelect from '../../InputSelect.astro'
@@ -109,7 +110,7 @@ const textItems = evidence.filter((item) => !item.imageUrl)
 
   {
     textItems.length > 0 && (
-      <div class={mediaItems.length > 0 ? 'mt-3 space-y-2' : 'space-y-2'}>
+      <div class={cn('space-y-2', mediaItems.length > 0 && 'mt-3')}>
         {textItems.map((item) => {
           const typeInfo = getCaseEvidenceTypeInfo(item.type)
           const lineCount = item.bodyMd ? item.bodyMd.split('\n').length : 3
