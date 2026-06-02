@@ -15,6 +15,7 @@ import Markdown from '../../../components/Markdown.astro'
 import MyPicture from '../../../components/MyPicture.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
 import { capabilities } from '../../../constants/capabilities'
+import { capabilityPresets } from '../../../constants/capabilityPresets'
 import { getServiceUserRoleInfo, serviceUserRoles } from '../../../constants/serviceUserRoles'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { prisma } from '../../../lib/prisma'
@@ -263,6 +264,22 @@ if (!user) return Astro.rewrite('/404')
         multiple
         error={updateInputErrors.type}
       />
+
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-sm text-day-400">Apply preset:</span>
+        {
+          capabilityPresets.map((preset) => (
+            <button
+              type="button"
+              data-capability-preset={preset.capabilities.join(',')}
+              class="inline-flex items-center gap-1.5 rounded-md border border-night-500 px-2.5 py-1 text-xs text-day-200 transition-colors hover:border-night-400 hover:bg-night-700"
+            >
+              <Icon name={preset.icon} class="size-3.5" />
+              {preset.label}
+            </button>
+          ))
+        }
+      </div>
 
       <InputCardGroup
         name="capabilities"
@@ -538,6 +555,25 @@ if (!user) return Astro.rewrite('/404')
             editForm.classList.add('hidden')
           }
         }
+      })
+    })
+  })
+</script>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Optional script for the capability role presets.       //
+  // Clicking a preset ticks exactly its capabilities in the //
+  // capabilities checkbox group.                            //
+  ////////////////////////////////////////////////////////////
+  document.addEventListener('astro:page-load', () => {
+    document.querySelectorAll<HTMLButtonElement>('[data-capability-preset]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const wanted = new Set((button.dataset.capabilityPreset ?? '').split(',').filter(Boolean))
+        document.querySelectorAll<HTMLInputElement>('input[name="capabilities"]').forEach((input) => {
+          input.checked = wanted.has(input.value)
+          input.dispatchEvent(new Event('change', { bubbles: true }))
+        })
       })
     })
   })

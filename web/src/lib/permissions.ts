@@ -12,12 +12,20 @@ import type { Capability } from '../constants/capabilities'
 type UserForPermissions = {
   admin: boolean
   capabilities: string[]
+  moderator?: boolean
 }
+
+// Temporary bridge while the `moderator` boolean is decomposed into capabilities.
+// Existing moderators keep their comment/contact powers until the column is
+// dropped and these are persisted as real grants. Remove with the column.
+const legacyModeratorCapabilities: Capability[] = ['comments:moderate', 'contact:manage']
 
 export function userCan(user: UserForPermissions | null | undefined, capability: Capability): boolean {
   if (!user) return false
   if (user.admin) return true
-  return user.capabilities.includes(capability)
+  if (user.capabilities.includes(capability)) return true
+  if (user.moderator && legacyModeratorCapabilities.includes(capability)) return true
+  return false
 }
 
 // Every admin route maps to the single capability that unlocks it. Routes
