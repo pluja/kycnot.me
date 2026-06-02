@@ -10,9 +10,9 @@ import Tooltip from '../../../components/Tooltip.astro'
 import UserBadge from '../../../components/UserBadge.astro'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
+import { hasAnyCapability } from '../../../lib/permissions'
 import { pluralize } from '../../../lib/pluralize'
 import { prisma } from '../../../lib/prisma'
-import { isStaff } from '../../../lib/permissions'
 import { formatDateShort } from '../../../lib/timeAgo'
 import { urlWithParams } from '../../../lib/urls'
 
@@ -352,7 +352,7 @@ const makePageSizeUrl = (size: string) => {
                           Verified
                         </span>
                       )}
-                      {isStaff(user) && (
+                      {hasAnyCapability(user) && (
                         <span class="inline-flex items-center gap-1 rounded-md bg-blue-900/30 px-2 py-0.5 text-xs font-medium text-blue-400">
                           <Icon name="ri:shield-check-fill" class="size-3.5" />
                           Staff

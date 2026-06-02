@@ -19,9 +19,9 @@ import { verificationStatusesByValue } from '../../constants/verificationStatus'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
 import { makeUserWithKarmaUnlocks } from '../../lib/karmaUnlocks'
+import { isStaff } from '../../lib/permissions'
 import { pluralize } from '../../lib/pluralize'
 import { prisma } from '../../lib/prisma'
-import { isStaff } from '../../lib/permissions'
 import { makeLoginUrl } from '../../lib/redirectUrls'
 import { formatDateShort } from '../../lib/timeAgo'
 import { urlDomain } from '../../lib/urls'
@@ -229,7 +229,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                 )}
                 {isStaff(user) && (
                   <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                    moderator
+                    Staff
                   </span>
                 )}
               </div>
@@ -375,7 +375,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                   {
                     isStaff(user) && (
                       <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                        Moderator
+                        Staff
                       </span>
                     )
                   }

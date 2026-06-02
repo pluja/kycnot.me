@@ -217,7 +217,7 @@ BEGIN
     IF OLD.spammer = NEW.spammer
     AND OLD.verified = NEW.verified
     AND OLD.admin = NEW.admin
-    AND OLD.capabilities = NEW.capabilities
+    AND ('comments:moderate' = ANY(OLD.capabilities)) IS NOT DISTINCT FROM ('comments:moderate' = ANY(NEW.capabilities))
     AND (
         CASE
             WHEN OLD."totalKarma" <= -5 THEN -1
@@ -292,7 +292,7 @@ CREATE TRIGGER user_rating_trust_trigger
         OR OLD.spammer <> NEW.spammer
         OR OLD.verified <> NEW.verified
         OR OLD.admin <> NEW.admin
-        OR OLD.capabilities <> NEW.capabilities
+        OR ('comments:moderate' = ANY(OLD.capabilities)) IS DISTINCT FROM ('comments:moderate' = ANY(NEW.capabilities))
     )
     EXECUTE FUNCTION refresh_user_comment_rating_trust();
 

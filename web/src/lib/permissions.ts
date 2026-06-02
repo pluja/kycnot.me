@@ -68,3 +68,11 @@ export function userCanAccessAdmin(user: UserForPermissions | null | undefined):
 export function isStaff(user: UserForPermissions | null | undefined): boolean {
   return userCan(user, 'comments:moderate') && userCan(user, 'services:edit')
 }
+
+// hasAnyCapability is true for any holder of at least one capability. The admin
+// user list keys both its "Staff" filter and the per-row badge on this, so a
+// scoped account (e.g. cases:manage only) never falls between the staff and
+// regular buckets. The narrower isStaff drives the public-facing badge instead.
+export function hasAnyCapability(user: UserForPermissions | null | undefined): boolean {
+  return !!user && user.capabilities.length > 0
+}
