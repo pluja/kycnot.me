@@ -10,6 +10,7 @@ import {
   SUGGESTION_SLUG_MAX_LENGTH,
 } from '../../actions/serviceSuggestion'
 import Captcha from '../../components/Captcha.astro'
+import FormReplay from '../../components/FormReplay.astro'
 import InputCardGroup from '../../components/InputCardGroup.astro'
 import InputCheckbox from '../../components/InputCheckbox.astro'
 import InputCheckboxGroup from '../../components/InputCheckboxGroup.astro'
@@ -26,6 +27,7 @@ import { countries } from '../../constants/countries'
 import { currencies } from '../../constants/currencies'
 import { kycLevels } from '../../constants/kycLevels'
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import { getFormReplay } from '../../lib/formReplay'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
 
@@ -39,6 +41,11 @@ if (result && !result.error && !result.data.hasDuplicates) {
   return Astro.redirect(`/service-suggestion/${result.data.serviceSuggestion.id}`)
 }
 const inputErrors = isInputError(result?.error) ? result.error.fields : {}
+
+// Replay the previous submission into the inputs so a failed validation does
+// not wipe a long form. The image cannot be restored: browsers forbid setting
+// a file input's value.
+const replay = getFormReplay(Astro.locals.actionFormValues)
 
 const [categories, attributes] = await Astro.locals.banners.tryMany([
   [
@@ -182,6 +189,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
         required: true,
         maxlength: SUGGESTION_NAME_MAX_LENGTH,
         'data-generate-slug': true,
+        value: replay.text('name'),
       }}
       error={inputErrors.name}
     />
@@ -197,6 +205,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
         minlength: 1,
         maxlength: SUGGESTION_SLUG_MAX_LENGTH,
         'data-generate-slug': true,
+        value: replay.text('slug'),
       }}
     />
 
@@ -204,6 +213,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       label="Description"
       name="description"
       id="description"
+      value={replay.text('description')}
       inputProps={{
         required: true,
         maxlength: SUGGESTION_DESCRIPTION_MAX_LENGTH,
@@ -216,6 +226,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
         label="Service URLs"
         description="One per line. Accepts **Web**, **Onion**, and **I2P** URLs."
         name="allServiceUrls"
+        value={replay.text('allServiceUrls')}
         inputProps={{
           placeholder: 'example1.com\nexample2.onion\nexample3.b32.i2p',
           class: 'md:min-h-20 min-h-24 h-full',
@@ -232,6 +243,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
           `Accepts: ${contactMethodUrlTypes.map((type) => type.labelPlural).join(', ')}`,
         ].join('\n')}
         name="contactMethods"
+        value={replay.text('contactMethods')}
         inputProps={{
           placeholder: 'contact@example.com\nt.me/example\n+123 456 7890',
           class: 'h-full',
@@ -246,6 +258,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
         label="ToS URLs"
         description="One per line. AI review uses the first working URL only."
         name="tosUrls"
+        value={replay.text('tosUrls')}
         inputProps={{
           placeholder: 'example.com/tos',
           required: true,
@@ -260,6 +273,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
         inputProps={{
           type: 'date',
           max: new Date().toISOString().slice(0, 10),
+          value: replay.text('operatingSince'),
         }}
         error={inputErrors.operatingSince}
       />
@@ -272,6 +286,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
         description="Official name of the registered company (optional)"
         inputProps={{
           placeholder: 'e.g. Example Corp Ltd.',
+          value: replay.text('registeredCompanyName'),
         }}
       />
 
@@ -288,7 +303,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
               value: country.code,
             })),
         ]}
-        selectedValue=""
+        selectedValue={replay.text('registrationCountryCode', '')}
       />
     </div>
 
@@ -304,6 +319,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       iconSize="md"
       cardSize="md"
       required
+      selectedValue={replay.text('kycLevel')}
       error={inputErrors.kycLevel}
     />
 
@@ -312,6 +328,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
         name="categories"
         label="Categories"
         required
+        selectedValues={replay.list('categories')}
         options={categories.map((category) => ({
           label: category.name,
           value: category.id.toString(),
@@ -325,6 +342,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       <InputCheckboxGroup
         name="attributes"
         label="Attributes"
+        selectedValues={replay.list('attributes')}
         options={orderBy(
           attributes.map((attribute) => ({
             ...attribute,
@@ -353,6 +371,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
         icon: currency.icon,
       }))}
       error={inputErrors.acceptedCurrencies}
+      selectedValue={replay.list('acceptedCurrencies')}
       required
       multiple
     />
@@ -360,7 +379,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
     <InputImageFile
       label="Service Image"
       name="imageFile"
-      description="Square image. At least 192x192px. Transparency supported."
+      description={`Square image. At least 192x192px. Transparency supported.${replay.isReplay ? ' Please re-select your image; uploads cannot be restored automatically.' : ''}`}
       error={inputErrors.imageFile}
       square
       required
@@ -370,6 +389,7 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       label="Note for Moderators"
       name="notes"
       id="notes"
+      value={replay.text('notes')}
       error={inputErrors.notes}
       inputProps={{
         maxlength: SUGGESTION_NOTES_MAX_LENGTH,
@@ -378,10 +398,17 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
 
     <Captcha action={actions.serviceSuggestion.createService} />
 
-    <InputCheckbox name="rulesConfirm" required error={inputErrors.rulesConfirm}>
+    <InputCheckbox
+      name="rulesConfirm"
+      required
+      checked={replay.checked('rulesConfirm')}
+      error={inputErrors.rulesConfirm}
+    >
       I understand the
       <a class="underline" target="_blank" href="/about#listings">suggestion rules and process</a>
     </InputCheckbox>
+
+    <FormReplay />
 
     <InputHoneypotTrap name="message" />
 

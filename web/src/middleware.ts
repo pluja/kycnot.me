@@ -3,6 +3,7 @@ import { defineMiddleware, sequence } from 'astro:middleware'
 
 import { hashApiKey } from './lib/apiKey'
 import { ErrorBanners, getMessagesFromUrl } from './lib/errorBanners'
+import { FORM_REPLAY_MARKER, FORM_REPLAY_MAX_CHARS, type ActionFormValues } from './lib/formReplay'
 import { getImpersonationInfo } from './lib/impersonation'
 import { makeUserWithKarmaUnlocks } from './lib/karmaUnlocks'
 import { adminRouteRequiredCapability, userCan, userCanAccessAdmin } from './lib/permissions'
@@ -11,6 +12,7 @@ import { makeLoginUrl, makeSafeRedirectUrl } from './lib/redirectUrls'
 import { getRedisActionsSessions } from './lib/redis/redisActionsSessions'
 import { browserOriginForUrl, cookieSecureForUrl } from './lib/urls'
 import { getUserFromCookies } from './lib/userCookies'
+
 
 const ACTION_SESSION_COOKIE = 'action-session-id'
 
@@ -28,7 +30,38 @@ function addActionBannerIfNeeded(
   })
 }
 
+async function readSubmittedFormValues(request: Request): Promise<ActionFormValues | undefined> {
+  let formData: FormData
+  try {
+    formData = await request.formData()
+  } catch {
+    return undefined
+  }
+
+  // Opt-in only (default-deny): forms without the marker, such as the login
+  // and token-generation forms, are never persisted. This keeps credentials
+  // out of the action session by construction rather than via a field denylist.
+  if (formData.get(FORM_REPLAY_MARKER) !== '1') return undefined
+
+  const values: ActionFormValues = {}
+  let totalChars = 0
+  for (const [key, value] of formData.entries()) {
+    if (key === FORM_REPLAY_MARKER) continue
+    if (typeof value !== 'string') continue // never persist File uploads
+    totalChars += key.length + value.length
+    if (totalChars > FORM_REPLAY_MAX_CHARS) return undefined // too large to persist
+    const existing = values[key]
+    if (existing === undefined) values[key] = value
+    else if (Array.isArray(existing)) existing.push(value)
+    else values[key] = [existing, value]
+  }
+
+  return Object.keys(values).length > 0 ? values : undefined
+}
+
 const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context, next) => {
+  context.locals.actionFormValues = null
+
   if (context.isPrerendered) return next()
 
   const { action, setActionResult, serializeActionResult } = getActionContext(context)
@@ -42,6 +75,7 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
   if (session) {
     setActionResult(session.actionName, session.actionResult)
     addActionBannerIfNeeded(context, session.deserializedActionResult.error)
+    context.locals.actionFormValues = session.formValues ?? null
 
     await redisActionsSessions.delete(sessionId)
     context.cookies.delete(ACTION_SESSION_COOKIE)
@@ -49,10 +83,20 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
   }
 
   if (action) {
+    // Capture the submitted fields before the handler consumes the body, so a
+    // re-rendered form (validation error, duplicate prompt, ...) can replay
+    // them after the redirect. Success paths store them too but redirect away
+    // without reading, so the cost is one extra parse per form submission.
+    const requestCloneForReplay = action.calledFrom === 'form' ? context.request.clone() : null
+
     const actionResult = await action.handler()
     addActionBannerIfNeeded(context, actionResult.error)
 
     if (action.calledFrom === 'form') {
+      const submittedFormValues = requestCloneForReplay
+        ? await readSubmittedFormValues(requestCloneForReplay)
+        : undefined
+
       // HTMX manages its own state via XHR. The PRG dance returns a 302
       // whose empty body HTMX swaps into the target, so the first click
       // looks like a no-op and the result only surfaces on the second
@@ -61,12 +105,14 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
       const isHtmx = context.request.headers.get('HX-Request') === 'true'
       if (isHtmx) {
         setActionResult(action.name, serializeActionResult(actionResult))
+        context.locals.actionFormValues = submittedFormValues ?? null
         return next()
       }
 
       const sessionId = await redisActionsSessions.store({
         actionName: action.name,
         actionResult: serializeActionResult(actionResult),
+        formValues: submittedFormValues,
       })
 
       context.cookies.set(ACTION_SESSION_COOKIE, sessionId, {
@@ -78,10 +124,14 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
       })
 
       if (actionResult.error) {
+        // Re-render the submitted form. Prefer a same-origin referer (so forms
+        // that post to a different page than they live on go back to the form),
+        // but fall back to the posted-to path when the referer is missing or
+        // fails the origin check (e.g. an http referer vs the https-normalised
+        // origin in dev) instead of dropping the user on '/'.
         const referer = context.request.headers.get('Referer')
-        return context.redirect(
-          referer ? makeSafeRedirectUrl(referer, browserOriginForUrl(context.url)) : context.originPathname
-        )
+        const safeReferer = referer ? makeSafeRedirectUrl(referer, browserOriginForUrl(context.url)) : null
+        return context.redirect(safeReferer && safeReferer !== '/' ? safeReferer : context.originPathname)
       }
       return context.redirect(context.originPathname)
     }

@@ -2,6 +2,7 @@
 
 import type { Capability } from './constants/capabilities'
 import type { ErrorBanners } from './lib/errorBanners'
+import type { ActionFormValues } from './lib/formReplay'
 import type { KarmaUnlocks } from './lib/karmaUnlocks'
 import type { Prisma } from '@prisma/client'
 import type htmx from 'htmx.org'
@@ -15,6 +16,10 @@ declare global {
       banners: ErrorBanners
       userCan: (capability: Capability) => boolean
       makeId: <T extends string>(prefix: T) => `${T}-${number}-${string}`
+      // Values of a submitted form action, carried across the post-redirect-get
+      // by the action session so pages can repopulate inputs without JS (see
+      // getFormReplay). Null unless the current render follows a form action.
+      actionFormValues: ActionFormValues | null
     }
   }
 

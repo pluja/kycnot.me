@@ -1,0 +1,8 @@
+---
+import { FORM_REPLAY_MARKER } from '../lib/formReplay'
+---
+
+{/* Opts this form into input replay on a failed/re-rendered submit. Pair with
+    getFormReplay(Astro.locals.actionFormValues) in the page. Do not add to
+    forms that submit credentials (login, token) or other secrets. */}
+<input type="hidden" name={FORM_REPLAY_MARKER} value="1" />

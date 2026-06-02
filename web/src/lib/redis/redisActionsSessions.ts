@@ -25,6 +25,10 @@ const dataSchema = z.object({
       status: z.literal(204),
     }),
   ]),
+  // Submitted form fields kept for a failed form action so the page can
+  // repopulate its inputs. Strings (single value) and string arrays
+  // (repeated names, e.g. checkbox groups). Files are never stored.
+  formValues: z.record(z.union([z.string(), z.array(z.string())])).optional(),
 })
 
 export class RedisActionsSessions extends RedisGenericManager {
