@@ -2,8 +2,11 @@
 import { Icon } from 'astro-icon/components'
 import { DATABASE_UI_URL, LOGS_UI_URL } from 'astro:env/server'
 
+import BadgeSmall from '../../components/BadgeSmall.astro'
+import { getCapabilityInfo } from '../../constants/capabilities'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
+import { adminRouteRequiredCapability, userCanAccessAdmin } from '../../lib/permissions'
 
 import type { ComponentProps } from 'astro/types'
 
@@ -55,6 +58,14 @@ const adminLinks: AdminLink[] = [
     href: '/admin/contact',
     classNames: {
       base: 'text-rose-300',
+    },
+  },
+  {
+    icon: 'ri:scales-3-line',
+    title: 'Cases',
+    href: '/admin/cases',
+    classNames: {
+      base: 'text-orange-300',
     },
   },
   {
@@ -118,20 +129,46 @@ const adminLinks: AdminLink[] = [
       ]
     : []),
 ]
+
+const user = Astro.locals.user
+if (!userCanAccessAdmin(user)) return Astro.rewrite('/404')
+
+// Show only the sections the user can actually open: a mapped route needs its
+// capability, an unmapped one is superuser-only. Mirrors the middleware guard.
+const visibleLinks = adminLinks.filter((link) => {
+  if (!link.href) return false
+  const capability = adminRouteRequiredCapability(link.href)
+  return capability ? Astro.locals.userCan(capability) : !!user?.admin
+})
+
+const grantedCapabilities = (user?.capabilities ?? []).map((capability) => getCapabilityInfo(capability))
 ---
 
 <BaseLayout pageTitle="Admin Dashboard" widthClassName="max-w-7xl">
-  <h1 class="mb-8 font-title text-3xl font-bold text-day-100">
+  <h1 class="mb-4 font-title text-3xl font-bold text-day-100">
     <Icon name="ri:home-gear-line" class="me-1 inline-block size-10 align-[-0.35em]" />
     Admin Dashboard
   </h1>
 
+  <div class="mb-8 flex flex-wrap items-center gap-2">
+    {
+      user?.admin ? (
+        <BadgeSmall color="green" variant="faded" icon="ri:shield-star-fill" text="Administrator — full access" />
+      ) : (
+        <Fragment>
+          <span class="text-sm text-day-400">Your access:</span>
+          {grantedCapabilities.map((capability) => (
+            <BadgeSmall color="blue" variant="faded" icon={capability.icon} text={capability.label} />
+          ))}
+        </Fragment>
+      )
+    }
+  </div>
+
   <nav>
     <ol class="grid grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*40),1fr))] gap-4">
       {
-        adminLinks
-          .filter((link) => link.href)
-          .map((link) => (
+        visibleLinks.map((link) => (
             <li
               class={cn(
                 'group transition-transform duration-250 ease-out-back hover:-translate-y-0.5 hover:scale-105',

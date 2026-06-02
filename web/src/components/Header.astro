@@ -5,9 +5,9 @@ import { sample } from 'lodash-es'
 import { splashTexts } from '../constants/splashTexts'
 import { DEPLOYMENT_MODE } from '../lib/client/envVariables'
 import { cn } from '../lib/cn'
+import { userCanAccessAdmin } from '../lib/permissions'
 import { makeLoginUrl, makeUnimpersonateUrl } from '../lib/redirectUrls'
 
-import AdminOnly from './AdminOnly.astro'
 import HeaderNotificationIndicator from './HeaderNotificationIndicator.astro'
 import HeaderSplashTextScript from './HeaderSplashTextScript.astro'
 import Logo from './Logo.astro'
@@ -16,6 +16,7 @@ import UserBadge from './UserBadge.astro'
 
 const user = Astro.locals.user
 const actualUser = Astro.locals.actualUser
+const canAccessAdmin = userCanAccessAdmin(user)
 
 type Props = {
   classNames?: {
@@ -128,19 +129,21 @@ const splashText = showSplashText ? sample(splashTexts) : null
         <span class="hidden text-sm font-medium 2xs:inline">Swap</span>
       </Tooltip>
 
-      <AdminOnly>
-        <Tooltip
-          as="a"
-          href="/admin"
-          class="flex h-full items-center text-red-500 transition-colors hover:text-red-400"
-          transition:name="header-admin-link"
-          text="Admin Dashboard"
-          position="left"
-          aria-label="Admin Dashboard"
-        >
-          <Icon name="ri:home-gear-line" class="size-10" />
-        </Tooltip>
-      </AdminOnly>
+      {
+        canAccessAdmin && (
+          <Tooltip
+            as="a"
+            href="/admin"
+            class="flex h-full items-center text-red-500 transition-colors hover:text-red-400"
+            transition:name="header-admin-link"
+            text="Admin Dashboard"
+            position="left"
+            aria-label="Admin Dashboard"
+          >
+            <Icon name="ri:home-gear-line" class="size-10" />
+          </Tooltip>
+        )
+      }
 
       {
         user ? (

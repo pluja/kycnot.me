@@ -5,7 +5,7 @@ import { hashApiKey } from './lib/apiKey'
 import { ErrorBanners, getMessagesFromUrl } from './lib/errorBanners'
 import { getImpersonationInfo } from './lib/impersonation'
 import { makeUserWithKarmaUnlocks } from './lib/karmaUnlocks'
-import { adminRouteRequiredCapability, userCan } from './lib/permissions'
+import { adminRouteRequiredCapability, userCan, userCanAccessAdmin } from './lib/permissions'
 import { prisma } from './lib/prisma'
 import { makeLoginUrl, makeSafeRedirectUrl } from './lib/redirectUrls'
 import { getRedisActionsSessions } from './lib/redis/redisActionsSessions'
@@ -170,9 +170,16 @@ const protectRoutes = defineMiddleware(async (context, next) => {
       return context.redirect(makeLoginUrl(context.url, { message: 'Login to access this page' }))
     }
 
+    // The dashboard root is reachable by anyone with admin access (it only
+    // renders the links they can use). Every other unmapped admin route is
+    // superuser-only (default-deny).
+    const isAdminRoot = context.url.pathname === '/admin' || context.url.pathname === '/admin/'
     const requiredCapability = adminRouteRequiredCapability(context.url.pathname)
-    // An unmapped admin route is superuser-only (default-deny).
-    const granted = requiredCapability ? userCan(user, requiredCapability) : user.admin
+    const granted = isAdminRoot
+      ? userCanAccessAdmin(user)
+      : requiredCapability
+        ? userCan(user, requiredCapability)
+        : user.admin
 
     if (!granted) {
       const accessDeniedUrl = new URL('/access-denied', context.url)
