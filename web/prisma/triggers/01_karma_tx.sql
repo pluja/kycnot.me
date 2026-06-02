@@ -88,7 +88,7 @@ BEGIN
         ) INTO is_user_related_to_service;
         
         -- Check if the user is an admin or moderator
-        SELECT (admin = true OR moderator = true)
+        SELECT (admin = true OR 'comments:moderate' = ANY(capabilities))
         FROM "User"
         WHERE id = NEW."authorId"
         INTO is_user_admin_or_moderator;
@@ -120,7 +120,7 @@ DECLARE
 BEGIN
     IF NEW.status = 'VERIFIED' AND OLD.status != 'VERIFIED' THEN
         -- Check if the comment author is an admin or moderator
-        SELECT (admin = true OR moderator = true)
+        SELECT (admin = true OR 'comments:moderate' = ANY(capabilities))
         FROM "User"
         WHERE id = NEW."authorId"
         INTO is_user_admin_or_moderator;
@@ -202,7 +202,7 @@ BEGIN
     JOIN "Service" s ON c.id = COALESCE(NEW."commentId", OLD."commentId") AND c."serviceId" = s.id;
 
     -- Check if the comment author is an admin or moderator
-    SELECT (admin = true OR moderator = true)
+    SELECT (admin = true OR 'comments:moderate' = ANY(capabilities))
     FROM "User"
     WHERE id = comment_author_id
     INTO is_author_admin_or_moderator;
@@ -307,7 +307,7 @@ BEGIN
         -- Only award karma if the service is public
         IF service_visibility = 'PUBLIC' THEN
             -- Check if the user is an admin or moderator
-            SELECT (admin = true OR moderator = true)
+            SELECT (admin = true OR 'comments:moderate' = ANY(capabilities))
             FROM "User"
             WHERE id = NEW."userId"
             INTO is_user_admin_or_moderator;

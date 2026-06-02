@@ -19,7 +19,6 @@ const selectUserReturnFields = {
   capabilities: true,
   canCreateApiKeys: true,
   verifiedLink: true,
-  secretTokenHash: true,
   totalKarma: true,
   createdAt: true,
   updatedAt: true,

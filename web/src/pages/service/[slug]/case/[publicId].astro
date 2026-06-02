@@ -94,6 +94,10 @@ if (!caseRow) return Astro.rewrite('/404')
 
 const statusInfo = getCaseStatusInfo(caseRow.status)
 const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
+
+// Only link out to http(s) sources; anything else (javascript:, data:, ...) is dropped.
+const sourceUrl =
+  caseRow.externalSource && /^https?:\/\//i.test(caseRow.externalSource) ? caseRow.externalSource : null
 ---
 
 <BaseLayout
@@ -136,8 +140,8 @@ const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
       <span>Opened <TimeFormatted date={caseRow.createdAt} /></span>
       {caseRow.amountText && <span>Amount: {caseRow.amountText}</span>}
       {
-        caseRow.externalSource && (
-          <a href={caseRow.externalSource} rel="nofollow noopener" class="inline-flex items-center gap-1 hover:text-day-200">
+        sourceUrl && (
+          <a href={sourceUrl} rel="nofollow noopener" class="inline-flex items-center gap-1 hover:text-day-200">
             <Icon name="ri:external-link-line" class="size-4" />
             Source
           </a>

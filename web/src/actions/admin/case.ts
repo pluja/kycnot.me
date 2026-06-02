@@ -17,6 +17,18 @@ const emptyToUndefined = (value: unknown) => (value === '' || value === null ? u
 const optionalText = z.preprocess(emptyToUndefined, z.string().optional())
 const optionalPositiveInt = z.preprocess(emptyToUndefined, z.coerce.number().int().positive().optional())
 
+// externalSource is rendered as a link href, so only http(s) URLs are accepted.
+// This blocks javascript:/data: and other script-capable schemes at the source.
+const optionalHttpUrl = z.preprocess(
+  emptyToUndefined,
+  z
+    .string()
+    .trim()
+    .url()
+    .refine((value) => /^https?:\/\//i.test(value), 'Source must start with http:// or https://')
+    .optional()
+)
+
 // resolvedAt is stamped when a case enters RESOLVED and kept if already set;
 // any other status clears it.
 function resolvedAtFor(status: CaseStatus, existing: Date | null): Date | null {
@@ -43,7 +55,7 @@ export const adminCaseActions = {
       status: z.nativeEnum(CaseStatus).default(CaseStatus.DRAFT),
       summaryMd: z.string().min(1),
       amountText: optionalText,
-      externalSource: optionalText,
+      externalSource: optionalHttpUrl,
       reportedById: optionalPositiveInt,
     }),
     handler: async (input, context) => {
@@ -85,7 +97,7 @@ export const adminCaseActions = {
       status: z.nativeEnum(CaseStatus),
       summaryMd: z.string().min(1),
       amountText: optionalText,
-      externalSource: optionalText,
+      externalSource: optionalHttpUrl,
       resolutionMd: optionalText,
       reportedById: z.preprocess(
         (value) => (value === '' || value === null ? null : value),
@@ -153,7 +165,22 @@ export const adminCaseActions = {
     permissions: manageCases,
     input: z.object({ caseId: z.coerce.number().int().positive() }),
     handler: async (input) => {
+      const evidence = await prisma.caseEvidence.findMany({
+        where: { caseId: input.caseId },
+        select: { imageUrl: true },
+      })
       const deleted = await prisma.case.delete({ where: { id: input.caseId }, select: { id: true } })
+
+      for (const item of evidence) {
+        if (item.imageUrl) {
+          try {
+            await deleteFileLocally(item.imageUrl)
+          } catch (error: unknown) {
+            console.error('Failed to delete case evidence image:', error)
+          }
+        }
+      }
+
       return { case: deleted }
     },
   }),

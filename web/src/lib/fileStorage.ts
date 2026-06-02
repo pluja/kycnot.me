@@ -146,6 +146,14 @@ export async function deleteFileLocally(fileUrl: string): Promise<void> {
   const { fsPath: uploadDirWithoutSubDir } = getUploadDir() // Get base upload directory
   const filePath = path.join(uploadDirWithoutSubDir, subPathAndFile)
 
+  // Confine deletion to the upload directory: a fileUrl containing ../ would
+  // otherwise resolve outside it and let a caller unlink arbitrary files.
+  const resolvedBase = path.resolve(uploadDirWithoutSubDir)
+  const resolvedTarget = path.resolve(filePath)
+  if (resolvedTarget !== resolvedBase && !resolvedTarget.startsWith(resolvedBase + path.sep)) {
+    throw new Error('Refusing to delete a file outside the upload directory')
+  }
+
   try {
     await fs.unlink(filePath)
   } catch (error: unknown) {
