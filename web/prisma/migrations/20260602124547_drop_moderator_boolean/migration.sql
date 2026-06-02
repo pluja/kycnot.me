@@ -1,3 +1,15 @@
+-- Decompose the legacy `moderator` boolean into capabilities.
+--   1. Grant existing moderators their equivalent capabilities (read before drop).
+--   2. Recreate the rating-trust + status-notification triggers so they key off
+--      `capabilities` instead of `moderator`, removing the column dependency that
+--      would otherwise block the DROP.
+--   3. Drop the column.
+
+UPDATE "User"
+SET "capabilities" = "capabilities" || ARRAY['comments:moderate', 'contact:manage']::text[]
+WHERE "moderator" = true
+  AND NOT ("capabilities" @> ARRAY['comments:moderate']::text[]);
+
 DROP TRIGGER IF EXISTS comment_rating_trust_before_write_trigger ON "Comment";
 DROP TRIGGER IF EXISTS comment_average_rating_trigger ON "Comment";
 DROP TRIGGER IF EXISTS user_rating_trust_trigger ON "User";
@@ -308,3 +320,70 @@ WHERE rating IS NOT NULL;
 
 SELECT recalculate_service_user_rating(id)
 FROM "Service";
+
+
+CREATE OR REPLACE FUNCTION trigger_user_status_change_notifications()
+RETURNS TRIGGER AS $$
+DECLARE
+  status_change "AccountStatusChange";
+BEGIN
+  -- Check for admin status change
+  IF OLD.admin IS DISTINCT FROM NEW.admin THEN
+    IF NEW.admin = true THEN
+      status_change := 'ADMIN_TRUE';
+    ELSE
+      status_change := 'ADMIN_FALSE';
+    END IF;
+    INSERT INTO "Notification" ("userId", "type", "aboutAccountStatusChange")
+    VALUES (NEW.id, 'ACCOUNT_STATUS_CHANGE', status_change);
+  END IF;
+
+  -- Check for verified status change
+  IF OLD.verified IS DISTINCT FROM NEW.verified THEN
+    IF NEW.verified = true THEN
+      status_change := 'VERIFIED_TRUE';
+    ELSE
+      status_change := 'VERIFIED_FALSE';
+    END IF;
+    INSERT INTO "Notification" ("userId", "type", "aboutAccountStatusChange")
+    VALUES (NEW.id, 'ACCOUNT_STATUS_CHANGE', status_change);
+  END IF;
+
+  -- Check for comment-moderation capability change (the legacy "moderator" role).
+  IF ('comments:moderate' = ANY(OLD.capabilities)) IS DISTINCT FROM ('comments:moderate' = ANY(NEW.capabilities)) THEN
+    IF 'comments:moderate' = ANY(NEW.capabilities) THEN
+      status_change := 'MODERATOR_TRUE';
+    ELSE
+      status_change := 'MODERATOR_FALSE';
+    END IF;
+    INSERT INTO "Notification" ("userId", "type", "aboutAccountStatusChange")
+    VALUES (NEW.id, 'ACCOUNT_STATUS_CHANGE', status_change);
+  END IF;
+
+  -- Check for spammer status change
+  IF OLD.spammer IS DISTINCT FROM NEW.spammer THEN
+    IF NEW.spammer = true THEN
+      status_change := 'SPAMMER_TRUE';
+    ELSE
+      status_change := 'SPAMMER_FALSE';
+    END IF;
+    INSERT INTO "Notification" ("userId", "type", "aboutAccountStatusChange")
+    VALUES (NEW.id, 'ACCOUNT_STATUS_CHANGE', status_change);
+  END IF;
+
+  -- Return NULL for AFTER triggers as the return value is ignored.
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Drop the trigger if it exists to ensure a clean setup
+DROP TRIGGER IF EXISTS user_status_change_notifications_trigger ON "User";
+
+-- Create the trigger to fire after updates on specific status columns
+CREATE TRIGGER user_status_change_notifications_trigger
+  AFTER UPDATE OF admin, verified, capabilities, spammer ON "User"
+  FOR EACH ROW
+  EXECUTE FUNCTION trigger_user_status_change_notifications();
+
+-- AlterTable
+ALTER TABLE "User" DROP COLUMN "moderator";

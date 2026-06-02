@@ -3,6 +3,7 @@ import rss from '@astrojs/rss'
 import { getServiceUserRoleInfo } from '../../../../constants/serviceUserRoles'
 import { makeCommentUrl } from '../../../../lib/commentsWithReplies'
 import { getCommentsForService } from '../../../../lib/feeds'
+import { isStaff } from '../../../../lib/permissions'
 import { absoluteSiteUrl, siteOrigin } from '../../../../lib/urls'
 
 import type { APIRoute } from 'astro'
@@ -31,7 +32,7 @@ export const GET: APIRoute = async (context) => {
           comment.author.verified ? '✅' : null,
           comment.author.spammer ? '(Spammer)' : null,
           comment.author.admin ? '(Admin)' : null,
-          comment.author.moderator && !comment.author.admin ? '(Moderator)' : null,
+          isStaff(comment.author) && !comment.author.admin ? '(Staff)' : null,
           ...comment.author.serviceAffiliations.map(
             (affiliation) =>
               ` (${getServiceUserRoleInfo(affiliation.role).label} at ${affiliation.service.name})`

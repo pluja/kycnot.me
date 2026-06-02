@@ -6,26 +6,18 @@ import type { Capability } from '../constants/capabilities'
 //      (middleware enforces it; the dashboard card auto-filters by it).
 //   3. Gate the action via defineProtectedAction({ permissions: { capability } }).
 //   4. Gate inline UI via userCan / Astro.locals.userCan.
-// `admin` is a superuser (passes everything). Most non-case surfaces still use
-// the legacy admin/moderator booleans, so don't assume a surface is scoped.
+// `admin` is a superuser (passes every capability); everything else is
+// capability-gated. `verified`/`spammer` remain separate user-state flags.
 
 type UserForPermissions = {
   admin: boolean
   capabilities: string[]
-  moderator?: boolean
 }
-
-// Temporary bridge while the `moderator` boolean is decomposed into capabilities.
-// Existing moderators keep their comment/contact powers until the column is
-// dropped and these are persisted as real grants. Remove with the column.
-const legacyModeratorCapabilities: Capability[] = ['comments:moderate', 'contact:manage']
 
 export function userCan(user: UserForPermissions | null | undefined, capability: Capability): boolean {
   if (!user) return false
   if (user.admin) return true
-  if (user.capabilities.includes(capability)) return true
-  if (user.moderator && legacyModeratorCapabilities.includes(capability)) return true
-  return false
+  return user.capabilities.includes(capability)
 }
 
 // cap builds the action permission object, keeping the capability literal typed
@@ -69,4 +61,10 @@ export function userCanAccessAdmin(user: UserForPermissions | null | undefined):
   if (!user) return false
   if (user.admin) return true
   return adminRouteCapabilities.some((route) => user.capabilities.includes(route.capability))
+}
+
+// isStaff marks support-level staff (comment + service powers) for the public
+// "Staff" badge. Admins are reported separately via their own badge.
+export function isStaff(user: UserForPermissions | null | undefined): boolean {
+  return userCan(user, 'comments:moderate') && userCan(user, 'services:edit')
 }

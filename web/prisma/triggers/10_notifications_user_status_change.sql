@@ -25,9 +25,9 @@ BEGIN
     VALUES (NEW.id, 'ACCOUNT_STATUS_CHANGE', status_change);
   END IF;
 
-  -- Check for moderator status change
-  IF OLD.moderator IS DISTINCT FROM NEW.moderator THEN
-    IF NEW.moderator = true THEN
+  -- Check for comment-moderation capability change (the legacy "moderator" role).
+  IF ('comments:moderate' = ANY(OLD.capabilities)) IS DISTINCT FROM ('comments:moderate' = ANY(NEW.capabilities)) THEN
+    IF 'comments:moderate' = ANY(NEW.capabilities) THEN
       status_change := 'MODERATOR_TRUE';
     ELSE
       status_change := 'MODERATOR_FALSE';
@@ -57,6 +57,6 @@ DROP TRIGGER IF EXISTS user_status_change_notifications_trigger ON "User";
 
 -- Create the trigger to fire after updates on specific status columns
 CREATE TRIGGER user_status_change_notifications_trigger
-  AFTER UPDATE OF admin, verified, moderator, spammer ON "User"
+  AFTER UPDATE OF admin, verified, capabilities, spammer ON "User"
   FOR EACH ROW
   EXECUTE FUNCTION trigger_user_status_change_notifications();

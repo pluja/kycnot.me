@@ -25,7 +25,7 @@ const user = await Astro.locals.banners.try('Failed to load user profile', () =>
     where: { id: userId },
     select: {
       admin: true,
-      moderator: true,
+      capabilities: true,
       name: true,
       displayName: true,
       picture: true,
@@ -130,8 +130,8 @@ if (!user) return Astro.rewrite('/404')
   </ul>
 
   {
-    user.admin || user.moderator ? (
-      <p class="text-center text-balance text-red-300">Admins and moderators cannot be deleted.</p>
+    user.admin || user.capabilities.length > 0 ? (
+      <p class="text-center text-balance text-red-300">Admins and staff cannot be deleted.</p>
     ) : (
       <form method="POST" action={actions.account.delete}>
         <Captcha action={actions.account.delete} class="mb-6" />

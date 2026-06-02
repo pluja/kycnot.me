@@ -68,7 +68,7 @@ const result = Astro.getActionResult(actions.service.requestVerification)
 
 const now = new Date()
 
-const canSeeHidden = (user?.admin ?? false) || (user?.moderator ?? false)
+const canSeeHidden = Astro.locals.userCan('services:edit')
 const visibleStatuses = canSeeHidden
   ? (['PUBLIC', 'UNLISTED', 'ARCHIVED', 'HIDDEN'] as const)
   : (['PUBLIC', 'UNLISTED', 'ARCHIVED'] as const)

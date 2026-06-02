@@ -72,7 +72,7 @@ const serviceCommentSelect = {
       displayName: true,
       verified: true,
       admin: true,
-      moderator: true,
+      capabilities: true,
       spammer: true,
       serviceAffiliations: {
         select: {

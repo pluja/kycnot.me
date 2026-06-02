@@ -622,7 +622,6 @@ model User {
   spammer             Boolean   @default(false)
   verified            Boolean   @default(false)
   admin               Boolean   @default(false)
-  moderator           Boolean   @default(false)
   /// Fine-grained capability scopes granted to non-admin staff. Admins bypass
   /// this and hold every capability. Validated against the app-level capability
   /// list, not a DB enum, so new scopes ship without a migration.

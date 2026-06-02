@@ -18,6 +18,7 @@ import { capabilities } from '../../../constants/capabilities'
 import { capabilityPresets } from '../../../constants/capabilityPresets'
 import { getServiceUserRoleInfo, serviceUserRoles } from '../../../constants/serviceUserRoles'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { isStaff } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
 
 const { username } = Astro.params
@@ -56,7 +57,6 @@ const [user, allServices] = await Astro.locals.banners.tryMany([
           link: true,
           admin: true,
           verified: true,
-          moderator: true,
           spammer: true,
           capabilities: true,
           canCreateApiKeys: true,
@@ -147,7 +147,7 @@ if (!user) return Astro.rewrite('/404')
     <div class="mb-4 flex flex-wrap justify-center gap-2">
       {user.admin && <BadgeSmall color="green" text="Admin" icon="ri:shield-star-fill" />}
       {user.verified && <BadgeSmall color="cyan" text="Verified" icon="ri:verified-badge-fill" />}
-      {user.moderator && <BadgeSmall color="blue" text="Moderator" icon="ri:graduation-cap-fill" />}
+      {isStaff(user) && <BadgeSmall color="blue" text="Staff" icon="ri:graduation-cap-fill" />}
       {user.spammer && <BadgeSmall color="red" text="Spammer" icon="ri:alert-fill" />}
     </div>
 
@@ -240,11 +240,6 @@ if (!user) return Astro.rewrite('/404')
                   icon: 'ri:shield-star-fill',
                 },
                 {
-                  label: 'Moderator',
-                  value: 'moderator',
-                  icon: 'ri:graduation-cap-fill',
-                },
-                {
                   label: 'Spammer',
                   value: 'spammer',
                   icon: 'ri:alert-fill',
@@ -259,7 +254,6 @@ if (!user) return Astro.rewrite('/404')
               selectedValue={[
                 user.admin ? 'admin' : null,
                 user.verified ? 'verified' : null,
-                user.moderator ? 'moderator' : null,
                 user.spammer ? 'spammer' : null,
               ].filter((v) => v !== null)}
               required
@@ -520,7 +514,7 @@ if (!user) return Astro.rewrite('/404')
 
   <FormSection title="Delete User">
     {
-      user.admin || user.moderator ? (
+      user.admin || user.capabilities.length > 0 ? (
         <p class="text-center text-balance">This user can't be deleted</p>
       ) : (
         <p class="text-center text-balance">

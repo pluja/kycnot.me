@@ -2,6 +2,7 @@
 import { karmaUnlocksById } from '../constants/karmaUnlocks'
 import { getServiceUserRoleInfo } from '../constants/serviceUserRoles'
 import { computeKarmaUnlocks } from '../lib/karmaUnlocks'
+import { isStaff } from '../lib/permissions'
 
 import BadgeSmall from './BadgeSmall.astro'
 import Tooltip from './Tooltip.astro'
@@ -20,13 +21,13 @@ const authorStatsText = `${authorCommentCount.toLocaleString()} ${authorCommentC
 
 const isNewUser =
   new Date().getTime() - new Date(comment.author.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000
-const shouldShowNewUserAgeBadge = isNewUser && !comment.author.admin && !comment.author.moderator
+const shouldShowNewUserAgeBadge = isNewUser && !comment.author.admin && !isStaff(comment.author)
 const shouldShowSingleReviewBadge =
   authorCommentCount === 1 &&
   comment.rating !== null &&
   !comment.parentId &&
   !comment.author.admin &&
-  !comment.author.moderator
+  !isStaff(comment.author)
 const isUserRatingTrustLabel = ['Active user', 'Trusted user'].includes(comment.ratingTrustLabel ?? '')
 const shouldShowUserRatingTrustBadge =
   comment.rating !== null &&
@@ -34,7 +35,7 @@ const shouldShowUserRatingTrustBadge =
   !!comment.ratingTrustLabel &&
   isUserRatingTrustLabel &&
   !comment.author.admin &&
-  !comment.author.moderator &&
+  !isStaff(comment.author) &&
   !comment.author.verified
 ---
 
@@ -45,8 +46,8 @@ const shouldShowUserRatingTrustBadge =
     )
   }
   {
-    comment.author.moderator && !comment.author.admin && (
-      <BadgeSmall icon="ri:graduation-cap-fill" color="teal" text="Moderator" variant="faded" inlineIcon />
+    isStaff(comment.author) && !comment.author.admin && (
+      <BadgeSmall icon="ri:graduation-cap-fill" color="teal" text="Staff" variant="faded" inlineIcon />
     )
   }
 
@@ -79,7 +80,7 @@ const shouldShowUserRatingTrustBadge =
     )
   }
   {
-    authorUnlocks.highKarmaBadge && !comment.author.admin && !comment.author.moderator && (
+    authorUnlocks.highKarmaBadge && !comment.author.admin && !isStaff(comment.author) && (
       <BadgeSmall
         icon={karmaUnlocksById.highKarmaBadge.icon}
         color="lime"

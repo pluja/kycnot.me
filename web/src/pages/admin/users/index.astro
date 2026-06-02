@@ -12,6 +12,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
 import { pluralize } from '../../../lib/pluralize'
 import { prisma } from '../../../lib/prisma'
+import { isStaff } from '../../../lib/permissions'
 import { formatDateShort } from '../../../lib/timeAgo'
 import { urlWithParams } from '../../../lib/urls'
 
@@ -22,7 +23,7 @@ const { data: filters } = zodParseQueryParamsStoringErrors(
     'sort-by': z.enum(['name', 'role', 'lastLoginAt', 'karma', 'createdAt']).default('createdAt'),
     'sort-order': z.enum(['asc', 'desc']).default('desc'),
     search: z.string().optional(),
-    role: z.enum(['user', 'admin', 'moderator', 'verified', 'spammer', 'has-api-key']).optional(),
+    role: z.enum(['user', 'admin', 'staff', 'verified', 'spammer', 'has-api-key']).optional(),
     page: z.coerce.number().int().positive().default(1),
     'page-size': z.enum(['25', '50', '100']).default('25'),
   },
@@ -52,7 +53,7 @@ if (filters.role) {
   switch (filters.role) {
     case 'user': {
       whereClause.admin = false
-      whereClause.moderator = false
+      whereClause.capabilities = { isEmpty: true }
       whereClause.verified = false
       whereClause.spammer = false
       break
@@ -61,8 +62,8 @@ if (filters.role) {
       whereClause.admin = true
       break
     }
-    case 'moderator': {
-      whereClause.moderator = true
+    case 'staff': {
+      whereClause.capabilities = { isEmpty: false }
       break
     }
     case 'verified': {
@@ -90,7 +91,7 @@ const dbUsers = await prisma.user.findMany({
     picture: true,
     verified: true,
     admin: true,
-    moderator: true,
+    capabilities: true,
     spammer: true,
     totalKarma: true,
     createdAt: true,
@@ -183,7 +184,7 @@ const makePageSizeUrl = (size: string) => {
             <option value="" selected={!filters.role}>All Users</option>
             <option value="user" selected={filters.role === 'user'}>Regular Users</option>
             <option value="admin" selected={filters.role === 'admin'}>Admins</option>
-            <option value="moderator" selected={filters.role === 'moderator'}>Moderators</option>
+            <option value="staff" selected={filters.role === 'staff'}>Staff</option>
             <option value="verified" selected={filters.role === 'verified'}>Verified Users</option>
             <option value="spammer" selected={filters.role === 'spammer'}>Spammers</option>
             <option value="has-api-key" selected={filters.role === 'has-api-key'}>Has API Key</option>
@@ -351,10 +352,10 @@ const makePageSizeUrl = (size: string) => {
                           Verified
                         </span>
                       )}
-                      {user.moderator && (
+                      {isStaff(user) && (
                         <span class="inline-flex items-center gap-1 rounded-md bg-blue-900/30 px-2 py-0.5 text-xs font-medium text-blue-400">
                           <Icon name="ri:shield-check-fill" class="size-3.5" />
-                          Moderator
+                          Staff
                         </span>
                       )}
                     </div>

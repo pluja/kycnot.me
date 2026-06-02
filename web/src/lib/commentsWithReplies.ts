@@ -80,7 +80,7 @@ const commentReplyQuery = {
         name: true,
         verified: true,
         admin: true,
-        moderator: true,
+        capabilities: true,
         createdAt: true,
         lastLoginAt: true,
         displayName: true,

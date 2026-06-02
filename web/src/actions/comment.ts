@@ -8,7 +8,7 @@ import { karmaUnlocksById } from '../constants/karmaUnlocks'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
 import { makeKarmaUnlockMessage } from '../lib/karmaUnlocks'
 import { getOrCreateNotificationPreferences } from '../lib/notificationPreferences'
-import { cap } from '../lib/permissions'
+import { cap, userCan } from '../lib/permissions'
 import { prisma } from '../lib/prisma'
 import { handleHoneypotTrap, handleXSSDetection } from '../lib/spamDetection'
 import { timeTrapSecretKey } from '../lib/timeTrapSecret'
@@ -349,7 +349,7 @@ export const commentActions = {
           }))
 
           const commentStatus: CommentStatus =
-            context.locals.user.admin || context.locals.user.moderator || isRelatedToService
+            userCan(context.locals.user, 'comments:moderate') || isRelatedToService
               ? 'APPROVED'
               : 'PENDING'
 

@@ -16,7 +16,6 @@ const selectUserReturnFields = {
   picture: true,
   admin: true,
   verified: true,
-  moderator: true,
   capabilities: true,
   canCreateApiKeys: true,
   verifiedLink: true,
@@ -57,7 +56,7 @@ export const adminUserActions = {
         .default(null) // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         .transform((val) => val || null),
       pictureFile: z.instanceof(File).optional(),
-      type: z.array(z.enum(['admin', 'moderator', 'spammer'])).default([]),
+      type: z.array(z.enum(['admin', 'spammer'])).default([]),
       capabilities: z.array(capabilitiesZodEnum).default([]),
       canCreateApiKeys: z.coerce.boolean().default(false),
       verifiedLink: z
@@ -112,7 +111,6 @@ export const adminUserActions = {
           ...(context.locals.user.admin
             ? {
                 admin: type.includes('admin'),
-                moderator: type.includes('moderator'),
                 spammer: type.includes('spammer'),
                 capabilities,
                 canCreateApiKeys,

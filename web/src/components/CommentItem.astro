@@ -10,6 +10,7 @@ import {
   MAX_COMMENT_DEPTH,
   type CommentWithRepliesPopulated,
 } from '../lib/commentsWithReplies'
+import { isStaff } from '../lib/permissions'
 import { absoluteSiteUrl, siteOrigin, urlDomain } from '../lib/urls'
 
 import BadgeSmall from './BadgeSmall.astro'
@@ -217,11 +218,11 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
       />
 
       {
-        (comment.author.verified || comment.author.admin || comment.author.moderator) && (
+        (comment.author.verified || comment.author.admin || isStaff(comment.author)) && (
           <Tooltip
             text={`${
-              comment.author.admin || comment.author.moderator
-                ? `KYCnot.me ${comment.author.admin ? 'Admin' : 'Moderator'}${comment.author.verifiedLink ? '. ' : ''}`
+              comment.author.admin || isStaff(comment.author)
+                ? `KYCnot.me ${comment.author.admin ? 'Admin' : 'Staff'}${comment.author.verifiedLink ? '. ' : ''}`
                 : ''
             }${comment.author.verifiedLink ? `Related to ${urlDomain(comment.author.verifiedLink)}` : ''}`}
           >
@@ -392,7 +393,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
   }
 
   {
-    user && (user.admin || user.moderator) && comment.adminNote && (
+    canModerate && comment.adminNote && (
       <div class="mt-2 peer-checked/collapse:hidden">
         <div class="border-l-2 border-red-600 bg-red-900/20 py-0.5 pl-2 text-xs">
           <span class="font-medium text-red-400">Internal note:</span>
@@ -403,7 +404,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
   }
 
   {
-    user && (user.admin || user.moderator) && comment.authorNote && (
+    canModerate && comment.authorNote && (
       <div class="mt-2 peer-checked/collapse:hidden">
         <div class="border-l-2 border-blue-600 bg-blue-900/20 py-0.5 pl-2 text-xs">
           <span class="font-medium text-blue-400">Private context:</span>

@@ -241,10 +241,10 @@ export const accountActions = {
       })
       .superRefine(captchaFormSchemaSuperRefine),
     handler: async (_input, context) => {
-      if (context.locals.user.admin || context.locals.user.moderator) {
+      if (context.locals.user.admin || context.locals.user.capabilities.length > 0) {
         throw new ActionError({
           code: 'FORBIDDEN',
-          message: 'Admins and moderators cannot delete their own accounts.',
+          message: 'Admins and staff cannot delete their own accounts.',
         })
       }
 

@@ -21,6 +21,7 @@ import { verificationStatusesByValue } from '../../constants/verificationStatus'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
 import { makeUserWithKarmaUnlocks } from '../../lib/karmaUnlocks'
+import { isStaff } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
 import { formatDateShort } from '../../lib/timeAgo'
@@ -44,7 +45,7 @@ const user = await Astro.locals.banners.try('user', async () => {
         spammer: true,
         verified: true,
         admin: true,
-        moderator: true,
+        capabilities: true,
         verifiedLink: true,
         totalKarma: true,
         createdAt: true,
@@ -233,7 +234,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
         sameAs: user.link ? [user.link] : undefined,
         description: `User profile page for ${user.displayName ?? user.name} on KYCnot.me`,
         identifier: [user.name, user.id.toString()],
-        jobTitle: user.admin ? 'Administrator' : user.moderator ? 'Moderator' : undefined,
+        jobTitle: user.admin ? 'Administrator' : isStaff(user) ? 'Staff' : undefined,
         memberOf: KYCNOTME_SCHEMA_MINI,
         interactionStatistic: [
           {
@@ -302,7 +303,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
               )
             }
             {
-              user.moderator && (
+              isStaff(user) && (
                 <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
                   moderator
                 </span>
@@ -406,7 +407,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
               <div>
                 <p class="text-xs text-day-500">Karma</p>
                 <p class="text-day-300">
-                  {!user.admin && !user.moderator ? user.totalKarma.toLocaleString() : '∞'}
+                  {!user.admin && !isStaff(user) ? user.totalKarma.toLocaleString() : '∞'}
                 </p>
               </div>
             </li>
@@ -438,14 +439,14 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                     )
                   }
                   {
-                    user.moderator && (
+                    isStaff(user) && (
                       <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
                         Moderator
                       </span>
                     )
                   }
                   {
-                    !user.admin && !user.verified && !user.moderator && (
+                    !user.admin && !user.verified && !isStaff(user) && (
                       <span class="rounded-full border border-day-700/50 bg-day-700/20 px-2 py-0.5 text-xs text-day-400">
                         Standard User
                       </span>
@@ -590,7 +591,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
   </AdminOnly>
 
   {
-    !user.admin && !user.moderator && (
+    !user.admin && !isStaff(user) && (
       <section class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
         <header>
           <h2 class="mb-4 font-title text-xl font-bold text-day-200">
@@ -657,7 +658,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
   }
 
   {
-    !user.admin && !user.moderator && (
+    !user.admin && !isStaff(user) && (
       <section
         class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs"
         id="karma-unlocks"
@@ -948,7 +949,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
     }
 
     {
-      !user.admin && !user.moderator && (
+      !user.admin && !isStaff(user) && (
         <section class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
           <header class="flex items-center justify-between">
             <h2 class="mb-4 font-title text-xl font-bold text-day-200">
@@ -1017,7 +1018,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
     }
 
     {
-      !user.admin && !user.moderator && (
+      !user.admin && !isStaff(user) && (
         <section class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
           <header class="flex items-center justify-between">
             <h2 class="mb-4 font-title text-xl font-bold text-day-200">

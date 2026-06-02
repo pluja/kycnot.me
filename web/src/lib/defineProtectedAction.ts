@@ -13,7 +13,7 @@ import type { MaybePromise } from 'astro/actions/runtime/utils.js'
 import type { z } from 'astro/zod'
 
 type CapabilityPermission = { capability: Capability }
-type SpecialUserPermission = 'admin' | 'moderator' | 'verified'
+type SpecialUserPermission = 'admin' | 'verified'
 type Permission = CapabilityPermission | SpecialUserPermission | 'guest' | 'not-spammer' | 'user'
 
 type ActionAPIContextWithUser = ActionAPIContext & {
@@ -93,7 +93,7 @@ export function defineProtectedAction<
       // single-string permissions require that one permission specifically.
       if (Array.isArray(permissions)) {
         const granted = permissions.some((p) =>
-          p === 'verified' ? user.verified : p === 'moderator' ? user.moderator : user.admin
+          p === 'verified' ? user.verified : user.admin
         )
         if (!granted) {
           throw new ActionError({
@@ -110,14 +110,6 @@ export function defineProtectedAction<
           message: 'Verified user privileges required.',
         })
       }
-
-      if (permissions === 'moderator' && !user.moderator) {
-        throw new ActionError({
-          code: 'FORBIDDEN',
-          message: 'Moderator privileges required.',
-        })
-      }
-
       if (permissions === 'admin' && !user.admin) {
         throw new ActionError({
           code: 'FORBIDDEN',
