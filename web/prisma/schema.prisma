@@ -658,6 +658,7 @@ model User {
   contactMessages          ContactMessage[]
   reportedCases            Case[]                       @relation("CaseReporter")
   createdCases             Case[]                       @relation("CaseCreatedBy")
+  caseUpdates              CaseUpdate[]                 @relation("CaseUpdateAuthor")
 
   @@index([createdAt])
   @@index([totalKarma])
@@ -829,25 +830,47 @@ model Case {
   createdBy      User?          @relation("CaseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdById    Int?
   evidence       CaseEvidence[]
+  updates        CaseUpdate[]
 
   @@index([serviceId])
   @@index([status])
   @@index([createdAt])
 }
 
-model CaseEvidence {
-  id        Int              @id @default(autoincrement())
-  type      CaseEvidenceType
-  label     String?
-  bodyMd    String?
-  imageUrl  String?
-  order     Int              @default(0)
-  createdAt DateTime         @default(now())
+model CaseUpdate {
+  id        Int            @id @default(autoincrement())
+  bodyMd    String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @default(now()) @updatedAt
 
-  case   Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  caseId Int
+  case     Case           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId   Int
+  author   User?          @relation("CaseUpdateAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  authorId Int?
+  evidence CaseEvidence[]
 
   @@index([caseId])
+  @@index([createdAt])
+}
+
+model CaseEvidence {
+  id          Int              @id @default(autoincrement())
+  type        CaseEvidenceType
+  /// Optional friendly caption shown in the media gallery.
+  description String?
+  bodyMd      String?
+  imageUrl    String?
+  order       Int              @default(0)
+  createdAt   DateTime         @default(now())
+
+  case         Case        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId       Int
+  /// When set, the evidence belongs to a timeline update rather than the root case.
+  caseUpdate   CaseUpdate? @relation(fields: [caseUpdateId], references: [id], onDelete: Cascade)
+  caseUpdateId Int?
+
+  @@index([caseId])
+  @@index([caseUpdateId])
 }
 
 model Category {

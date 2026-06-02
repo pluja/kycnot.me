@@ -1,0 +1,226 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import { caseEvidenceTypes, getCaseEvidenceTypeInfo } from '../../../constants/caseEvidenceTypes'
+import BadgeSmall from '../../BadgeSmall.astro'
+import InputImageFile from '../../InputImageFile.astro'
+import InputSelect from '../../InputSelect.astro'
+import InputSubmitButton from '../../InputSubmitButton.astro'
+import InputText from '../../InputText.astro'
+import InputTextArea from '../../InputTextArea.astro'
+import MyPicture from '../../MyPicture.astro'
+import TimeFormatted from '../../TimeFormatted.astro'
+import DeleteConfirmButton from '../DeleteConfirmButton.astro'
+
+import type { CaseEvidenceType } from '@prisma/client'
+
+type EvidenceItem = {
+  id: number
+  type: CaseEvidenceType
+  description: string | null
+  bodyMd: string | null
+  imageUrl: string | null
+  createdAt: Date
+}
+
+type Props = {
+  caseId: number
+  caseUpdateId?: number | null
+  evidence: EvidenceItem[]
+  canManage: boolean
+  addInputErrors?: Record<string, string[] | undefined>
+  id?: string
+  addOpen?: boolean
+}
+
+const {
+  caseId,
+  caseUpdateId = null,
+  evidence,
+  canManage,
+  addInputErrors = {},
+  id = 'evidence',
+  addOpen = false,
+} = Astro.props
+
+const sectionHash = `#${id}`
+const watermarkId = `${id}-watermark`
+
+const mediaItems = evidence.filter((item) => item.imageUrl)
+const textItems = evidence.filter((item) => !item.imageUrl)
+---
+
+<div>
+  {
+    mediaItems.length > 0 && (
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        {mediaItems.map((item) => {
+          const typeInfo = getCaseEvidenceTypeInfo(item.type)
+          return (
+            <div class="group relative flex flex-col rounded-md border border-night-600 bg-night-800 p-2">
+              {canManage && (
+                <div class="absolute top-1 right-1 z-10 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                  <DeleteConfirmButton
+                    action={`${actions.admin.case.evidence.delete}${sectionHash}`}
+                    id={`evidence-${item.id.toString()}`}
+                    label="Delete evidence"
+                  >
+                    <input type="hidden" name="evidenceId" value={item.id} />
+                  </DeleteConfirmButton>
+                </div>
+              )}
+
+              <button
+                type="button"
+                class="block w-full cursor-zoom-in"
+                data-lightbox-trigger
+                data-lightbox-src={item.imageUrl}
+              >
+                <MyPicture
+                  src={item.imageUrl}
+                  alt={item.description ?? 'Case evidence'}
+                  width={220}
+                  height={220}
+                  class="aspect-square w-full rounded-sm object-cover"
+                />
+              </button>
+
+              <div class="mt-2 space-y-1">
+                <BadgeSmall text={typeInfo.label} variant="faded" color="gray" icon={typeInfo.icon} />
+                {item.description && <p class="text-sm font-medium text-day-100">{item.description}</p>}
+                {item.bodyMd && (
+                  <p class="text-xs wrap-anywhere whitespace-pre-wrap text-day-300">{item.bodyMd}</p>
+                )}
+                <input
+                  type="text"
+                  readonly
+                  value={`![${item.description ?? 'evidence'}](${item.imageUrl})`}
+                  class="w-full cursor-text rounded-sm border border-night-600 bg-night-700 p-1 font-mono text-[10px] text-day-200 select-all"
+                />
+                <TimeFormatted date={item.createdAt} class="block text-[10px] text-day-500" hourPrecision />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  {
+    textItems.length > 0 && (
+      <div class={mediaItems.length > 0 ? 'mt-3 space-y-2' : 'space-y-2'}>
+        {textItems.map((item) => {
+          const typeInfo = getCaseEvidenceTypeInfo(item.type)
+          const lineCount = item.bodyMd ? item.bodyMd.split('\n').length : 3
+          const rows = Math.min(16, Math.max(3, lineCount))
+          return (
+            <div class="rounded-md border border-night-600 bg-night-800 p-3">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex flex-wrap items-center gap-2">
+                  <BadgeSmall text={typeInfo.label} variant="faded" color="gray" icon={typeInfo.icon} />
+                  {item.description && <span class="text-sm font-medium text-day-100">{item.description}</span>}
+                </div>
+                {canManage && (
+                  <DeleteConfirmButton
+                    action={`${actions.admin.case.evidence.delete}${sectionHash}`}
+                    id={`evidence-${item.id.toString()}`}
+                    label="Delete evidence"
+                  >
+                    <input type="hidden" name="evidenceId" value={item.id} />
+                  </DeleteConfirmButton>
+                )}
+              </div>
+              {item.bodyMd && (
+                <textarea
+                  readonly
+                  rows={rows}
+                  aria-label={item.description ?? typeInfo.label}
+                  class="mt-2 w-full cursor-text resize-y rounded-sm border border-night-600 bg-night-900 p-2 font-mono text-xs whitespace-pre text-day-200 select-all"
+                  set:text={item.bodyMd}
+                />
+              )}
+              <p class="mt-1 flex items-center gap-1.5 text-[10px] text-day-500">
+                <TimeFormatted date={item.createdAt} hourPrecision />
+                {item.bodyMd && <span>· click the text to select all, then copy</span>}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  {
+    evidence.length === 0 && !canManage && (
+      <p class="text-sm text-day-400">No evidence attached.</p>
+    )
+  }
+
+  {
+    canManage && (
+      <details open={addOpen} class="mt-3 rounded-md border border-night-600 bg-night-800">
+        <summary class="cursor-pointer px-3 py-2 text-sm font-medium text-day-200">
+          <Icon name="ri:add-line" class="mr-1 inline size-4" />
+          Add evidence
+        </summary>
+        <form
+          method="POST"
+          action={`${actions.admin.case.evidence.add}${sectionHash}`}
+          enctype="multipart/form-data"
+          class="space-y-3 border-t border-night-600 p-3"
+        >
+          <input type="hidden" name="caseId" value={caseId} />
+          {caseUpdateId !== null && <input type="hidden" name="caseUpdateId" value={caseUpdateId} />}
+
+          <InputSelect
+            name="type"
+            label="Type"
+            options={caseEvidenceTypes.map((type) => ({ label: type.label, value: type.value }))}
+            selectProps={{ required: true }}
+            error={addInputErrors.type}
+          />
+
+          <InputText
+            label="Description"
+            name="description"
+            error={addInputErrors.description}
+            description="Optional caption shown in the gallery."
+          />
+
+          <InputTextArea
+            label="Text"
+            name="bodyMd"
+            inputProps={{ rows: 4 }}
+            error={addInputErrors.bodyMd}
+            description="Paste a PGP-signed Letter of Guarantee, transaction IDs, or logs. Shown verbatim. Provide this, an image, or both."
+          />
+
+          <InputImageFile
+            label="Image"
+            name="imageFile"
+            error={addInputErrors.imageFile}
+            description="Optional. PNG, JPG, WebP or AVIF, max 5MB. Served through kycnot.me."
+          />
+
+          <div class="flex items-center gap-3 rounded-lg border border-night-400 bg-night-600 p-3">
+            <input
+              type="checkbox"
+              id={watermarkId}
+              name="watermark"
+              value="true"
+              checked
+              class="size-4 rounded-sm border-zinc-600 bg-zinc-800 text-blue-500 focus:ring-blue-500"
+            />
+            <label for={watermarkId} class="flex items-center gap-2 text-sm text-day-200">
+              <Icon name="ri:drop-line" class="size-4 text-day-400" />
+              Apply KYCNOT.ME watermark to the image
+            </label>
+          </div>
+
+          <InputSubmitButton label="Add evidence" icon="ri:add-line" hideCancel />
+        </form>
+      </details>
+    )
+  }
+</div>

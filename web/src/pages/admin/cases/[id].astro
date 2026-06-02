@@ -1,0 +1,256 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions, isInputError } from 'astro:actions'
+
+import CaseEvidenceGallery from '../../../components/admin/cases/CaseEvidenceGallery.astro'
+import CaseUpdatesTimeline from '../../../components/admin/cases/CaseUpdatesTimeline.astro'
+import DeleteConfirmButton from '../../../components/admin/DeleteConfirmButton.astro'
+import BadgeSmall from '../../../components/BadgeSmall.astro'
+import Button from '../../../components/Button.astro'
+import FormSection from '../../../components/FormSection.astro'
+import InputSelect from '../../../components/InputSelect.astro'
+import InputSubmitButton from '../../../components/InputSubmitButton.astro'
+import InputText from '../../../components/InputText.astro'
+import InputTextArea from '../../../components/InputTextArea.astro'
+import Lightbox from '../../../components/Lightbox.astro'
+import TimeFormatted from '../../../components/TimeFormatted.astro'
+import { caseIssueTypes, getCaseIssueTypeInfo } from '../../../constants/caseIssueTypes'
+import { caseStatuses, getCaseStatusInfo } from '../../../constants/caseStatus'
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { prisma } from '../../../lib/prisma'
+
+import type { Prisma } from '@prisma/client'
+
+if (!Astro.locals.userCan('cases:manage')) return Astro.rewrite('/404')
+
+const caseId = Number(Astro.params.id)
+if (!Number.isInteger(caseId) || caseId <= 0) return Astro.rewrite('/404')
+
+const errorsOf = <T extends { error?: unknown } | undefined>(result: T) =>
+  isInputError(result?.error) ? result.error.fields : {}
+
+const deleteResult = Astro.getActionResult(actions.admin.case.delete)
+if (deleteResult && !deleteResult.error) return Astro.redirect('/admin/cases')
+
+const updateResult = Astro.getActionResult(actions.admin.case.update)
+Astro.locals.banners.addIfSuccess(updateResult, 'Case updated')
+const updateInputErrors = errorsOf(updateResult)
+
+const setStatusResult = Astro.getActionResult(actions.admin.case.setStatus)
+Astro.locals.banners.addIfSuccess(setStatusResult, 'Case status updated')
+
+const addEvidenceResult = Astro.getActionResult(actions.admin.case.evidence.add)
+Astro.locals.banners.addIfSuccess(addEvidenceResult, 'Evidence added')
+
+const deleteEvidenceResult = Astro.getActionResult(actions.admin.case.evidence.delete)
+Astro.locals.banners.addIfSuccess(deleteEvidenceResult, 'Evidence removed')
+
+const addUpdateResult = Astro.getActionResult(actions.admin.case.updates.add)
+Astro.locals.banners.addIfSuccess(addUpdateResult, 'Update posted')
+
+const editUpdateResult = Astro.getActionResult(actions.admin.case.updates.edit)
+Astro.locals.banners.addIfSuccess(editUpdateResult, 'Update edited')
+
+const deleteUpdateResult = Astro.getActionResult(actions.admin.case.updates.delete)
+Astro.locals.banners.addIfSuccess(deleteUpdateResult, 'Update deleted')
+
+const evidenceOrderBy = [{ order: 'asc' }, { createdAt: 'asc' }] satisfies Prisma.CaseEvidenceOrderByWithRelationInput[]
+const evidenceSelect = {
+  id: true,
+  type: true,
+  description: true,
+  bodyMd: true,
+  imageUrl: true,
+  createdAt: true,
+} satisfies Prisma.CaseEvidenceSelect
+
+const caseRow = await Astro.locals.banners.try(
+  'Failed to load case',
+  () =>
+    prisma.case.findUnique({
+      where: { id: caseId },
+      select: {
+        id: true,
+        publicId: true,
+        title: true,
+        issueType: true,
+        status: true,
+        summaryMd: true,
+        amountText: true,
+        externalSource: true,
+        resolvedAt: true,
+        resolutionMd: true,
+        createdAt: true,
+        service: { select: { name: true, slug: true } },
+        reportedBy: { select: { id: true, name: true } },
+        createdBy: { select: { name: true } },
+        evidence: { where: { caseUpdateId: null }, orderBy: evidenceOrderBy, select: evidenceSelect },
+        updates: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            bodyMd: true,
+            createdAt: true,
+            author: { select: { name: true } },
+            evidence: { orderBy: evidenceOrderBy, select: evidenceSelect },
+          },
+        },
+      },
+    }),
+  null
+)
+
+if (!caseRow) return Astro.rewrite('/404')
+
+const statusInfo = getCaseStatusInfo(caseRow.status)
+const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
+---
+
+<BaseLayout pageTitle={`Case: ${caseRow.title}`} description="Manage case" widthClassName="max-w-3xl" noindex>
+  <div class="mt-10 flex flex-wrap items-center justify-between gap-2">
+    <a
+      href="/admin/cases"
+      class="inline-flex items-center gap-1 text-sm text-day-400 transition-colors hover:text-day-200"
+    >
+      <Icon name="ri:arrow-left-line" class="size-4" />
+      All cases
+    </a>
+    <Button
+      as="a"
+      href={`/service/${caseRow.service.slug}/case/${caseRow.publicId}`}
+      size="sm"
+      variant="faded"
+      color="success"
+      icon="ri:external-link-line"
+      label="View public page"
+    />
+  </div>
+
+  <div class="mt-3 mb-6">
+    <div class="flex flex-wrap items-center gap-2">
+      <BadgeSmall text={statusInfo.label} variant="faded" color={statusInfo.color} icon={statusInfo.icon} />
+      <BadgeSmall text={issueInfo.label} variant="faded" color="gray" icon={issueInfo.icon} />
+    </div>
+    <h1 class="mt-2 font-title text-3xl font-bold">{caseRow.title}</h1>
+    <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-day-400">
+      <a href={`/service/${caseRow.service.slug}`} class="inline-flex items-center gap-1 hover:text-day-200">
+        <Icon name="ri:box-3-line" class="size-4" />
+        {caseRow.service.name}
+      </a>
+      <span>Created <TimeFormatted date={caseRow.createdAt} /></span>
+      {caseRow.createdBy && <span>by {caseRow.createdBy.name}</span>}
+    </div>
+    <p class="mt-2 text-xs text-day-500">
+      Public id: <code class="rounded-sm bg-night-700 px-1.5 py-0.5">{caseRow.publicId}</code>
+    </p>
+  </div>
+
+  <FormSection title="Details">
+    <form method="POST" action={`${actions.admin.case.update}#details`} class="space-y-4">
+      <input type="hidden" name="caseId" value={caseRow.id} />
+
+      <InputText
+        label="Title"
+        name="title"
+        inputProps={{ required: true, maxlength: 200, value: caseRow.title }}
+        error={updateInputErrors.title}
+      />
+
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <InputSelect
+          name="issueType"
+          label="Issue type"
+          options={caseIssueTypes.map((issue) => ({ label: issue.label, value: issue.value }))}
+          selectedValue={caseRow.issueType}
+          selectProps={{ required: true }}
+          error={updateInputErrors.issueType}
+        />
+
+        <InputSelect
+          name="status"
+          label="Status"
+          options={caseStatuses.map((status) => ({ label: status.label, value: status.value }))}
+          selectedValue={caseRow.status}
+          selectProps={{ required: true }}
+          error={updateInputErrors.status}
+        />
+      </div>
+
+      <InputTextArea
+        label="Summary"
+        name="summaryMd"
+        inputProps={{ required: true, rows: 8 }}
+        value={caseRow.summaryMd}
+        error={updateInputErrors.summaryMd}
+        description="Markdown supported."
+      />
+
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <InputText
+          label="Amount"
+          name="amountText"
+          inputProps={{ value: caseRow.amountText ?? '' }}
+          error={updateInputErrors.amountText}
+        />
+        <InputText
+          label="External source"
+          name="externalSource"
+          inputProps={{ type: 'url', value: caseRow.externalSource ?? '' }}
+          error={updateInputErrors.externalSource}
+        />
+      </div>
+
+      <InputText
+        label="Reporter user ID"
+        name="reportedById"
+        inputProps={{ type: 'number', min: 1, value: caseRow.reportedBy?.id ?? '' }}
+        error={updateInputErrors.reportedById}
+        description="Optional internal user id of the reporter."
+      />
+
+      <InputTextArea
+        label="Resolution"
+        name="resolutionMd"
+        inputProps={{ rows: 3 }}
+        value={caseRow.resolutionMd}
+        error={updateInputErrors.resolutionMd}
+        description="Shown when the case is resolved. Markdown supported."
+      />
+
+      <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
+    </form>
+  </FormSection>
+
+  <FormSection title="Evidence" class="mt-12">
+    <CaseEvidenceGallery
+      caseId={caseRow.id}
+      evidence={caseRow.evidence}
+      canManage
+      id="evidence"
+      addOpen
+      addInputErrors={errorsOf(addEvidenceResult)}
+    />
+  </FormSection>
+
+  <FormSection title="Updates" class="mt-12">
+    <CaseUpdatesTimeline
+      caseId={caseRow.id}
+      status={caseRow.status}
+      updates={caseRow.updates}
+      canManage
+      addInputErrors={errorsOf(addUpdateResult)}
+      editInputErrors={errorsOf(editUpdateResult)}
+    />
+  </FormSection>
+
+  <FormSection title="Danger zone" class="mt-12">
+    <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-950/20 p-4">
+      <p class="text-sm text-day-300">Deleting a case removes its updates and all evidence. This cannot be undone.</p>
+      <DeleteConfirmButton action={actions.admin.case.delete} id="case" label="Delete case">
+        <input type="hidden" name="caseId" value={caseRow.id} />
+      </DeleteConfirmButton>
+    </div>
+  </FormSection>
+
+  <Lightbox />
+</BaseLayout>

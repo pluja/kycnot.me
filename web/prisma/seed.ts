@@ -623,9 +623,15 @@ const generateFakeCase = (serviceId: number, userIds: number[]) => {
     evidence: {
       create: Array.from({ length: evidenceCount }, (_unused, index) => ({
         type: faker.helpers.arrayElement(Object.values(CaseEvidenceType)),
-        label: faker.lorem.words({ min: 1, max: 3 }),
+        description: faker.lorem.words({ min: 1, max: 3 }),
         bodyMd: faker.lorem.sentence(),
         order: index,
+      })),
+    },
+    updates: {
+      create: Array.from({ length: faker.number.int({ min: 0, max: 3 }) }, () => ({
+        bodyMd: faker.lorem.paragraph(),
+        author: { connect: { id: faker.helpers.arrayElement(userIds) } },
       })),
     },
   } satisfies Prisma.CaseCreateInput
@@ -1184,6 +1190,7 @@ async function cleanup() {
     await prisma.event.deleteMany()
     await prisma.verificationStep.deleteMany()
     await prisma.caseEvidence.deleteMany()
+    await prisma.caseUpdate.deleteMany()
     await prisma.case.deleteMany()
     await prisma.serviceSuggestionMessage.deleteMany()
     await prisma.serviceSuggestion.deleteMany()

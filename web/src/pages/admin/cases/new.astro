@@ -1,0 +1,99 @@
+---
+import { actions, isInputError } from 'astro:actions'
+
+import InputSelect from '../../../components/InputSelect.astro'
+import InputSubmitButton from '../../../components/InputSubmitButton.astro'
+import InputText from '../../../components/InputText.astro'
+import InputTextArea from '../../../components/InputTextArea.astro'
+import { caseIssueTypes } from '../../../constants/caseIssueTypes'
+import { caseStatuses } from '../../../constants/caseStatus'
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { prisma } from '../../../lib/prisma'
+
+if (!Astro.locals.userCan('cases:manage')) return Astro.rewrite('/404')
+
+const result = Astro.getActionResult(actions.admin.case.create)
+if (result && !result.error) {
+  return Astro.redirect(`/admin/cases/${result.data.case.id.toString()}`)
+}
+const inputErrors = isInputError(result?.error) ? result.error.fields : {}
+
+const services = await Astro.locals.banners.try(
+  'Failed to load services',
+  () => prisma.service.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+  []
+)
+---
+
+<BaseLayout pageTitle="New case" description="Create a service case" widthClassName="max-w-3xl" noindex>
+  <h1 class="mt-10 mb-6 font-title text-3xl font-bold">New case</h1>
+
+  <form method="POST" action={actions.admin.case.create} class="space-y-6">
+    <InputSelect
+      name="serviceId"
+      label="Service"
+      options={services.map((service) => ({ label: service.name, value: service.id.toString() }))}
+      selectProps={{ required: true }}
+      error={inputErrors.serviceId}
+    />
+
+    <InputText
+      label="Title"
+      name="title"
+      inputProps={{ required: true, maxlength: 200 }}
+      error={inputErrors.title}
+    />
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <InputSelect
+        name="issueType"
+        label="Issue type"
+        options={caseIssueTypes.map((issue) => ({ label: issue.label, value: issue.value }))}
+        selectProps={{ required: true }}
+        error={inputErrors.issueType}
+      />
+
+      <InputSelect
+        name="status"
+        label="Status"
+        options={caseStatuses.map((status) => ({ label: status.label, value: status.value }))}
+        selectedValue="DRAFT"
+        error={inputErrors.status}
+      />
+    </div>
+
+    <InputTextArea
+      label="Summary"
+      name="summaryMd"
+      inputProps={{ required: true, rows: 8 }}
+      error={inputErrors.summaryMd}
+      description="Markdown supported. Describe the case factually."
+    />
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <InputText
+        label="Amount"
+        name="amountText"
+        error={inputErrors.amountText}
+        description="Optional, e.g. 0.5 BTC"
+      />
+      <InputText
+        label="External source"
+        name="externalSource"
+        inputProps={{ type: 'url' }}
+        error={inputErrors.externalSource}
+        description="Optional link, e.g. a Bitcointalk thread"
+      />
+    </div>
+
+    <InputText
+      label="Reporter user ID"
+      name="reportedById"
+      inputProps={{ type: 'number', min: 1 }}
+      error={inputErrors.reportedById}
+      description="Optional internal user id of the reporter."
+    />
+
+    <InputSubmitButton label="Create case" icon="ri:add-line" hideCancel />
+  </form>
+</BaseLayout>

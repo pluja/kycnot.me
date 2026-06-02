@@ -1,0 +1,60 @@
+---
+import { Icon } from 'astro-icon/components'
+---
+
+<div
+  class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm"
+  data-lightbox-overlay
+>
+  <button type="button" class="absolute inset-0 cursor-default" data-lightbox-close aria-label="Close"></button>
+  <button
+    type="button"
+    class="absolute top-4 right-4 z-10 flex size-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+    data-lightbox-close
+    aria-label="Close"
+  >
+    <Icon name="ri:close-line" class="size-6" />
+  </button>
+  <img
+    src=""
+    alt="Evidence at full size"
+    class="relative max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
+    data-lightbox-img
+  />
+</div>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Optional script for the evidence image lightbox.       //
+  // Any [data-lightbox-trigger] with a data-lightbox-src    //
+  // opens the shared overlay at full size.                 //
+  ////////////////////////////////////////////////////////////
+  document.addEventListener('astro:page-load', () => {
+    const overlay = document.querySelector<HTMLDivElement>('[data-lightbox-overlay]')
+    const img = document.querySelector<HTMLImageElement>('[data-lightbox-img]')
+    if (!overlay || !img) return
+
+    document.querySelectorAll<HTMLButtonElement>('[data-lightbox-trigger]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const src = btn.dataset.lightboxSrc
+        if (!src) return
+        img.src = src
+        overlay.classList.remove('hidden')
+        overlay.classList.add('flex')
+        document.body.style.overflow = 'hidden'
+      })
+    })
+
+    const close = () => {
+      overlay.classList.add('hidden')
+      overlay.classList.remove('flex')
+      img.src = ''
+      document.body.style.overflow = ''
+    }
+
+    overlay.querySelectorAll('[data-lightbox-close]').forEach((el) => el.addEventListener('click', close))
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !overlay.classList.contains('hidden')) close()
+    })
+  })
+</script>

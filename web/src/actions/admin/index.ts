@@ -1,5 +1,6 @@
 import { adminAnnouncementActions } from './announcement'
 import { adminAttributeActions } from './attribute'
+import { adminCaseActions } from './case'
 import { adminContactActions } from './contact'
 import { adminEventActions } from './event'
 import { adminNotificationActions } from './notification'
@@ -11,6 +12,7 @@ import { verificationStep } from './verificationStep'
 export const adminActions = {
   announcement: adminAnnouncementActions,
   attribute: adminAttributeActions,
+  case: adminCaseActions,
   contact: adminContactActions,
   event: adminEventActions,
   notification: adminNotificationActions,

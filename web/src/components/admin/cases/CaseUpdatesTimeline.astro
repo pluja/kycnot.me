@@ -1,0 +1,165 @@
+---
+import { CaseStatus } from '@prisma/client'
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import { getCaseStatusInfo } from '../../../constants/caseStatus'
+import Button from '../../Button.astro'
+import InputSubmitButton from '../../InputSubmitButton.astro'
+import InputTextArea from '../../InputTextArea.astro'
+import Markdown from '../../Markdown.astro'
+import TimeFormatted from '../../TimeFormatted.astro'
+import DeleteConfirmButton from '../DeleteConfirmButton.astro'
+import EditableListItem from '../EditableListItem.astro'
+import EditToggleButton from '../EditToggleButton.astro'
+
+import CaseEvidenceGallery from './CaseEvidenceGallery.astro'
+
+import type { CaseEvidenceType } from '@prisma/client'
+
+type EvidenceItem = {
+  id: number
+  type: CaseEvidenceType
+  description: string | null
+  bodyMd: string | null
+  imageUrl: string | null
+  createdAt: Date
+}
+
+type UpdateItem = {
+  id: number
+  bodyMd: string
+  createdAt: Date
+  author: { name: string } | null
+  evidence: EvidenceItem[]
+}
+
+type Props = {
+  caseId: number
+  status: CaseStatus
+  updates: UpdateItem[]
+  canManage: boolean
+  addInputErrors?: Record<string, string[] | undefined>
+  editInputErrors?: Record<string, string[] | undefined>
+}
+
+const { caseId, status, updates, canManage, addInputErrors = {}, editInputErrors = {} } = Astro.props
+
+// Status quick-actions available from the timeline, by current status.
+const closedStatuses: CaseStatus[] = [CaseStatus.RESOLVED, CaseStatus.DISPUTED, CaseStatus.REJECTED]
+const isClosed = closedStatuses.includes(status)
+
+const statusActions: { status: CaseStatus; label: string; icon: string; color: 'danger' | 'gray' | 'success' | 'warning' }[] =
+  status === CaseStatus.DRAFT
+    ? [{ status: CaseStatus.OPEN, label: 'Publish (open)', icon: 'ri:eye-line', color: 'success' }]
+    : isClosed
+      ? [{ status: CaseStatus.OPEN, label: 'Reopen', icon: 'ri:refresh-line', color: 'warning' }]
+      : [
+          { status: CaseStatus.RESOLVED, label: 'Mark resolved', icon: 'ri:checkbox-circle-line', color: 'success' },
+          { status: CaseStatus.DISPUTED, label: 'Mark disputed', icon: 'ri:scales-3-line', color: 'warning' },
+          { status: CaseStatus.REJECTED, label: 'Reject', icon: 'ri:close-circle-line', color: 'danger' },
+        ]
+---
+
+<section class="space-y-4">
+  {
+    updates.length === 0 ? (
+      <p class="text-sm text-day-400">No updates yet.</p>
+    ) : (
+      <ol class="relative space-y-4 border-l border-night-600 pl-5">
+        {updates.map((update) => {
+          const itemId = `case-update-${update.id.toString()}`
+          return (
+            <li class="relative">
+              <span class="absolute top-3 -left-[1.65rem] flex size-5 items-center justify-center rounded-full bg-night-700 text-day-400">
+                <Icon name="ri:chat-1-line" class="size-3" />
+              </span>
+              <EditableListItem id={itemId}>
+                <Fragment slot="header">
+                  <div class="flex flex-wrap items-center gap-x-2 text-sm text-day-400">
+                    <span class="font-medium text-day-200">{update.author?.name ?? 'Unknown'}</span>
+                    <TimeFormatted date={update.createdAt} hourPrecision />
+                  </div>
+                  <div class="mt-1 text-pretty text-day-200">
+                    <Markdown content={update.bodyMd} />
+                  </div>
+                  {(update.evidence.length > 0 || canManage) && (
+                    <div class="mt-3">
+                      <CaseEvidenceGallery
+                        caseId={caseId}
+                        caseUpdateId={update.id}
+                        evidence={update.evidence}
+                        canManage={canManage}
+                        id={`evidence-update-${update.id.toString()}`}
+                      />
+                    </div>
+                  )}
+                </Fragment>
+
+                {canManage && (
+                  <Fragment slot="actions">
+                    <EditToggleButton for={itemId} />
+                    <DeleteConfirmButton
+                      action={`${actions.admin.case.updates.delete}#updates`}
+                      id={itemId}
+                      label="Delete update"
+                    >
+                      <input type="hidden" name="updateId" value={update.id} />
+                    </DeleteConfirmButton>
+                  </Fragment>
+                )}
+
+                {canManage && (
+                  <Fragment slot="edit">
+                    <form method="POST" action={`${actions.admin.case.updates.edit}#updates`} class="space-y-3">
+                      <input type="hidden" name="updateId" value={update.id} />
+                      <InputTextArea
+                        label="Update"
+                        name="bodyMd"
+                        value={update.bodyMd}
+                        inputProps={{ required: true, rows: 4 }}
+                        error={editInputErrors.bodyMd}
+                      />
+                      <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
+                    </form>
+                  </Fragment>
+                )}
+              </EditableListItem>
+            </li>
+          )
+        })}
+      </ol>
+    )
+  }
+
+  {
+    canManage && (
+      <div id="updates" class="space-y-4 rounded-lg border border-night-600 bg-night-800 p-4">
+        <form method="POST" action={`${actions.admin.case.updates.add}#updates`} class="space-y-3">
+          <input type="hidden" name="caseId" value={caseId} />
+          <InputTextArea
+            label="Add an update"
+            name="bodyMd"
+            inputProps={{ required: true, rows: 4 }}
+            error={addInputErrors.bodyMd}
+            description="Post a timeline update. Markdown supported. Attach evidence after posting."
+          />
+          <InputSubmitButton label="Post update" icon="ri:chat-new-line" hideCancel />
+        </form>
+
+        <div class="flex flex-wrap items-center gap-2 border-t border-night-600 pt-3">
+          <span class="text-xs text-day-400">
+            Status: {getCaseStatusInfo(status).label}
+          </span>
+          {statusActions.map((action) => (
+            <form method="POST" action={`${actions.admin.case.setStatus}#updates`}>
+              <input type="hidden" name="caseId" value={caseId} />
+              <input type="hidden" name="status" value={action.status} />
+              <Button type="submit" size="sm" variant="faded" color={action.color} icon={action.icon} label={action.label} />
+            </form>
+          ))}
+        </div>
+      </div>
+    )
+  }
+</section>

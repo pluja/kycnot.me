@@ -1,0 +1,188 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions, isInputError } from 'astro:actions'
+
+import CaseEvidenceGallery from '../../../../components/admin/cases/CaseEvidenceGallery.astro'
+import CaseUpdatesTimeline from '../../../../components/admin/cases/CaseUpdatesTimeline.astro'
+import BadgeSmall from '../../../../components/BadgeSmall.astro'
+import Button from '../../../../components/Button.astro'
+import Lightbox from '../../../../components/Lightbox.astro'
+import Markdown from '../../../../components/Markdown.astro'
+import TimeFormatted from '../../../../components/TimeFormatted.astro'
+import { getCaseIssueTypeInfo } from '../../../../constants/caseIssueTypes'
+import { getCaseStatusInfo } from '../../../../constants/caseStatus'
+import BaseLayout from '../../../../layouts/BaseLayout.astro'
+import { prisma } from '../../../../lib/prisma'
+
+import type { Prisma } from '@prisma/client'
+
+const { slug, publicId } = Astro.params
+if (!slug || !publicId) return Astro.rewrite('/404')
+
+const canManage = Astro.locals.userCan('cases:manage')
+// Phase 3 will open this page to the public with status-gated visibility
+// (DRAFT/REJECTED hidden). For now it is reachable by case managers only.
+if (!canManage) return Astro.rewrite('/404')
+
+const errorsOf = <T extends { error?: unknown } | undefined>(result: T) =>
+  isInputError(result?.error) ? result.error.fields : {}
+
+const addEvidenceResult = Astro.getActionResult(actions.admin.case.evidence.add)
+Astro.locals.banners.addIfSuccess(addEvidenceResult, 'Evidence added')
+
+const deleteEvidenceResult = Astro.getActionResult(actions.admin.case.evidence.delete)
+Astro.locals.banners.addIfSuccess(deleteEvidenceResult, 'Evidence removed')
+
+const addUpdateResult = Astro.getActionResult(actions.admin.case.updates.add)
+Astro.locals.banners.addIfSuccess(addUpdateResult, 'Update posted')
+
+const editUpdateResult = Astro.getActionResult(actions.admin.case.updates.edit)
+Astro.locals.banners.addIfSuccess(editUpdateResult, 'Update edited')
+
+const deleteUpdateResult = Astro.getActionResult(actions.admin.case.updates.delete)
+Astro.locals.banners.addIfSuccess(deleteUpdateResult, 'Update deleted')
+
+const setStatusResult = Astro.getActionResult(actions.admin.case.setStatus)
+Astro.locals.banners.addIfSuccess(setStatusResult, 'Case status updated')
+
+const evidenceOrderBy = [{ order: 'asc' }, { createdAt: 'asc' }] satisfies Prisma.CaseEvidenceOrderByWithRelationInput[]
+const evidenceSelect = {
+  id: true,
+  type: true,
+  description: true,
+  bodyMd: true,
+  imageUrl: true,
+  createdAt: true,
+} satisfies Prisma.CaseEvidenceSelect
+
+const caseRow = await Astro.locals.banners.try(
+  'Failed to load case',
+  () =>
+    prisma.case.findFirst({
+      where: { publicId, service: { slug } },
+      select: {
+        id: true,
+        publicId: true,
+        title: true,
+        issueType: true,
+        status: true,
+        summaryMd: true,
+        amountText: true,
+        externalSource: true,
+        resolvedAt: true,
+        resolutionMd: true,
+        createdAt: true,
+        service: { select: { name: true, slug: true } },
+        createdBy: { select: { name: true } },
+        evidence: { where: { caseUpdateId: null }, orderBy: evidenceOrderBy, select: evidenceSelect },
+        updates: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            bodyMd: true,
+            createdAt: true,
+            author: { select: { name: true } },
+            evidence: { orderBy: evidenceOrderBy, select: evidenceSelect },
+          },
+        },
+      },
+    }),
+  null
+)
+
+if (!caseRow) return Astro.rewrite('/404')
+
+const statusInfo = getCaseStatusInfo(caseRow.status)
+const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
+---
+
+<BaseLayout
+  pageTitle={`Case: ${caseRow.title}`}
+  description={`Case against ${caseRow.service.name}`}
+  widthClassName="max-w-3xl"
+  noindex
+>
+  <div
+    class="mt-8 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-950/20 p-2 text-xs text-amber-200"
+  >
+    <span class="inline-flex items-center gap-1.5">
+      <Icon name="ri:eye-off-line" class="size-4" />
+      Manager view. This page is not yet visible to the public.
+    </span>
+    <Button
+      as="a"
+      href={`/admin/cases/${caseRow.id.toString()}`}
+      size="sm"
+      variant="faded"
+      color="gray"
+      icon="ri:settings-3-line"
+      label="Edit case"
+    />
+  </div>
+
+  <article class="mt-6">
+    <div class="flex flex-wrap items-center gap-2">
+      <BadgeSmall text={statusInfo.label} variant="faded" color={statusInfo.color} icon={statusInfo.icon} />
+      <BadgeSmall text={issueInfo.label} variant="faded" color="gray" icon={issueInfo.icon} />
+    </div>
+
+    <h1 class="mt-2 font-title text-3xl font-bold">{caseRow.title}</h1>
+
+    <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-day-400">
+      <a href={`/service/${caseRow.service.slug}`} class="inline-flex items-center gap-1 hover:text-day-200">
+        <Icon name="ri:box-3-line" class="size-4" />
+        {caseRow.service.name}
+      </a>
+      <span>Opened <TimeFormatted date={caseRow.createdAt} /></span>
+      {caseRow.amountText && <span>Amount: {caseRow.amountText}</span>}
+      {
+        caseRow.externalSource && (
+          <a href={caseRow.externalSource} rel="nofollow noopener" class="inline-flex items-center gap-1 hover:text-day-200">
+            <Icon name="ri:external-link-line" class="size-4" />
+            Source
+          </a>
+        )
+      }
+    </div>
+
+    <div class="mt-4 text-pretty text-day-200">
+      <Markdown content={caseRow.summaryMd} />
+    </div>
+
+    {
+      caseRow.resolutionMd && (
+        <div class="mt-4 rounded-lg border border-green-500/30 bg-green-950/20 p-3">
+          <p class="mb-1 text-xs font-semibold text-green-300">Resolution</p>
+          <div class="text-pretty text-day-200">
+            <Markdown content={caseRow.resolutionMd} />
+          </div>
+        </div>
+      )
+    }
+  </article>
+
+  <section class="mt-8">
+    <h2 class="mb-3 font-title text-xl font-bold">Evidence</h2>
+    <CaseEvidenceGallery
+      caseId={caseRow.id}
+      evidence={caseRow.evidence}
+      canManage={canManage}
+      id="evidence"
+      addInputErrors={errorsOf(addEvidenceResult)}
+    />
+  </section>
+
+  <section class="mt-8">
+    <h2 class="mb-3 font-title text-xl font-bold">Updates</h2>
+    <CaseUpdatesTimeline
+      caseId={caseRow.id}
+      status={caseRow.status}
+      updates={caseRow.updates}
+      canManage={canManage}
+      addInputErrors={errorsOf(addUpdateResult)}
+      editInputErrors={errorsOf(editUpdateResult)}
+    />
+  </section>
+
+  <Lightbox />
+</BaseLayout>
