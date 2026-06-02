@@ -8,6 +8,7 @@ import { karmaUnlocksById } from '../constants/karmaUnlocks'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
 import { makeKarmaUnlockMessage } from '../lib/karmaUnlocks'
 import { getOrCreateNotificationPreferences } from '../lib/notificationPreferences'
+import { cap } from '../lib/permissions'
 import { prisma } from '../lib/prisma'
 import { handleHoneypotTrap, handleXSSDetection } from '../lib/spamDetection'
 import { timeTrapSecretKey } from '../lib/timeTrapSecret'
@@ -299,7 +300,7 @@ export const commentActions = {
       // --- Rate Limit Check End ---
 
       // --- Issue tags and admin-only note from user submission ---
-      const issueTypes: ('KYC_REQUESTED' | 'FUNDS_BLOCKED')[] = []
+      const issueTypes: ('FUNDS_BLOCKED' | 'KYC_REQUESTED')[] = []
       if (input.issueKycRequested) issueTypes.push('KYC_REQUESTED')
       if (input.issueFundsBlocked) issueTypes.push('FUNDS_BLOCKED')
 
@@ -412,7 +413,7 @@ export const commentActions = {
   }),
 
   moderate: defineProtectedAction({
-    permissions: ['admin', 'moderator'],
+    permissions: cap('comments:moderate'),
     input: z.discriminatedUnion('action', [
       z.object({
         commentId: z.number().int().positive(),
@@ -487,11 +488,7 @@ export const commentActions = {
             updateData.humanDecidedAt = new Date()
             updateData.humanDecidedBy = { connect: { id: context.locals.user.id } }
             updateData.status =
-              input.value === 'APPROVE'
-                ? 'APPROVED'
-                : input.value === 'REJECT'
-                  ? 'REJECTED'
-                  : 'PENDING'
+              input.value === 'APPROVE' ? 'APPROVED' : input.value === 'REJECT' ? 'REJECTED' : 'PENDING'
             break
           }
           case 'rating-mute':
@@ -546,7 +543,7 @@ export const commentActions = {
             input.action === 'rating-mute-reason' ||
             input.action === 'private-proof-status')
         const preferredCommentId =
-          input.action === 'rating-mute' && input.value === false ? input.commentId : undefined
+          input.action === 'rating-mute' && !input.value ? input.commentId : undefined
 
         await prisma.$transaction(async (tx) => {
           await tx.comment.update({

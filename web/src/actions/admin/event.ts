@@ -3,17 +3,15 @@ import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
+import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 
-const endedAtSchema = z.preprocess(
-  (val) => (val === '' ? null : val),
-  z.coerce.date().nullable().optional()
-)
+const endedAtSchema = z.preprocess((val) => (val === '' ? null : val), z.coerce.date().nullable().optional())
 
 export const adminEventActions = {
   create: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: z
       .object({
         serviceId: z.coerce.number().int().positive(),
@@ -50,7 +48,7 @@ export const adminEventActions = {
 
   toggle: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: z.object({
       eventId: z.coerce.number().int().positive(),
     }),
@@ -78,7 +76,7 @@ export const adminEventActions = {
 
   update: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: z
       .object({
         eventId: z.coerce.number().int().positive(),
@@ -122,7 +120,7 @@ export const adminEventActions = {
 
   delete: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: z.object({
       eventId: z.coerce.number().int().positive(),
     }),

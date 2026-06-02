@@ -5,6 +5,7 @@ import { ActionError } from 'astro:actions'
 import { capabilitiesZodEnum } from '../../constants/capabilities'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { saveFileLocally } from '../../lib/fileStorage'
+import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 
 const selectUserReturnFields = {
@@ -29,7 +30,7 @@ const selectUserReturnFields = {
 export const adminUserActions = {
   search: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('users:manage'),
     input: z.object({
       name: z.string().min(1, 'User name is required'),
     }),
@@ -45,7 +46,7 @@ export const adminUserActions = {
 
   update: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('users:manage'),
     input: z.object({
       id: z.number().int().positive(),
       name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
@@ -56,7 +57,7 @@ export const adminUserActions = {
         .default(null) // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         .transform((val) => val || null),
       pictureFile: z.instanceof(File).optional(),
-      type: z.array(z.enum(['admin', 'moderator', 'spammer'])),
+      type: z.array(z.enum(['admin', 'moderator', 'spammer'])).default([]),
       capabilities: z.array(capabilitiesZodEnum).default([]),
       canCreateApiKeys: z.coerce.boolean().default(false),
       verifiedLink: z
@@ -72,7 +73,10 @@ export const adminUserActions = {
         .default(null) // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         .transform((val) => val || null),
     }),
-    handler: async ({ id, pictureFile, type, capabilities, canCreateApiKeys, ...valuesToUpdate }) => {
+    handler: async (
+      { id, pictureFile, type, capabilities, canCreateApiKeys, ...valuesToUpdate },
+      context
+    ) => {
       const user = await prisma.user.findUnique({
         where: {
           id,
@@ -103,11 +107,17 @@ export const adminUserActions = {
           displayName: valuesToUpdate.displayName,
           verified: !!valuesToUpdate.verifiedLink,
           picture: pictureUrl,
-          admin: type.includes('admin'),
-          moderator: type.includes('moderator'),
-          spammer: type.includes('spammer'),
-          capabilities,
-          canCreateApiKeys,
+          // Role, capability and API-key grants are admin-only; a users:manage
+          // editor (e.g. support) leaves them untouched.
+          ...(context.locals.user.admin
+            ? {
+                admin: type.includes('admin'),
+                moderator: type.includes('moderator'),
+                spammer: type.includes('spammer'),
+                capabilities,
+                canCreateApiKeys,
+              }
+            : {}),
         },
         select: selectUserReturnFields,
       })
@@ -121,7 +131,7 @@ export const adminUserActions = {
   internalNotes: {
     add: defineProtectedAction({
       accept: 'form',
-      permissions: 'admin',
+      permissions: cap('users:manage'),
       input: z.object({
         userId: z.coerce.number().int().positive(),
         content: z.string().min(1).max(1000),
@@ -144,7 +154,7 @@ export const adminUserActions = {
 
     delete: defineProtectedAction({
       accept: 'form',
-      permissions: 'admin',
+      permissions: cap('users:manage'),
       input: z.object({
         noteId: z.coerce.number().int().positive(),
       }),
@@ -159,7 +169,7 @@ export const adminUserActions = {
 
     update: defineProtectedAction({
       accept: 'form',
-      permissions: 'admin',
+      permissions: cap('users:manage'),
       input: z.object({
         noteId: z.coerce.number().int().positive(),
         content: z.string().min(1).max(1000),
@@ -186,7 +196,7 @@ export const adminUserActions = {
   serviceAffiliations: {
     add: defineProtectedAction({
       accept: 'form',
-      permissions: 'admin',
+      permissions: cap('users:manage'),
       input: z.object({
         userId: z.coerce.number().int().positive(),
         serviceId: z.coerce.number().int().positive(),
@@ -271,7 +281,7 @@ export const adminUserActions = {
 
     remove: defineProtectedAction({
       accept: 'form',
-      permissions: 'admin',
+      permissions: cap('users:manage'),
       input: z.object({
         id: z.coerce.number().int().positive(),
       }),
@@ -297,7 +307,7 @@ export const adminUserActions = {
   karmaTransactions: {
     add: defineProtectedAction({
       accept: 'form',
-      permissions: 'admin',
+      permissions: cap('users:manage'),
       input: z.object({
         userId: z.coerce.number().int().positive(),
         points: z.coerce.number().int(),

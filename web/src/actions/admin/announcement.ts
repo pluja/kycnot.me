@@ -3,6 +3,7 @@ import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
+import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 
 const selectAnnouncementReturnFields = {
@@ -21,7 +22,7 @@ const selectAnnouncementReturnFields = {
 export const adminAnnouncementActions = {
   create: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('announcements:manage'),
     input: z.object({
       content: z
         .string()
@@ -59,7 +60,7 @@ export const adminAnnouncementActions = {
 
   update: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('announcements:manage'),
     input: z.object({
       id: z.coerce.number().int().positive(),
       content: z
@@ -115,7 +116,7 @@ export const adminAnnouncementActions = {
 
   delete: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('announcements:manage'),
     input: z.object({
       id: z.coerce.number().int().positive(),
     }),
@@ -146,7 +147,7 @@ export const adminAnnouncementActions = {
 
   toggleActive: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('announcements:manage'),
     input: z.object({
       id: z.coerce.number().int().positive(),
       isActive: z.coerce.boolean(),

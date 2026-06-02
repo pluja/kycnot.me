@@ -4,6 +4,7 @@ import { ActionError } from 'astro:actions'
 import slugify from 'slugify'
 
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
+import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 
 import type { Prisma } from '@prisma/client'
@@ -37,7 +38,7 @@ const attributeSelect = {
 export const adminAttributeActions = {
   create: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('attributes:manage'),
     input: z.object({
       title: z.string().min(1, 'Title is required'),
       description: z.string().min(1, 'Description is required'),
@@ -62,7 +63,7 @@ export const adminAttributeActions = {
 
   update: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('attributes:manage'),
     input: attributeInputSchema.extend({
       id: z.coerce.number().int().positive(),
     }),
@@ -109,7 +110,7 @@ export const adminAttributeActions = {
 
   delete: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('attributes:manage'),
     input: z.object({
       id: z.coerce.number().int().positive('Attribute ID must be a positive integer.'),
     }),

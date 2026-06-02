@@ -3,13 +3,14 @@ import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
+import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { sendChatMessageEvents } from '../../lib/sendChatEvents'
 
 export const adminServiceSuggestionActions = {
   update: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('suggestions:manage'),
     input: z.object({
       suggestionId: z.coerce.number().int().positive(),
       status: z.nativeEnum(ServiceSuggestionStatus),
@@ -42,7 +43,7 @@ export const adminServiceSuggestionActions = {
 
   message: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('suggestions:manage'),
     input: z.object({
       suggestionId: z.coerce.number().int().positive(),
       content: z.string().min(1).max(1000),

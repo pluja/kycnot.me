@@ -226,91 +226,96 @@ if (!user) return Astro.rewrite('/404')
         description="Upload a square image for best results. Supported formats: JPG, PNG, WebP, AVIF. Max size: 5MB."
       />
 
-      <InputCardGroup
-        name="type"
-        label="Type"
-        options={[
-          {
-            label: 'Admin',
-            value: 'admin',
-            icon: 'ri:shield-star-fill',
-          },
-          {
-            label: 'Moderator',
-            value: 'moderator',
-            icon: 'ri:graduation-cap-fill',
-          },
-          {
-            label: 'Spammer',
-            value: 'spammer',
-            icon: 'ri:alert-fill',
-          },
-          {
-            label: 'Verified',
-            value: 'verified',
-            icon: 'ri:verified-badge-fill',
-            disabled: true,
-          },
-        ]}
-        selectedValue={[
-          user.admin ? 'admin' : null,
-          user.verified ? 'verified' : null,
-          user.moderator ? 'moderator' : null,
-          user.spammer ? 'spammer' : null,
-        ].filter((v) => v !== null)}
-        required
-        cardSize="sm"
-        iconSize="sm"
-        multiple
-        error={updateInputErrors.type}
-      />
+      {
+        /* Role, capability and API-key grants are admin-only (the action ignores them otherwise). */
+        Astro.locals.user?.admin && (
+          <Fragment>
+            <InputCardGroup
+              name="type"
+              label="Type"
+              options={[
+                {
+                  label: 'Admin',
+                  value: 'admin',
+                  icon: 'ri:shield-star-fill',
+                },
+                {
+                  label: 'Moderator',
+                  value: 'moderator',
+                  icon: 'ri:graduation-cap-fill',
+                },
+                {
+                  label: 'Spammer',
+                  value: 'spammer',
+                  icon: 'ri:alert-fill',
+                },
+                {
+                  label: 'Verified',
+                  value: 'verified',
+                  icon: 'ri:verified-badge-fill',
+                  disabled: true,
+                },
+              ]}
+              selectedValue={[
+                user.admin ? 'admin' : null,
+                user.verified ? 'verified' : null,
+                user.moderator ? 'moderator' : null,
+                user.spammer ? 'spammer' : null,
+              ].filter((v) => v !== null)}
+              required
+              cardSize="sm"
+              iconSize="sm"
+              multiple
+              error={updateInputErrors.type}
+            />
 
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-sm text-day-400">Apply preset:</span>
-        {
-          capabilityPresets.map((preset) => (
-            <button
-              type="button"
-              data-capability-preset={preset.capabilities.join(',')}
-              class="inline-flex items-center gap-1.5 rounded-md border border-night-500 px-2.5 py-1 text-xs text-day-200 transition-colors hover:border-night-400 hover:bg-night-700"
-            >
-              <Icon name={preset.icon} class="size-3.5" />
-              {preset.label}
-            </button>
-          ))
-        }
-      </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-sm text-day-400">Apply preset:</span>
+              {capabilityPresets.map((preset) => (
+                <button
+                  type="button"
+                  data-capability-preset={preset.capabilities.join(',')}
+                  class="inline-flex items-center gap-1.5 rounded-md border border-night-500 px-2.5 py-1 text-xs text-day-200 transition-colors hover:border-night-400 hover:bg-night-700"
+                >
+                  <Icon name={preset.icon} class="size-3.5" />
+                  {preset.label}
+                </button>
+              ))}
+            </div>
 
-      <InputCardGroup
-        name="capabilities"
-        label="Capabilities"
-        options={capabilities.map((capability) => ({
-          label: capability.label,
-          value: capability.value,
-          icon: capability.icon,
-          description: capability.description,
-        }))}
-        selectedValue={user.capabilities}
-        cardSize="sm"
-        iconSize="sm"
-        multiple
-        error={updateInputErrors.capabilities}
-      />
+            <InputCardGroup
+              name="capabilities"
+              label="Capabilities"
+              options={capabilities.map((capability) => ({
+                label: capability.label,
+                value: capability.value,
+                icon: capability.icon,
+                description: capability.description,
+              }))}
+              selectedValue={user.capabilities}
+              cardSize="sm"
+              iconSize="sm"
+              multiple
+              error={updateInputErrors.capabilities}
+            />
 
-      <div class="flex items-center gap-3 rounded-lg border border-night-400 bg-night-600 p-3">
-        <input
-          type="checkbox"
-          id="canCreateApiKeys"
-          name="canCreateApiKeys"
-          value="true"
-          checked={user.canCreateApiKeys}
-          class="size-4 rounded-sm border-zinc-600 bg-zinc-800 text-blue-500 focus:ring-blue-500"
-        />
-        <label for="canCreateApiKeys" class="flex items-center gap-2 text-sm text-day-200">
-          <Icon name="ri:key-2-line" class="size-4 text-day-400" />
-          Allow API key creation
-        </label>
-      </div>
+            <div class="flex items-center gap-3 rounded-lg border border-night-400 bg-night-600 p-3">
+              <input
+                type="checkbox"
+                id="canCreateApiKeys"
+                name="canCreateApiKeys"
+                value="true"
+                checked={user.canCreateApiKeys}
+                class="size-4 rounded-sm border-zinc-600 bg-zinc-800 text-blue-500 focus:ring-blue-500"
+              />
+              <label for="canCreateApiKeys" class="flex items-center gap-2 text-sm text-day-200">
+                <Icon name="ri:key-2-line" class="size-4 text-day-400" />
+                Allow API key creation
+              </label>
+            </div>
+          </Fragment>
+        )
+      }
 
       <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
     </form>

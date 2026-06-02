@@ -1,13 +1,14 @@
 import { z } from 'astro/zod'
 
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
+import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { stringListOfSlugsSchemaRequired } from '../../lib/zodUtils'
 
 export const adminNotificationActions = {
   test: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('notifications:manage'),
     input: z.object({
       userNames: stringListOfSlugsSchemaRequired,
     }),

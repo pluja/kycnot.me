@@ -2,11 +2,12 @@ import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
+import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 
 export const adminContactActions = {
   update: defineProtectedAction({
-    permissions: ['admin', 'moderator'],
+    permissions: cap('contact:manage'),
     input: z.discriminatedUnion('action', [
       z.object({
         messageId: z.number().int().positive(),

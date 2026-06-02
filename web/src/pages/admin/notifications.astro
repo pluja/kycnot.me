@@ -9,8 +9,9 @@ import MiniLayout from '../../layouts/MiniLayout.astro'
 import { cn } from '../../lib/cn'
 import { prisma } from '../../lib/prisma'
 
-// Check if user is admin
-if (!Astro.locals.user?.admin) {
+// Requires the notifications:manage capability
+const currentUser = Astro.locals.user
+if (!currentUser || !Astro.locals.userCan('notifications:manage')) {
   return Astro.redirect('/access-denied')
 }
 
@@ -111,7 +112,7 @@ const stats = [
         placeholder: 'john-doe, jane-doe',
         class: 'leading-tight min-h-24',
       }}
-      value={uniq([Astro.locals.user, ...adminUsers].map((user) => user.name)).join('\n')}
+      value={uniq([currentUser, ...adminUsers].map((user) => user.name)).join('\n')}
       description={[
         '- Comma-separated list of user names.',
         '- Minimum 1 user name.',

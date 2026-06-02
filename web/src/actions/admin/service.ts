@@ -7,6 +7,7 @@ import slugify from 'slugify'
 import { countriesZodEnumByCode } from '../../constants/countries'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { saveFileLocally, deleteFileLocally } from '../../lib/fileStorage'
+import { cap, userCan } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { separateServiceUrlsByType } from '../../lib/urls'
 import {
@@ -101,7 +102,7 @@ const evidenceImageDeleteSchema = z.object({
 export const adminServiceActions = {
   create: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: createServiceInputSchema,
     handler: async (input: z.infer<typeof createServiceInputSchema>, context) => {
       const existing = await prisma.service.findUnique({
@@ -121,6 +122,12 @@ export const adminServiceActions = {
         ? await saveFileLocally(input.imageFile, input.imageFile.name)
         : undefined
 
+      // Setting the verification status is gated by services:approve; others
+      // (e.g. support) create services as community-contributed.
+      const resolvedVerificationStatus = userCan(context.locals.user, 'services:approve')
+        ? input.verificationStatus
+        : VerificationStatus.COMMUNITY_CONTRIBUTED
+
       const {
         web: serviceUrls,
         onion: onionUrls,
@@ -138,7 +145,7 @@ export const adminServiceActions = {
           kycLevel: input.kycLevel,
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
           kycPolicyMd: input.kycPolicyMd || null,
-          verificationStatus: input.verificationStatus,
+          verificationStatus: resolvedVerificationStatus,
           verificationSummary: input.verificationSummary,
           verificationProofMd: input.verificationProofMd,
           acceptedCurrencies: input.acceptedCurrencies,
@@ -188,9 +195,9 @@ export const adminServiceActions = {
 
   update: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: updateServiceInputSchema,
-    handler: async (input: z.infer<typeof updateServiceInputSchema>) => {
+    handler: async (input: z.infer<typeof updateServiceInputSchema>, context) => {
       const anotherServiceWithNewSlug = await prisma.service.findUnique({
         where: {
           slug: input.slug,
@@ -249,6 +256,12 @@ export const adminServiceActions = {
           ? await saveFileLocally(input.imageFile, input.imageFile.name)
           : undefined
 
+      // Changing the verification status is gated by services:approve; for
+      // others (e.g. support) it is left untouched.
+      const resolvedVerificationStatus = userCan(context.locals.user, 'services:approve')
+        ? input.verificationStatus
+        : undefined
+
       const {
         web: serviceUrls,
         onion: onionUrls,
@@ -267,7 +280,7 @@ export const adminServiceActions = {
           kycLevel: input.kycLevel,
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
           kycPolicyMd: input.kycPolicyMd || null,
-          verificationStatus: input.verificationStatus,
+          verificationStatus: resolvedVerificationStatus,
           verificationSummary: input.verificationSummary,
           verificationProofMd: input.verificationProofMd,
           acceptedCurrencies: input.acceptedCurrencies,
@@ -318,7 +331,7 @@ export const adminServiceActions = {
   contactMethod: {
     add: defineProtectedAction({
       accept: 'form',
-      permissions: 'admin',
+      permissions: cap('services:edit'),
       input: z.object({
         label: z.string().min(1).max(50).nullable(),
         value: zodContactMethod,
@@ -338,7 +351,7 @@ export const adminServiceActions = {
 
     update: defineProtectedAction({
       accept: 'form',
-      permissions: 'admin',
+      permissions: cap('services:edit'),
       input: z.object({
         id: z.number().int().positive(),
         label: z.string().min(1).max(50).nullable(),
@@ -360,7 +373,7 @@ export const adminServiceActions = {
 
     delete: defineProtectedAction({
       accept: 'form',
-      permissions: 'admin',
+      permissions: cap('services:edit'),
       input: z.object({
         id: z.number().int().positive(),
       }),
@@ -375,7 +388,7 @@ export const adminServiceActions = {
   internalNote: {
     add: defineProtectedAction({
       accept: 'form',
-      permissions: 'admin',
+      permissions: cap('services:edit'),
       input: z.object({
         serviceId: z.number().int().positive(),
         content: z.string().min(1),
@@ -404,7 +417,7 @@ export const adminServiceActions = {
 
     update: defineProtectedAction({
       accept: 'form',
-      permissions: 'admin',
+      permissions: cap('services:edit'),
       input: z.object({
         noteId: z.number().int().positive(),
         content: z.string().min(1),
@@ -430,7 +443,7 @@ export const adminServiceActions = {
 
     delete: defineProtectedAction({
       accept: 'form',
-      permissions: 'admin',
+      permissions: cap('services:edit'),
       input: z.object({
         noteId: z.number().int().positive(),
       }),
@@ -460,7 +473,7 @@ export const adminServiceActions = {
   evidenceImage: {
     add: defineProtectedAction({
       accept: 'form',
-      permissions: 'admin',
+      permissions: cap('services:edit'),
       input: evidenceImageAddSchema,
       handler: async (input) => {
         const service = await prisma.service.findUnique({
@@ -493,7 +506,7 @@ export const adminServiceActions = {
     }),
     delete: defineProtectedAction({
       accept: 'form',
-      permissions: 'admin',
+      permissions: cap('services:edit'),
       input: evidenceImageDeleteSchema,
       handler: async (input) => {
         await deleteFileLocally(input.fileUrl)

@@ -2,6 +2,7 @@ import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
 import { defineProtectedAction } from '../../../lib/defineProtectedAction'
+import { cap } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
 
 const tosHighlightFieldsSchema = z.object({
@@ -13,7 +14,7 @@ const tosHighlightFieldsSchema = z.object({
 export const tosHighlightActions = {
   add: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: tosHighlightFieldsSchema.extend({
       serviceId: z.coerce.number().int().positive(),
     }),
@@ -56,7 +57,7 @@ export const tosHighlightActions = {
 
   update: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: tosHighlightFieldsSchema.extend({
       serviceId: z.coerce.number().int().positive(),
       index: z.coerce.number().int().min(0),
@@ -97,7 +98,7 @@ export const tosHighlightActions = {
 
   delete: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: z.object({
       serviceId: z.coerce.number().int().positive(),
       index: z.coerce.number().int().min(0),

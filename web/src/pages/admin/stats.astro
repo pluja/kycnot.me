@@ -5,8 +5,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
 import { prisma } from '../../lib/prisma'
 
-const user = Astro.locals.user
-if (!user?.admin) return Astro.rewrite('/404')
+if (!Astro.locals.userCan('stats:view')) return Astro.rewrite('/404')
 
 const RANGE_OPTIONS = [
   { id: 'today', label: 'Today', days: 1 },

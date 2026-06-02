@@ -28,11 +28,26 @@ export function userCan(user: UserForPermissions | null | undefined, capability:
   return false
 }
 
+// cap builds the action permission object, keeping the capability literal typed
+// (a bare inline `{ capability: '...' }` widens to string and fails the guard).
+export const cap = (capability: Capability) => ({ capability })
+
 // Every admin route maps to the single capability that unlocks it. Routes
 // absent from this list are superuser-only: a new /admin page is locked to
 // admins until it is granted a capability here. This is the auditable,
 // default-deny chokepoint enforced in middleware.
-const adminRouteCapabilities = [{ prefix: '/admin/cases', capability: 'cases:manage' }] as const satisfies {
+const adminRouteCapabilities = [
+  { prefix: '/admin/cases', capability: 'cases:manage' },
+  { prefix: '/admin/comments', capability: 'comments:moderate' },
+  { prefix: '/admin/contact', capability: 'contact:manage' },
+  { prefix: '/admin/service-suggestions', capability: 'suggestions:manage' },
+  { prefix: '/admin/services', capability: 'services:edit' },
+  { prefix: '/admin/attributes', capability: 'attributes:manage' },
+  { prefix: '/admin/announcements', capability: 'announcements:manage' },
+  { prefix: '/admin/notifications', capability: 'notifications:manage' },
+  { prefix: '/admin/stats', capability: 'stats:view' },
+  { prefix: '/admin/users', capability: 'users:manage' },
+] as const satisfies {
   prefix: string
   capability: Capability
 }[]

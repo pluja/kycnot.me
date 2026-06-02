@@ -21,7 +21,7 @@ import { makeLoginUrl } from '../../../lib/redirectUrls'
 import { formatDateShort } from '../../../lib/timeAgo'
 
 const user = Astro.locals.user
-if (!user?.admin) {
+if (!user || !Astro.locals.userCan('suggestions:manage')) {
   return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Admin access required' }))
 }
 
@@ -207,7 +207,11 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
 
     {
       !serviceSuggestion.proposedEdits && (
-        <form method="POST" action={actions.admin.serviceSuggestions.update} class="mt-6 flex items-end gap-2">
+        <form
+          method="POST"
+          action={actions.admin.serviceSuggestions.update}
+          class="mt-6 flex items-end gap-2"
+        >
           <input type="hidden" name="suggestionId" value={serviceSuggestion.id} />
           <InputSelect
             name="status"

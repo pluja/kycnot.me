@@ -62,9 +62,9 @@ const isHighlighted = comment.id === highlightedCommentId
 const userVote = user ? comment.votes.find((v) => v.userId === user.id) : null
 
 const isAuthor = user?.id === comment.author.id
-const isAdminOrModerator = !!user && (user.admin || user.moderator)
-const canSeeOrderId = isAdminOrModerator || viewerIsAffiliated
-const isAuthorOrPrivileged = isAuthor || isAdminOrModerator
+const canModerate = Astro.locals.userCan('comments:moderate')
+const canSeeOrderId = canModerate || viewerIsAffiliated
+const isAuthorOrPrivileged = isAuthor || canModerate
 const ratingWeightPercent = `${Math.round(comment.ratingWeight * 100).toLocaleString()}%`
 
 const isUserRatingTrustLabel = ['Active user', 'Trusted user'].includes(comment.ratingTrustLabel ?? '')
@@ -83,8 +83,7 @@ const isRatingActive =
 // TEMPLATE_SPAM, so the AI-spam case flows through this same gate.
 const isPenaltyMute =
   comment.ratingMuted &&
-  (comment.ratingMuteReason === 'SUSPICIOUS_PATTERN' ||
-    comment.ratingMuteReason === 'TEMPLATE_SPAM')
+  (comment.ratingMuteReason === 'SUSPICIOUS_PATTERN' || comment.ratingMuteReason === 'TEMPLATE_SPAM')
 
 const shouldShowRatingTrustBadge =
   comment.rating !== null &&
@@ -247,11 +246,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
       <TimeFormatted date={comment.createdAt} hourPrecision />
     </a>
 
-    {
-      isPenaltyMute && (
-        <BadgeSmall icon="ri:spam-2-fill" color="red" text="Potential SPAM" inlineIcon />
-      )
-    }
+    {isPenaltyMute && <BadgeSmall icon="ri:spam-2-fill" color="red" text="Potential SPAM" inlineIcon />}
 
     {
       comment.rating !== null && !comment.parentId && (
@@ -306,15 +301,14 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
     }
 
     {
-      comment.status === 'PENDING' &&
-        (showPending || isHighlightParent || isAuthorOrPrivileged) && (
-          <BadgeSmall
-            icon={commentStatusById.PENDING.icon}
-            color={commentStatusById.PENDING.color}
-            text={commentStatusById.PENDING.label}
-            inlineIcon
-          />
-        )
+      comment.status === 'PENDING' && (showPending || isHighlightParent || isAuthorOrPrivileged) && (
+        <BadgeSmall
+          icon={commentStatusById.PENDING.icon}
+          color={commentStatusById.PENDING.color}
+          text={commentStatusById.PENDING.label}
+          inlineIcon
+        />
+      )
     }
 
     {

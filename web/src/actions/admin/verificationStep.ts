@@ -3,6 +3,7 @@ import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
+import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 
 const verificationStepSchemaBase = z.object({
@@ -37,7 +38,7 @@ const verificationStepIdSchema = z.object({
 export const verificationStep = {
   create: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: verificationStepSchemaBase,
     handler: async (input) => {
       const { serviceId, title, description, status, evidenceMd, showBanner } = input
@@ -72,7 +73,7 @@ export const verificationStep = {
 
   update: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: verificationStepUpdateSchema,
     handler: async (input) => {
       const { id, ...dataToUpdate } = input
@@ -99,7 +100,7 @@ export const verificationStep = {
 
   delete: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: verificationStepIdSchema,
     handler: async ({ id }) => {
       const existingStep = await prisma.verificationStep.findUnique({

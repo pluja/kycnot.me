@@ -2,6 +2,7 @@ import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
 import { defineProtectedAction } from '../../../lib/defineProtectedAction'
+import { cap } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
 
 import { buildAuditLines, intersectAcceptedAttributeIds } from './deepScan.helpers'
@@ -15,7 +16,7 @@ const checkboxBoolean = z
 export const deepScanActions = {
   request: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: z.object({
       serviceId: z.coerce.number().int().positive(),
     }),
@@ -53,7 +54,7 @@ export const deepScanActions = {
 
   apply: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: z.object({
       suggestionId: z.coerce.number().int().positive(),
       acceptTosReview: checkboxBoolean,
@@ -91,10 +92,7 @@ export const deepScanActions = {
       }
 
       const proposed = suggestion.proposedEdits
-      const acceptedAdd = intersectAcceptedAttributeIds(
-        input.attributeAddIds,
-        proposed.attributes.add
-      )
+      const acceptedAdd = intersectAcceptedAttributeIds(input.attributeAddIds, proposed.attributes.add)
       const acceptedRemove = intersectAcceptedAttributeIds(
         input.attributeRemoveIds,
         proposed.attributes.remove
@@ -127,9 +125,7 @@ export const deepScanActions = {
                   }
                 : {}),
               ...(input.acceptKycLevel ? { kycLevel: proposed.kycPolicy.inferredLevel } : {}),
-              ...(input.acceptKycPolicy
-                ? { kycPolicyMd: proposed.kycPolicy.notesMd ?? null }
-                : {}),
+              ...(input.acceptKycPolicy ? { kycPolicyMd: proposed.kycPolicy.notesMd ?? null } : {}),
             },
           })
         }
@@ -176,7 +172,7 @@ export const deepScanActions = {
 
   dismiss: defineProtectedAction({
     accept: 'form',
-    permissions: 'admin',
+    permissions: cap('services:edit'),
     input: z.object({
       suggestionId: z.coerce.number().int().positive(),
       reason: z.string().trim().max(500).optional(),
@@ -203,9 +199,7 @@ export const deepScanActions = {
         })
       }
 
-      const dismissalLine = input.reason
-        ? `Dismissed by admin: ${input.reason}`
-        : 'Dismissed by admin'
+      const dismissalLine = input.reason ? `Dismissed by admin: ${input.reason}` : 'Dismissed by admin'
       const newNotes = [suggestion.notes, '', dismissalLine]
         .filter((line) => line !== null)
         .join('\n')

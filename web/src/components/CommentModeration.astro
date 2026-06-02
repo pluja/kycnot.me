@@ -73,8 +73,8 @@ const { comment, compact = false, class: className, ...divProps } = Astro.props
 
 const user = Astro.locals.user
 
-// Only render for admin/moderator users
-if (!user || (!user.admin && !user.moderator)) return null
+// Only render for users who can moderate comments
+if (!user || !Astro.locals.userCan('comments:moderate')) return null
 
 const muteReasonOptions: { value: RatingMuteReason; label: string }[] = [
   { value: 'MODERATOR_DISCRETION', label: 'Moderator discretion' },
@@ -135,10 +135,7 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
         >
           <Icon name="ri:shield-keyhole-line" class="size-3.5" />
           <span class="text-xs">Moderation</span>
-          <Icon
-            name="ri:arrow-down-s-line"
-            class="size-3.5 transition-transform peer-checked:rotate-180"
-          />
+          <Icon name="ri:arrow-down-s-line" class="size-3.5 transition-transform peer-checked:rotate-180" />
         </label>
       </>
     )
@@ -159,7 +156,7 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
         <div class="mb-2 rounded-sm border border-indigo-500/30 bg-indigo-500/10 px-2 py-1.5">
           <div class="mb-1 flex flex-wrap items-center gap-1.5 text-[10px] text-indigo-300">
             <Icon name="ri:robot-2-line" class="size-3.5" />
-            <span class="font-semibold uppercase tracking-wide">AI verdict</span>
+            <span class="font-semibold tracking-wide uppercase">AI verdict</span>
             {comment.aiDecidedAt && (
               <span class="text-indigo-400/70">
                 <TimeFormatted date={comment.aiDecidedAt} hourPrecision />
@@ -228,10 +225,12 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
       )
     }
 
-    {/* Moderation action buttons (audit-trailed). Shown in both modes; also
+    {
+      /* Moderation action buttons (audit-trailed). Shown in both modes; also
         in compact (admin row), so a moderator can decide without scrolling
         back up to the row's action rail. The effective action falls back
-        to status for legacy comments that pre-date humanAction tracking. */}
+        to status for legacy comments that pre-date humanAction tracking. */
+    }
     <div class="mb-2 flex flex-wrap items-center gap-1 border-b border-night-500 pb-2">
       <span class="mr-1 text-[10px] text-day-500">Decide:</span>
       {
@@ -285,9 +284,11 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
       </button>
     </div>
 
-    {/* Issue toggles. Mods can mark/unmark whether the user flagged KYC
+    {
+      /* Issue toggles. Mods can mark/unmark whether the user flagged KYC
         or funds-blocked problems with the service. Pyworker treats these
-        as hard gates, so accuracy matters. */}
+        as hard gates, so accuracy matters. */
+    }
     <div class="mb-2 flex flex-wrap items-center gap-1 border-b border-night-500 pb-2">
       <span class="mr-1 text-[10px] text-day-500">Issues:</span>
       {
@@ -320,7 +321,8 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
       }
     </div>
 
-    {/* Mute controls. `ratingMuted` is the unified flag: when true it
+    {
+      /* Mute controls. `ratingMuted` is the unified flag: when true it
         always disables the rating from counting; when the reason is
         SUSPICIOUS_PATTERN or TEMPLATE_SPAM it also collapses the comment,
         adds the "Potential SPAM" badge, and sinks the row to the bottom of
@@ -329,99 +331,97 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
         Mute Rating only shows for rated root comments — for replies and
         unrated comments the only meaningful mute is spam, so the Spam
         button stands alone there and doubles as a toggle (click an active
-        Spam button to clear the mute). */}
-    {(() => {
-      const canMuteRating = comment.rating !== null && !comment.parentId
-      const isSpamReason =
-        comment.ratingMuted &&
-        (comment.ratingMuteReason === 'TEMPLATE_SPAM' ||
-          comment.ratingMuteReason === 'SUSPICIOUS_PATTERN')
-      return (
-        <div class="mb-2 flex flex-wrap items-center gap-1.5 border-b border-night-500 pb-2">
-          <span class="mr-1 text-[10px] text-day-500">
-            {canMuteRating ? 'Rating:' : 'Mute:'}
-          </span>
+        Spam button to clear the mute). */
+    }
+    {
+      (() => {
+        const canMuteRating = comment.rating !== null && !comment.parentId
+        const isSpamReason =
+          comment.ratingMuted &&
+          (comment.ratingMuteReason === 'TEMPLATE_SPAM' || comment.ratingMuteReason === 'SUSPICIOUS_PATTERN')
+        return (
+          <div class="mb-2 flex flex-wrap items-center gap-1.5 border-b border-night-500 pb-2">
+            <span class="mr-1 text-[10px] text-day-500">{canMuteRating ? 'Rating:' : 'Mute:'}</span>
 
-          {canMuteRating && (
-            <button
-              class={cn(
-                'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-                comment.ratingMuted
-                  ? 'border border-orange-500/30 bg-orange-500/20 text-orange-400'
-                  : 'bg-night-700 hover:bg-orange-500/20 hover:text-orange-400'
-              )}
-              data-action="rating-mute"
-              data-value={(!comment.ratingMuted).toString()}
-              data-comment-id={comment.id}
-              data-user-id={user.id}
-              title="Mute the rating so it stops counting toward the service score. The comment stays visible unless the reason is also marked as spam."
-            >
-              <Icon
-                name={comment.ratingMuted ? 'ri:volume-up-line' : 'ri:volume-mute-line'}
-                class="size-3.5"
-              />
-              <span>{comment.ratingMuted ? 'Unmute Rating' : 'Mute Rating'}</span>
-            </button>
-          )}
+            {canMuteRating && (
+              <button
+                class={cn(
+                  'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
+                  comment.ratingMuted
+                    ? 'border border-orange-500/30 bg-orange-500/20 text-orange-400'
+                    : 'bg-night-700 hover:bg-orange-500/20 hover:text-orange-400'
+                )}
+                data-action="rating-mute"
+                data-value={(!comment.ratingMuted).toString()}
+                data-comment-id={comment.id}
+                data-user-id={user.id}
+                title="Mute the rating so it stops counting toward the service score. The comment stays visible unless the reason is also marked as spam."
+              >
+                <Icon
+                  name={comment.ratingMuted ? 'ri:volume-up-line' : 'ri:volume-mute-line'}
+                  class="size-3.5"
+                />
+                <span>{comment.ratingMuted ? 'Unmute Rating' : 'Mute Rating'}</span>
+              </button>
+            )}
 
-          {/* Spam shortcut. In the rated-root context it's purely additive
+            {/* Spam shortcut. In the rated-root context it's purely additive
               (Mute Rating handles unmuting). In the reply / unrated context
               it doubles as a toggle: clicking an active Spam button clears
               the mute entirely, since there's no Mute Rating button to do
               that job. */}
-          <button
-            class={cn(
-              'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-              isSpamReason
-                ? 'border border-red-500/30 bg-red-500/20 text-red-400'
-                : 'bg-night-700 hover:bg-red-500/20 hover:text-red-400'
-            )}
-            data-action={!canMuteRating && isSpamReason ? 'rating-mute' : 'rating-mute-reason'}
-            data-value={!canMuteRating && isSpamReason ? 'false' : 'TEMPLATE_SPAM'}
-            data-comment-id={comment.id}
-            data-user-id={user.id}
-            title={
-              isSpamReason
-                ? canMuteRating
-                  ? 'This comment is currently flagged as spam. Use Unmute Rating to clear, or pick a different reason below.'
-                  : 'Click to clear the spam flag on this comment.'
-                : 'Mark as spam: collapses the comment, adds the SPAM badge, sinks it to the bottom of the thread.'
-            }
-          >
-            <Icon name="ri:spam-2-line" class="size-3.5" />
-            <span>
-              {isSpamReason ? (canMuteRating ? 'Spam' : 'Unmark spam') : 'Mark spam'}
-            </span>
-          </button>
+            <button
+              class={cn(
+                'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
+                isSpamReason
+                  ? 'border border-red-500/30 bg-red-500/20 text-red-400'
+                  : 'bg-night-700 hover:bg-red-500/20 hover:text-red-400'
+              )}
+              data-action={!canMuteRating && isSpamReason ? 'rating-mute' : 'rating-mute-reason'}
+              data-value={!canMuteRating && isSpamReason ? 'false' : 'TEMPLATE_SPAM'}
+              data-comment-id={comment.id}
+              data-user-id={user.id}
+              title={
+                isSpamReason
+                  ? canMuteRating
+                    ? 'This comment is currently flagged as spam. Use Unmute Rating to clear, or pick a different reason below.'
+                    : 'Click to clear the spam flag on this comment.'
+                  : 'Mark as spam: collapses the comment, adds the SPAM badge, sinks it to the bottom of the thread.'
+              }
+            >
+              <Icon name="ri:spam-2-line" class="size-3.5" />
+              <span>{isSpamReason ? (canMuteRating ? 'Spam' : 'Unmark spam') : 'Mark spam'}</span>
+            </button>
 
-          {comment.ratingMuted && (
-            <label class="inline-flex items-center gap-1 text-[10px] text-day-500">
-              Reason:
-              <select
-                class="rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
-                data-action="rating-mute-reason"
-                data-comment-id={comment.id}
-                data-user-id={user.id}
-                title="Suspicious pattern and Template spam additionally collapse and grey out the comment. Other reasons leave the comment displayed normally."
-              >
-                {muteReasonOptions.map((opt) => (
-                  <option value={opt.value} selected={comment.ratingMuteReason === opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-        </div>
-      )
-    })()}
+            {comment.ratingMuted && (
+              <label class="inline-flex items-center gap-1 text-[10px] text-day-500">
+                Reason:
+                <select
+                  class="rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
+                  data-action="rating-mute-reason"
+                  data-comment-id={comment.id}
+                  data-user-id={user.id}
+                  title="Suspicious pattern and Template spam additionally collapse and grey out the comment. Other reasons leave the comment displayed normally."
+                >
+                  {muteReasonOptions.map((opt) => (
+                    <option value={opt.value} selected={comment.ratingMuteReason === opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+        )
+      })()
+    }
 
     {/* Rating trust display. Hidden in compact mode (shown in Context panel). */}
     {
       !compact && comment.rating !== null && (
         <div class="mb-2 rounded-sm border border-night-500 bg-night-700 px-1.5 py-1 text-[10px] text-day-400">
-          <span class="font-medium text-day-300">Rating trust:</span>{' '}
-          {comment.ratingTrustLabel ?? 'Unknown'} · weight {comment.ratingWeight.toFixed(2)}
+          <span class="font-medium text-day-300">Rating trust:</span> {comment.ratingTrustLabel ?? 'Unknown'}{' '}
+          · weight {comment.ratingWeight.toFixed(2)}
           {comment.ratingTrustReason && <span> · {comment.ratingTrustReason}</span>}
         </div>
       )
@@ -440,11 +440,10 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
           class="field-sizing-content w-full resize-y rounded-sm border border-night-500 bg-night-700 px-2 py-1 text-xs leading-snug outline-hidden focus:ring-1 focus:ring-blue-500"
           data-action="public-note"
           data-comment-id={comment.id}
-          data-user-id={user.id}>{comment.publicNote ?? ''}</textarea>
+          data-user-id={user.id}>{comment.publicNote ?? ''}</textarea
+        >
         <details class="mt-1">
-          <summary class="cursor-pointer text-[10px] text-day-500 hover:text-day-300">
-            Presets
-          </summary>
+          <summary class="cursor-pointer text-[10px] text-day-500 hover:text-day-300"> Presets </summary>
           <div class="mt-1 flex flex-wrap gap-1">
             {
               communityNotePresets.map((preset) => (
@@ -473,7 +472,8 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
           class="field-sizing-content w-full resize-y rounded-sm border border-night-500 bg-night-700 px-2 py-1 text-xs leading-snug outline-hidden focus:ring-1 focus:ring-blue-500"
           data-action="admin-note"
           data-comment-id={comment.id}
-          data-user-id={user.id}>{comment.adminNote ?? ''}</textarea>
+          data-user-id={user.id}>{comment.adminNote ?? ''}</textarea
+        >
       </div>
 
       <div class="space-y-1">
@@ -487,11 +487,11 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
           class="field-sizing-content w-full resize-y rounded-sm border border-night-500 bg-night-700 px-2 py-1 text-xs leading-snug outline-hidden focus:ring-1 focus:ring-blue-500"
           data-action="author-note"
           data-comment-id={comment.id}
-          data-user-id={user.id}>{comment.authorNote ?? ''}</textarea>
+          data-user-id={user.id}>{comment.authorNote ?? ''}</textarea
+        >
       </div>
     </div>
     <div class="space-y-1.5">
-
       {/* Private proof */}
       {
         comment.privateProof && (
@@ -670,35 +670,33 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
     })
 
     document
-      .querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
-        'input[data-action], textarea[data-action]'
-      )
+      .querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input[data-action], textarea[data-action]')
       .forEach((input) => {
-      const action = input.getAttribute('data-action')
-      const commentId = parseInt(input.getAttribute('data-comment-id') || '0')
+        const action = input.getAttribute('data-action')
+        const commentId = parseInt(input.getAttribute('data-comment-id') || '0')
 
-      if (!action || !commentId) return
+        if (!action || !commentId) return
 
-      let timeout: ReturnType<typeof setTimeout>
+        let timeout: ReturnType<typeof setTimeout>
 
-      input.addEventListener('input', () => {
-        clearTimeout(timeout)
-        timeout = setTimeout(async () => {
-          try {
-            const { error } = await actions.comment.moderate({
-              commentId,
-              action: action as any,
-              value: input.value,
-            })
+        input.addEventListener('input', () => {
+          clearTimeout(timeout)
+          timeout = setTimeout(async () => {
+            try {
+              const { error } = await actions.comment.moderate({
+                commentId,
+                action: action as any,
+                value: input.value,
+              })
 
-            if (error) {
+              if (error) {
+                console.error('Error updating note:', error)
+              }
+            } catch (error) {
               console.error('Error updating note:', error)
             }
-          } catch (error) {
-            console.error('Error updating note:', error)
-          }
-        }, 500)
+          }, 500)
+        })
       })
-    })
   })
 </script>

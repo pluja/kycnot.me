@@ -23,8 +23,7 @@ import { urlWithParams } from '../../lib/urls'
 
 import type { CommentStatus, Prisma, VerificationStatus } from '@prisma/client'
 
-const user = Astro.locals.user
-if (!user || (!user.admin && !user.moderator)) {
+if (!Astro.locals.userCan('comments:moderate')) {
   return Astro.rewrite('/404')
 }
 
@@ -203,8 +202,7 @@ const priorityTotalPages = Math.ceil(totalPriorityComments / PRIORITY_PAGE_SIZE)
 // same filter rather than showing an empty list. Keep all other params.
 const pageOutOfRange = params.page > 1 && (totalComments === 0 || params.page > totalPages)
 const priorityPageOutOfRange =
-  params['priority-page'] > 1 &&
-  (totalPriorityComments === 0 || params['priority-page'] > priorityTotalPages)
+  params['priority-page'] > 1 && (totalPriorityComments === 0 || params['priority-page'] > priorityTotalPages)
 if (pageOutOfRange || priorityPageOutOfRange) {
   const fixed = new URL(Astro.url)
   if (pageOutOfRange) fixed.searchParams.delete('page')
@@ -235,7 +233,10 @@ const makePriorityPageUrl = (page: number) => {
       >
         <div class="mb-2 font-medium text-zinc-200">Keyboard shortcuts</div>
         <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-zinc-300">
-          <dt class="flex gap-1"><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">j</kbd><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">k</kbd></dt>
+          <dt class="flex gap-1">
+            <kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">j</kbd><kbd
+              class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">k</kbd>
+          </dt>
           <dd class="text-zinc-400">Navigate rows</dd>
           <dt><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">e</kbd></dt>
           <dd class="text-zinc-400">Expand / collapse</dd>
@@ -348,9 +349,7 @@ const makePriorityPageUrl = (page: number) => {
       <section class="mb-6 rounded-lg border border-amber-600/40 bg-amber-950/10">
         <header class="flex items-center gap-2 border-b border-amber-700/30 px-3 py-2">
           <Icon name="ri:star-fill" class="size-4 text-amber-400" />
-          <h2 class="text-sm font-medium text-amber-300">
-            Priority: pending on listed services
-          </h2>
+          <h2 class="text-sm font-medium text-amber-300">Priority: pending on listed services</h2>
           <span class="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-amber-950">
             {totalPriorityComments}
           </span>
@@ -400,11 +399,13 @@ const makePriorityPageUrl = (page: number) => {
 
   <!-- Main list -->
   <div class="space-y-2">
-    {comments.length === 0 && (
-      <div class="rounded-md border border-zinc-800 bg-night-800/50 px-3 py-6 text-center text-sm text-zinc-500">
-        No comments match the current filter.
-      </div>
-    )}
+    {
+      comments.length === 0 && (
+        <div class="rounded-md border border-zinc-800 bg-night-800/50 px-3 py-6 text-center text-sm text-zinc-500">
+          No comments match the current filter.
+        </div>
+      )
+    }
     {comments.map((comment) => <AdminCommentRow comment={comment} />)}
   </div>
 
@@ -420,9 +421,7 @@ const makePriorityPageUrl = (page: number) => {
   // while typing in inputs.                                //
   ////////////////////////////////////////////////////////////
   document.addEventListener('astro:page-load', () => {
-    const rows = Array.from(
-      document.querySelectorAll<HTMLDetailsElement>('details[data-comment-row]')
-    )
+    const rows = Array.from(document.querySelectorAll<HTMLDetailsElement>('details[data-comment-row]'))
     if (rows.length === 0) return
 
     // Clicks inside an element marked [data-row-no-toggle] should not flip the

@@ -29,8 +29,7 @@ import { makeLoginUrl } from '../../../lib/redirectUrls'
 
 import type { Prisma } from '@prisma/client'
 
-const user = Astro.locals.user
-if (!user?.admin) {
+if (!Astro.locals.userCan('suggestions:manage')) {
   return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Admin access required' }))
 }
 
@@ -174,7 +173,8 @@ if (filters['sort-by'] === 'service') {
 const prioritySuggestions = suggestionsWithDetails.filter(
   (s) =>
     s.typeInfo.slug === 'edit' &&
-    (s.service.verificationStatus === 'APPROVED' || s.service.verificationStatus === 'VERIFICATION_SUCCESS') &&
+    (s.service.verificationStatus === 'APPROVED' ||
+      s.service.verificationStatus === 'VERIFICATION_SUCCESS') &&
     (s.status === 'PENDING' || s.status === 'UNDER_REVIEW')
 )
 
@@ -182,7 +182,8 @@ const regularSuggestions = suggestionsWithDetails.filter(
   (s) =>
     !(
       s.typeInfo.slug === 'edit' &&
-      (s.service.verificationStatus === 'APPROVED' || s.service.verificationStatus === 'VERIFICATION_SUCCESS') &&
+      (s.service.verificationStatus === 'APPROVED' ||
+        s.service.verificationStatus === 'VERIFICATION_SUCCESS') &&
       (s.status === 'PENDING' || s.status === 'UNDER_REVIEW')
     )
 )
@@ -272,7 +273,9 @@ const makePageSizeUrl = (size: string) => {
           id="status-filter"
           class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
         >
-          <option value="pending-review" selected={filters.status === 'pending-review'}>Pending + Review</option>
+          <option value="pending-review" selected={filters.status === 'pending-review'}
+            >Pending + Review</option
+          >
           <option value="all" selected={filters.status === 'all'}>All Statuses</option>
           {
             serviceSuggestionStatuses.map((status) => (
