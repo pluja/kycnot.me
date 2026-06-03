@@ -34,11 +34,13 @@ class TosReviewTask(Task):
         service_name = service["name"]
         verification_status = service.get("verificationStatus")
 
-        # Only process verified, approved, or community contributed services
+        # Only process verified or approved services. Community-contributed
+        # listings are excluded: their TOS review is never shown in the UI, so
+        # reviewing them only spends AI budget and files unactionable KYC
+        # suggestions on listings the team has not vetted.
         if verification_status not in [
             "VERIFICATION_SUCCESS",
             "APPROVED",
-            "COMMUNITY_CONTRIBUTED",
         ]:
             self.logger.info(
                 f"Skipping TOS review for service: {service_name} (ID: {service_id}) - Status: {verification_status}"
