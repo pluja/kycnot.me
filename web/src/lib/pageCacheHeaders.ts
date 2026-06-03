@@ -8,6 +8,12 @@
  *
  * Authenticated requests and responses with active error banners get
  * `no-store` so personalized or broken HTML is never cached at any layer.
+ *
+ * The anonymous copy carries `Vary: Cookie` because the page renders a
+ * user-specific header (login vs. profile/logout). Without it a browser that
+ * cached the guest page keeps serving it after the user logs in (the session
+ * cookie changes the request but not the cache key), so the header looks
+ * logged-out until a manual refresh.
  */
 export function setPublicPageCacheHeaders(
   headers: Headers,
@@ -20,5 +26,6 @@ export function setPublicPageCacheHeaders(
     headers.set('Cache-Control', 'private, no-store, no-cache, must-revalidate')
   } else {
     headers.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400')
+    headers.set('Vary', 'Cookie')
   }
 }
