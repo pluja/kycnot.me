@@ -257,14 +257,18 @@ const headers = {
                 {signalPills.length === 0 ? (
                   <span class="text-day-600">-</span>
                 ) : (
-                  <span class="inline-flex items-center gap-1.5">
+                  <a
+                    href={`/service/${service.slug}#attributes`}
+                    aria-label={`View ${service.name} attributes`}
+                    class="inline-flex items-center gap-1.5 rounded-sm transition-opacity hover:opacity-80 focus-visible:ring-1 focus-visible:ring-green-500 focus-visible:outline-none"
+                  >
                     {signalPills.map((pill) => (
                       <span class={cn('inline-flex items-center gap-0.5 font-bold', pill.info.classNames.text)}>
                         <Icon name={pill.info.icon} class="size-3.5" is:inline={inlineIcons} />
                         {pill.count}
                       </span>
                     ))}
-                  </span>
+                  </a>
                 )}
               </td>
 
