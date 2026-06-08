@@ -54,7 +54,7 @@ export const {
       description: 'No mention of current or future KYC requirements.',
       privacyPoints: 15,
       attributeType: 'GOOD',
-      badgeClassName: 'bg-green-500/20 text-green-300',
+      badgeClassName: 'bg-zinc-500/20 text-zinc-300',
     },
     {
       id: '2',
