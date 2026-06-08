@@ -21,19 +21,20 @@ const {
 <a
   href="/swap"
   class={cn(
-    'group flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 transition-colors hover:border-green-500/50 hover:bg-green-500/15',
+    'group flex items-center gap-2.5 rounded-lg border border-green-500/25 bg-green-500/5 px-3.5 py-2 text-sm transition-colors hover:border-green-500/45 hover:bg-green-500/10',
     className
   )}
   {...htmlProps}
 >
-  <Icon name="ri:swap-line" class="size-8 shrink-0 text-green-500" />
-  <div class="min-w-0 flex-1">
-    <div class="font-title font-bold text-green-400 group-hover:text-green-300">
-      {heading}
-    </div>
-    <div class="text-sm text-day-400">
-      {description}
-    </div>
-  </div>
-  <Icon name="ri:arrow-right-line" class="size-5 shrink-0 text-green-500/60 group-hover:text-green-400" />
+  <Icon name="ri:swap-line" class="size-4 shrink-0 text-green-500" />
+  <span class="font-title font-semibold text-green-400 group-hover:text-green-300">
+    {heading}
+  </span>
+  <span class="min-w-0 flex-1 truncate text-day-400 max-sm:hidden">
+    {description}
+  </span>
+  <Icon
+    name="ri:arrow-right-line"
+    class="ml-auto size-4 shrink-0 text-green-500/60 group-hover:text-green-400"
+  />
 </a>
