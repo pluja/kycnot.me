@@ -2,29 +2,56 @@
 import { Icon } from 'astro-icon/components'
 
 import MyPicture from '../../../components/MyPicture.astro'
+import { getEventTypeInfo } from '../../../constants/eventTypes'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { cn } from '../../../lib/cn'
 import { prisma } from '../../../lib/prisma'
 
 const q = (Astro.url.searchParams.get('q') ?? '').trim()
 
-const services = await Astro.locals.banners.try(
-  'Failed to load services',
-  () =>
-    prisma.service.findMany({
-      where: q
-        ? { name: { contains: q, mode: 'insensitive' } }
-        : { serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] } },
-      select: {
-        name: true,
-        slug: true,
-        imageUrl: true,
-        _count: { select: { events: { where: { deletedAt: null } } } },
-      },
-      orderBy: { name: 'asc' },
-      take: 60,
-    }),
-  [] as []
-)
+const now = new Date()
+
+const [activeEvents, services] = await Astro.locals.banners.tryMany([
+  [
+    'Failed to load active events',
+    () =>
+      prisma.event.findMany({
+        where: {
+          visible: true,
+          deletedAt: null,
+          startedAt: { lte: now },
+          OR: [{ endedAt: null }, { endedAt: { gte: now } }],
+        },
+        select: {
+          title: true,
+          type: true,
+          startedAt: true,
+          endedAt: true,
+          service: { select: { name: true, slug: true, imageUrl: true } },
+        },
+        orderBy: { startedAt: 'desc' },
+      }),
+    [] as [],
+  ],
+  [
+    'Failed to load services',
+    () =>
+      prisma.service.findMany({
+        where: q
+          ? { name: { contains: q, mode: 'insensitive' } }
+          : { serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] } },
+        select: {
+          name: true,
+          slug: true,
+          imageUrl: true,
+          _count: { select: { events: { where: { deletedAt: null } } } },
+        },
+        orderBy: { name: 'asc' },
+        take: 60,
+      }),
+    [] as [],
+  ],
+])
 ---
 
 <BaseLayout pageTitle="Manage events" widthClassName="max-w-3xl">
@@ -32,6 +59,54 @@ const services = await Astro.locals.banners.try(
     <h1 class="font-title text-2xl font-bold text-white">Manage service events</h1>
     <p class="mt-1 text-sm text-day-400">Pick a service to manage its timeline events.</p>
   </header>
+
+  {
+    activeEvents.length > 0 && (
+      <section class="mb-8">
+        <h2 class="mb-3 flex items-center gap-2 text-sm font-semibold text-day-300">
+          <span class="relative flex size-2">
+            <span class="absolute inline-flex size-full animate-ping rounded-full bg-green-500/60" />
+            <span class="relative inline-flex size-2 rounded-full bg-green-500" />
+          </span>
+          Active events
+          <span class="text-day-500">({activeEvents.length})</span>
+        </h2>
+
+        <ul class="space-y-1.5">
+          {activeEvents.map((event) => {
+            const typeInfo = getEventTypeInfo(event.type)
+            return (
+              <li>
+                <a
+                  href={`/admin/events/${event.service.slug}`}
+                  class="flex items-center gap-3 rounded-lg border border-night-700 bg-night-900 px-3 py-2 transition-colors hover:border-green-500/50"
+                >
+                  <MyPicture
+                    src={event.service.imageUrl}
+                    fallback="service"
+                    alt={`${event.service.name} logo`}
+                    class="size-6 shrink-0 rounded-sm object-contain"
+                    width={24}
+                    height={24}
+                  />
+                  <span class={cn('inline-flex size-5 shrink-0 items-center justify-center rounded-full', typeInfo.classNames.dot)}>
+                    <Icon name={typeInfo.icon} class="size-3" />
+                  </span>
+                  <span class="min-w-0 flex-1 truncate text-sm text-white">{event.title}</span>
+                  <span class="shrink-0 text-xs text-day-500">{event.service.name}</span>
+                  <span class="shrink-0 text-xs text-day-500">
+                    {new Date(event.startedAt).toLocaleDateString()}
+                    {' '}&rarr;{' '}
+                    {event.endedAt ? new Date(event.endedAt).toLocaleDateString() : 'ongoing'}
+                  </span>
+                </a>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+    )
+  }
 
   <form method="GET" class="mb-6">
     <input
