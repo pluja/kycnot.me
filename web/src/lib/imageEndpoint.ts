@@ -8,14 +8,28 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
+import { GET as nodeImageEndpoint } from 'astro/assets/endpoint/node'
 import { getConfiguredImageService, imageConfig } from 'astro:assets'
-import { GET as defaultImageEndpoint } from 'astro/assets/endpoint/node'
 import { UPLOAD_DIR } from 'astro:env/server'
 import * as mime from 'mrmime'
 
-import type { APIRoute } from 'astro'
+import type { APIContext, APIRoute } from 'astro'
 
 const FILES_PREFIX = '/files/'
+
+// Non-upload images (content/asset images like blog covers) are handed back to
+// Astro's built-in endpoint. The `node` build endpoint walks a built server
+// layout that doesn't exist under `astro dev`, where it spins forever in its
+// `resolveOutDir` loop, so in dev we serve them via the Vite-backed `dev`
+// endpoint. The dev import is dynamic and gated on `import.meta.env.DEV` so its
+// `vite` dependency is dead-code-eliminated from the production build.
+async function defaultImageEndpoint(context: APIContext): Promise<Response> {
+  if (import.meta.env.DEV) {
+    const { GET } = await import('astro/assets/endpoint/dev')
+    return GET(context) as Promise<Response>
+  }
+  return nodeImageEndpoint(context) as Promise<Response>
+}
 
 export const GET: APIRoute = async (context) => {
   const { request } = context
@@ -23,7 +37,7 @@ export const GET: APIRoute = async (context) => {
   const href = url.searchParams.get('href') ?? ''
 
   if (extractFilesSubpath(href) === null) {
-    // Not one of our uploads — let Astro's default endpoint handle it.
+    // Not one of our uploads, let Astro's default endpoint handle it.
     return defaultImageEndpoint(context)
   }
 
@@ -41,7 +55,7 @@ export const GET: APIRoute = async (context) => {
     const filesSubpath = extractFilesSubpath(transform.src)
     if (filesSubpath === null) {
       // parseURL may have rewritten src; fall back rather than 403.
-      return defaultImageEndpoint(context)
+      return await defaultImageEndpoint(context)
     }
 
     const inputBuffer = await readUpload(filesSubpath)
