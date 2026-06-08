@@ -34,6 +34,7 @@ const adminRouteCapabilities = [
   { prefix: '/admin/contact', capability: 'contact:manage' },
   { prefix: '/admin/service-suggestions', capability: 'suggestions:manage' },
   { prefix: '/admin/services', capability: 'services:edit' },
+  { prefix: '/admin/events', capability: 'events:manage' },
   { prefix: '/admin/attributes', capability: 'attributes:manage' },
   { prefix: '/admin/announcements', capability: 'announcements:manage' },
   { prefix: '/admin/notifications', capability: 'notifications:manage' },

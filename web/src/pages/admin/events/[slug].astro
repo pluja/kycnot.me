@@ -1,0 +1,77 @@
+---
+import { actions, isInputError } from 'astro:actions'
+
+import EventsSection from '../../../components/admin/services/edit/Events.astro'
+import Button from '../../../components/Button.astro'
+import MyPicture from '../../../components/MyPicture.astro'
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { prisma } from '../../../lib/prisma'
+
+const { slug } = Astro.params
+if (!slug) return Astro.rewrite('/404')
+
+const errorsOf = <T extends { error?: unknown } | undefined>(result: T) =>
+  isInputError(result?.error) ? result.error.fields : {}
+
+const eventCreateResult = Astro.getActionResult(actions.admin.event.create)
+Astro.locals.banners.addIfSuccess(eventCreateResult, 'Event created successfully')
+const eventUpdateResult = Astro.getActionResult(actions.admin.event.update)
+Astro.locals.banners.addIfSuccess(eventUpdateResult, 'Event updated successfully')
+const eventToggleResult = Astro.getActionResult(actions.admin.event.toggle)
+Astro.locals.banners.addIfSuccess(eventToggleResult, 'Event visibility updated successfully')
+const eventDeleteResult = Astro.getActionResult(actions.admin.event.delete)
+Astro.locals.banners.addIfSuccess(eventDeleteResult, 'Event deleted successfully')
+const eventRestoreResult = Astro.getActionResult(actions.admin.event.restore)
+Astro.locals.banners.addIfSuccess(eventRestoreResult, 'Event restored successfully')
+const eventPurgeResult = Astro.getActionResult(actions.admin.event.purge)
+Astro.locals.banners.addIfSuccess(eventPurgeResult, 'Event permanently deleted')
+
+const service = await Astro.locals.banners.try(
+  'Failed to load service',
+  () =>
+    prisma.service.findUnique({
+      where: { slug },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        imageUrl: true,
+        events: {
+          orderBy: { startedAt: 'desc' },
+          include: {
+            createdBy: { select: { name: true, displayName: true } },
+            updatedBy: { select: { name: true, displayName: true } },
+          },
+        },
+      },
+    }),
+  null
+)
+
+if (!service) return Astro.rewrite('/404')
+---
+
+<BaseLayout pageTitle={`Events: ${service.name}`} widthClassName="max-w-3xl" htmx>
+  <div class="mt-8 mb-4">
+    <Button as="a" href="/admin/events" label="All services" icon="ri:arrow-left-line" size="sm" variant="faded" />
+  </div>
+
+  <header class="mb-6 flex items-center gap-3">
+    <MyPicture
+      src={service.imageUrl}
+      fallback="service"
+      alt={`${service.name} logo`}
+      class="size-10 shrink-0 rounded-sm object-contain"
+      width={40}
+      height={40}
+    />
+    <h1 class="font-title text-2xl font-bold text-white">{service.name} events</h1>
+  </header>
+
+  <EventsSection
+    serviceId={service.id}
+    events={service.events}
+    createInputErrors={errorsOf(eventCreateResult)}
+    updateInputErrors={errorsOf(eventUpdateResult)}
+  />
+</BaseLayout>

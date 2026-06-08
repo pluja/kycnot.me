@@ -49,6 +49,12 @@ Astro.locals.banners.addIfSuccess(eventToggleResult, 'Event visibility updated s
 const eventDeleteResult = Astro.getActionResult(actions.admin.event.delete)
 Astro.locals.banners.addIfSuccess(eventDeleteResult, 'Event deleted successfully')
 
+const eventRestoreResult = Astro.getActionResult(actions.admin.event.restore)
+Astro.locals.banners.addIfSuccess(eventRestoreResult, 'Event restored successfully')
+
+const eventPurgeResult = Astro.getActionResult(actions.admin.event.purge)
+Astro.locals.banners.addIfSuccess(eventPurgeResult, 'Event permanently deleted')
+
 const verificationStepCreateResult = Astro.getActionResult(actions.admin.verificationStep.create)
 Astro.locals.banners.addIfSuccess(verificationStepCreateResult, 'Verification step added successfully')
 
@@ -132,6 +138,10 @@ const [service, categories, attributes] = await Astro.locals.banners.tryMany([
           events: {
             orderBy: {
               startedAt: 'desc',
+            },
+            include: {
+              createdBy: { select: { name: true, displayName: true } },
+              updatedBy: { select: { name: true, displayName: true } },
             },
           },
           verificationRequests: {
@@ -276,6 +286,10 @@ const apiCalls = await Astro.locals.banners.try(
 const isScanning = !!scanJob && scanJob.processedAt === null
 const tasksBadge = pendingDeepScanSuggestion ? '!' : isScanning ? '...' : undefined
 
+// Events are gated by their own capability, so a services:edit-only editor
+// neither sees nor can act on the events section.
+const canManageEvents = Astro.locals.userCan('events:manage')
+
 const navItems = [
   { id: 'details', label: 'Service Details', icon: 'ri:settings-3-line' },
   {
@@ -296,12 +310,16 @@ const navItems = [
     icon: 'ri:sticky-note-line',
     badge: service.internalNotes.length,
   },
-  {
-    id: 'events',
-    label: 'Events',
-    icon: 'ri:calendar-event-line',
-    badge: service.events.length,
-  },
+  ...(canManageEvents
+    ? [
+        {
+          id: 'events',
+          label: 'Events',
+          icon: 'ri:calendar-event-line',
+          badge: service.events.length,
+        },
+      ]
+    : []),
   {
     id: 'verification-steps',
     label: 'Verification Steps',
@@ -403,12 +421,14 @@ const navItems = [
           addInputErrors={errorsOf(internalNoteCreateResult)}
         />
 
-        <EventsSection
-          serviceId={service.id}
-          events={service.events}
-          createInputErrors={errorsOf(eventCreateResult)}
-          updateInputErrors={errorsOf(eventUpdateResult)}
-        />
+        {canManageEvents && (
+          <EventsSection
+            serviceId={service.id}
+            events={service.events}
+            createInputErrors={errorsOf(eventCreateResult)}
+            updateInputErrors={errorsOf(eventUpdateResult)}
+          />
+        )}
 
         <VerificationStepsSection
           serviceId={service.id}

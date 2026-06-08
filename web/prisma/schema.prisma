@@ -350,6 +350,15 @@ model Event {
   service      Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   serviceId    Int
   Notification Notification[]
+  /// Soft delete: set by non-purge deletes so the event is recoverable.
+  /// Public reads already filter `visible: true`, so soft-deletes also set
+  /// `visible = false` to disappear everywhere except the admin manager.
+  deletedAt    DateTime?
+  /// Internal monitoring: who created and last edited this event.
+  createdBy    User?          @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById  Int?
+  updatedBy    User?          @relation("EventUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedById  Int?
 
   @@index([visible])
   @@index([startedAt])
@@ -357,6 +366,9 @@ model Event {
   @@index([endedAt])
   @@index([type])
   @@index([serviceId])
+  @@index([createdById])
+  @@index([updatedById])
+  @@index([deletedAt])
 }
 
 enum ServiceSuggestionStatus {
@@ -658,6 +670,8 @@ model User {
   reportedCases            Case[]                       @relation("CaseReporter")
   createdCases             Case[]                       @relation("CaseCreatedBy")
   caseUpdates              CaseUpdate[]                 @relation("CaseUpdateAuthor")
+  createdEvents            Event[]                      @relation("EventCreatedBy")
+  updatedEvents            Event[]                      @relation("EventUpdatedBy")
 
   @@index([createdAt])
   @@index([totalKarma])

@@ -50,8 +50,15 @@ export const {
       slug: 'services-edit',
       label: 'Edit services',
       description:
-        'Create and edit service listings, events, verification steps, ToS highlights, evidence and contact methods. Excludes the final approve/verify decision.',
+        'Create and edit service listings, verification steps, ToS highlights, evidence and contact methods. Excludes the final approve/verify decision.',
       icon: 'ri:box-3-line',
+    },
+    {
+      value: 'events:manage',
+      slug: 'events-manage',
+      label: 'Manage events',
+      description: "Create, edit, show/hide and delete a service's timeline events. Nothing else on the service.",
+      icon: 'ri:calendar-event-line',
     },
     {
       value: 'services:approve',

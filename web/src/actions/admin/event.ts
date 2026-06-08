@@ -11,7 +11,7 @@ const endedAtSchema = z.preprocess((val) => (val === '' ? null : val), z.coerce.
 export const adminEventActions = {
   create: defineProtectedAction({
     accept: 'form',
-    permissions: cap('services:edit'),
+    permissions: cap('events:manage'),
     input: z
       .object({
         serviceId: z.coerce.number().int().positive(),
@@ -32,11 +32,12 @@ export const adminEventActions = {
           })
         }
       }),
-    handler: async (input) => {
+    handler: async (input, context) => {
       const event = await prisma.event.create({
         data: {
           ...input,
           visible: true,
+          createdById: context.locals.user.id,
         },
         select: {
           id: true,
@@ -48,11 +49,11 @@ export const adminEventActions = {
 
   toggle: defineProtectedAction({
     accept: 'form',
-    permissions: cap('services:edit'),
+    permissions: cap('events:manage'),
     input: z.object({
       eventId: z.coerce.number().int().positive(),
     }),
-    handler: async (input) => {
+    handler: async (input, context) => {
       const existingEvent = await prisma.event.findUnique({ where: { id: input.eventId } })
       if (!existingEvent) {
         throw new ActionError({
@@ -65,6 +66,7 @@ export const adminEventActions = {
         where: { id: input.eventId },
         data: {
           visible: !existingEvent.visible,
+          updatedById: context.locals.user.id,
         },
         select: {
           id: true,
@@ -76,7 +78,7 @@ export const adminEventActions = {
 
   update: defineProtectedAction({
     accept: 'form',
-    permissions: cap('services:edit'),
+    permissions: cap('events:manage'),
     input: z
       .object({
         eventId: z.coerce.number().int().positive(),
@@ -97,7 +99,7 @@ export const adminEventActions = {
           })
         }
       }),
-    handler: async (input) => {
+    handler: async (input, context) => {
       const { eventId, ...data } = input
       const existingEvent = await prisma.event.findUnique({ where: { id: eventId } })
       if (!existingEvent) {
@@ -109,7 +111,7 @@ export const adminEventActions = {
 
       const event = await prisma.event.update({
         where: { id: eventId },
-        data,
+        data: { ...data, updatedById: context.locals.user.id },
         select: {
           id: true,
         },
@@ -118,9 +120,44 @@ export const adminEventActions = {
     },
   }),
 
+  // Soft delete: recoverable. Hides the event everywhere public (which all
+  // filter `visible: true`) while keeping it in the admin manager for restore.
   delete: defineProtectedAction({
     accept: 'form',
-    permissions: cap('services:edit'),
+    permissions: cap('events:manage'),
+    input: z.object({
+      eventId: z.coerce.number().int().positive(),
+    }),
+    handler: async (input, context) => {
+      const event = await prisma.event.update({
+        where: { id: input.eventId },
+        data: { deletedAt: new Date(), visible: false, updatedById: context.locals.user.id },
+        select: { id: true },
+      })
+      return { event }
+    },
+  }),
+
+  restore: defineProtectedAction({
+    accept: 'form',
+    permissions: cap('events:manage'),
+    input: z.object({
+      eventId: z.coerce.number().int().positive(),
+    }),
+    handler: async (input, context) => {
+      const event = await prisma.event.update({
+        where: { id: input.eventId },
+        data: { deletedAt: null, visible: true, updatedById: context.locals.user.id },
+        select: { id: true },
+      })
+      return { event }
+    },
+  }),
+
+  // Permanent delete: admins only, so managers cannot destroy events.
+  purge: defineProtectedAction({
+    accept: 'form',
+    permissions: 'admin',
     input: z.object({
       eventId: z.coerce.number().int().positive(),
     }),

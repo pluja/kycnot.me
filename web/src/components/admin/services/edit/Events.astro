@@ -20,13 +20,20 @@ import type { Prisma } from '@prisma/client'
 
 type Props = {
   serviceId: number
-  events: Prisma.EventGetPayload<true>[]
+  events: Prisma.EventGetPayload<{
+    include: {
+      createdBy: { select: { name: true; displayName: true } }
+      updatedBy: { select: { name: true; displayName: true } }
+    }
+  }>[]
   createInputErrors: Record<string, string[] | undefined>
   updateInputErrors: Record<string, string[] | undefined>
   id?: string
 }
 
 const { serviceId, events, createInputErrors, updateInputErrors, id = 'events' } = Astro.props
+
+const isAdmin = Astro.locals.user?.admin ?? false
 
 const toLocalDateTime = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
@@ -56,8 +63,12 @@ const sectionHash = `#${id}`
                       color={eventTypeInfo.color}
                       icon={eventTypeInfo.icon}
                     />
-                    {!event.visible && (
-                      <BadgeSmall text="Hidden" variant="faded" color="gray" icon="ri:eye-off-line" />
+                    {event.deletedAt ? (
+                      <BadgeSmall text="Deleted" variant="faded" color="red" icon="ri:delete-bin-line" />
+                    ) : (
+                      !event.visible && (
+                        <BadgeSmall text="Hidden" variant="faded" color="gray" icon="ri:eye-off-line" />
+                      )
                     )}
                   </div>
                   <p class="text-sm text-pretty text-day-400">{event.content}</p>
@@ -73,30 +84,74 @@ const sectionHash = `#${id}`
                     </span>
                     {event.source && <span>Source: {event.source}</span>}
                   </div>
+                  {(event.createdBy ?? event.updatedBy) && (
+                    <div class="flex flex-wrap items-center gap-3 text-xs text-day-600">
+                      {event.createdBy && (
+                        <span>Created by {event.createdBy.displayName ?? event.createdBy.name}</span>
+                      )}
+                      {event.updatedBy && (
+                        <span>Last edited by {event.updatedBy.displayName ?? event.updatedBy.name}</span>
+                      )}
+                    </div>
+                  )}
                 </Fragment>
 
                 <Fragment slot="actions">
-                  <Tooltip text={event.visible ? 'Hide' : 'Show'}>
-                    <form
-                      method="POST"
-                      action={`${actions.admin.event.toggle}${sectionHash}`}
-                      class="contents"
-                    >
-                      <input type="hidden" name="eventId" value={event.id} />
-                      <Button
-                        type="submit"
-                        variant="faded"
-                        size="sm"
-                        icon={event.visible ? 'ri:eye-off-line' : 'ri:eye-line'}
-                        iconOnly
-                        label={event.visible ? 'Hide' : 'Show'}
-                      />
-                    </form>
-                  </Tooltip>
-                  <EditToggleButton for={itemId} />
-                  <DeleteConfirmButton action={`${actions.admin.event.delete}${sectionHash}`} id={itemId}>
-                    <input type="hidden" name="eventId" value={event.id} />
-                  </DeleteConfirmButton>
+                  {event.deletedAt ? (
+                    <>
+                      <Tooltip text="Restore">
+                        <form
+                          method="POST"
+                          action={`${actions.admin.event.restore}${sectionHash}`}
+                          class="contents"
+                        >
+                          <input type="hidden" name="eventId" value={event.id} />
+                          <Button
+                            type="submit"
+                            variant="faded"
+                            size="sm"
+                            color="success"
+                            icon="ri:arrow-go-back-line"
+                            iconOnly
+                            label="Restore"
+                          />
+                        </form>
+                      </Tooltip>
+                      {isAdmin && (
+                        <DeleteConfirmButton
+                          action={`${actions.admin.event.purge}${sectionHash}`}
+                          id={itemId}
+                          label="Permanently delete"
+                        >
+                          <input type="hidden" name="eventId" value={event.id} />
+                        </DeleteConfirmButton>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Tooltip text={event.visible ? 'Hide' : 'Show'}>
+                        <form
+                          method="POST"
+                          action={`${actions.admin.event.toggle}${sectionHash}`}
+                          class="contents"
+                        >
+                          <input type="hidden" name="eventId" value={event.id} />
+                          <Button
+                            type="submit"
+                            variant="faded"
+                            size="sm"
+                            icon={event.visible ? 'ri:eye-off-line' : 'ri:eye-line'}
+                            iconOnly
+                            label={event.visible ? 'Hide' : 'Show'}
+                          />
+                        </form>
+                      </Tooltip>
+                      <EditToggleButton for={itemId} />
+                      <DeleteConfirmButton action={`${actions.admin.event.delete}${sectionHash}`} id={itemId}>
+                        <input type="hidden" name="eventId" value={event.id} />
+                      </DeleteConfirmButton>
+                    </>
+                  )}
                 </Fragment>
 
                 <Fragment slot="edit">
