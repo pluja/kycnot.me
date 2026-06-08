@@ -2,6 +2,7 @@ import { CaseEvidenceType, CaseIssueType, CaseStatus } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
+import { canParticipateInCase, isCaseStaff, isCaseVisibleToParticipants } from '../../lib/caseAccess'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { deleteFileLocally, saveFileLocally } from '../../lib/fileStorage'
 import { prisma } from '../../lib/prisma'
@@ -188,22 +189,43 @@ export const adminCaseActions = {
   updates: {
     add: defineProtectedAction({
       accept: 'form',
-      permissions: manageCases,
+      permissions: 'not-spammer',
       input: z.object({
         caseId: z.coerce.number().int().positive(),
         bodyMd: z.string().min(1),
+        staffOnly: z.coerce.boolean().default(false),
       }),
       handler: async (input, context) => {
-        const existing = await prisma.case.findUnique({ where: { id: input.caseId }, select: { id: true } })
-        if (!existing) {
+        const caseRow = await prisma.case.findUnique({
+          where: { id: input.caseId },
+          select: {
+            status: true,
+            participants: { select: { id: true } },
+            service: { select: { affiliatedUsers: { select: { userId: true } } } },
+          },
+        })
+        if (!caseRow) {
           throw new ActionError({ code: 'BAD_REQUEST', message: 'Case not found' })
+        }
+
+        const user = context.locals.user
+        const staff = isCaseStaff(user)
+        const canPost =
+          canParticipateInCase(
+            user,
+            caseRow.participants.map((participant) => participant.id),
+            caseRow.service.affiliatedUsers.map((affiliation) => affiliation.userId)
+          ) && (staff || isCaseVisibleToParticipants(caseRow.status))
+        if (!canPost) {
+          throw new ActionError({ code: 'FORBIDDEN', message: 'You cannot post in this case.' })
         }
 
         const update = await prisma.caseUpdate.create({
           data: {
             bodyMd: input.bodyMd,
+            staffOnly: staff && input.staffOnly,
             case: { connect: { id: input.caseId } },
-            author: { connect: { id: context.locals.user.id } },
+            author: { connect: { id: user.id } },
           },
           select: { id: true },
         })
@@ -274,6 +296,7 @@ export const adminCaseActions = {
         bodyMd: optionalText,
         imageFile: imageFileSchema,
         watermark: z.coerce.boolean().default(false),
+        isPublic: z.coerce.boolean().default(false),
       }),
       handler: async (input) => {
         const existing = await prisma.case.findUnique({ where: { id: input.caseId }, select: { id: true } })
@@ -313,6 +336,7 @@ export const adminCaseActions = {
             description: input.description ?? null,
             bodyMd: input.bodyMd ?? null,
             imageUrl,
+            isPublic: input.isPublic,
             order,
           },
           select: { id: true },
@@ -344,6 +368,67 @@ export const adminCaseActions = {
         }
 
         await prisma.caseEvidence.delete({ where: { id: input.evidenceId } })
+      },
+    }),
+  },
+
+  participants: {
+    search: defineProtectedAction({
+      accept: 'form',
+      permissions: manageCases,
+      input: z.object({ query: z.string().trim().min(1) }),
+      handler: async (input) => {
+        const numericId = Number.parseInt(input.query, 10)
+        const users = await prisma.user.findMany({
+          where: {
+            spammer: false,
+            OR: [
+              { name: { contains: input.query, mode: 'insensitive' } },
+              { displayName: { contains: input.query, mode: 'insensitive' } },
+              ...(Number.isInteger(numericId) && numericId > 0 ? [{ id: numericId }] : []),
+            ],
+          },
+          select: { id: true, name: true, displayName: true, picture: true },
+          orderBy: { name: 'asc' },
+          take: 10,
+        })
+        return { users }
+      },
+    }),
+
+    add: defineProtectedAction({
+      accept: 'form',
+      permissions: manageCases,
+      input: z.object({
+        caseId: z.coerce.number().int().positive(),
+        userId: z.coerce.number().int().positive(),
+      }),
+      handler: async (input) => {
+        const user = await prisma.user.findUnique({ where: { id: input.userId }, select: { id: true } })
+        if (!user) {
+          throw new ActionError({ code: 'BAD_REQUEST', message: 'User not found' })
+        }
+        await prisma.case.update({
+          where: { id: input.caseId },
+          data: { participants: { connect: { id: input.userId } } },
+          select: { id: true },
+        })
+      },
+    }),
+
+    remove: defineProtectedAction({
+      accept: 'form',
+      permissions: manageCases,
+      input: z.object({
+        caseId: z.coerce.number().int().positive(),
+        userId: z.coerce.number().int().positive(),
+      }),
+      handler: async (input) => {
+        await prisma.case.update({
+          where: { id: input.caseId },
+          data: { participants: { disconnect: { id: input.userId } } },
+          select: { id: true },
+        })
       },
     }),
   },

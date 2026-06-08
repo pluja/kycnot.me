@@ -670,6 +670,7 @@ model User {
   reportedCases            Case[]                       @relation("CaseReporter")
   createdCases             Case[]                       @relation("CaseCreatedBy")
   caseUpdates              CaseUpdate[]                 @relation("CaseUpdateAuthor")
+  participatingCases       Case[]                       @relation("CaseParticipants")
   createdEvents            Event[]                      @relation("EventCreatedBy")
   updatedEvents            Event[]                      @relation("EventUpdatedBy")
 
@@ -844,6 +845,7 @@ model Case {
   createdById    Int?
   evidence       CaseEvidence[]
   updates        CaseUpdate[]
+  participants   User[]         @relation("CaseParticipants")
 
   @@index([serviceId])
   @@index([status])
@@ -853,6 +855,7 @@ model Case {
 model CaseUpdate {
   id        Int            @id @default(autoincrement())
   bodyMd    String
+  staffOnly Boolean        @default(false)
   createdAt DateTime       @default(now())
   updatedAt DateTime       @default(now()) @updatedAt
 
@@ -873,6 +876,7 @@ model CaseEvidence {
   description String?
   bodyMd      String?
   imageUrl    String?
+  isPublic    Boolean          @default(false)
   order       Int              @default(0)
   createdAt   DateTime         @default(now())
 
