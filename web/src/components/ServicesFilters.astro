@@ -3,6 +3,7 @@ import { Icon } from 'astro-icon/components'
 
 import { cn } from '../lib/cn'
 import { makeOverallScoreInfo } from '../lib/overallScore'
+import { defaultViewOption } from '../lib/searchFiltersOptions'
 import { type ServicesFiltersObject } from '../pages/index.astro'
 
 import Button from './Button.astro'
@@ -519,6 +520,7 @@ const {
   </fieldset>
 
   <input type="hidden" name="sort-seed" value={filters['sort-seed']} />
+  {filters.view !== defaultViewOption.value && <input type="hidden" name="view" value={filters.view} />}
 
   <div
     class="sticky inset-x-0 bottom-0 mt-4 block rounded-t-md bg-night-700 pb-4 shadow-[0_0_16px_16px_var(--color-night-700)] sm:js:hidden"

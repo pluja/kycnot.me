@@ -27,11 +27,14 @@ import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import {
   defaultSortOption,
+  defaultViewOption,
   makeSearchFiltersOptions,
   modeOptions,
   sortOptions,
+  viewOptions,
 } from '../lib/searchFiltersOptions'
 import { makeSearchMetaDescription, makeSearchTitle } from '../lib/searchSeo'
+import { serviceListItemSelect } from '../lib/serviceListItem'
 import { makeSortSeed } from '../lib/sortSeed'
 import { siteOrigin } from '../lib/urls'
 
@@ -87,6 +90,7 @@ const {
     'currency-mode': zodEnumFromConstant(modeOptions, 'value').default('or'),
     'attribute-mode': zodEnumFromConstant(modeOptions, 'value').default('or'),
     sort: zodEnumFromConstant(sortOptions, 'value').default(defaultSortOption.value),
+    view: zodEnumFromConstant(viewOptions, 'value').default(defaultViewOption.value),
     'sort-seed': z
       .string()
       .transform((seed) => (Astro.url.searchParams.has('page') ? seed : makeSortSeed()))
@@ -107,6 +111,7 @@ const {
         verification: { if: 'default' },
         q: { if: 'default' },
         sort: { if: 'default' },
+        view: { if: 'default' },
         'currency-mode': { if: 'another-is-unset', prop: 'currencies' },
         'attribute-mode': { if: 'another-is-unset', prop: 'attr' },
         'min-score': { if: 'default' },
@@ -281,6 +286,14 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
         const rng = seedrandom(filters['sort-seed'])
         const selectedSort = sortOptions.find((sort) => sort.value === filters.sort) ?? defaultSortOption
 
+        // trustWeightedUserRating is nullable; lodash orders nulls first on desc,
+        // so coerce to -Infinity to keep unrated services last in both sort passes.
+        const sortIteratee =
+          selectedSort.orderBy.key === 'trustWeightedUserRating'
+            ? (service: { trustWeightedUserRating: number | null }) =>
+                service.trustWeightedUserRating ?? -Infinity
+            : selectedSort.orderBy.key
+
         const sortedServices = orderBy(
           // NOTE: We do a first sort by id to make the seeded sort deterministic
           sortBy(unsortedServices, 'id'),
@@ -288,7 +301,7 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
             ...(filters.q ? (['similarityScore'] as const) : ([] as const)),
             (service) => (service.verificationStatus === 'VERIFICATION_FAILED' ? 1 : 0),
             (service) => (service.serviceVisibility === 'ARCHIVED' ? 1 : 0),
-            selectedSort.orderBy.key,
+            sortIteratee,
             () => rng(),
           ],
           [
@@ -306,39 +319,7 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
               in: sortedServices.map((service) => service.id),
             },
           },
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            description: true,
-            overallScore: true,
-            privacyScore: true,
-            trustScore: true,
-            kycLevel: true,
-            imageUrl: true,
-            verificationStatus: true,
-            acceptedCurrencies: true,
-            serviceVisibility: true,
-            attributes: {
-              select: {
-                attribute: {
-                  select: {
-                    id: true,
-                    slug: true,
-                    title: true,
-                    category: true,
-                    type: true,
-                  },
-                },
-              },
-            },
-            categories: {
-              select: {
-                name: true,
-                icon: true,
-              },
-            },
-          },
+          select: serviceListItemSelect,
         })
 
         const unsortedServicesWithInfo = unsortedServicesWithInfoMissingSimilarityScore.map((service) => ({
@@ -352,7 +333,7 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
             ...(filters.q ? (['similarityScore'] as const) : ([] as const)),
             (service) => (service.verificationStatus === 'VERIFICATION_FAILED' ? 1 : 0),
             (service) => (service.serviceVisibility === 'ARCHIVED' ? 1 : 0),
-            selectedSort.orderBy.key,
+            sortIteratee,
             // Now we can shuffle indeternimistically, because the pagination was already applied
             () => Math.random(),
           ],

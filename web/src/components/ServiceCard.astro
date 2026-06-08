@@ -4,7 +4,7 @@ import { Icon } from 'astro-icon/components'
 import { currencies } from '../constants/currencies'
 import { getKycLevelInfo } from '../constants/kycLevels'
 import { serviceVisibilitiesById } from '../constants/serviceVisibility'
-import { verificationStatusesByValue } from '../constants/verificationStatus'
+import { getServiceStatusIcon } from '../constants/verificationStatus'
 import { cn } from '../lib/cn'
 import { makeOverallScoreInfo } from '../lib/overallScore'
 
@@ -61,10 +61,7 @@ const {
   ...htmlProps
 } = Astro.props
 
-const statusIcon = {
-  ...verificationStatusesByValue,
-  APPROVED: undefined,
-}[verificationStatus]
+const statusIcon = getServiceStatusIcon(verificationStatus)
 
 const Element = withoutLink ? 'div' : 'a'
 

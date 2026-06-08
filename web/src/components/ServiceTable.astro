@@ -1,0 +1,369 @@
+---
+import { Icon } from 'astro-icon/components'
+import { round } from 'lodash-es'
+
+import { attributeTypesById } from '../constants/attributeTypes'
+import { currencies } from '../constants/currencies'
+import { getKycLevelInfo } from '../constants/kycLevels'
+import { serviceVisibilitiesById } from '../constants/serviceVisibility'
+import { getServiceStatusIcon } from '../constants/verificationStatus'
+import { cn } from '../lib/cn'
+import { makeOverallScoreInfo } from '../lib/overallScore'
+import { pluralize } from '../lib/pluralize'
+import { defaultSortOption } from '../lib/searchFiltersOptions'
+import { createPageUrl, urlWithParams } from '../lib/urls'
+
+import MyPicture from './MyPicture.astro'
+import OnionIcon from './OnionIcon.astro'
+import SortHeaderLink from './SortHeaderLink.astro'
+import Tooltip from './Tooltip.astro'
+
+import type { ServiceListItem } from '../lib/serviceListItem'
+
+type Props = {
+  services: ServiceListItem[]
+  currentPage: number
+  totalPages: number
+  sort: string
+  sortSeed?: string
+  inlineIcons?: boolean
+}
+
+const { services, currentPage, totalPages, sort, sortSeed, inlineIcons = false } = Astro.props
+
+const MAX_KYC_LEVEL = 4
+
+// On desktop the wrapper is `overflow-visible`, so the header can stick to the
+// viewport (under the navbar) without an inner scrollbar. On mobile the wrapper
+// is the horizontal scroll container, so the header scrolls with the page.
+const headCellClass =
+  'bg-night-900 px-3 py-2.5 text-[11px] font-semibold tracking-wider text-day-500 uppercase sm:sticky sm:top-16 z-20'
+const bodyCellClass =
+  'border-t border-night-700/60 bg-night-800 px-3 py-2.5 align-middle transition-colors group-hover/tr:bg-night-700'
+const stickyColClass = 'sticky left-0 z-10'
+// Keeps the score column off the sticky service name on horizontal scroll.
+const serviceCellClass = 'pr-6 border-r border-night-700/60'
+const actionButtonClass =
+  'inline-flex size-7 items-center justify-center rounded-md border border-night-600 bg-night-700 transition-colors hover:border-green-500/50 hover:text-white focus-visible:ring-1 focus-visible:ring-green-500 focus-visible:outline-none'
+
+const sortColumns = {
+  name: { asc: 'name-asc', desc: 'name-desc', primary: 'name-asc' },
+  score: { asc: 'score-asc', desc: 'score-desc', primary: 'score-desc' },
+  rating: { asc: 'rating-asc', desc: 'rating-desc', primary: 'rating-desc' },
+  kyc: { asc: 'kyc-asc', desc: 'kyc-desc', primary: 'kyc-asc' },
+} as const
+
+function sortHeader(column: keyof typeof sortColumns) {
+  const { asc, desc, primary } = sortColumns[column]
+  const isAsc = sort === asc
+  const isDesc = sort === desc
+  const next = isDesc ? asc : isAsc ? desc : primary
+  return {
+    href: urlWithParams(Astro.url, {
+      sort: next === defaultSortOption.value ? null : next,
+      page: null,
+    }),
+    isAsc,
+    isDesc,
+    active: isAsc || isDesc,
+    icon: isAsc ? 'ri:arrow-up-s-fill' : isDesc ? 'ri:arrow-down-s-fill' : 'ri:expand-up-down-fill',
+    ariaSort: isAsc ? 'ascending' : isDesc ? 'descending' : 'none',
+  } as const
+}
+
+const headers = {
+  name: sortHeader('name'),
+  score: sortHeader('score'),
+  rating: sortHeader('rating'),
+  kyc: sortHeader('kyc'),
+}
+---
+
+<p class="mb-2 flex items-center gap-1.5 text-xs text-day-500 sm:hidden">
+  <Icon name="ri:arrow-left-right-line" class="size-3.5" is:inline={inlineIcons} />
+  Scroll sideways for more
+</p>
+
+<div class="relative mt-2 overflow-x-auto rounded-xl border border-night-600 sm:mt-6 sm:overflow-visible">
+  <table
+    aria-label="Services comparison"
+    class="w-full border-separate border-spacing-0 text-left text-sm whitespace-nowrap"
+  >
+    <thead>
+      <tr>
+        <th
+          scope="col"
+          aria-sort={headers.name.ariaSort}
+          class={cn(headCellClass, stickyColClass, serviceCellClass, 'z-20')}
+        >
+          <SortHeaderLink
+            label="Service"
+            href={headers.name.href}
+            active={headers.name.active}
+            icon={headers.name.icon}
+            inlineIcons={inlineIcons}
+          />
+        </th>
+        <th scope="col" aria-sort={headers.score.ariaSort} class={cn(headCellClass, 'text-center')}>
+          <SortHeaderLink
+            label="Score"
+            href={headers.score.href}
+            active={headers.score.active}
+            icon={headers.score.icon}
+            inlineIcons={inlineIcons}
+          />
+        </th>
+        <th scope="col" aria-sort={headers.kyc.ariaSort} class={cn(headCellClass, 'text-center')}>
+          <SortHeaderLink
+            label="KYC"
+            href={headers.kyc.href}
+            active={headers.kyc.active}
+            icon={headers.kyc.icon}
+            inlineIcons={inlineIcons}
+          />
+        </th>
+        <th scope="col" class={cn(headCellClass, 'text-center')}>Tor</th>
+        <th scope="col" class={cn(headCellClass, 'text-center')}>Attributes</th>
+        <th scope="col" aria-sort={headers.rating.ariaSort} class={cn(headCellClass, 'text-center')}>
+          <SortHeaderLink
+            label="User rating"
+            href={headers.rating.href}
+            active={headers.rating.active}
+            icon={headers.rating.icon}
+            inlineIcons={inlineIcons}
+          />
+        </th>
+        <th scope="col" class={cn(headCellClass, 'text-center')}>Accepts</th>
+        <th scope="col" class={headCellClass}>Categories</th>
+        <th scope="col" class={cn(headCellClass, 'text-right')}>
+          <span class="sr-only">Links</span>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        services.map((service, i) => {
+          const overallScoreInfo = makeOverallScoreInfo(service.overallScore)
+          const kycLevelInfo = getKycLevelInfo(`${service.kycLevel}`)
+          // Link straight to the onion site, but only to an http(s) URL so the
+          // href can never become a javascript:/data: sink if bad data slips in.
+          const onionUrl = service.onionUrls.find(
+            (url) => url.startsWith('http://') || url.startsWith('https://')
+          )
+          const hasTor = onionUrl !== undefined
+          const hasOutboundUrl = service.serviceUrls.length > 0
+          const isScam = service.verificationStatus === 'VERIFICATION_FAILED'
+          const isArchived = service.serviceVisibility === 'ARCHIVED'
+          const statusIcon = getServiceStatusIcon(service.verificationStatus)
+          const signals = service.attributes.reduce(
+            (acc, { attribute }) => {
+              if (attribute.type === 'GOOD') acc.good += 1
+              else if (attribute.type === 'WARNING') acc.warning += 1
+              else if (attribute.type === 'BAD') acc.bad += 1
+              return acc
+            },
+            { good: 0, warning: 0, bad: 0 }
+          )
+          const signalPills = [
+            { count: signals.good, info: attributeTypesById.GOOD },
+            { count: signals.warning, info: attributeTypesById.WARNING },
+            { count: signals.bad, info: attributeTypesById.BAD },
+          ].filter((pill) => pill.count > 0)
+
+          return (
+            <tr
+              data-hx-search-results-card
+              class={cn('group/tr', (isScam || isArchived) && 'opacity-75 transition-opacity hover:opacity-100')}
+              {...(i === services.length - 1 && currentPage < totalPages
+                ? {
+                    'hx-get': createPageUrl(currentPage + 1, Astro.url, { 'sort-seed': sortSeed }),
+                    'hx-trigger': 'revealed',
+                    'hx-swap': 'afterend',
+                    'hx-select': '[data-hx-search-results-card]',
+                    'hx-indicator': '#infinite-scroll-indicator',
+                  }
+                : {})}
+            >
+              <th scope="row" class={cn(bodyCellClass, stickyColClass, serviceCellClass, 'font-normal')}>
+                <a
+                  href={`/service/${service.slug}`}
+                  class="group/row flex items-center gap-3 outline-none"
+                  aria-label={service.name}
+                >
+                  <MyPicture
+                    src={service.imageUrl}
+                    fallback="service"
+                    alt={`${service.name} logo`}
+                    class={cn(
+                      'size-8 shrink-0 rounded-sm object-contain text-white',
+                      (isScam || isArchived) && 'grayscale-67'
+                    )}
+                    width={32}
+                    height={32}
+                  />
+                  <span class="font-title font-medium text-white group-hover/row:underline group-focus-visible/row:underline">
+                    {service.name}
+                  </span>
+                  {statusIcon && (
+                    <Tooltip text={statusIcon.label} position="right" enabled={!isScam}>
+                      <Icon
+                        is:inline={inlineIcons}
+                        name={statusIcon.icon}
+                        class={cn('size-4 shrink-0', statusIcon.classNames.icon)}
+                      />
+                    </Tooltip>
+                  )}
+                  {isArchived && (
+                    <Tooltip text={serviceVisibilitiesById.ARCHIVED.label} position="right">
+                      <Icon
+                        is:inline={inlineIcons}
+                        name={serviceVisibilitiesById.ARCHIVED.icon}
+                        class={cn('size-4 shrink-0', serviceVisibilitiesById.ARCHIVED.iconClass)}
+                      />
+                    </Tooltip>
+                  )}
+                </a>
+              </th>
+
+              <td class={cn(bodyCellClass, 'text-center')}>
+                <Tooltip
+                  class={cn(
+                    'inline-flex size-6 items-center justify-center rounded-sm font-bold',
+                    overallScoreInfo.classNameBg
+                  )}
+                  text={`${Math.round(service.privacyScore).toLocaleString()}% Privacy | ${Math.round(service.trustScore).toLocaleString()}% Trust`}
+                >
+                  {overallScoreInfo.formattedScore}
+                </Tooltip>
+              </td>
+
+              <td class={cn(bodyCellClass, 'text-center')}>
+                <Tooltip
+                  class="inline-flex items-center gap-1 font-bold text-day-300"
+                  text={kycLevelInfo.description}
+                >
+                  <Icon name={kycLevelInfo.icon} class="size-4" is:inline={inlineIcons} />
+                  {kycLevelInfo.id}/{MAX_KYC_LEVEL}
+                </Tooltip>
+              </td>
+
+              <td class={cn(bodyCellClass, 'text-center')}>
+                <Tooltip text={hasTor ? 'Tor onion service available' : 'No Tor onion service'}>
+                  <OnionIcon class={cn('inline-block size-4', hasTor ? 'text-purple-400' : 'text-day-700')} />
+                </Tooltip>
+              </td>
+
+              <td class={cn(bodyCellClass, 'text-center')}>
+                {signalPills.length === 0 ? (
+                  <span class="text-day-600">-</span>
+                ) : (
+                  <span class="inline-flex items-center gap-1.5">
+                    {signalPills.map((pill) => (
+                      <span class={cn('inline-flex items-center gap-0.5 font-bold', pill.info.classNames.text)}>
+                        <Icon name={pill.info.icon} class="size-3.5" is:inline={inlineIcons} />
+                        {pill.count}
+                      </span>
+                    ))}
+                  </span>
+                )}
+              </td>
+
+              <td class={cn(bodyCellClass, 'text-center')}>
+                {service.trustWeightedUserRating === null ? (
+                  <Tooltip class="text-day-600" text="Not enough trusted reviews yet">
+                    -
+                  </Tooltip>
+                ) : (
+                  <Tooltip
+                    class="inline-flex flex-col items-center leading-tight"
+                    text={`Trust weighted score from ${service.userRatingCount.toLocaleString()} ${pluralize('rating', service.userRatingCount)}`}
+                  >
+                    <span class="inline-flex items-center gap-1 font-bold text-day-200">
+                      <Icon name="ri:star-fill" class="size-3.5 text-yellow-400" is:inline={inlineIcons} />
+                      {round(service.trustWeightedUserRating, 1).toLocaleString()}
+                    </span>
+                    <span class="text-[10px] text-day-500">
+                      {service.userRatingCount.toLocaleString()} {pluralize('rating', service.userRatingCount)}
+                    </span>
+                  </Tooltip>
+                )}
+              </td>
+
+              <td class={cn(bodyCellClass, 'text-center')}>
+                <span class="-m-1 inline-flex">
+                  {currencies.map((currency) => {
+                    const isAccepted = service.acceptedCurrencies.includes(currency.id)
+                    return (
+                      <Tooltip text={currency.name}>
+                        <Icon
+                          is:inline={inlineIcons}
+                          name={currency.icon}
+                          class={cn('box-content size-4 p-1 text-day-600', { 'text-white': isAccepted })}
+                        />
+                      </Tooltip>
+                    )
+                  })}
+                </span>
+              </td>
+
+              <td class={bodyCellClass}>
+                <span class="flex items-center gap-3">
+                  {service.categories.map((category) => (
+                    <span class="inline-flex shrink-0 items-center gap-1 text-day-300">
+                      <Icon name={category.icon} class="size-4" is:inline={inlineIcons} />
+                      {category.name}
+                    </span>
+                  ))}
+                </span>
+              </td>
+
+              <td class={cn(bodyCellClass, 'text-right')}>
+                <span class="inline-flex items-center justify-end gap-1">
+                  <Tooltip text="View details">
+                    <a
+                      href={`/service/${service.slug}`}
+                      aria-label={`View ${service.name} details`}
+                      class={cn(actionButtonClass, 'text-day-200')}
+                    >
+                      <Icon name="ri:information-line" class="size-4" is:inline={inlineIcons} />
+                    </a>
+                  </Tooltip>
+                  {hasOutboundUrl ? (
+                    <Tooltip text="Visit website">
+                      <a
+                        href={`/go/${service.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer nofollow"
+                        aria-label={`Visit ${service.name} website`}
+                        class={cn(actionButtonClass, 'text-day-200')}
+                      >
+                        <Icon name="ri:global-line" class="size-4" is:inline={inlineIcons} />
+                      </a>
+                    </Tooltip>
+                  ) : (
+                    <span class="size-7" aria-hidden="true" />
+                  )}
+                  {hasTor ? (
+                    <Tooltip text="Visit onion site">
+                      <a
+                        href={onionUrl}
+                        target="_blank"
+                        rel="noopener noreferrer nofollow"
+                        aria-label={`Visit ${service.name} onion site`}
+                        class={cn(actionButtonClass, 'text-purple-400 hover:border-purple-500/50')}
+                      >
+                        <OnionIcon class="size-4" />
+                      </a>
+                    </Tooltip>
+                  ) : (
+                    <span class="size-7" aria-hidden="true" />
+                  )}
+                </span>
+              </td>
+            </tr>
+          )
+        })
+      }
+    </tbody>
+  </table>
+</div>

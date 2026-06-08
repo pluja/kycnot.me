@@ -30,6 +30,38 @@ export const sortOptions = [
     },
   },
   {
+    value: 'rating-desc',
+    label: 'User rating (High → Low)',
+    orderBy: {
+      key: 'trustWeightedUserRating',
+      direction: 'desc',
+    },
+  },
+  {
+    value: 'rating-asc',
+    label: 'User rating (Low → High)',
+    orderBy: {
+      key: 'trustWeightedUserRating',
+      direction: 'asc',
+    },
+  },
+  {
+    value: 'kyc-asc',
+    label: 'KYC (Low → High)',
+    orderBy: {
+      key: 'kycLevel',
+      direction: 'asc',
+    },
+  },
+  {
+    value: 'kyc-desc',
+    label: 'KYC (High → Low)',
+    orderBy: {
+      key: 'kycLevel',
+      direction: 'desc',
+    },
+  },
+  {
     value: 'name-asc',
     label: 'Name (A → Z)',
     orderBy: {
@@ -85,6 +117,25 @@ export const modeOptions = [
   value: string
   label: string
 }[]
+
+export const viewOptions = [
+  {
+    value: 'cards',
+    label: 'Cards',
+    icon: 'ri:layout-grid-line',
+  },
+  {
+    value: 'table',
+    label: 'Table',
+    icon: 'ri:table-line',
+  },
+] as const satisfies {
+  value: string
+  label: string
+  icon: string
+}[]
+
+export const defaultViewOption = viewOptions[0]
 
 export function makeSearchFiltersOptions({
   filters,

@@ -1,0 +1,27 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../lib/cn'
+
+type Props = {
+  label: string
+  href: string
+  active: boolean
+  icon: string
+  inlineIcons?: boolean
+}
+
+const { label, href, active, icon, inlineIcons = false } = Astro.props
+---
+
+<a href={href} class="group/sort inline-flex items-center gap-1 hover:text-day-300">
+  {label}
+  <Icon
+    name={icon}
+    class={cn(
+      'size-3.5',
+      active ? 'text-green-500' : 'text-day-600 opacity-0 group-hover/sort:opacity-100'
+    )}
+    is:inline={inlineIcons}
+  />
+</a>

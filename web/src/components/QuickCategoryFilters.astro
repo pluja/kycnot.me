@@ -1,0 +1,63 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { quickCategoryFilters } from '../constants/quickCategoryFilters'
+import { areEqualArraysWithoutOrder } from '../lib/arrays'
+import { cn } from '../lib/cn'
+
+type Props = {
+  activeCategories: string[]
+  availableSlugs: string[]
+  inlineIcons?: boolean
+}
+
+const { activeCategories, availableSlugs, inlineIcons = false } = Astro.props
+
+const availableSet = new Set(availableSlugs)
+
+// Replaces the categories filter with this preset (delete then append). Not
+// urlWithParams: that appends array values without clearing, which would merge
+// the preset into any already-active category instead of replacing it.
+function buildHref(slugs: readonly string[] | null): string {
+  const url = new URL(Astro.url)
+  url.searchParams.delete('categories')
+  url.searchParams.delete('page')
+  if (slugs) for (const slug of slugs) url.searchParams.append('categories', slug)
+  return url.pathname + url.search
+}
+
+const filters = quickCategoryFilters
+  .map((filter) => ({ ...filter, slugs: filter.slugs.filter((slug) => availableSet.has(slug)) }))
+  .filter((filter) => filter.slugs.length > 0)
+  .map((filter) => {
+    const active = areEqualArraysWithoutOrder(activeCategories, filter.slugs)
+    return { ...filter, active, href: buildHref(active ? null : filter.slugs) }
+  })
+
+const allActive = activeCategories.length === 0
+
+const pillClass = (active: boolean) =>
+  cn(
+    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors',
+    active
+      ? 'border-green-500/50 bg-green-500/15 text-white'
+      : 'border-night-600 bg-night-800 text-day-300 hover:border-night-500 hover:text-white'
+  )
+---
+
+{
+  filters.length > 0 && (
+    <div class="mt-6 flex flex-wrap items-center gap-2" aria-label="Quick category filters">
+      <a href={buildHref(null)} aria-current={allActive ? 'true' : undefined} class={pillClass(allActive)}>
+        <Icon name="ri:apps-line" class="size-4" is:inline={inlineIcons} />
+        All
+      </a>
+      {filters.map((filter) => (
+        <a href={filter.href} aria-current={filter.active ? 'true' : undefined} class={pillClass(filter.active)}>
+          <Icon name={filter.icon} class="size-4" is:inline={inlineIcons} />
+          {filter.label}
+        </a>
+      ))}
+    </div>
+  )
+}

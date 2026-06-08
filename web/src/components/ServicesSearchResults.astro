@@ -5,22 +5,26 @@ import { uniq } from 'lodash-es'
 import { verificationStatusesByValue } from '../constants/verificationStatus'
 import { cn } from '../lib/cn'
 import { pluralize } from '../lib/pluralize'
+import { defaultViewOption, viewOptions } from '../lib/searchFiltersOptions'
 import { makeSearchTitle } from '../lib/searchSeo'
 import { createPageUrl, urlWithParams } from '../lib/urls'
 
 import Button from './Button.astro'
+import QuickCategoryFilters from './QuickCategoryFilters.astro'
 import ServiceCard from './ServiceCard.astro'
 import ServiceFiltersPillsRow from './ServiceFiltersPillsRow.astro'
+import ServiceTable from './ServiceTable.astro'
 import SwapCTA from './swap/SwapCTA.astro'
 
 import type { ServicesFiltersOptions } from '../lib/searchFiltersOptions'
+import type { ServiceListItem } from '../lib/serviceListItem'
 import type { AttributeOption, ServicesFiltersObject } from '../pages/index.astro'
 import type { Prisma } from '@prisma/client'
-import type { ComponentProps, HTMLAttributes } from 'astro/types'
+import type { HTMLAttributes } from 'astro/types'
 
 type Props = HTMLAttributes<'div'> & {
   hasDefaultFilters?: boolean
-  services: ComponentProps<typeof ServiceCard>['service'][] | undefined
+  services: ServiceListItem[] | undefined
   currentPage?: number
   total: number
   pageSize: number
@@ -76,6 +80,14 @@ const hasSomeCommunityContributed = !!services?.some((service) =>
 )
 
 const totalPages = Math.ceil(total / pageSize) || 1
+
+const viewLinks = viewOptions.map((option) => ({
+  ...option,
+  active: filters.view === option.value,
+  href: urlWithParams(Astro.url, {
+    view: option.value === defaultViewOption.value ? null : option.value,
+  }),
+}))
 
 const urlIfIncludingCommunity = urlWithParams(Astro.url, {
   verification: uniq([
@@ -168,17 +180,43 @@ const searchTitle = makeSearchTitle({
         )
       }
     </span>
-    <Button
-      as="a"
-      href="/service-suggestion/new"
-      label="Add service"
-      icon="ri:add-line"
-      inlineIcon={inlineIcons}
-      class="max-xs:w-9 max-xs:px-0"
-      classNames={{
-        label: 'max-xs:hidden',
-      }}
-    />
+    <div class="flex items-center gap-2">
+      <div
+        class="inline-flex rounded-md border border-night-600 bg-night-800 p-0.5"
+        role="group"
+        aria-label="Result view"
+      >
+        {
+          viewLinks.map((view) => (
+            <a
+              href={view.href}
+              aria-label={`${view.label} view`}
+              aria-current={view.active ? 'true' : undefined}
+              class={cn(
+                'flex items-center gap-1 rounded-sm px-2 py-1 text-sm transition-colors',
+                view.active
+                  ? 'bg-night-600 text-white'
+                  : 'text-day-400 hover:text-day-200'
+              )}
+            >
+              <Icon name={view.icon} class="size-4" is:inline={inlineIcons} />
+              <span class="hidden sm:inline">{view.label}</span>
+            </a>
+          ))
+        }
+      </div>
+      <Button
+        as="a"
+        href="/service-suggestion/new"
+        label="Add service"
+        icon="ri:add-line"
+        inlineIcon={inlineIcons}
+        class="max-xs:w-9 max-xs:px-0"
+        classNames={{
+          label: 'max-xs:hidden',
+        }}
+      />
+    </div>
   </div>
 
   {
@@ -265,24 +303,42 @@ const searchTitle = makeSearchTitle({
       </div>
     ) : (
       <>
-        <ol class="mt-6 grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*80),1fr))]">
-          {services.map((service, i) => (
-            <li
-              data-hx-search-results-card
-              {...(i === services.length - 1 && currentPage < totalPages
-                ? {
-                    'hx-get': createPageUrl(currentPage + 1, Astro.url, { 'sort-seed': sortSeed }),
-                    'hx-trigger': 'revealed',
-                    'hx-swap': 'afterend',
-                    'hx-select': '[data-hx-search-results-card]',
-                    'hx-indicator': '#infinite-scroll-indicator',
-                  }
-                : {})}
-            >
-              <ServiceCard inlineIcons={inlineIcons} service={service} />
-            </li>
-          ))}
-        </ol>
+        {filters.view === 'table' ? (
+          <>
+            <QuickCategoryFilters
+              activeCategories={filters.categories}
+              availableSlugs={categories.map((category) => category.slug)}
+              inlineIcons={inlineIcons}
+            />
+            <ServiceTable
+              services={services}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              sort={filters.sort}
+              sortSeed={sortSeed}
+              inlineIcons={inlineIcons}
+            />
+          </>
+        ) : (
+          <ol class="mt-6 grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*80),1fr))]">
+            {services.map((service, i) => (
+              <li
+                data-hx-search-results-card
+                {...(i === services.length - 1 && currentPage < totalPages
+                  ? {
+                      'hx-get': createPageUrl(currentPage + 1, Astro.url, { 'sort-seed': sortSeed }),
+                      'hx-trigger': 'revealed',
+                      'hx-swap': 'afterend',
+                      'hx-select': '[data-hx-search-results-card]',
+                      'hx-indicator': '#infinite-scroll-indicator',
+                    }
+                  : {})}
+              >
+                <ServiceCard inlineIcons={inlineIcons} service={service} />
+              </li>
+            ))}
+          </ol>
+        )}
 
         <div class="mt-8 flex justify-center no-js:hidden" id="infinite-scroll-indicator">
           <div class="flex items-center gap-2 opacity-0 transition-opacity duration-500 htmx-request:opacity-100">

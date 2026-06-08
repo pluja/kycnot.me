@@ -178,3 +178,9 @@ export const {
 type _ExpectToHaveAllValues = Assert<
   Equals<(typeof verificationStatuses)[number]['value'], VerificationStatus>
 >
+
+// getServiceStatusIcon returns the status badge to render next to a service
+// name, or undefined for APPROVED, which intentionally shows no icon.
+export function getServiceStatusIcon(status: VerificationStatus) {
+  return status === 'APPROVED' ? undefined : verificationStatusesByValue[status]
+}
