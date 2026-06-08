@@ -16,20 +16,6 @@ export const serviceListItemSelect = {
   serviceUrls: true,
   onionUrls: true,
   trustWeightedUserRating: true,
-  userRatingCount: true,
-  attributes: {
-    select: {
-      attribute: {
-        select: {
-          id: true,
-          slug: true,
-          title: true,
-          category: true,
-          type: true,
-        },
-      },
-    },
-  },
   categories: {
     select: {
       name: true,

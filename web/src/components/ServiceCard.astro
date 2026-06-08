@@ -9,6 +9,7 @@ import { cn } from '../lib/cn'
 import { makeOverallScoreInfo } from '../lib/overallScore'
 
 import MyPicture from './MyPicture.astro'
+import SwapKycBadge from './swap/SwapKycBadge.astro'
 import Tooltip from './Tooltip.astro'
 
 import type { Prisma } from '@prisma/client'
@@ -172,13 +173,12 @@ const kycLevelInfo = getKycLevelInfo(`${kycLevel}`)
         {overallScoreInfo.formattedScore}
       </Tooltip>
 
-      <Tooltip
-        class="ml-3 inline-flex items-center gap-1 text-sm font-bold whitespace-nowrap text-day-300"
-        text={kycLevelInfo.description}
-      >
-        <Icon name={kycLevelInfo.icon} class="size-4" />
-        KYC &nbsp;{kycLevelInfo.id}
-      </Tooltip>
+      <div class="ml-3 inline-flex items-center gap-1.5 text-sm font-medium text-day-400">
+        KYC:
+        <Tooltip class="inline-flex" text={kycLevelInfo.description}>
+          <SwapKycBadge kycInfo={kycLevelInfo} class="min-w-0" />
+        </Tooltip>
+      </div>
 
       <div class="-m-1 ml-auto flex">
         {

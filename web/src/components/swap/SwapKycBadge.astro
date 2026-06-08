@@ -7,15 +7,17 @@ import type { getKycLevelInfo } from '../../constants/kycLevels'
 
 type Props = {
   kycInfo: ReturnType<typeof getKycLevelInfo>
+  class?: string
 }
 
-const { kycInfo } = Astro.props
+const { kycInfo, class: className } = Astro.props
 ---
 
 <span
   class={cn(
     'inline-flex min-w-20 items-center justify-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-medium whitespace-nowrap',
-    kycInfo.badgeClassName
+    kycInfo.badgeClassName,
+    className
   )}
 >
   <Icon name={kycInfo.icon} class="size-3.5 shrink-0" aria-hidden="true" />
