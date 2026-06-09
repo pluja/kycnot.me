@@ -1,0 +1,61 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import MyPicture from '../../MyPicture.astro'
+
+type Props = {
+  selected?: { id: number; name: string; displayName: string | null; picture: string | null } | null
+}
+
+const { selected = null } = Astro.props
+---
+
+<div id="reporter-field" class="space-y-2">
+  <input type="hidden" name="reportedById" value={selected?.id ?? ''} />
+
+  {
+    selected ? (
+      <div class="flex items-center gap-2 rounded-lg border border-night-600 bg-night-800 p-2">
+        <MyPicture
+          src={selected.picture}
+          fallback="service"
+          alt=""
+          class="size-7 shrink-0 rounded-full object-cover"
+          width={28}
+          height={28}
+        />
+        <span class="font-medium text-day-100">{selected.displayName ?? selected.name}</span>
+        <span class="text-xs text-day-500">
+          @{selected.name} · #{selected.id}
+        </span>
+        <button
+          type="button"
+          hx-get="/admin/cases/reporter-select"
+          hx-target="#reporter-field"
+          hx-swap="outerHTML"
+          aria-label="Clear reporter"
+          class="ml-auto flex size-7 items-center justify-center rounded-md text-day-400 transition-colors hover:bg-night-700 hover:text-red-300"
+        >
+          <Icon name="ri:close-line" class="size-4" />
+        </button>
+      </div>
+    ) : (
+      <div>
+        <input
+          type="search"
+          name="q"
+          aria-label="Search a user to set as reporter"
+          placeholder="Search a user by name or id..."
+          autocomplete="off"
+          hx-get="/admin/cases/reporter-search"
+          hx-trigger="input changed delay:300ms"
+          hx-target="#reporter-results"
+          hx-swap="innerHTML"
+          hx-on:keydown="if (event.key === 'Enter') event.preventDefault()"
+          class="w-full rounded-md border border-night-600 bg-night-900 p-2 text-white placeholder-day-500 focus:border-green-500 focus:outline-hidden"
+        />
+        <div id="reporter-results" class="mt-2" />
+      </div>
+    )
+  }
+</div>

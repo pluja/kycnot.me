@@ -4,6 +4,7 @@ import { actions, isInputError } from 'astro:actions'
 
 import CaseEvidenceGallery from '../../../components/admin/cases/CaseEvidenceGallery.astro'
 import CaseUpdatesTimeline from '../../../components/admin/cases/CaseUpdatesTimeline.astro'
+import ReporterField from '../../../components/admin/cases/ReporterField.astro'
 import DeleteConfirmButton from '../../../components/admin/DeleteConfirmButton.astro'
 import BadgeSmall from '../../../components/BadgeSmall.astro'
 import Button from '../../../components/Button.astro'
@@ -13,6 +14,7 @@ import InputSubmitButton from '../../../components/InputSubmitButton.astro'
 import InputText from '../../../components/InputText.astro'
 import InputTextArea from '../../../components/InputTextArea.astro'
 import Lightbox from '../../../components/Lightbox.astro'
+import MyPicture from '../../../components/MyPicture.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
 import { caseIssueTypes, getCaseIssueTypeInfo } from '../../../constants/caseIssueTypes'
 import { caseStatuses, getCaseStatusInfo } from '../../../constants/caseStatus'
@@ -54,6 +56,11 @@ Astro.locals.banners.addIfSuccess(editUpdateResult, 'Update edited')
 const deleteUpdateResult = Astro.getActionResult(actions.admin.case.updates.delete)
 Astro.locals.banners.addIfSuccess(deleteUpdateResult, 'Update deleted')
 
+const addParticipantResult = Astro.getActionResult(actions.admin.case.participants.add)
+Astro.locals.banners.addIfSuccess(addParticipantResult, 'Participant added')
+const removeParticipantResult = Astro.getActionResult(actions.admin.case.participants.remove)
+Astro.locals.banners.addIfSuccess(removeParticipantResult, 'Participant removed')
+
 const evidenceOrderBy = [{ order: 'asc' }, { createdAt: 'asc' }] satisfies Prisma.CaseEvidenceOrderByWithRelationInput[]
 const evidenceSelect = {
   id: true,
@@ -61,6 +68,7 @@ const evidenceSelect = {
   description: true,
   bodyMd: true,
   imageUrl: true,
+  visibility: true,
   createdAt: true,
 } satisfies Prisma.CaseEvidenceSelect
 
@@ -82,14 +90,19 @@ const caseRow = await Astro.locals.banners.try(
         resolutionMd: true,
         createdAt: true,
         service: { select: { name: true, slug: true } },
-        reportedBy: { select: { id: true, name: true } },
+        reportedBy: { select: { id: true, name: true, displayName: true, picture: true } },
         createdBy: { select: { name: true } },
+        participants: {
+          orderBy: { name: 'asc' },
+          select: { id: true, name: true, displayName: true, picture: true },
+        },
         evidence: { where: { caseUpdateId: null }, orderBy: evidenceOrderBy, select: evidenceSelect },
         updates: {
           orderBy: { createdAt: 'asc' },
           select: {
             id: true,
             bodyMd: true,
+            visibility: true,
             createdAt: true,
             author: { select: { name: true } },
             evidence: { orderBy: evidenceOrderBy, select: evidenceSelect },
@@ -106,7 +119,7 @@ const statusInfo = getCaseStatusInfo(caseRow.status)
 const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
 ---
 
-<BaseLayout pageTitle={`Case: ${caseRow.title}`} description="Manage case" widthClassName="max-w-3xl" noindex>
+<BaseLayout pageTitle={`Case: ${caseRow.title}`} description="Manage case" widthClassName="max-w-3xl" noindex htmx>
   <div class="mt-10 flex flex-wrap items-center justify-between gap-2">
     <a
       href="/admin/cases"
@@ -200,13 +213,16 @@ const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
         />
       </div>
 
-      <InputText
-        label="Reporter user ID"
-        name="reportedById"
-        inputProps={{ type: 'number', min: 1, value: caseRow.reportedBy?.id ?? '' }}
-        error={updateInputErrors.reportedById}
-        description="Optional internal user id of the reporter."
-      />
+      <div>
+        <span class="mb-1 block text-sm font-medium text-day-200">Reporter user</span>
+        <p class="mb-2 text-xs text-day-400">Optional. The user who reported this case.</p>
+        <ReporterField selected={caseRow.reportedBy} />
+        {
+          updateInputErrors.reportedById && (
+            <p class="mt-1 text-sm text-red-400">{updateInputErrors.reportedById}</p>
+          )
+        }
+      </div>
 
       <InputTextArea
         label="Resolution"
@@ -219,6 +235,74 @@ const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
 
       <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
     </form>
+  </FormSection>
+
+  <FormSection title="Participants" id="participants" class="mt-12">
+    <p class="mb-3 text-sm text-day-400">
+      Attached users, the reporter, and the service's affiliated accounts can read and post in the
+      conversation once the case is published.
+    </p>
+
+    {
+      caseRow.participants.length === 0 ? (
+        <p class="rounded-lg border border-night-600 bg-night-800 p-4 text-center text-sm text-day-400">
+          No participants attached yet.
+        </p>
+      ) : (
+        <ul class="space-y-2">
+          {caseRow.participants.map((participant) => (
+            <li class="flex items-center gap-2 rounded-lg border border-night-600 bg-night-800 p-2">
+              <MyPicture
+                src={participant.picture}
+                fallback="service"
+                alt=""
+                class="size-7 shrink-0 rounded-full object-cover"
+                width={28}
+                height={28}
+              />
+              <span class="font-medium text-day-100">{participant.displayName ?? participant.name}</span>
+              <span class="text-xs text-day-500">
+                @{participant.name} · #{participant.id}
+              </span>
+              <form
+                method="POST"
+                action={`${actions.admin.case.participants.remove}#participants`}
+                class="contents"
+              >
+                <input type="hidden" name="caseId" value={caseRow.id} />
+                <input type="hidden" name="userId" value={participant.id} />
+                <Button
+                  type="submit"
+                  label="Remove participant"
+                  icon="ri:close-line"
+                  iconOnly
+                  size="sm"
+                  variant="faded"
+                  color="danger"
+                  class="ml-auto"
+                />
+              </form>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+
+    <div class="mt-3">
+      <input
+        type="search"
+        name="q"
+        aria-label="Search users to add as participants"
+        placeholder="Search users by name or id..."
+        autocomplete="off"
+        hx-get={`/admin/cases/participant-search?caseId=${caseRow.id}`}
+        hx-trigger="input changed delay:300ms"
+        hx-target="#participant-results"
+        hx-swap="innerHTML"
+        class="w-full rounded-md border border-night-600 bg-night-900 p-2 text-white placeholder-day-500 focus:border-green-500 focus:outline-hidden"
+      />
+      <div id="participant-results" class="mt-2"></div>
+    </div>
   </FormSection>
 
   <FormSection title="Evidence" class="mt-12">

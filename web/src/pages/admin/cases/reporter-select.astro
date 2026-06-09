@@ -1,0 +1,19 @@
+---
+import ReporterField from '../../../components/admin/cases/ReporterField.astro'
+import { prisma } from '../../../lib/prisma'
+
+if (!Astro.locals.userCan('cases:manage')) return new Response(null, { status: 403 })
+
+const userId = Number(Astro.url.searchParams.get('userId'))
+
+let selected: { id: number; name: string; displayName: string | null; picture: string | null } | null = null
+
+if (Number.isInteger(userId) && userId > 0) {
+  selected = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, name: true, displayName: true, picture: true },
+  })
+}
+---
+
+<ReporterField selected={selected} />

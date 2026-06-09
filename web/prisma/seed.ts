@@ -10,6 +10,7 @@ import {
   CaseEvidenceType,
   CaseIssueType,
   CaseStatus,
+  CaseVisibility,
   CommentIssueType,
   CommentStatus,
   Currency,
@@ -624,12 +625,22 @@ const generateFakeCase = (serviceId: number, userIds: number[]) => {
         type: faker.helpers.arrayElement(Object.values(CaseEvidenceType)),
         description: faker.lorem.words({ min: 1, max: 3 }),
         bodyMd: faker.lorem.sentence(),
+        visibility: faker.helpers.weightedArrayElement([
+          { weight: 4, value: CaseVisibility.PUBLIC },
+          { weight: 4, value: CaseVisibility.PARTICIPANTS },
+          { weight: 2, value: CaseVisibility.STAFF },
+        ]),
         order: index,
       })),
     },
     updates: {
       create: Array.from({ length: faker.number.int({ min: 0, max: 3 }) }, () => ({
         bodyMd: faker.lorem.paragraph(),
+        visibility: faker.helpers.weightedArrayElement([
+          { weight: 4, value: CaseVisibility.PUBLIC },
+          { weight: 4, value: CaseVisibility.PARTICIPANTS },
+          { weight: 2, value: CaseVisibility.STAFF },
+        ]),
         author: { connect: { id: faker.helpers.arrayElement(userIds) } },
       })),
     },

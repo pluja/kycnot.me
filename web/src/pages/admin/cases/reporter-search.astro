@@ -1,0 +1,62 @@
+---
+import Button from '../../../components/Button.astro'
+import MyPicture from '../../../components/MyPicture.astro'
+import { prisma } from '../../../lib/prisma'
+
+if (!Astro.locals.userCan('cases:manage')) return new Response(null, { status: 403 })
+
+const query = (Astro.url.searchParams.get('q') ?? '').trim()
+
+let users: { id: number; name: string; displayName: string | null; picture: string | null }[] = []
+
+if (query.length > 0) {
+  const numericId = Number.parseInt(query, 10)
+  users = await prisma.user.findMany({
+    where: {
+      spammer: false,
+      OR: [
+        { name: { contains: query, mode: 'insensitive' } },
+        { displayName: { contains: query, mode: 'insensitive' } },
+        ...(Number.isInteger(numericId) && numericId > 0 ? [{ id: numericId }] : []),
+      ],
+    },
+    select: { id: true, name: true, displayName: true, picture: true },
+    orderBy: { name: 'asc' },
+    take: 8,
+  })
+}
+---
+
+{
+  query.length === 0 ? null : users.length === 0 ? (
+    <p class="px-1 py-2 text-sm text-day-500">No matching users.</p>
+  ) : (
+    <ul class="divide-y divide-night-700 overflow-hidden rounded-lg border border-night-600 bg-night-800">
+      {users.map((user) => (
+        <li>
+          <button
+            type="button"
+            hx-get={`/admin/cases/reporter-select?userId=${user.id}`}
+            hx-target="#reporter-field"
+            hx-swap="outerHTML"
+            class="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-night-700"
+          >
+            <MyPicture
+              src={user.picture}
+              fallback="service"
+              alt=""
+              class="size-6 shrink-0 rounded-full object-cover"
+              width={24}
+              height={24}
+            />
+            <span class="font-medium text-day-100">{user.displayName ?? user.name}</span>
+            <span class="text-xs text-day-500">
+              @{user.name} · #{user.id}
+            </span>
+            <Button as="span" label="Select" icon="ri:user-add-line" size="sm" variant="faded" class="ml-auto" />
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}

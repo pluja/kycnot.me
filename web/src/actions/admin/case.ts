@@ -1,8 +1,8 @@
-import { CaseEvidenceType, CaseIssueType, CaseStatus } from '@prisma/client'
+import { CaseEvidenceType, CaseIssueType, CaseStatus, CaseVisibility } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
-import { canParticipateInCase, isCaseStaff, isCaseVisibleToParticipants } from '../../lib/caseAccess'
+import { canParticipateInCase, isCaseStaff, isCasePublished } from '../../lib/caseAccess'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { deleteFileLocally, saveFileLocally } from '../../lib/fileStorage'
 import { prisma } from '../../lib/prisma'
@@ -193,13 +193,14 @@ export const adminCaseActions = {
       input: z.object({
         caseId: z.coerce.number().int().positive(),
         bodyMd: z.string().min(1),
-        staffOnly: z.coerce.boolean().default(false),
+        visibility: z.nativeEnum(CaseVisibility).default(CaseVisibility.PARTICIPANTS),
       }),
       handler: async (input, context) => {
         const caseRow = await prisma.case.findUnique({
           where: { id: input.caseId },
           select: {
             status: true,
+            reportedById: true,
             participants: { select: { id: true } },
             service: { select: { affiliatedUsers: { select: { userId: true } } } },
           },
@@ -210,20 +211,19 @@ export const adminCaseActions = {
 
         const user = context.locals.user
         const staff = isCaseStaff(user)
-        const canPost =
-          canParticipateInCase(
-            user,
-            caseRow.participants.map((participant) => participant.id),
-            caseRow.service.affiliatedUsers.map((affiliation) => affiliation.userId)
-          ) && (staff || isCaseVisibleToParticipants(caseRow.status))
+        const canPost = canParticipateInCase(user, caseRow) && (staff || isCasePublished(caseRow.status))
         if (!canPost) {
           throw new ActionError({ code: 'FORBIDDEN', message: 'You cannot post in this case.' })
         }
 
+        // Only staff curate the public tier; participants always post at the
+        // participant tier regardless of what the form submits.
+        const visibility = staff ? input.visibility : CaseVisibility.PARTICIPANTS
+
         const update = await prisma.caseUpdate.create({
           data: {
             bodyMd: input.bodyMd,
-            staffOnly: staff && input.staffOnly,
+            visibility,
             case: { connect: { id: input.caseId } },
             author: { connect: { id: user.id } },
           },
@@ -240,6 +240,7 @@ export const adminCaseActions = {
       input: z.object({
         updateId: z.coerce.number().int().positive(),
         bodyMd: z.string().min(1),
+        visibility: z.nativeEnum(CaseVisibility).default(CaseVisibility.PARTICIPANTS),
       }),
       handler: async (input) => {
         const existing = await prisma.caseUpdate.findUnique({
@@ -252,7 +253,7 @@ export const adminCaseActions = {
 
         const update = await prisma.caseUpdate.update({
           where: { id: input.updateId },
-          data: { bodyMd: input.bodyMd },
+          data: { bodyMd: input.bodyMd, visibility: input.visibility },
           select: { id: true },
         })
 
@@ -296,7 +297,7 @@ export const adminCaseActions = {
         bodyMd: optionalText,
         imageFile: imageFileSchema,
         watermark: z.coerce.boolean().default(false),
-        isPublic: z.coerce.boolean().default(false),
+        visibility: z.nativeEnum(CaseVisibility).default(CaseVisibility.PARTICIPANTS),
       }),
       handler: async (input) => {
         const existing = await prisma.case.findUnique({ where: { id: input.caseId }, select: { id: true } })
@@ -336,7 +337,7 @@ export const adminCaseActions = {
             description: input.description ?? null,
             bodyMd: input.bodyMd ?? null,
             imageUrl,
-            isPublic: input.isPublic,
+            visibility: input.visibility,
             order,
           },
           select: { id: true },
@@ -373,29 +374,6 @@ export const adminCaseActions = {
   },
 
   participants: {
-    search: defineProtectedAction({
-      accept: 'form',
-      permissions: manageCases,
-      input: z.object({ query: z.string().trim().min(1) }),
-      handler: async (input) => {
-        const numericId = Number.parseInt(input.query, 10)
-        const users = await prisma.user.findMany({
-          where: {
-            spammer: false,
-            OR: [
-              { name: { contains: input.query, mode: 'insensitive' } },
-              { displayName: { contains: input.query, mode: 'insensitive' } },
-              ...(Number.isInteger(numericId) && numericId > 0 ? [{ id: numericId }] : []),
-            ],
-          },
-          select: { id: true, name: true, displayName: true, picture: true },
-          orderBy: { name: 'asc' },
-          take: 10,
-        })
-        return { users }
-      },
-    }),
-
     add: defineProtectedAction({
       accept: 'form',
       permissions: manageCases,

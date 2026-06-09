@@ -12,6 +12,7 @@ import TimeFormatted from '../../../../components/TimeFormatted.astro'
 import { getCaseIssueTypeInfo } from '../../../../constants/caseIssueTypes'
 import { getCaseStatusInfo } from '../../../../constants/caseStatus'
 import BaseLayout from '../../../../layouts/BaseLayout.astro'
+import { canParticipateInCase, caseVisibilityTiersFor, isCasePublished } from '../../../../lib/caseAccess'
 import { prisma } from '../../../../lib/prisma'
 
 import type { Prisma } from '@prisma/client'
@@ -19,10 +20,8 @@ import type { Prisma } from '@prisma/client'
 const { slug, publicId } = Astro.params
 if (!slug || !publicId) return Astro.rewrite('/404')
 
+const user = Astro.locals.user
 const canManage = Astro.locals.userCan('cases:manage')
-// Phase 3 will open this page to the public with status-gated visibility
-// (DRAFT/REJECTED hidden). For now it is reachable by case managers only.
-if (!canManage) return Astro.rewrite('/404')
 
 const errorsOf = <T extends { error?: unknown } | undefined>(result: T) =>
   isInputError(result?.error) ? result.error.fields : {}
@@ -52,9 +51,11 @@ const evidenceSelect = {
   description: true,
   bodyMd: true,
   imageUrl: true,
+  visibility: true,
   createdAt: true,
 } satisfies Prisma.CaseEvidenceSelect
 
+// Load the case core and the data needed to decide who may see what.
 const caseRow = await Astro.locals.banners.try(
   'Failed to load case',
   () =>
@@ -62,27 +63,55 @@ const caseRow = await Astro.locals.banners.try(
       where: { publicId, service: { slug } },
       select: {
         id: true,
-        publicId: true,
         title: true,
         issueType: true,
         status: true,
         summaryMd: true,
         amountText: true,
         externalSource: true,
-        resolvedAt: true,
         resolutionMd: true,
         createdAt: true,
-        service: { select: { name: true, slug: true } },
-        createdBy: { select: { name: true } },
-        evidence: { where: { caseUpdateId: null }, orderBy: evidenceOrderBy, select: evidenceSelect },
+        reportedById: true,
+        participants: { select: { id: true } },
+        service: { select: { name: true, slug: true, affiliatedUsers: { select: { userId: true } } } },
+      },
+    }),
+  null
+)
+
+if (!caseRow) return Astro.rewrite('/404')
+
+// Staff always reach the case. Everyone else needs it to be published.
+if (!canManage && !isCasePublished(caseRow.status)) return Astro.rewrite('/404')
+
+const canParticipate = canParticipateInCase(user, caseRow)
+const visibleTiers = caseVisibilityTiersFor(user, caseRow)
+
+const content = await Astro.locals.banners.try(
+  'Failed to load case content',
+  () =>
+    prisma.case.findUnique({
+      where: { id: caseRow.id },
+      select: {
+        evidence: {
+          where: { caseUpdateId: null, visibility: { in: visibleTiers } },
+          orderBy: evidenceOrderBy,
+          select: evidenceSelect,
+        },
         updates: {
+          where: { visibility: { in: visibleTiers } },
           orderBy: { createdAt: 'asc' },
           select: {
             id: true,
             bodyMd: true,
+            visibility: true,
             createdAt: true,
             author: { select: { name: true } },
-            evidence: { orderBy: evidenceOrderBy, select: evidenceSelect },
+            evidence: {
+              where: { visibility: { in: visibleTiers } },
+              orderBy: evidenceOrderBy,
+              select: evidenceSelect,
+            },
           },
         },
       },
@@ -90,7 +119,8 @@ const caseRow = await Astro.locals.banners.try(
   null
 )
 
-if (!caseRow) return Astro.rewrite('/404')
+const evidence = content?.evidence ?? []
+const updates = content?.updates ?? []
 
 const statusInfo = getCaseStatusInfo(caseRow.status)
 const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
@@ -106,23 +136,34 @@ const sourceUrl =
   widthClassName="max-w-3xl"
   noindex
 >
-  <div
-    class="mt-8 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-950/20 p-2 text-xs text-amber-200"
-  >
-    <span class="inline-flex items-center gap-1.5">
-      <Icon name="ri:eye-off-line" class="size-4" />
-      Manager view. This page is not yet visible to the public.
-    </span>
-    <Button
-      as="a"
-      href={`/admin/cases/${caseRow.id.toString()}`}
-      size="sm"
-      variant="faded"
-      color="gray"
-      icon="ri:settings-3-line"
-      label="Edit case"
-    />
-  </div>
+  {
+    canManage && (
+      <div class="mt-8 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-950/20 p-2 text-xs text-amber-200">
+        <span class="inline-flex items-center gap-1.5">
+          <Icon name="ri:shield-user-line" class="size-4" />
+          Staff view. You can see staff-only notes and private evidence.
+        </span>
+        <Button
+          as="a"
+          href={`/admin/cases/${caseRow.id.toString()}`}
+          size="sm"
+          variant="faded"
+          color="gray"
+          icon="ri:settings-3-line"
+          label="Edit case"
+        />
+      </div>
+    )
+  }
+
+  {
+    canParticipate && !canManage && (
+      <div class="mt-8 flex items-center gap-1.5 rounded-lg border border-blue-500/30 bg-blue-950/20 p-2 text-xs text-blue-200">
+        <Icon name="ri:group-line" class="size-4" />
+        You are a participant in this case. You can see private details and post in the conversation.
+      </div>
+    )
+  }
 
   <article class="mt-6">
     <div class="flex flex-wrap items-center gap-2">
@@ -169,7 +210,7 @@ const sourceUrl =
     <h2 class="mb-3 font-title text-xl font-bold">Evidence</h2>
     <CaseEvidenceGallery
       caseId={caseRow.id}
-      evidence={caseRow.evidence}
+      evidence={evidence}
       canManage={canManage}
       id="evidence"
       addInputErrors={errorsOf(addEvidenceResult)}
@@ -177,12 +218,13 @@ const sourceUrl =
   </section>
 
   <section class="mt-8">
-    <h2 class="mb-3 font-title text-xl font-bold">Updates</h2>
+    <h2 class="mb-3 font-title text-xl font-bold">Conversation</h2>
     <CaseUpdatesTimeline
       caseId={caseRow.id}
       status={caseRow.status}
-      updates={caseRow.updates}
+      updates={updates}
       canManage={canManage}
+      canPost={canManage || canParticipate}
       addInputErrors={errorsOf(addUpdateResult)}
       editInputErrors={errorsOf(editUpdateResult)}
     />

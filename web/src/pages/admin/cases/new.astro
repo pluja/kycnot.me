@@ -1,6 +1,7 @@
 ---
 import { actions, isInputError } from 'astro:actions'
 
+import ReporterField from '../../../components/admin/cases/ReporterField.astro'
 import InputSelect from '../../../components/InputSelect.astro'
 import InputSubmitButton from '../../../components/InputSubmitButton.astro'
 import InputText from '../../../components/InputText.astro'
@@ -25,7 +26,7 @@ const services = await Astro.locals.banners.try(
 )
 ---
 
-<BaseLayout pageTitle="New case" description="Create a service case" widthClassName="max-w-3xl" noindex>
+<BaseLayout pageTitle="New case" description="Create a service case" widthClassName="max-w-3xl" htmx noindex>
   <h1 class="mt-10 mb-6 font-title text-3xl font-bold">New case</h1>
 
   <form method="POST" action={actions.admin.case.create} class="space-y-6">
@@ -86,13 +87,12 @@ const services = await Astro.locals.banners.try(
       />
     </div>
 
-    <InputText
-      label="Reporter user ID"
-      name="reportedById"
-      inputProps={{ type: 'number', min: 1 }}
-      error={inputErrors.reportedById}
-      description="Optional internal user id of the reporter."
-    />
+    <div>
+      <span class="mb-1 block text-sm font-medium text-day-200">Reporter user</span>
+      <p class="mb-2 text-xs text-day-400">Optional. The user who reported this case.</p>
+      <ReporterField />
+      {inputErrors.reportedById && <p class="mt-1 text-sm text-red-400">{inputErrors.reportedById}</p>}
+    </div>
 
     <InputSubmitButton label="Create case" icon="ri:add-line" hideCancel />
   </form>

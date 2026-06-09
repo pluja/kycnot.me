@@ -3,6 +3,7 @@ import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
 import { caseEvidenceTypes, getCaseEvidenceTypeInfo } from '../../../constants/caseEvidenceTypes'
+import { caseVisibilities, getCaseVisibilityInfo } from '../../../constants/caseVisibility'
 import { cn } from '../../../lib/cn'
 import BadgeSmall from '../../BadgeSmall.astro'
 import InputImageFile from '../../InputImageFile.astro'
@@ -14,7 +15,7 @@ import MyPicture from '../../MyPicture.astro'
 import TimeFormatted from '../../TimeFormatted.astro'
 import DeleteConfirmButton from '../DeleteConfirmButton.astro'
 
-import type { CaseEvidenceType } from '@prisma/client'
+import type { CaseEvidenceType, CaseVisibility } from '@prisma/client'
 
 type EvidenceItem = {
   id: number
@@ -22,6 +23,7 @@ type EvidenceItem = {
   description: string | null
   bodyMd: string | null
   imageUrl: string | null
+  visibility: CaseVisibility
   createdAt: Date
 }
 
@@ -58,6 +60,7 @@ const textItems = evidence.filter((item) => !item.imageUrl)
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {mediaItems.map((item) => {
           const typeInfo = getCaseEvidenceTypeInfo(item.type)
+          const visInfo = getCaseVisibilityInfo(item.visibility)
           return (
             <div class="group relative flex flex-col rounded-md border border-night-600 bg-night-800 p-2">
               {canManage && (
@@ -88,7 +91,10 @@ const textItems = evidence.filter((item) => !item.imageUrl)
               </button>
 
               <div class="mt-2 space-y-1">
-                <BadgeSmall text={typeInfo.label} variant="faded" color="gray" icon={typeInfo.icon} />
+                <div class="flex flex-wrap items-center gap-1">
+                  <BadgeSmall text={typeInfo.label} variant="faded" color="gray" icon={typeInfo.icon} />
+                  <BadgeSmall text={visInfo.label} variant="faded" color={visInfo.color} icon={visInfo.icon} />
+                </div>
                 {item.description && <p class="text-sm font-medium text-day-100">{item.description}</p>}
                 {item.bodyMd && (
                   <p class="text-xs wrap-anywhere whitespace-pre-wrap text-day-300">{item.bodyMd}</p>
@@ -113,6 +119,7 @@ const textItems = evidence.filter((item) => !item.imageUrl)
       <div class={cn('space-y-2', mediaItems.length > 0 && 'mt-3')}>
         {textItems.map((item) => {
           const typeInfo = getCaseEvidenceTypeInfo(item.type)
+          const visInfo = getCaseVisibilityInfo(item.visibility)
           const lineCount = item.bodyMd ? item.bodyMd.split('\n').length : 3
           const rows = Math.min(16, Math.max(3, lineCount))
           return (
@@ -120,6 +127,7 @@ const textItems = evidence.filter((item) => !item.imageUrl)
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="flex flex-wrap items-center gap-2">
                   <BadgeSmall text={typeInfo.label} variant="faded" color="gray" icon={typeInfo.icon} />
+                  <BadgeSmall text={visInfo.label} variant="faded" color={visInfo.color} icon={visInfo.icon} />
                   {item.description && <span class="text-sm font-medium text-day-100">{item.description}</span>}
                 </div>
                 {canManage && (
@@ -218,6 +226,16 @@ const textItems = evidence.filter((item) => !item.imageUrl)
               Apply KYCNOT.ME watermark to the image
             </label>
           </div>
+
+          <InputSelect
+            name="visibility"
+            label="Visibility"
+            options={caseVisibilities.map((tier) => ({ label: tier.label, value: tier.value }))}
+            selectedValue="PARTICIPANTS"
+            selectProps={{ required: true }}
+            error={addInputErrors.visibility}
+            description="Public shows to anyone on a published case. Participants is private to the people involved. Staff only is internal."
+          />
 
           <InputSubmitButton label="Add evidence" icon="ri:add-line" hideCancel />
         </form>

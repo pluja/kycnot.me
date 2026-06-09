@@ -53,35 +53,35 @@ enum CommentIssueType {
 }
 
 model Comment {
-  id                Int                @id @default(autoincrement())
+  id      Int           @id @default(autoincrement())
   /// Computed via trigger. Do not update through prisma.
-  upvotes           Int                @default(0)
-  status            CommentStatus      @default(PENDING)
+  upvotes Int           @default(0)
+  status  CommentStatus @default(PENDING)
 
-  content           String
-  rating            Int?               @db.SmallInt
+  content String
+  rating  Int?   @db.SmallInt
 
   // --- Notes (named after audience, not source) ---
   /// Visible to everyone.
-  publicNote        String?
+  publicNote String?
   /// Visible only to admins and moderators.
-  adminNote         String?
+  adminNote  String?
   /// Submitted by the author; visible only to the author and admins.
-  authorNote        String?
+  authorNote String?
 
   // --- Private proof of usage ---
   privateProof       String?             @db.VarChar(100)
   privateProofStatus PrivateProofStatus? @default(PENDING)
 
   // --- Issue tags ---
-  issues            CommentIssueType[] @default([])
+  issues CommentIssueType[] @default([])
 
   // --- Rating ---
-  ratingActive      Boolean            @default(false)
-  ratingMuted       Boolean            @default(false)
+  ratingActive      Boolean           @default(false)
+  ratingMuted       Boolean           @default(false)
   ratingMuteReason  RatingMuteReason?
   /// Computed via trigger. Do not update through prisma.
-  ratingWeight      Float              @default(0)
+  ratingWeight      Float             @default(0)
   /// Computed via trigger. Do not update through prisma.
   ratingTrustLabel  String?
   /// Computed via trigger. Do not update through prisma.
@@ -106,21 +106,21 @@ model Comment {
   humanAction      ModerationAction?
   humanReasoning   String?
   humanDecidedById Int?
-  humanDecidedBy   User?              @relation("humanDecidedBy", fields: [humanDecidedById], references: [id], onDelete: SetNull)
+  humanDecidedBy   User?             @relation("humanDecidedBy", fields: [humanDecidedById], references: [id], onDelete: SetNull)
 
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @default(now()) @updatedAt
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @default(now()) @updatedAt
   /// Computed via trigger when the status is APPROVED or VERIFIED. Do not update through prisma.
-  approvedAt       DateTime?
-  author           User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  authorId         Int
-  service          Service            @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  serviceId        Int
-  parentId         Int?
-  parent           Comment?           @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies          Comment[]          @relation("CommentReplies")
+  approvedAt        DateTime?
+  author            User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId          Int
+  service           Service            @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId         Int
+  parentId          Int?
+  parent            Comment?           @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies           Comment[]          @relation("CommentReplies")
   karmaTransactions KarmaTransaction[]
-  votes            CommentVote[]
+  votes             CommentVote[]
 
   notificationPreferenceswatchedComments NotificationPreferences[] @relation("watchedComments")
   Notification                           Notification[]
@@ -686,16 +686,16 @@ enum ContactCategory {
 }
 
 model ContactMessage {
-  id          Int             @id @default(autoincrement())
-  createdAt   DateTime        @default(now())
-  category    ContactCategory
-  message     String          @db.Text
+  id         Int             @id @default(autoincrement())
+  createdAt  DateTime        @default(now())
+  category   ContactCategory
+  message    String          @db.Text
   /// Optional reply address provided by the user. Used out-of-band: admins
   /// copy-paste into their own mail client. The platform does not send mail.
-  replyEmail  String?
-  readAt      DateTime?
-  repliedAt   DateTime?
-  adminNote   String?
+  replyEmail String?
+  readAt     DateTime?
+  repliedAt  DateTime?
+  adminNote  String?
 
   author   User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
   authorId Int?
@@ -806,9 +806,15 @@ enum CaseStatus {
 
 enum CaseIssueType {
   NON_PAYMENT
+  DEPOSIT_NOT_CREDITED
   FROZEN_FUNDS
   KYC_DEMAND
   ACCOUNT_CLOSURE
+  SCAM_ALLEGATION
+  RATE_OR_FEE_DISPUTE
+  CHARGEBACK
+  PLATFORM_OUTAGE
+  LEGAL_SEIZURE
   UNRESPONSIVE_SUPPORT
   OTHER
 }
@@ -821,31 +827,37 @@ enum CaseEvidenceType {
   OTHER
 }
 
+enum CaseVisibility {
+  PUBLIC
+  PARTICIPANTS
+  STAFF
+}
+
 model Case {
-  id             Int            @id @default(autoincrement())
+  id             Int           @id @default(autoincrement())
   /// Non-sequential id used in the public URL so cases can't be enumerated
   /// while the feature is undiscoverable.
-  publicId       String         @unique @default(cuid(2))
+  publicId       String        @unique @default(cuid(2))
   title          String
   issueType      CaseIssueType
-  status         CaseStatus     @default(DRAFT)
+  status         CaseStatus    @default(DRAFT)
   summaryMd      String
   amountText     String?
   externalSource String?
   resolvedAt     DateTime?
   resolutionMd   String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @default(now()) @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @default(now()) @updatedAt
 
-  service        Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  serviceId      Int
-  reportedBy     User?          @relation("CaseReporter", fields: [reportedById], references: [id], onDelete: SetNull)
-  reportedById   Int?
-  createdBy      User?          @relation("CaseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  createdById    Int?
-  evidence       CaseEvidence[]
-  updates        CaseUpdate[]
-  participants   User[]         @relation("CaseParticipants")
+  service      Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId    Int
+  reportedBy   User?          @relation("CaseReporter", fields: [reportedById], references: [id], onDelete: SetNull)
+  reportedById Int?
+  createdBy    User?          @relation("CaseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById  Int?
+  evidence     CaseEvidence[]
+  updates      CaseUpdate[]
+  participants User[]         @relation("CaseParticipants")
 
   @@index([serviceId])
   @@index([status])
@@ -853,11 +865,11 @@ model Case {
 }
 
 model CaseUpdate {
-  id        Int            @id @default(autoincrement())
-  bodyMd    String
-  staffOnly Boolean        @default(false)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @default(now()) @updatedAt
+  id         Int            @id @default(autoincrement())
+  bodyMd     String
+  visibility CaseVisibility @default(PARTICIPANTS)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @default(now()) @updatedAt
 
   case     Case           @relation(fields: [caseId], references: [id], onDelete: Cascade)
   caseId   Int
@@ -876,7 +888,7 @@ model CaseEvidence {
   description String?
   bodyMd      String?
   imageUrl    String?
-  isPublic    Boolean          @default(false)
+  visibility  CaseVisibility   @default(PARTICIPANTS)
   order       Int              @default(0)
   createdAt   DateTime         @default(now())
 

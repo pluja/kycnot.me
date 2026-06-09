@@ -1,10 +1,13 @@
 ---
-import { CaseStatus } from '@prisma/client'
+import { CaseStatus, CaseVisibility } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
 import { getCaseStatusInfo } from '../../../constants/caseStatus'
+import { caseVisibilities, getCaseVisibilityInfo } from '../../../constants/caseVisibility'
+import BadgeSmall from '../../BadgeSmall.astro'
 import Button from '../../Button.astro'
+import InputSelect from '../../InputSelect.astro'
 import InputSubmitButton from '../../InputSubmitButton.astro'
 import InputTextArea from '../../InputTextArea.astro'
 import Markdown from '../../Markdown.astro'
@@ -23,12 +26,14 @@ type EvidenceItem = {
   description: string | null
   bodyMd: string | null
   imageUrl: string | null
+  visibility: CaseVisibility
   createdAt: Date
 }
 
 type UpdateItem = {
   id: number
   bodyMd: string
+  visibility: CaseVisibility
   createdAt: Date
   author: { name: string } | null
   evidence: EvidenceItem[]
@@ -39,11 +44,20 @@ type Props = {
   status: CaseStatus
   updates: UpdateItem[]
   canManage: boolean
+  canPost?: boolean
   addInputErrors?: Record<string, string[] | undefined>
   editInputErrors?: Record<string, string[] | undefined>
 }
 
-const { caseId, status, updates, canManage, addInputErrors = {}, editInputErrors = {} } = Astro.props
+const {
+  caseId,
+  status,
+  updates,
+  canManage,
+  canPost = canManage,
+  addInputErrors = {},
+  editInputErrors = {},
+} = Astro.props
 
 // Status quick-actions available from the timeline, by current status.
 const closedStatuses: CaseStatus[] = [CaseStatus.RESOLVED, CaseStatus.DISPUTED, CaseStatus.REJECTED]
@@ -69,6 +83,7 @@ const statusActions: { status: CaseStatus; label: string; icon: string; color: '
       <ol class="relative space-y-4 border-l border-night-600 pl-5">
         {updates.map((update) => {
           const itemId = `case-update-${update.id.toString()}`
+          const visInfo = getCaseVisibilityInfo(update.visibility)
           return (
             <li class="relative">
               <span class="absolute top-3 -left-[1.65rem] flex size-5 items-center justify-center rounded-full bg-night-700 text-day-400">
@@ -76,9 +91,12 @@ const statusActions: { status: CaseStatus; label: string; icon: string; color: '
               </span>
               <EditableListItem id={itemId}>
                 <Fragment slot="header">
-                  <div class="flex flex-wrap items-center gap-x-2 text-sm text-day-400">
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-day-400">
                     <span class="font-medium text-day-200">{update.author?.name ?? 'Unknown'}</span>
                     <TimeFormatted date={update.createdAt} hourPrecision />
+                    {update.visibility !== CaseVisibility.PARTICIPANTS && (
+                      <BadgeSmall text={visInfo.label} variant="faded" color={visInfo.color} icon={visInfo.icon} />
+                    )}
                   </div>
                   <div class="mt-1 text-pretty text-day-200">
                     <Markdown content={update.bodyMd} />
@@ -120,6 +138,14 @@ const statusActions: { status: CaseStatus; label: string; icon: string; color: '
                         inputProps={{ required: true, rows: 4 }}
                         error={editInputErrors.bodyMd}
                       />
+                      <InputSelect
+                        name="visibility"
+                        label="Visibility"
+                        options={caseVisibilities.map((tier) => ({ label: tier.label, value: tier.value }))}
+                        selectedValue={update.visibility}
+                        selectProps={{ required: true }}
+                        error={editInputErrors.visibility}
+                      />
                       <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
                     </form>
                   </Fragment>
@@ -133,7 +159,7 @@ const statusActions: { status: CaseStatus; label: string; icon: string; color: '
   }
 
   {
-    canManage && (
+    canPost && (
       <div id="updates" class="space-y-4 rounded-lg border border-night-600 bg-night-800 p-4">
         <form method="POST" action={`${actions.admin.case.updates.add}#updates`} class="space-y-3">
           <input type="hidden" name="caseId" value={caseId} />
@@ -142,11 +168,28 @@ const statusActions: { status: CaseStatus; label: string; icon: string; color: '
             name="bodyMd"
             inputProps={{ required: true, rows: 4 }}
             error={addInputErrors.bodyMd}
-            description="Post a timeline update. Markdown supported. Attach evidence after posting."
+            description="Post a timeline update. Markdown supported."
           />
+          {canManage ? (
+            <InputSelect
+              name="visibility"
+              label="Visibility"
+              options={caseVisibilities.map((tier) => ({ label: tier.label, value: tier.value }))}
+              selectedValue="PARTICIPANTS"
+              selectProps={{ required: true }}
+              error={addInputErrors.visibility}
+              description="Public posts a statement on the published case. Participants is private to those involved. Staff only is internal."
+            />
+          ) : (
+            <p class="flex items-center gap-1.5 text-xs text-day-400">
+              <Icon name="ri:group-line" class="size-4" />
+              Visible to the people involved in this case and staff.
+            </p>
+          )}
           <InputSubmitButton label="Post update" icon="ri:chat-new-line" hideCancel />
         </form>
 
+        {canManage && (
         <div class="flex flex-wrap items-center gap-2 border-t border-night-600 pt-3">
           <span class="text-xs text-day-400">
             Status: {getCaseStatusInfo(status).label}
@@ -159,6 +202,7 @@ const statusActions: { status: CaseStatus; label: string; icon: string; color: '
             </form>
           ))}
         </div>
+        )}
       </div>
     )
   }
