@@ -20,6 +20,7 @@ from pyworker.database import (
 from pyworker.scheduler import TaskScheduler
 from .tasks import (
     CommentModerationTask,
+    ContactCleanupTask,
     DeepScanTask,
     ForceTriggersTask,
     InactiveUsersTask,
@@ -140,6 +141,12 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     subparsers.add_parser(
         "inactive-users",
         help="Handle inactive users - send deletion warnings and clean up accounts",
+    )
+
+    # Contact cleanup task
+    subparsers.add_parser(
+        "contact-cleanup",
+        help="Delete resolved contact threads past their 30-day retention window",
     )
 
     # Deep scan task
@@ -522,6 +529,29 @@ def run_inactive_users_task(close_pool: bool = True) -> int:
             close_db_pool()
 
 
+def run_contact_cleanup_task(close_pool: bool = True) -> int:
+    """
+    Run the contact cleanup task.
+
+    Returns:
+        Exit code.
+    """
+    logger.info("Starting contact cleanup task")
+
+    try:
+        with ContactCleanupTask() as task:  # type: ignore
+            result = task.run()  # type: ignore
+            logger.info(f"Contact cleanup task completed. Results: {result}")
+
+        return 0
+    except Exception as e:
+        logger.exception(f"Error running contact cleanup task: {e}")
+        return 1
+    finally:
+        if close_pool:
+            close_db_pool()
+
+
 def run_worker_mode() -> int:
     """
     Run in worker mode, scheduling tasks to run periodically.
@@ -549,6 +579,7 @@ def run_worker_mode() -> int:
         "comment_moderation": partial(run_moderation_task, close_pool=False),
         "force_triggers": partial(run_force_triggers_task, close_pool=False),
         "inactive_users": partial(run_inactive_users_task, close_pool=False),
+        "contact_cleanup": partial(run_contact_cleanup_task, close_pool=False),
         "service_score_recalc": partial(
             run_service_score_recalc_task, close_pool=False
         ),
@@ -625,6 +656,8 @@ def main() -> int:
             return run_service_score_recalc_all_task()
         elif args.task == "inactive-users":
             return run_inactive_users_task()
+        elif args.task == "contact-cleanup":
+            return run_contact_cleanup_task()
         elif args.task == "deep-scan":
             return run_deep_scan_task(args.service_id)
         elif args.task:

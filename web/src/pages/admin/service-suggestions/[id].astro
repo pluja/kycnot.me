@@ -238,7 +238,8 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
     formData={{
       suggestionId: serviceSuggestion.id,
     }}
-    suggestionId={serviceSuggestion.id}
+    conversationType="suggestion"
+    conversationId={serviceSuggestion.id}
     class="mt-12"
   />
 </BaseLayout>

@@ -13,6 +13,7 @@ from croniter import croniter
 from pyworker.database import close_db_pool
 from .tasks import (
     CommentModerationTask,
+    ContactCleanupTask,
     ForceTriggersTask,
     InactiveUsersTask,
     ServiceScoreRecalculationTask,
@@ -90,6 +91,8 @@ class TaskScheduler:
                 task_instance = ServiceScoreRecalculationTask()
             elif task_name.lower() == "inactive_users":
                 task_instance = InactiveUsersTask()
+            elif task_name.lower() == "contact_cleanup":
+                task_instance = ContactCleanupTask()
             else:
                 self.logger.warning(f"Unknown task '{task_name}', skipping")
                 return

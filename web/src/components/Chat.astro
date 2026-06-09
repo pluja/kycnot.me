@@ -10,6 +10,7 @@ import { baseInputClassNames } from '../lib/formInputs'
 import ChatMessages, { type ChatMessage } from './ChatMessages.astro'
 
 import type { ActionInput, AnyAction } from '../lib/astroActions'
+import type { ChatConversationType } from '../lib/serverEventsTypes'
 import type { HTMLAttributes } from 'astro/types'
 
 export type Props<TAction extends AnyAction | undefined = AnyAction | undefined> =
@@ -19,7 +20,9 @@ export type Props<TAction extends AnyAction | undefined = AnyAction | undefined>
     userId: number | null
     action: TAction
     formData?: TAction extends AnyAction ? Omit<ActionInput<TAction>, 'content'> : undefined
-    suggestionId: number
+    conversationType: ChatConversationType
+    conversationId: number
+    maxLength?: number
   }
 
 const {
@@ -28,7 +31,9 @@ const {
   userId,
   action,
   formData,
-  suggestionId,
+  conversationType,
+  conversationId,
+  maxLength = SUGGESTION_MESSAGE_CONTENT_MAX_LENGTH,
   class: className,
   ...htmlProps
 } = Astro.props
@@ -44,7 +49,8 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
     id="chat-messages"
     messages={messages}
     userId={userId}
-    data-suggestion-id={suggestionId}
+    data-conversation-type={conversationType}
+    data-conversation-id={conversationId}
     hx-get={Astro.url.pathname}
     hx-target="#chat-messages"
     hx-select="#chat-messages>*"
@@ -78,7 +84,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
               !!inputErrors.content && baseInputClassNames.error
             )}
             required
-            maxlength={SUGGESTION_MESSAGE_CONTENT_MAX_LENGTH}
+            maxlength={maxLength}
           />
 
           <Tooltip text="Send">
@@ -104,10 +110,12 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
   const audio = new Audio(newChatMessageSound)
 
   document.addEventListener('sse:new-chat-message', (event) => {
-    const suggestionId = document.getElementById('chat-messages')?.dataset.suggestionId
-    if (!suggestionId) return
+    const chatMessages = document.getElementById('chat-messages')
+    const conversationType = chatMessages?.dataset.conversationType
+    const conversationId = chatMessages?.dataset.conversationId
+    if (!conversationType || !conversationId) return
 
-    if (Number(suggestionId) === event.detail.suggestionId) {
+    if (conversationType === event.detail.conversationType && Number(conversationId) === event.detail.id) {
       window.htmx?.trigger('#chat-messages', 'js:refresh-chat')
       audio.currentTime = 0
       audio.play()

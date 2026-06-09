@@ -277,6 +277,12 @@ const notificationSelect = {
       },
     },
   },
+  aboutContactThreadId: true,
+  aboutContactThread: {
+    select: {
+      authorId: true,
+    },
+  },
   aboutKarmaTransaction: {
     select: {
       points: true,

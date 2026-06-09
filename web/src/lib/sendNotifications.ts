@@ -77,6 +77,12 @@ export async function sendNotification(
           },
         },
       },
+      aboutContactThreadId: true,
+      aboutContactThread: {
+        select: {
+          authorId: true,
+        },
+      },
       aboutEvent: {
         select: {
           title: true,

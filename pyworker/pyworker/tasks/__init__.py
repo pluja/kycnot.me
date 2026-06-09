@@ -2,6 +2,7 @@
 
 from .base import Task
 from .comment_moderation import CommentModerationTask
+from .contact_cleanup import ContactCleanupTask
 from .deep_scan import DeepScanTask
 from .force_triggers import ForceTriggersTask
 from .inactive_users import InactiveUsersTask
@@ -12,6 +13,7 @@ from .user_sentiment import UserSentimentTask
 __all__ = [
     "Task",
     "CommentModerationTask",
+    "ContactCleanupTask",
     "DeepScanTask",
     "ForceTriggersTask",
     "InactiveUsersTask",

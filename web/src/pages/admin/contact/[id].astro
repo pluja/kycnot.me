@@ -1,0 +1,174 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import BadgeSmall from '../../../components/BadgeSmall.astro'
+import Button from '../../../components/Button.astro'
+import Chat from '../../../components/Chat.astro'
+import type { ChatMessage } from '../../../components/ChatMessages.astro'
+import TimeFormatted from '../../../components/TimeFormatted.astro'
+import UserBadge from '../../../components/UserBadge.astro'
+import { CONTACT_MESSAGE_MAX_LENGTH } from '../../../actions/contact'
+import { contactCategoryBadges, contactCategoryLabels } from '../../../constants/contactCategories'
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { parseIntWithFallback } from '../../../lib/numbers'
+import { prisma } from '../../../lib/prisma'
+
+import type { ContactStatus } from '@prisma/client'
+
+if (!Astro.locals.userCan('contact:manage')) {
+  return Astro.rewrite('/404')
+}
+
+const threadId = parseIntWithFallback(Astro.params.id)
+if (!threadId) return Astro.redirect('/admin/contact')
+
+const thread = await Astro.locals.banners.try('Error fetching conversation', async () =>
+  prisma.contactThread.findUnique({
+    select: {
+      id: true,
+      category: true,
+      status: true,
+      readAt: true,
+      createdAt: true,
+      adminNote: true,
+      author: {
+        select: { id: true, name: true, displayName: true, picture: true, totalKarma: true },
+      },
+      messages: {
+        select: {
+          id: true,
+          content: true,
+          createdAt: true,
+          fromStaff: true,
+          author: { select: { id: true, name: true, displayName: true, picture: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      },
+    },
+    where: { id: threadId },
+  })
+)
+
+// Missing thread (bad id or just deleted) sends staff back to the queue.
+if (!thread) return Astro.redirect('/admin/contact')
+
+const user = Astro.locals.user!
+const isResolved = thread.status === 'RESOLVED'
+
+const statusStyles: Record<ContactStatus, { label: string; color: 'rose' | 'green' | 'gray'; icon: string }> = {
+  AWAITING_STAFF: { label: 'Awaiting reply', color: 'rose', icon: 'ri:time-line' },
+  AWAITING_USER: { label: 'Answered', color: 'green', icon: 'ri:chat-1-line' },
+  RESOLVED: { label: 'Resolved', color: 'gray', icon: 'ri:check-line' },
+}
+const status = statusStyles[thread.status]
+const category = contactCategoryBadges[thread.category]
+
+const fallbackAuthor = { id: -1, name: 'removed', displayName: 'Removed user', picture: null }
+const messages: ChatMessage[] = thread.messages.map((m) => ({
+  id: m.id,
+  content: m.content,
+  createdAt: m.createdAt,
+  user: m.author ?? fallbackAuthor,
+}))
+---
+
+<BaseLayout pageTitle="Conversation | Contact queue" widthClassName="max-w-3xl" htmx>
+  <a
+    href="/admin/contact"
+    class="mt-6 inline-flex items-center gap-1.5 text-xs text-day-400 hover:text-rose-300"
+  >
+    <Icon name="ri:arrow-left-line" class="size-3.5" />
+    <span>Back to the queue</span>
+  </a>
+
+  <div class="mt-3 mb-6 flex flex-wrap items-center gap-2">
+    <BadgeSmall color={status.color} text={status.label} icon={status.icon} class="h-auto gap-1.5 px-3 py-1 text-sm" classNames={{ icon: 'size-4' }} />
+    <BadgeSmall color={category.color} variant="faded" text={contactCategoryLabels[thread.category]} icon={category.icon} class="h-auto gap-1.5 px-3 py-1 text-sm" classNames={{ icon: 'size-4' }} />
+    <span class="text-zinc-600">·</span>
+    {thread.author ? <UserBadge user={thread.author} size="sm" /> : <span class="text-zinc-500">[deleted user]</span>}
+    <span class="text-zinc-600">·</span>
+    <TimeFormatted date={thread.createdAt} hourPrecision class="text-zinc-400" />
+  </div>
+
+  <section class="mb-6 space-y-3 rounded-md border border-zinc-800 bg-night-700 p-3">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <form method="POST" action={actions.admin.contact.update}>
+        <input type="hidden" name="threadId" value={thread.id} />
+        <input type="hidden" name="action" value={thread.readAt ? 'mark-unread' : 'mark-read'} />
+        <Button
+          as="button"
+          type="submit"
+          size="sm"
+          color="gray"
+          icon={thread.readAt ? 'ri:check-double-line' : 'ri:check-line'}
+          label={thread.readAt ? 'Mark unread' : 'Mark read'}
+        />
+      </form>
+
+      {
+        !isResolved && (
+          <form method="POST" action={actions.admin.contact.update}>
+            <input type="hidden" name="threadId" value={thread.id} />
+            <input type="hidden" name="action" value="resolve" />
+            <Button as="button" type="submit" size="sm" color="success" icon="ri:checkbox-circle-line" label="Resolve" />
+          </form>
+        )
+      }
+
+      <form method="POST" action={actions.admin.contact.update} class="ml-auto" data-confirm="Delete this conversation permanently?">
+        <input type="hidden" name="threadId" value={thread.id} />
+        <input type="hidden" name="action" value="delete" />
+        <Button as="button" type="submit" size="sm" color="danger" icon="ri:delete-bin-line" label="Delete" />
+      </form>
+    </div>
+
+    <form method="POST" action={actions.admin.contact.update} class="space-y-1">
+      <input type="hidden" name="threadId" value={thread.id} />
+      <input type="hidden" name="action" value="admin-note" />
+      <label class="block text-[10px] text-day-500" for="admin-note">Admin note (internal)</label>
+      <textarea
+        id="admin-note"
+        name="value"
+        rows="2"
+        placeholder="Notes for other moderators..."
+        class="field-sizing-content w-full resize-y rounded-sm border border-night-500 bg-night-800 px-2 py-1 text-xs leading-snug outline-hidden focus:ring-1 focus:ring-rose-500"
+        set:text={thread.adminNote ?? ''}
+      />
+      <div class="flex justify-end">
+        <Button as="button" type="submit" size="sm" color="gray" icon="ri:save-line" label="Save note" />
+      </div>
+    </form>
+  </section>
+
+  {
+    isResolved ? (
+      <Chat messages={messages} userId={user.id} conversationType="contact" conversationId={thread.id} action={undefined} />
+    ) : (
+      <Chat
+        messages={messages}
+        userId={user.id}
+        conversationType="contact"
+        conversationId={thread.id}
+        action={actions.admin.contact.message}
+        formData={{ threadId: thread.id }}
+        maxLength={CONTACT_MESSAGE_MAX_LENGTH}
+      />
+    )
+  }
+</BaseLayout>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Confirm prompt for destructive moderation forms.        //
+  ////////////////////////////////////////////////////////////
+  document.addEventListener('astro:page-load', () => {
+    document.querySelectorAll<HTMLFormElement>('form[data-confirm]').forEach((form) => {
+      if (form.dataset.bound) return
+      form.dataset.bound = '1'
+      form.addEventListener('submit', (event) => {
+        if (!confirm(form.dataset.confirm || 'Are you sure?')) event.preventDefault()
+      })
+    })
+  })
+</script>

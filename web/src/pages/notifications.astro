@@ -121,6 +121,12 @@ const [dbNotifications, notificationPreferences, totalNotifications, pushSubscri
                 },
               },
             },
+            aboutContactThreadId: true,
+            aboutContactThread: {
+              select: {
+                authorId: true,
+              },
+            },
             aboutEvent: {
               select: {
                 title: true,

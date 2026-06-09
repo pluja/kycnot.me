@@ -27,9 +27,12 @@ export type ServerEventsData = {
     timestamp: string
   }
   'new-chat-message': {
-    suggestionId: number
+    conversationType: ChatConversationType
+    id: number
   }
 }
+
+export type ChatConversationType = 'suggestion' | 'contact'
 
 export const allServerEventsData = [
   'new-notification',

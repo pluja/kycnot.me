@@ -1,0 +1,173 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import BadgeSmall from '../../components/BadgeSmall.astro'
+import Chat from '../../components/Chat.astro'
+import type { ChatMessage } from '../../components/ChatMessages.astro'
+import { CONTACT_MESSAGE_MAX_LENGTH } from '../../actions/contact'
+import { contactCategoryBadges, contactCategoryLabels } from '../../constants/contactCategories'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { canUserSendMessage } from '../../lib/contactThread'
+import { parseIntWithFallback } from '../../lib/numbers'
+import { prisma } from '../../lib/prisma'
+import { makeLoginUrl } from '../../lib/redirectUrls'
+
+import type { ContactStatus } from '@prisma/client'
+
+const user = Astro.locals.user
+if (!user) {
+  return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Log in to view your conversation' }))
+}
+
+const threadId = parseIntWithFallback(Astro.params.id)
+if (!threadId) return Astro.rewrite('/404')
+
+const thread = await Astro.locals.banners.try('Error fetching conversation', async () =>
+  prisma.contactThread.findUnique({
+    select: {
+      id: true,
+      category: true,
+      status: true,
+      readAt: true,
+      createdAt: true,
+      authorId: true,
+      messages: {
+        select: {
+          id: true,
+          content: true,
+          createdAt: true,
+          fromStaff: true,
+          author: { select: { id: true, name: true, displayName: true, picture: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      },
+    },
+    where: { id: threadId, authorId: user.id },
+  })
+)
+
+if (!thread) {
+  if (Astro.locals.userCan('contact:manage')) {
+    return Astro.redirect(`/admin/contact/${String(threadId)}`)
+  }
+  return Astro.rewrite('/404')
+}
+
+const isResolved = thread.status === 'RESOLVED'
+
+const statusBadge: Record<ContactStatus, { label: string; color: 'blue' | 'green' | 'gray'; icon: string }> = {
+  AWAITING_STAFF: { label: 'Waiting for the team', color: 'blue', icon: 'ri:time-line' },
+  AWAITING_USER: { label: 'Your turn to reply', color: 'green', icon: 'ri:chat-1-line' },
+  RESOLVED: { label: 'Resolved', color: 'gray', icon: 'ri:check-line' },
+}
+// While waiting on staff, surface whether they have read it yet: a read
+// timestamp means they have seen the message but not replied.
+const status =
+  thread.status === 'AWAITING_STAFF' && thread.readAt
+    ? { label: 'Seen by the team', color: 'blue' as const, icon: 'ri:eye-line' }
+    : statusBadge[thread.status]
+
+const fallbackAuthor = { id: -1, name: 'removed', displayName: 'Removed user', picture: null }
+const messages: ChatMessage[] = thread.messages.map((m) => ({
+  id: m.id,
+  content: m.content,
+  createdAt: m.createdAt,
+  user: m.author ?? fallbackAuthor,
+}))
+
+// messages are newest-first; count the author's trailing messages with no
+// staff reply after them to decide whether the reply box stays open.
+let unansweredUserMessages = 0
+for (const m of thread.messages) {
+  if (m.fromStaff) break
+  unansweredUserMessages++
+}
+const canSend = canUserSendMessage({ status: thread.status, unansweredUserMessages })
+---
+
+<BaseLayout
+  pageTitle="Your conversation | Contact"
+  description="View your conversation with the KYCnot.me team."
+  noindex
+  ogImage={{
+    template: 'generic',
+    title: 'Contact',
+    description: 'Your conversation with the KYCnot.me team',
+    icon: 'ri:mail-line',
+  }}
+  widthClassName="max-w-3xl"
+  htmx
+  breadcrumbs={[{ name: 'Contact', url: '/contact' }, { name: 'Your conversation' }]}
+>
+  <div class="mt-12 mb-6 text-center">
+    <h1 class="font-title text-3xl font-bold">Your conversation</h1>
+    <div class="mt-3 flex flex-wrap items-center justify-center gap-2">
+      <BadgeSmall
+        color={status.color}
+        text={status.label}
+        icon={status.icon}
+        class="h-auto gap-1.5 px-3 py-1 text-sm"
+        classNames={{ icon: 'size-4' }}
+      />
+      <BadgeSmall
+        color={contactCategoryBadges[thread.category].color}
+        variant="faded"
+        text={contactCategoryLabels[thread.category]}
+        icon={contactCategoryBadges[thread.category].icon}
+        class="h-auto gap-1.5 px-3 py-1 text-sm"
+        classNames={{ icon: 'size-4' }}
+      />
+    </div>
+  </div>
+
+  <section
+    class="mb-6 flex items-start gap-2 rounded-md border border-blue-500/30 bg-blue-500/5 p-4 text-sm text-day-300"
+  >
+    <Icon name="ri:information-line" class="mt-0.5 size-4 shrink-0 text-blue-300" />
+    <p>
+      <strong class="text-day-200">We reply here.</strong> You will get a notification when we answer.
+      Messages that break the
+      <a href="/contact#rules" class="underline hover:text-blue-200">rules</a> are ignored. Resolved
+      chats are deleted after 30 days.
+    </p>
+  </section>
+
+  {
+    canSend ? (
+      <Chat
+        messages={messages}
+        userId={user.id}
+        conversationType="contact"
+        conversationId={thread.id}
+        action={actions.contact.message}
+        formData={{ threadId: thread.id }}
+        maxLength={CONTACT_MESSAGE_MAX_LENGTH}
+      />
+    ) : (
+      <>
+        <Chat
+          messages={messages}
+          userId={user.id}
+          conversationType="contact"
+          conversationId={thread.id}
+          action={undefined}
+        />
+        {isResolved ? (
+          <p class="mt-2 text-center text-sm text-day-500 italic">
+            This conversation is resolved. If you still need help,{' '}
+            <a href="/contact" class="text-green-400 hover:text-day-200">
+              start a new one
+            </a>
+            .
+          </p>
+        ) : (
+          <p class="mt-2 flex items-center justify-center gap-1.5 text-center text-sm text-day-500 italic">
+            <Icon name="ri:time-line" class="size-4 shrink-0" />
+            Waiting for the team to reply. You will be notified here when they respond.
+          </p>
+        )}
+      </>
+    )
+  }
+</BaseLayout>

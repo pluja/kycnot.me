@@ -4,13 +4,16 @@ import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 
 import Captcha from '../../components/Captcha.astro'
+import FormReplay from '../../components/FormReplay.astro'
 import InputCardGroup from '../../components/InputCardGroup.astro'
 import InputCheckbox from '../../components/InputCheckbox.astro'
 import InputHoneypotTrap from '../../components/InputHoneypotTrap.astro'
 import InputSubmitButton from '../../components/InputSubmitButton.astro'
-import InputText from '../../components/InputText.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import { cn } from '../../lib/cn'
+import { getFormReplay } from '../../lib/formReplay'
+import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
 import { CONTACT_MESSAGE_MAX_LENGTH, CONTACT_MESSAGE_MIN_LENGTH } from '../../actions/contact'
 
@@ -21,10 +24,24 @@ if (!user) {
 
 const result = Astro.getActionResult(actions.contact.send)
 if (result && !result.error) {
-  return Astro.redirect('/contact/sent')
+  return Astro.redirect(`/contact/${String(result.data.threadId)}`)
 }
 const inputErrors = isInputError(result?.error) ? result.error.fields : {}
 const submitError = result?.error && !isInputError(result.error) ? result.error.message : null
+
+// One open conversation at a time: if the user already has a non-resolved
+// thread, point them to it instead of showing the form (mirrors the server
+// rule in contact.send, and keeps the conversation in one place).
+const openThread = await Astro.locals.banners.try(
+  'Error checking your conversations',
+  async () =>
+    prisma.contactThread.findFirst({
+      where: { authorId: user.id, status: { not: 'RESOLVED' } },
+      select: { id: true },
+      orderBy: { lastMessageAt: 'desc' },
+    }),
+  null
+)
 
 // Optional ?category=… deep-link pre-selects a category card so links from
 // other pages (account → verification, etc.) land on the right one and
@@ -32,6 +49,9 @@ const submitError = result?.error && !isInputError(result.error) ? result.error.
 const categoryParam = Astro.url.searchParams.get('category')
 const preselectedCategory =
   categoryParam && categoryParam in ContactCategory ? categoryParam : undefined
+
+// Repopulate the form (no JS) after a failed submit so the message is not lost.
+const replay = getFormReplay(Astro.locals.actionFormValues)
 
 const categoryOptions = [
   {
@@ -77,6 +97,7 @@ const categoryOptions = [
   <h1 class="font-title mt-8 mb-6 text-center text-3xl font-bold">Contact</h1>
 
   <section
+    id="rules"
     class="mb-6 space-y-2 rounded-md border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm text-day-300"
   >
     <header class="flex items-center gap-2 text-yellow-300">
@@ -123,10 +144,10 @@ const categoryOptions = [
       </span>
     </p>
     <p class="flex items-start gap-2">
-      <Icon name="ri:mail-line" class="mt-0.5 size-4 shrink-0 text-yellow-400" />
+      <Icon name="ri:chat-3-line" class="mt-0.5 size-4 shrink-0 text-yellow-400" />
       <span>
-        <strong class="text-yellow-300">Want a reply?</strong>
-        Email is optional, but required if you want one back.
+        <strong class="text-yellow-300">We reply here.</strong>
+        You will get a notification when we answer. Resolved chats are deleted after 30 days.
       </span>
     </p>
   </section>
@@ -139,12 +160,34 @@ const categoryOptions = [
     )
   }
 
-  <form method="POST" action={actions.contact.send} class="space-y-6" data-contact-form>
+  {
+    openThread && (
+      <a
+        href={`/contact/${String(openThread.id)}`}
+        class="flex items-center gap-3 rounded-md border border-green-500/30 bg-green-500/5 p-4 text-sm text-day-200 hover:border-green-500/50"
+        data-astro-reload
+      >
+        <Icon name="ri:chat-3-line" class="size-5 shrink-0 text-green-300" />
+        <span class="flex-1">
+          <strong class="text-green-300">You have an open conversation.</strong> Continue it instead of
+          starting a new one. You can open another once it is resolved.
+        </span>
+        <Icon name="ri:arrow-right-line" class="size-4 shrink-0" />
+      </a>
+    )
+  }
+
+  <form
+    method="POST"
+    action={actions.contact.send}
+    class={cn('space-y-6', openThread && 'hidden')}
+    data-contact-form
+  >
     <InputCardGroup
       name="category"
       label="What is this about?"
       options={categoryOptions}
-      selectedValue={preselectedCategory}
+      selectedValue={replay.text('category', preselectedCategory)}
       cardSize="md"
       iconSize="md"
       required
@@ -181,6 +224,7 @@ const categoryOptions = [
     <InputTextArea
       label="Message"
       name="message"
+      value={replay.text('message')}
       description={`Minimum ${CONTACT_MESSAGE_MIN_LENGTH.toLocaleString()} characters. Be specific.`}
       inputProps={{
         rows: 10,
@@ -192,29 +236,19 @@ const categoryOptions = [
       error={inputErrors.message}
     />
 
-    <InputText
-      label="Reply email (optional)"
-      name="replyEmail"
-      description="Required if you want a reply. Leave blank if you just want us to read."
-      inputProps={{
-        type: 'email',
-        autocomplete: 'email',
-        placeholder: 'you@example.com',
-        maxlength: 200,
-      }}
-      error={inputErrors.replyEmail}
-    />
-
     <InputCheckbox
       name="confirmRules"
       label="I have read the rules above and my message follows them."
       required
+      checked={replay.checked('confirmRules')}
       error={inputErrors.confirmRules}
     />
 
     <Captcha action={actions.contact.send} />
 
     <InputHoneypotTrap name="website" />
+
+    <FormReplay />
 
     <InputSubmitButton hideCancel />
   </form>

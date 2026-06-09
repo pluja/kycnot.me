@@ -39,6 +39,7 @@ Required environment variables:
 - `CRON_FORCE_TRIGGERS_TASK`: Cron expression for force triggers task
 - `CRON_SERVICE_SCORE_RECALC_TASK`: Cron expression for service score recalculation task
 - `CRON_INACTIVE_USERS_TASK`: Cron expression for inactive users cleanup task
+- `CRON_CONTACT_CLEANUP_TASK`: Cron expression for deleting resolved contact threads past their 30-day retention
 
 ## Usage
 
@@ -118,6 +119,12 @@ Tasks will run according to their configured cron schedules.
 - Deletes accounts that remain inactive after the warning period
 - Cancels deletion for users who become active again
 - Scheduled via `CRON_INACTIVE_USERS_TASK`
+
+### Contact Cleanup Task
+
+- Permanently deletes resolved contact threads 30 days after they were resolved
+- Messages cascade with the thread; this deletion (not encryption) is the privacy mechanism for the contact feature
+- Scheduled via `CRON_CONTACT_CLEANUP_TASK`
 
 ## Development
 

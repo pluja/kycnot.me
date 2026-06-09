@@ -70,6 +70,11 @@ export function makeNotificationTitle(
           }
         }
       }
+      aboutContactThread: {
+        select: {
+          authorId: true
+        }
+      }
       aboutEvent: {
         select: {
           type: true
@@ -143,6 +148,16 @@ export function makeNotificationTitle(
       if (!notification.aboutServiceSuggestionMessage) return 'New message on your suggestion'
       const service = notification.aboutServiceSuggestionMessage.suggestion.service.name
       return `New message for ${service} suggestion`
+    }
+    case 'CONTACT_MESSAGE': {
+      const isAuthor = !!user && notification.aboutContactThread?.authorId === user.id
+      return isAuthor ? 'New reply from the team' : 'New contact message'
+    }
+    case 'CONTACT_SEEN': {
+      return 'The team has seen your message'
+    }
+    case 'CONTACT_RESOLVED': {
+      return 'Your conversation was resolved'
     }
     case 'SUGGESTION_STATUS_CHANGE': {
       if (!notification.aboutServiceSuggestion) return 'Suggestion status updated'
@@ -241,6 +256,9 @@ export function makeNotificationContent(
     }
     case 'SUGGESTION_CREATED':
     case 'SUGGESTION_STATUS_CHANGE':
+    case 'CONTACT_MESSAGE':
+    case 'CONTACT_SEEN':
+    case 'CONTACT_RESOLVED':
     case 'ACCOUNT_STATUS_CHANGE':
     case 'SERVICE_VERIFICATION_STATUS_CHANGE': {
       return null
@@ -297,6 +315,7 @@ export function makeNotificationActions(
           }
         }
       }
+      aboutContactThreadId: true
       aboutEvent: {
         select: {
           service: {
@@ -369,6 +388,21 @@ export function makeNotificationActions(
           title: 'View',
           ...iconNameAndUrl('ri:arrow-right-line'),
           url: `${origin}/service-suggestion/${String(notification.aboutServiceSuggestionMessage.suggestion.id)}#message-${String(notification.aboutServiceSuggestionMessage.id)}`,
+        },
+      ]
+    }
+    case 'CONTACT_MESSAGE':
+    case 'CONTACT_SEEN':
+    case 'CONTACT_RESOLVED': {
+      if (!notification.aboutContactThreadId) return []
+      return [
+        {
+          action: 'view',
+          title: 'View',
+          ...iconNameAndUrl('ri:arrow-right-line'),
+          // Single URL for both sides: the author sees their thread, while a
+          // staff viewer is redirected to the admin queue by /contact/[id].
+          url: `${origin}/contact/${String(notification.aboutContactThreadId)}`,
         },
       ]
     }

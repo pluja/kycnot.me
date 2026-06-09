@@ -1,20 +1,21 @@
 import { ContactCategory } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
+import { formatDistanceStrict } from 'date-fns'
 
 import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../lib/captchaValidation'
+import { canUserSendMessage } from '../lib/contactThread'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
 import { prisma } from '../lib/prisma'
+import { sendContactChatMessageEvents } from '../lib/sendChatEvents'
 import { handleHoneypotTrap, handleXSSDetection } from '../lib/spamDetection'
 
 export const CONTACT_MESSAGE_MIN_LENGTH = 80
 export const CONTACT_MESSAGE_MAX_LENGTH = 4000
 export const CONTACT_MAX_PER_USER_PER_DAY = 3
 
-// Stricter than RFC 5321 by design: forbids mailto: query separators
-// (?, &, =) and other URL specials so the admin queue's `mailto:` link
-// can't be turned into a pre-filled subject/body payload by a submitter.
-const SAFE_EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/
+const CONTACT_MESSAGE_RATE_LIMIT_WINDOW_MINUTES = 1
+const MAX_CONTACT_MESSAGES_PER_WINDOW = 5
 
 const dayWindowAgo = () => new Date(Date.now() - 24 * 60 * 60 * 1000)
 
@@ -36,21 +37,6 @@ export const contactActions = {
           .max(
             CONTACT_MESSAGE_MAX_LENGTH,
             `Message must be at most ${CONTACT_MESSAGE_MAX_LENGTH.toLocaleString()} characters.`
-          ),
-        // Astro's form parser sends `null` for empty optional inputs (not ''),
-        // so `.nullish()` is required to accept blanks. Normalize to either
-        // undefined or a trimmed non-empty string before validating.
-        replyEmail: z
-          .string()
-          .nullish()
-          .transform((v) => {
-            if (!v) return undefined
-            const trimmed = v.trim()
-            return trimmed.length > 0 ? trimmed : undefined
-          })
-          .refine(
-            (v) => v === undefined || (v.length <= 200 && SAFE_EMAIL_RE.test(v)),
-            'Reply address must be a valid email or left empty'
           ),
         // Single required attestation. Checkbox form inputs send "on"
         // when checked and are omitted entirely when unchecked, so we
@@ -80,45 +66,133 @@ export const contactActions = {
         location: 'contact.send',
       })
 
-      // Per-user rolling 24h cap. Pre-existing open messages also block:
-      // one outstanding message at a time so the queue doesn't accumulate
-      // multiple threads from the same person. Per-IP throttling is
-      // intentionally not done here; the edge (Caddy) handles DoS at the
-      // network layer, and storing IP-derived data per message would add
-      // a privacy footprint we don't want.
-      const since = dayWindowAgo()
-      const [perUserCount, openMessages] = await Promise.all([
-        prisma.contactMessage.count({
-          where: { authorId: user.id, createdAt: { gte: since } },
+      // One open conversation at a time, plus a rolling 24h cap on new ones.
+      // The single-open-thread rule is the anti-flood mechanism: a user cannot
+      // start another conversation until the current one is resolved. Per-IP
+      // throttling is intentionally not done here (the edge handles DoS, and
+      // storing IP-derived data would add a privacy footprint we don't want).
+      const [openThreads, perDayCount] = await Promise.all([
+        prisma.contactThread.count({
+          where: { authorId: user.id, status: { not: 'RESOLVED' } },
         }),
-        prisma.contactMessage.count({
-          where: { authorId: user.id, readAt: null },
+        prisma.contactThread.count({
+          where: { authorId: user.id, createdAt: { gte: dayWindowAgo() } },
         }),
       ])
 
-      if (openMessages > 0) {
+      if (openThreads > 0) {
         throw new ActionError({
           code: 'TOO_MANY_REQUESTS',
           message:
-            'You already have a message waiting to be read. Please wait for a reply (or for the moderator to mark it read) before sending another.',
+            'You already have an open conversation. Continue it instead of starting a new one; you can open another once it is resolved.',
         })
       }
-      if (perUserCount >= CONTACT_MAX_PER_USER_PER_DAY) {
+      if (perDayCount >= CONTACT_MAX_PER_USER_PER_DAY) {
         throw new ActionError({
           code: 'TOO_MANY_REQUESTS',
-          message: `You can send up to ${CONTACT_MAX_PER_USER_PER_DAY.toLocaleString()} messages per day.`,
+          message: `You can start up to ${CONTACT_MAX_PER_USER_PER_DAY.toLocaleString()} conversations per day.`,
         })
       }
 
-      await prisma.contactMessage.create({
+      const thread = await prisma.contactThread.create({
         data: {
           category: input.category,
-          message: input.message,
-          replyEmail: input.replyEmail ?? null,
           authorId: user.id,
+          status: 'AWAITING_STAFF',
+          messages: {
+            create: { content: input.message, fromStaff: false, authorId: user.id },
+          },
         },
         select: { id: true },
       })
+
+      sendContactChatMessageEvents(thread.id, user.id).catch(console.error)
+
+      return { threadId: thread.id }
+    },
+  }),
+
+  message: defineProtectedAction({
+    accept: 'form',
+    permissions: 'not-spammer',
+    input: z.object({
+      threadId: z.coerce.number().int().positive(),
+      content: z.string().min(1).max(CONTACT_MESSAGE_MAX_LENGTH),
+    }),
+    handler: async (input, context) => {
+      const user = context.locals.user
+
+      const thread = await prisma.contactThread.findUnique({
+        where: { id: input.threadId },
+        select: { id: true, authorId: true, status: true },
+      })
+
+      if (!thread || thread.authorId !== user.id) {
+        throw new ActionError({ code: 'NOT_FOUND', message: 'Conversation not found' })
+      }
+      if (thread.status === 'RESOLVED') {
+        throw new ActionError({
+          code: 'BAD_REQUEST',
+          message: 'This conversation is resolved. Start a new one if you still need help.',
+        })
+      }
+
+      // Turn-gate (admins exempt): cap consecutive messages with no staff reply
+      // in between, so a thread cannot be flooded with follow-up nagging.
+      if (!user.admin) {
+        const lastStaff = await prisma.contactMessage.findFirst({
+          where: { threadId: thread.id, fromStaff: true },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        })
+        const unansweredUserMessages = await prisma.contactMessage.count({
+          where: {
+            threadId: thread.id,
+            fromStaff: false,
+            ...(lastStaff ? { createdAt: { gt: lastStaff.createdAt } } : {}),
+          },
+        })
+        if (!canUserSendMessage({ status: thread.status, unansweredUserMessages })) {
+          throw new ActionError({
+            code: 'TOO_MANY_REQUESTS',
+            message: 'Please wait for the team to reply before sending more messages.',
+          })
+        }
+      }
+
+      // Rate limit (admins exempt), mirroring the suggestion chat.
+      if (!user.admin) {
+        const windowStart = new Date(
+          Date.now() - CONTACT_MESSAGE_RATE_LIMIT_WINDOW_MINUTES * 60 * 1000
+        )
+        const recentMessages = await prisma.contactMessage.findMany({
+          where: { authorId: user.id, fromStaff: false, createdAt: { gte: windowStart } },
+          select: { createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        })
+        if (recentMessages.length >= MAX_CONTACT_MESSAGES_PER_WINDOW) {
+          const oldest = recentMessages[0]
+          const timeToWait = oldest
+            ? formatDistanceStrict(oldest.createdAt, windowStart)
+            : '1 minute'
+          throw new ActionError({
+            code: 'TOO_MANY_REQUESTS',
+            message: `Rate limit exceeded. Please wait ${timeToWait} before sending another message.`,
+          })
+        }
+      }
+
+      await prisma.$transaction([
+        prisma.contactMessage.create({
+          data: { threadId: thread.id, content: input.content, fromStaff: false, authorId: user.id },
+        }),
+        prisma.contactThread.update({
+          where: { id: thread.id },
+          data: { status: 'AWAITING_STAFF', readAt: null, lastMessageAt: new Date() },
+        }),
+      ])
+
+      sendContactChatMessageEvents(thread.id, user.id).catch(console.error)
     },
   }),
 }
