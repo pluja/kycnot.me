@@ -38,6 +38,19 @@ const isAdmin = Astro.locals.user?.admin ?? false
 const toLocalDateTime = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 const sectionHash = `#${id}`
+
+// Active events (ongoing or not yet ended, matching the events index) sort
+// first; within each group, ongoing events lead and the rest go by latest end.
+const now = Date.now()
+const isActiveEvent = (event: (typeof events)[number]) =>
+  event.endedAt === null || event.endedAt.getTime() >= now
+const sortedEvents = [...events].sort((a, b) => {
+  const activeDiff = Number(isActiveEvent(b)) - Number(isActiveEvent(a))
+  if (activeDiff !== 0) return activeDiff
+  const aEnd = a.endedAt ? a.endedAt.getTime() : Infinity
+  const bEnd = b.endedAt ? b.endedAt.getTime() : Infinity
+  return bEnd - aEnd
+})
 ---
 
 <FormSection title="Events" id={id}>
@@ -49,7 +62,7 @@ const sectionHash = `#${id}`
         </p>
       ) : (
         <div class="space-y-2">
-          {events.map((event) => {
+          {sortedEvents.map((event) => {
             const eventTypeInfo = getEventTypeInfo(event.type)
             const itemId = `event-${event.id}`
             return (
