@@ -189,7 +189,7 @@ CREATE OR REPLACE FUNCTION handle_comment_vote_change()
 RETURNS TRIGGER AS $$
 DECLARE
     karma_points INT;
-    vote_action "KarmaTransactionAction";
+    vote_action TEXT;
     vote_description TEXT;
     comment_author_id INT;
     service_name TEXT;
