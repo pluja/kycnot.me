@@ -174,9 +174,8 @@ const kycLevelInfo = getKycLevelInfo(`${kycLevel}`)
       </Tooltip>
 
       <div class="ml-3 inline-flex items-center gap-1.5 text-sm font-medium text-day-400">
-        KYC:
         <Tooltip class="inline-flex" text={kycLevelInfo.description}>
-          <SwapKycBadge kycInfo={kycLevelInfo} class="min-w-0" />
+          <SwapKycBadge kycInfo={kycLevelInfo} class="min-w-0 h-6 opacity-80" />
         </Tooltip>
       </div>
 

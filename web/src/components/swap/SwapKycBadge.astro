@@ -7,10 +7,15 @@ import type { getKycLevelInfo } from '../../constants/kycLevels'
 
 type Props = {
   kycInfo: ReturnType<typeof getKycLevelInfo>
+  // Append " KYC" so the badge is self-describing (e.g. "Never KYC"). Disable
+  // where a "KYC" label already provides context, like the services table.
+  kycSuffix?: boolean
   class?: string
 }
 
-const { kycInfo, class: className } = Astro.props
+const { kycInfo, kycSuffix = true, class: className } = Astro.props
+
+const label = kycSuffix ? `${kycInfo.shortName} KYC` : kycInfo.shortName
 ---
 
 <span
@@ -21,5 +26,5 @@ const { kycInfo, class: className } = Astro.props
   )}
 >
   <Icon name={kycInfo.icon} class="size-3.5 shrink-0" aria-hidden="true" />
-  <span>{kycInfo.shortName}</span>
+  <span>{label}</span>
 </span>
