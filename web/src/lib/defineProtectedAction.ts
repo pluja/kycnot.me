@@ -93,7 +93,7 @@ export function defineProtectedAction<
       // single-string permissions require that one permission specifically.
       if (Array.isArray(permissions)) {
         const granted = permissions.some((p) =>
-          p === 'verified' ? user.verified : user.admin
+          typeof p === 'object' ? userCan(user, p.capability) : p === 'verified' ? user.verified : user.admin
         )
         if (!granted) {
           throw new ActionError({
