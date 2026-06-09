@@ -2,7 +2,9 @@
 import { ContactCategory } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
+import { SOURCE_CODE_URL } from 'astro:env/client'
 
+import { CONTACT_MESSAGE_MAX_LENGTH, CONTACT_MESSAGE_MIN_LENGTH } from '../../actions/contact'
 import Captcha from '../../components/Captcha.astro'
 import FormReplay from '../../components/FormReplay.astro'
 import InputCardGroup from '../../components/InputCardGroup.astro'
@@ -15,7 +17,6 @@ import { cn } from '../../lib/cn'
 import { getFormReplay } from '../../lib/formReplay'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
-import { CONTACT_MESSAGE_MAX_LENGTH, CONTACT_MESSAGE_MIN_LENGTH } from '../../actions/contact'
 
 const user = Astro.locals.user
 if (!user) {
@@ -47,8 +48,7 @@ const openThread = await Astro.locals.banners.try(
 // other pages (account → verification, etc.) land on the right one and
 // surface its category-specific help panel immediately.
 const categoryParam = Astro.url.searchParams.get('category')
-const preselectedCategory =
-  categoryParam && categoryParam in ContactCategory ? categoryParam : undefined
+const preselectedCategory = categoryParam && categoryParam in ContactCategory ? categoryParam : undefined
 
 // Repopulate the form (no JS) after a failed submit so the message is not lost.
 const replay = getFormReplay(Astro.locals.actionFormValues)
@@ -68,16 +68,10 @@ const categoryOptions = [
     description: 'An active scam, exit, or compromise that **cannot wait** for an edit suggestion.',
   },
   {
-    value: 'BUG',
-    label: 'Website bug',
-    icon: 'ri:bug-line',
-    description: 'Something on the site is broken.',
-  },
-  {
     value: 'OTHER',
     label: 'Other',
     icon: 'ri:question-line',
-    description: "Doesn't fit any of the above.",
+    description: 'Something else that genuinely needs a human.',
   },
 ]
 ---
@@ -94,7 +88,7 @@ const categoryOptions = [
   }}
   widthClassName="max-w-3xl"
 >
-  <h1 class="font-title mt-8 mb-6 text-center text-3xl font-bold">Contact</h1>
+  <h1 class="mt-8 mb-6 text-center font-title text-3xl font-bold">Contact</h1>
 
   <section
     id="rules"
@@ -139,8 +133,31 @@ const categoryOptions = [
     <p class="flex items-start gap-2">
       <Icon name="ri:edit-line" class="mt-0.5 size-4 shrink-0 text-yellow-400" />
       <span>
-        <strong class="text-yellow-300">Reporting a service issue?</strong>
+        <strong class="text-yellow-300">Service page needs changes?</strong>
         Use the <strong>Edit</strong> link on the service page, or leave a comment.
+      </span>
+    </p>
+    <p class="flex items-start gap-2">
+      <Icon name="ri:bug-line" class="mt-0.5 size-4 shrink-0 text-yellow-400" />
+      <span>
+        <strong class="text-yellow-300">Found a website bug?</strong>
+        {
+          SOURCE_CODE_URL ? (
+            <Fragment>
+              <a
+                href={`${SOURCE_CODE_URL}/issues`}
+                target="_blank"
+                rel="noopener"
+                class="underline hover:text-yellow-200"
+              >
+                Open an issue
+              </a>{' '}
+              on the code repository, not here.
+            </Fragment>
+          ) : (
+            <Fragment>Report it on the code repository, not here.</Fragment>
+          )
+        }
       </span>
     </p>
     <p class="flex items-start gap-2">
