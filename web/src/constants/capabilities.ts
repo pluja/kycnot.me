@@ -46,6 +46,14 @@ export const {
       icon: 'ri:mail-line',
     },
     {
+      value: 'contact:manage-urgent',
+      slug: 'contact-manage-urgent',
+      label: 'Manage urgent reports',
+      description:
+        'Read and triage only urgent service reports (active scams, exits, compromises) from the contact form.',
+      icon: 'ri:alarm-warning-line',
+    },
+    {
       value: 'services:edit',
       slug: 'services-edit',
       label: 'Edit services',

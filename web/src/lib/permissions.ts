@@ -1,3 +1,5 @@
+import { ContactCategory } from '@prisma/client'
+
 import type { Capability } from '../constants/capabilities'
 
 // Capability-based access control. To add a capability:
@@ -24,35 +26,36 @@ export function userCan(user: UserForPermissions | null | undefined, capability:
 // (a bare inline `{ capability: '...' }` widens to string and fails the guard).
 export const cap = (capability: Capability) => ({ capability })
 
-// Every admin route maps to the single capability that unlocks it. Routes
-// absent from this list are superuser-only: a new /admin page is locked to
-// admins until it is granted a capability here. This is the auditable,
-// default-deny chokepoint enforced in middleware.
+// Every admin route maps to the capabilities that unlock it; holding any one
+// grants access. Routes absent from this list are superuser-only: a new /admin
+// page is locked to admins until it is granted a capability here. This is the
+// auditable, default-deny chokepoint enforced in middleware.
 const adminRouteCapabilities = [
-  { prefix: '/admin/cases', capability: 'cases:manage' },
-  { prefix: '/admin/comments', capability: 'comments:moderate' },
-  { prefix: '/admin/contact', capability: 'contact:manage' },
-  { prefix: '/admin/service-suggestions', capability: 'suggestions:manage' },
-  { prefix: '/admin/services', capability: 'services:edit' },
-  { prefix: '/admin/events', capability: 'events:manage' },
-  { prefix: '/admin/attributes', capability: 'attributes:manage' },
-  { prefix: '/admin/announcements', capability: 'announcements:manage' },
-  { prefix: '/admin/notifications', capability: 'notifications:manage' },
-  { prefix: '/admin/stats', capability: 'stats:view' },
-  { prefix: '/admin/users', capability: 'users:manage' },
+  { prefix: '/admin/cases', capabilities: ['cases:manage'] },
+  { prefix: '/admin/comments', capabilities: ['comments:moderate'] },
+  { prefix: '/admin/contact', capabilities: ['contact:manage', 'contact:manage-urgent'] },
+  { prefix: '/admin/service-suggestions', capabilities: ['suggestions:manage'] },
+  { prefix: '/admin/services', capabilities: ['services:edit'] },
+  { prefix: '/admin/events', capabilities: ['events:manage'] },
+  { prefix: '/admin/attributes', capabilities: ['attributes:manage'] },
+  { prefix: '/admin/announcements', capabilities: ['announcements:manage'] },
+  { prefix: '/admin/notifications', capabilities: ['notifications:manage'] },
+  { prefix: '/admin/stats', capabilities: ['stats:view'] },
+  { prefix: '/admin/users', capabilities: ['users:manage'] },
 ] as const satisfies {
   prefix: string
-  capability: Capability
+  capabilities: readonly Capability[]
 }[]
 
-// adminRouteRequiredCapability returns the capability that grants a non-admin
-// access to the given admin path, or null when the path is admin-only.
-export function adminRouteRequiredCapability(pathname: string): Capability | null {
+// adminRouteRequiredCapabilities returns the capabilities that grant a non-admin
+// access to the given admin path (holding any one is enough), or [] when the
+// path is admin-only.
+export function adminRouteRequiredCapabilities(pathname: string): readonly Capability[] {
   const match = adminRouteCapabilities
     .filter((route) => pathname === route.prefix || pathname.startsWith(`${route.prefix}/`))
     .sort((a, b) => b.prefix.length - a.prefix.length)[0]
 
-  return match?.capability ?? null
+  return match?.capabilities ?? []
 }
 
 // userCanAccessAdmin is true for admins and for any user holding a capability
@@ -61,7 +64,9 @@ export function adminRouteRequiredCapability(pathname: string): Capability | nul
 export function userCanAccessAdmin(user: UserForPermissions | null | undefined): boolean {
   if (!user) return false
   if (user.admin) return true
-  return adminRouteCapabilities.some((route) => user.capabilities.includes(route.capability))
+  return adminRouteCapabilities.some((route) =>
+    route.capabilities.some((capability) => user.capabilities.includes(capability))
+  )
 }
 
 // isStaff marks support-level staff (comment + service powers) for the public
@@ -76,4 +81,16 @@ export function isStaff(user: UserForPermissions | null | undefined): boolean {
 // regular buckets. The narrower isStaff drives the public-facing badge instead.
 export function hasAnyCapability(user: UserForPermissions | null | undefined): boolean {
   return !!user && user.capabilities.length > 0
+}
+
+// contactCategoriesForUser returns which contact categories a user may manage.
+// 'all' means unrestricted (admins and full contact:manage holders); a holder
+// of only contact:manage-urgent is scoped to urgent service reports. Used to
+// filter the contact queue and to re-check access on every contact mutation.
+export function contactCategoriesForUser(
+  user: UserForPermissions | null | undefined
+): ContactCategory[] | 'all' {
+  if (userCan(user, 'contact:manage')) return 'all'
+  if (userCan(user, 'contact:manage-urgent')) return [ContactCategory.SERVICE_REPORT_URGENT]
+  return []
 }

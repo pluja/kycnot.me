@@ -6,7 +6,7 @@ import { ErrorBanners, getMessagesFromUrl } from './lib/errorBanners'
 import { FORM_REPLAY_MARKER, FORM_REPLAY_MAX_CHARS, type ActionFormValues } from './lib/formReplay'
 import { getImpersonationInfo } from './lib/impersonation'
 import { makeUserWithKarmaUnlocks } from './lib/karmaUnlocks'
-import { adminRouteRequiredCapability, userCan, userCanAccessAdmin } from './lib/permissions'
+import { adminRouteRequiredCapabilities, userCan, userCanAccessAdmin } from './lib/permissions'
 import { prisma } from './lib/prisma'
 import { makeLoginUrl, makeSafeRedirectUrl } from './lib/redirectUrls'
 import { getRedisActionsSessions } from './lib/redis/redisActionsSessions'
@@ -224,18 +224,18 @@ const protectRoutes = defineMiddleware(async (context, next) => {
     // renders the links they can use). Every other unmapped admin route is
     // superuser-only (default-deny).
     const isAdminRoot = context.url.pathname === '/admin' || context.url.pathname === '/admin/'
-    const requiredCapability = adminRouteRequiredCapability(context.url.pathname)
+    const requiredCapabilities = adminRouteRequiredCapabilities(context.url.pathname)
     const granted = isAdminRoot
       ? userCanAccessAdmin(user)
-      : requiredCapability
-        ? userCan(user, requiredCapability)
+      : requiredCapabilities.length > 0
+        ? requiredCapabilities.some((capability) => userCan(user, capability))
         : user.admin
 
     if (!granted) {
       const accessDeniedUrl = new URL('/access-denied', context.url)
       accessDeniedUrl.searchParams.set(
         'reasonType',
-        requiredCapability ? 'capability-required' : 'admin-required'
+        requiredCapabilities.length > 0 ? 'capability-required' : 'admin-required'
       )
       accessDeniedUrl.searchParams.set('redirect', context.url.pathname + context.url.search)
       return context.redirect(accessDeniedUrl.pathname + accessDeniedUrl.search)

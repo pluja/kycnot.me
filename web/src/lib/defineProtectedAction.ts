@@ -31,7 +31,7 @@ type ActionHandlerWithUser<TInputSchema, TOutput> = TInputSchema extends z.ZodTy
     ) => MaybePromise<TOutput>
 
 export function defineProtectedAction<
-  P extends Permission | SpecialUserPermission[],
+  P extends Permission | (CapabilityPermission | SpecialUserPermission)[],
   TOutput,
   TAccept extends ActionAccept | undefined = undefined,
   TInputSchema extends z.ZodType | undefined = TAccept extends 'form' ? z.ZodType<FormData> : undefined,

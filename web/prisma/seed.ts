@@ -13,6 +13,8 @@ import {
   CaseVisibility,
   CommentIssueType,
   CommentStatus,
+  ContactCategory,
+  ContactStatus,
   Currency,
   EventType,
   PrismaClient,
@@ -1101,6 +1103,30 @@ const specialUsersData = {
     link: 'https://kycnot.me',
     picture: 'https://kycnot.me/files/users/pictures/c277dc0f2f.png',
   },
+  contactManager: {
+    name: 'contact_manager_dev',
+    envToken: 'DEV_CONTACT_MANAGER_USER_SECRET_TOKEN',
+    defaultToken: 'contactmanager',
+    admin: false,
+    verified: true,
+    verifiedLink: 'https://kycnot.me',
+    capabilities: ['contact:manage'],
+    totalKarma: 1001,
+    link: 'https://kycnot.me',
+    picture: 'https://kycnot.me/files/users/pictures/c277dc0f2f.png',
+  },
+  contactUrgent: {
+    name: 'contact_urgent_dev',
+    envToken: 'DEV_CONTACT_URGENT_USER_SECRET_TOKEN',
+    defaultToken: 'contacturgent',
+    admin: false,
+    verified: true,
+    verifiedLink: 'https://kycnot.me',
+    capabilities: ['contact:manage-urgent'],
+    totalKarma: 1001,
+    link: 'https://kycnot.me',
+    picture: 'https://kycnot.me/files/users/pictures/c277dc0f2f.png',
+  },
   verified: {
     name: 'verified_dev',
     envToken: 'DEV_VERIFIED_USER_SECRET_TOKEN',
@@ -1183,6 +1209,77 @@ const generateFakeAnnouncement = () => {
   } as const satisfies Prisma.AnnouncementCreateInput
 }
 
+// Creates a realistic contact thread with an alternating user/staff
+// conversation, deriving readAt/repliedAt/resolvedAt from the status so the
+// admin queue and the scoped contact:manage-urgent role have data to act on.
+async function createFakeContactThread({
+  category,
+  status,
+  authorId,
+  staffIds,
+}: {
+  category: ContactCategory
+  status: ContactStatus
+  authorId: number
+  staffIds: number[]
+}) {
+  const createdAt = faker.date.recent({ days: 30 })
+  const hasStaffReply = status !== ContactStatus.AWAITING_STAFF
+
+  const messages: { fromStaff: boolean; authorId: number; content: string }[] = [
+    { fromStaff: false, authorId, content: faker.lorem.paragraph() },
+  ]
+  if (hasStaffReply) {
+    messages.push({
+      fromStaff: true,
+      authorId: faker.helpers.arrayElement(staffIds),
+      content: faker.lorem.paragraph(),
+    })
+    for (let turn = 0; turn < faker.number.int({ min: 0, max: 3 }); turn++) {
+      const fromStaff = turn % 2 === 1
+      messages.push({
+        fromStaff,
+        authorId: fromStaff ? faker.helpers.arrayElement(staffIds) : authorId,
+        content: faker.lorem.sentence(),
+      })
+    }
+  }
+
+  const lastMessageAt = new Date(createdAt.getTime() + messages.length * 60_000)
+
+  const thread = await prisma.contactThread.create({
+    data: {
+      category,
+      status,
+      authorId,
+      createdAt,
+      lastMessageAt,
+      // Unread only while awaiting staff, and even then sometimes already seen.
+      readAt:
+        status === ContactStatus.AWAITING_STAFF
+          ? (faker.helpers.maybe(() => createdAt, { probability: 0.4 }) ?? null)
+          : lastMessageAt,
+      repliedAt: hasStaffReply ? lastMessageAt : null,
+      resolvedAt: status === ContactStatus.RESOLVED ? lastMessageAt : null,
+      adminNote: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.3 }) ?? null,
+    },
+    select: { id: true },
+  })
+
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i]!
+    await prisma.contactMessage.create({
+      data: {
+        threadId: thread.id,
+        content: message.content,
+        fromStaff: message.fromStaff,
+        authorId: message.authorId,
+        createdAt: new Date(createdAt.getTime() + i * 60_000),
+      },
+    })
+  }
+}
+
 async function cleanup() {
   console.info('🧹 Cleaning up existing data...')
 
@@ -1199,6 +1296,8 @@ async function cleanup() {
     await prisma.case.deleteMany()
     await prisma.serviceSuggestionMessage.deleteMany()
     await prisma.serviceSuggestion.deleteMany()
+    await prisma.contactMessage.deleteMany()
+    await prisma.contactThread.deleteMany()
     await prisma.serviceVerificationRequest.deleteMany()
     await prisma.service.deleteMany()
     await prisma.attribute.deleteMany()
@@ -1601,6 +1700,29 @@ async function main() {
       )
     })
   )
+
+  // ---- Create contact threads (one per category + status, for coverage) ----
+  const contactAuthorIds = uniqBy(
+    [specialUsers.normal, specialUsers.verified, ...users.slice(0, 4)],
+    'id'
+  ).map((u) => u.id)
+  const contactStaffIds = [
+    specialUsers.admin.id,
+    specialUsers.moderator.id,
+    specialUsers.contactManager.id,
+  ]
+  const contactCombos = Object.values(ContactCategory).flatMap((category) =>
+    Object.values(ContactStatus).map((status) => ({ category, status }))
+  )
+  for (let i = 0; i < contactCombos.length; i++) {
+    const { category, status } = contactCombos[i]!
+    await createFakeContactThread({
+      category,
+      status,
+      authorId: contactAuthorIds[i % contactAuthorIds.length]!,
+      staffIds: contactStaffIds,
+    })
+  }
 
   // ---- Create internal notes for users ----
   await Promise.all(

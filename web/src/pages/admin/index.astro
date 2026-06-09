@@ -6,7 +6,7 @@ import BadgeSmall from '../../components/BadgeSmall.astro'
 import { getCapabilityInfo } from '../../constants/capabilities'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
-import { adminRouteRequiredCapability, userCanAccessAdmin } from '../../lib/permissions'
+import { adminRouteRequiredCapabilities, userCanAccessAdmin } from '../../lib/permissions'
 
 import type { ComponentProps } from 'astro/types'
 
@@ -145,8 +145,10 @@ if (!userCanAccessAdmin(user)) return Astro.rewrite('/404')
 // capability, an unmapped one is superuser-only. Mirrors the middleware guard.
 const visibleLinks = adminLinks.filter((link) => {
   if (!link.href) return false
-  const capability = adminRouteRequiredCapability(link.href)
-  return capability ? Astro.locals.userCan(capability) : !!user?.admin
+  const capabilities = adminRouteRequiredCapabilities(link.href)
+  return capabilities.length > 0
+    ? capabilities.some((capability) => Astro.locals.userCan(capability))
+    : !!user?.admin
 })
 
 const grantedCapabilities = (user?.capabilities ?? []).map((capability) => getCapabilityInfo(capability))

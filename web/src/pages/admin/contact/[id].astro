@@ -12,11 +12,13 @@ import { CONTACT_MESSAGE_MAX_LENGTH } from '../../../actions/contact'
 import { contactCategoryBadges, contactCategoryLabels } from '../../../constants/contactCategories'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { parseIntWithFallback } from '../../../lib/numbers'
+import { contactCategoriesForUser } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
 
 import type { ContactStatus } from '@prisma/client'
 
-if (!Astro.locals.userCan('contact:manage')) {
+const allowedCategories = contactCategoriesForUser(Astro.locals.user)
+if (allowedCategories !== 'all' && allowedCategories.length === 0) {
   return Astro.rewrite('/404')
 }
 
@@ -50,8 +52,13 @@ const thread = await Astro.locals.banners.try('Error fetching conversation', asy
   })
 )
 
-// Missing thread (bad id or just deleted) sends staff back to the queue.
+// Missing thread (bad id or just deleted) sends staff back to the queue. A
+// thread outside the user's category scope is treated the same, so a scoped
+// staffer cannot open conversations they are not allowed to manage.
 if (!thread) return Astro.redirect('/admin/contact')
+if (allowedCategories !== 'all' && !allowedCategories.includes(thread.category)) {
+  return Astro.redirect('/admin/contact')
+}
 
 const user = Astro.locals.user!
 const isResolved = thread.status === 'RESOLVED'

@@ -8,14 +8,21 @@ import { contactCategoryBadges, contactCategoryLabels } from '../../constants/co
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
 import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
+import { contactCategoriesForUser } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { urlWithParams } from '../../lib/urls'
 
 import type { ContactStatus, Prisma } from '@prisma/client'
 
-if (!Astro.locals.userCan('contact:manage')) {
+const allowedCategories = contactCategoriesForUser(Astro.locals.user)
+if (allowedCategories !== 'all' && allowedCategories.length === 0) {
   return Astro.rewrite('/404')
 }
+
+// Scope every query to the categories this user may manage: urgent-only staff
+// (contact:manage-urgent) see just urgent reports, full managers see everything.
+const categoryScope: Prisma.ContactThreadWhereInput =
+  allowedCategories === 'all' ? {} : { category: { in: allowedCategories } }
 
 const filterValues = ['unread', 'open', 'replied', 'resolved', 'all'] as const
 
@@ -51,7 +58,7 @@ const [threads, counts] = await Astro.locals.banners.tryMany([
     'Failed to fetch contact threads',
     () =>
       prisma.contactThread.findMany({
-        where: whereByFilter[params.filter],
+        where: { ...whereByFilter[params.filter], ...categoryScope },
         orderBy: { lastMessageAt: 'desc' },
         take: 200,
         select: {
@@ -75,11 +82,11 @@ const [threads, counts] = await Astro.locals.banners.tryMany([
     'Failed to count contact threads',
     async () => {
       const [unread, open, replied, resolved, all] = await Promise.all([
-        prisma.contactThread.count({ where: whereByFilter.unread }),
-        prisma.contactThread.count({ where: whereByFilter.open }),
-        prisma.contactThread.count({ where: whereByFilter.replied }),
-        prisma.contactThread.count({ where: whereByFilter.resolved }),
-        prisma.contactThread.count({ where: whereByFilter.all }),
+        prisma.contactThread.count({ where: { ...whereByFilter.unread, ...categoryScope } }),
+        prisma.contactThread.count({ where: { ...whereByFilter.open, ...categoryScope } }),
+        prisma.contactThread.count({ where: { ...whereByFilter.replied, ...categoryScope } }),
+        prisma.contactThread.count({ where: { ...whereByFilter.resolved, ...categoryScope } }),
+        prisma.contactThread.count({ where: { ...whereByFilter.all, ...categoryScope } }),
       ])
       return { unread, open, replied, resolved, all }
     },

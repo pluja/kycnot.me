@@ -3,6 +3,8 @@ import { without, uniq } from 'lodash-es'
 import { prisma } from './prisma'
 import { getRedisServerEvents } from './redis/redisServerEvents'
 
+import type { Prisma } from '@prisma/client'
+
 async function sendNewChatMessage(
   conversationType: 'suggestion' | 'contact',
   id: number,
@@ -37,16 +39,20 @@ export async function sendChatMessageEvents(suggestionId: number, senderUserId: 
 export async function sendContactChatMessageEvents(threadId: number, senderUserId: number) {
   const thread = await prisma.contactThread.findUnique({
     where: { id: threadId },
-    select: { authorId: true },
+    select: { authorId: true, category: true },
   })
   if (!thread) throw new Error('Contact thread not found')
 
-  const staffIds = (
-    await prisma.user.findMany({
-      where: { OR: [{ admin: true }, { capabilities: { has: 'contact:manage' } }] },
-      select: { id: true },
-    })
-  ).map((u) => u.id)
+  // Mirror the notification trigger: urgent reports also reach
+  // contact:manage-urgent holders; other categories only full managers.
+  const staffWhere: Prisma.UserWhereInput =
+    thread.category === 'SERVICE_REPORT_URGENT'
+      ? { OR: [{ admin: true }, { capabilities: { hasSome: ['contact:manage', 'contact:manage-urgent'] } }] }
+      : { OR: [{ admin: true }, { capabilities: { has: 'contact:manage' } }] }
+
+  const staffIds = (await prisma.user.findMany({ where: staffWhere, select: { id: true } })).map(
+    (u) => u.id
+  )
 
   const recipientIds = without(
     uniq([...(thread.authorId ? [thread.authorId] : []), ...staffIds]),
