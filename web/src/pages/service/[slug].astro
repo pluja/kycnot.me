@@ -383,6 +383,8 @@ const attributes = sortAttributes([
 const kycAttributes = attributes.filter((a) => a.category === 'KYC')
 const nonKycAttributes = attributes.filter((a) => a.category !== 'KYC')
 
+const isFlaggedScam = service.verificationStatus === 'VERIFICATION_FAILED'
+
 const statusInfo = getVerificationStatusInfo(service.verificationStatus)
 
 const hasRequestedVerification =
@@ -514,9 +516,13 @@ const exchangeSlugs = ['exchange', 'cex', 'dex'] as const satisfies string[]
 const isExchange = service.categories.some((c) => exchangeSlugs.includes(c.slug))
 
 // Show swap CTA / compare section only when the aggregator can actually quote
-// this provider. List is cached for 30 minutes server-side.
+// this provider. List is cached for 30 minutes server-side. In dev the aggregator
+// is usually unreachable (empty set), so fall back to showing it for any exchange.
 const supportedProviderSlugs = isExchange ? await getSupportedProviderSlugs() : null
-const isSwapSupported = !!supportedProviderSlugs && supportedProviderSlugs.has(service.slug)
+const isSwapSupported =
+  !!supportedProviderSlugs &&
+  (supportedProviderSlugs.has(service.slug) ||
+    (import.meta.env.DEV && supportedProviderSlugs.size === 0))
 
 const verificationOverview = getServiceVerificationOverview(service)
 
@@ -1219,9 +1225,14 @@ const verificationStatusDate =
     )
   }
 
-  <p class="mt-3 text-center text-xs text-day-400">
-    <span class="transition-colors hover:text-day-200">Overall = 60% Privacy + 40% Trust (Truncated)</span>
-  </p>
+  <div class="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-day-400">
+    <span>Privacy <span class="font-semibold text-day-200">{service.privacyScore}</span> × 60%</span>
+    <span class="text-day-500">+</span>
+    <span>Trust <span class="font-semibold text-day-200">{service.trustScore}</span> × 40%</span>
+    <span class="text-day-500">=</span>
+    <span>Overall <span class="font-semibold text-day-200">{service.overallScore}</span>/10</span>
+    {isFlaggedScam && <span class="text-red-400">capped at 3</span>}
+  </div>
   <div class="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs xs:gap-x-6">
     <a
       href="/about#service-scores"
