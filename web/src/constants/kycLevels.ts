@@ -52,7 +52,7 @@ export const {
       name: 'No KYC mention',
       shortName: 'Unstated',
       description: 'No mention of current or future KYC requirements.',
-      privacyPoints: 15,
+      privacyPoints: 10, // keep in sync with kyc_factor in prisma/triggers/02_service_score.sql
       attributeType: 'GOOD',
       badgeClassName: 'bg-zinc-500/20 text-zinc-300',
     },

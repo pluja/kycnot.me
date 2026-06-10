@@ -183,7 +183,7 @@ export const nonDbAttributes: NonDbAttributeFull[] = [
     category: 'TRUST',
     description: 'Approved on KYCnot.me less than 15 days ago. Proceed with caution.',
     privacyPoints: 0,
-    trustPoints: -5,
+    trustPoints: -10, // keep in sync with recently_approved_factor in prisma/triggers/02_service_score.sql
     links: [],
     customize: (service) => ({
       show: service.isRecentlyApproved,

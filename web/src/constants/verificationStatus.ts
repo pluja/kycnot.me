@@ -161,7 +161,7 @@ export const {
       default: false,
       description: 'Failed review or shows serious unresolved risk.',
       privacyPoints: 0,
-      trustPoints: -30,
+      trustPoints: -50, // keep in sync with verification_factor in prisma/triggers/02_service_score.sql
       classNames: {
         icon: 'text-red-500',
         badgeBig: 'bg-red-800/50 text-red-100',
