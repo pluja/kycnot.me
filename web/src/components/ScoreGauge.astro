@@ -15,23 +15,25 @@ import type { Review, WithContext } from 'schema-dts'
 const gauge = tv({
   slots: {
     base: 'relative flex aspect-square flex-col items-center justify-start text-white',
-    score: 'relative leading-none font-bold tracking-tight',
-    label: 'relative leading-none font-bold tracking-wide uppercase',
-    text: 'relative leading-none tracking-wide text-current/80',
+    score: 'relative font-bold tracking-tight',
+    label: 'relative font-bold tracking-wide uppercase',
+    text: 'relative tracking-wide text-current/80',
   },
+  // leading-none must sit after the text-* size in each variant, otherwise
+  // tailwind-merge drops it (a text size utility also sets its own line-height).
   variants: {
     size: {
       lg: {
         base: 'size-18 2xs:size-24',
-        score: 'mt-[25%] mb-1 text-[1.5rem] 2xs:text-[2rem]',
-        label: 'text-base 2xs:mb-0.5',
-        text: 'text-xs',
+        score: 'mt-[25%] mb-1 text-[1.5rem] leading-none 2xs:text-[2rem]',
+        label: 'text-base leading-none 2xs:mb-0.5',
+        text: 'text-xs leading-none',
       },
       // The square keeps room for the (here hidden) label and text, so a
       // negative bottom margin pulls the empty space out and centers the dial.
       sm: {
         base: '-mb-4 size-11',
-        score: 'mt-[28%] text-sm',
+        score: 'mt-[28%] text-sm leading-none',
         label: 'hidden',
         text: 'hidden',
       },
