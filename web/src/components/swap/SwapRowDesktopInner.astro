@@ -102,7 +102,7 @@ const guaranteeCoverage = describeGuaranteeCoverage(quote)
     kycInfo && service && (
       <>
         <Tooltip text={kycInfo.description || kycInfo.name} position="top">
-          <SwapKycBadge kycInfo={kycInfo} />
+          <SwapKycBadge kycInfo={kycInfo} kycSuffix={false} />
         </Tooltip>
         {showChevron && (
           <span class="mt-0.5 block text-[10px] text-day-600 underline decoration-dotted underline-offset-2">
