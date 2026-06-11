@@ -27,7 +27,7 @@ CREATE OR REPLACE FUNCTION calculate_comment_rating_trust(
     p_rating_mute_reason "RatingMuteReason",
     p_parent_id INT,
     p_status "CommentStatus",
-    p_private_proof_status "PrivateProofStatus",
+    p_order_id_status "PrivateProofStatus",
     p_author_id INT,
     p_service_id INT
 )
@@ -98,7 +98,7 @@ BEGIN
         RETURN;
     END IF;
 
-    IF p_private_proof_status = 'APPROVED'::"PrivateProofStatus" THEN
+    IF p_order_id_status = 'APPROVED'::"PrivateProofStatus" THEN
         RETURN QUERY SELECT 0.9::DOUBLE PRECISION, 'Verified customer'::TEXT, 'Private proof was approved'::TEXT;
         RETURN;
     END IF;
