@@ -339,7 +339,9 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
     {/* Service usage verification indicators */}
     {
       comment.privateProof && comment.privateProofStatus === 'APPROVED' && (
-        <BadgeSmall icon="ri:verified-badge-fill" color="green" text="Verified customer" inlineIcon />
+        <Tooltip text="The submitted Order ID was checked by moderation. It does not verify the reviewer, the full review, or whether the review is unbiased.">
+          <BadgeSmall icon="ri:checkbox-circle-line" color="green" text="Order ID checked" inlineIcon />
+        </Tooltip>
       )
     }
     {
