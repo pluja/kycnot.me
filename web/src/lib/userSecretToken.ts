@@ -9,7 +9,7 @@ import {
   LOWERCASE_VOWEL_CHARACTERS,
 } from '../constants/characters'
 
-import { getRandom, typedJoin } from './arrays'
+import { typedJoin } from './arrays'
 import { DEPLOYMENT_MODE } from './client/envVariables'
 import { transformCase } from './strings'
 
@@ -83,32 +83,40 @@ export const userSecretTokenZodSchema = z
   .regex(USER_SECRET_TOKEN_REGEX)
   .transform(parseUserSecretToken)
 
+// pickSecure draws a uniformly random element with a CSPRNG. The token is the
+// account's sole login credential, so it must not come from Math.random (the
+// generic getRandom); crypto.randomInt is unbiased and unpredictable. The
+// output format is unchanged, so existing tokens remain valid.
+function pickSecure<T>(array: readonly T[]): T {
+  return array[crypto.randomInt(array.length)] as T
+}
+
 export function generateUserSecretToken(): string {
   const token = [
-    getRandom(LOWERCASE_VOWEL_CHARACTERS),
-    getRandom(LOWERCASE_CONSONANT_CHARACTERS),
-    getRandom(LOWERCASE_VOWEL_CHARACTERS),
-    getRandom(LOWERCASE_CONSONANT_CHARACTERS),
+    pickSecure(LOWERCASE_VOWEL_CHARACTERS),
+    pickSecure(LOWERCASE_CONSONANT_CHARACTERS),
+    pickSecure(LOWERCASE_VOWEL_CHARACTERS),
+    pickSecure(LOWERCASE_CONSONANT_CHARACTERS),
 
-    getRandom(LOWERCASE_VOWEL_CHARACTERS),
-    getRandom(LOWERCASE_CONSONANT_CHARACTERS),
-    getRandom(LOWERCASE_VOWEL_CHARACTERS),
-    getRandom(LOWERCASE_CONSONANT_CHARACTERS),
+    pickSecure(LOWERCASE_VOWEL_CHARACTERS),
+    pickSecure(LOWERCASE_CONSONANT_CHARACTERS),
+    pickSecure(LOWERCASE_VOWEL_CHARACTERS),
+    pickSecure(LOWERCASE_CONSONANT_CHARACTERS),
 
-    getRandom(LOWERCASE_VOWEL_CHARACTERS),
-    getRandom(LOWERCASE_CONSONANT_CHARACTERS),
-    getRandom(LOWERCASE_VOWEL_CHARACTERS),
-    getRandom(LOWERCASE_CONSONANT_CHARACTERS),
+    pickSecure(LOWERCASE_VOWEL_CHARACTERS),
+    pickSecure(LOWERCASE_CONSONANT_CHARACTERS),
+    pickSecure(LOWERCASE_VOWEL_CHARACTERS),
+    pickSecure(LOWERCASE_CONSONANT_CHARACTERS),
 
-    getRandom(LOWERCASE_VOWEL_CHARACTERS),
-    getRandom(LOWERCASE_CONSONANT_CHARACTERS),
-    getRandom(LOWERCASE_VOWEL_CHARACTERS),
-    getRandom(LOWERCASE_CONSONANT_CHARACTERS),
+    pickSecure(LOWERCASE_VOWEL_CHARACTERS),
+    pickSecure(LOWERCASE_CONSONANT_CHARACTERS),
+    pickSecure(LOWERCASE_VOWEL_CHARACTERS),
+    pickSecure(LOWERCASE_CONSONANT_CHARACTERS),
 
-    getRandom(DIGIT_CHARACTERS),
-    getRandom(DIGIT_CHARACTERS),
-    getRandom(DIGIT_CHARACTERS),
-    getRandom(DIGIT_CHARACTERS),
+    pickSecure(DIGIT_CHARACTERS),
+    pickSecure(DIGIT_CHARACTERS),
+    pickSecure(DIGIT_CHARACTERS),
+    pickSecure(DIGIT_CHARACTERS),
   ].join('')
 
   return parseUserSecretToken(token)
