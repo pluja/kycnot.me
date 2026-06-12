@@ -23,6 +23,15 @@ import {
 } from '../lib/userSecretToken'
 import { imageFileSchema } from '../lib/zodUtils'
 
+// toPublicUser strips credential-equivalent fields before a User is returned
+// from an action: the result is devalue-serialized into the PRG action session,
+// so secretTokenHash (the login verifier) and feedId (the private-feed token)
+// must not ride along.
+function toPublicUser<T extends { secretTokenHash: string; feedId: string }>(user: T) {
+  const { secretTokenHash, feedId, ...publicUser } = user
+  return publicUser
+}
+
 export const accountActions = {
   login: defineProtectedAction({
     accept: 'form',
@@ -52,7 +61,7 @@ export const accountActions = {
 
       const origin = new URL(context.request.url).origin
       return {
-        user: matchedUser,
+        user: toPublicUser(matchedUser),
         redirect: makeSafeRedirectUrl(input.redirect ?? context.request.headers.get('referer'), origin),
       }
     },
@@ -108,7 +117,7 @@ export const accountActions = {
 
       return {
         token,
-        user: newUser,
+        user: toPublicUser(newUser),
       } as const
     },
   }),
@@ -145,8 +154,8 @@ export const accountActions = {
 
       const origin = new URL(context.request.url).origin
       return {
-        adminUser,
-        impersonatedUser: targetUser,
+        adminUser: toPublicUser(adminUser),
+        impersonatedUser: toPublicUser(targetUser),
         redirect: makeSafeRedirectUrl(input.redirect ?? context.request.headers.get('referer'), origin),
       }
     },
@@ -228,7 +237,7 @@ export const accountActions = {
         },
       })
 
-      return { user }
+      return { user: toPublicUser(user) }
     },
   }),
 
