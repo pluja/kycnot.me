@@ -5,8 +5,16 @@ import { ActionError } from 'astro:actions'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
+import { zodUrlOptionalProtocol } from '../../lib/zodUtils'
 
 const endedAtSchema = z.preprocess((val) => (val === '' ? null : val), z.coerce.date().nullable().optional())
+
+// source is rendered as a link href on the public events page, so it must be a
+// scheme-checked http(s) URL, not a free string (which would accept javascript:).
+const sourceSchema = z.preprocess(
+  (val) => (val === '' || val == null ? undefined : val),
+  zodUrlOptionalProtocol.optional()
+)
 
 export const adminEventActions = {
   create: defineProtectedAction({
@@ -18,7 +26,7 @@ export const adminEventActions = {
         title: z.string().min(1),
         content: z.string().min(1),
         icon: z.string().optional(),
-        source: z.string().optional(),
+        source: sourceSchema,
         type: z.nativeEnum(EventType).default('NORMAL'),
         startedAt: z.coerce.date(),
         endedAt: endedAtSchema,
@@ -85,7 +93,7 @@ export const adminEventActions = {
         title: z.string().min(1),
         content: z.string().min(1),
         icon: z.string().optional(),
-        source: z.string().optional(),
+        source: sourceSchema,
         type: z.nativeEnum(EventType).default('NORMAL'),
         startedAt: z.coerce.date(),
         endedAt: endedAtSchema,

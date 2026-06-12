@@ -1,6 +1,8 @@
 import { z, type ZodTypeAny } from 'astro/zod'
 import { round } from 'lodash-es'
 
+import { safeHttpUrl } from './exchange/safeUrl'
+
 const addZodPipe = (schema: ZodTypeAny, zodPipe?: ZodTypeAny) => {
   return zodPipe ? schema.pipe(zodPipe) : schema
 }
@@ -19,11 +21,29 @@ const cleanUrl = (input: unknown) => {
   return !/^\w+:\/\//i.test(cleanInput) ? `https://${cleanInput}` : cleanInput
 }
 
+// Contact methods and URLs are rendered straight into an href, so the scheme
+// must be constrained. cleanUrl only forces https:// onto schemeless input; an
+// explicit scheme (javascript:, data:, ...) is kept verbatim, so the scheme
+// guard below is what rejects script-capable URLs.
+const CONTACT_METHOD_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:'])
+const hasRenderableContactScheme = (value: string): boolean => {
+  try {
+    return CONTACT_METHOD_SCHEMES.has(new URL(value).protocol)
+  } catch {
+    return false
+  }
+}
+
 export const zodUrlOptionalProtocol = z.preprocess(
   cleanUrl,
-  z.string().refine((value) => /^(https?:\/\/)?[^\s$.?#]+(\.[^\s$.?#])*(\.[a-z0-9]{2,}).*$/i.test(value), {
-    message: 'Invalid URL',
-  })
+  z
+    .string()
+    .refine((value) => /^(https?:\/\/)?[^\s$.?#]+(\.[^\s$.?#])*(\.[a-z0-9]{2,}).*$/i.test(value), {
+      message: 'Invalid URL',
+    })
+    .refine((value) => safeHttpUrl(value) !== null, {
+      message: 'URL must start with http:// or https://',
+    })
 )
 
 export const zodContactMethod = z.preprocess(
@@ -49,6 +69,9 @@ export const zodContactMethod = z.preprocess(
         message: 'Invalid contact method',
       }
     )
+    .refine(hasRenderableContactScheme, {
+      message: 'Contact method must be a URL, email, or phone number',
+    })
 )
 
 const stringToArrayFactory = (delimiter: RegExp | string = ',') => {
