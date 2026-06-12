@@ -2,10 +2,11 @@
 import { actions } from 'astro:actions'
 
 import { stopImpersonating } from '../../lib/impersonation'
-import { urlParamsToFormData } from '../../lib/urls'
+import { makeSafeRedirectUrl } from '../../lib/redirectUrls'
+import { browserOriginForUrl, urlParamsToFormData } from '../../lib/urls'
 
-// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-const redirectUrl = Astro.url.searchParams.get('redirect') || Astro.request.headers.get('referer') || '/'
+const rawRedirect = Astro.url.searchParams.get('redirect') ?? Astro.request.headers.get('referer')
+const redirectUrl = makeSafeRedirectUrl(rawRedirect, browserOriginForUrl(Astro.url))
 
 const stop = Astro.url.searchParams.get('stop')
 if (stop) {

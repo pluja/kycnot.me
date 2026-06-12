@@ -4,7 +4,8 @@ import { z } from 'astro:content'
 
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
-import { makeLoginUrl, makeUnimpersonateUrl } from '../lib/redirectUrls'
+import { makeLoginUrl, makeSafeRedirectUrl, makeUnimpersonateUrl } from '../lib/redirectUrls'
+import { browserOriginForUrl } from '../lib/urls'
 
 const {
   data: { reason, reasonType, redirect },
@@ -18,7 +19,7 @@ const {
 )
 
 if (reasonType === 'admin-required' && Astro.locals.user?.admin) {
-  return Astro.redirect(redirect)
+  return Astro.redirect(makeSafeRedirectUrl(redirect, browserOriginForUrl(Astro.url)))
 }
 ---
 
