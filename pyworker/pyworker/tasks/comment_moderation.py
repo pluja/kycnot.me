@@ -12,6 +12,9 @@ shouldn't sit in a queue just because it can't be auto-approved.
   (replies don't need proof; strict-commenting only governs new reviews)
 - the user flagged KYC_REQUESTED or FUNDS_BLOCKED
 - the AI detected a brigade with confidence >= 4 (rating gets auto-muted)
+- the AI flags a rating as illegitimate on subjective grounds with no
+  concrete signal: the rating is NOT auto-muted, the comment is escalated
+  to a human who decides (mirrors how proof/funds-blocked claims escalate)
 
 Outcomes map to columns:
 - recommendedAction -> aiAction (APPROVE / REJECT / HOLD)
@@ -20,7 +23,10 @@ Outcomes map to columns:
 - isSpam -> ratingMuted=true + ratingMuteReason=TEMPLATE_SPAM (drives the
   "Potential SPAM" collapse + bottom-sort on the public side; brigade wins
   over spam when both are set because brigade is the more specific signal)
-- ratingShouldBeDisabled (affiliated puff, etc.) -> ratingMuted=true with reason
+- ratingShouldBeDisabled auto-mutes ONLY with a concrete basis: an affiliated
+  self-rating (AUTHOR_AFFILIATED), negative karma (AUTHOR_LOW_TRUST), or a
+  brigade cluster (SUSPICIOUS_PATTERN). With no such signal the AI does not
+  get to mute a genuine user's rating; the comment goes to human review.
 """
 
 import json
@@ -77,11 +83,13 @@ def _pick_mute_reason(
     context: Mapping[str, Any],
     is_brigade_hard_gate: bool,
 ) -> Optional[str]:
-    # Brigade is the most specific signal and wins. Then spam, since the
-    # spam call is a content judgement that doesn't depend on the author.
-    # Author-level reasons (affiliated / low trust / COI) come last because
-    # they only apply to rating-disable cases where the comment itself
-    # might still be fine.
+    # A rating is auto-muted only when there is a concrete, checkable basis.
+    # Brigade is the most specific signal and wins, then spam (a content
+    # judgement independent of the author), then author-level facts
+    # (affiliated self-rating, negative karma). When the AI flags
+    # ratingShouldBeDisabled on subjective grounds alone, there is no concrete
+    # basis: return None so the caller escalates to a human instead of letting
+    # the AI silently mute a genuine user's rating.
     if is_brigade_hard_gate:
         return "SUSPICIOUS_PATTERN"
     if ai_result.get("isSpam"):
@@ -96,7 +104,7 @@ def _pick_mute_reason(
         return "AUTHOR_LOW_TRUST"
     if int(ai_result.get("brigadeConfidence", 0)) >= 2:
         return "SUSPICIOUS_PATTERN"
-    return "CONFLICT_OF_INTEREST"
+    return None
 
 
 def _decide(ai_result: Mapping[str, Any], context: Mapping[str, Any]) -> Dict[str, Any]:
@@ -111,6 +119,15 @@ def _decide(ai_result: Mapping[str, Any], context: Mapping[str, Any]) -> Dict[st
 
     is_root_review = bool(submission.get("isRootReview"))
 
+    # Decide the rating outcome first. A concrete basis auto-mutes; a purely
+    # subjective ratingShouldBeDisabled (no affiliation / karma / brigade
+    # signal) does NOT auto-mute and instead escalates the comment to a human.
+    rating_mute_reason = _pick_mute_reason(ai_result, context, is_high_conf_brigade)
+    rating_muted = rating_mute_reason is not None
+    subjective_rating_flag = (
+        bool(ai_result.get("ratingShouldBeDisabled")) and rating_mute_reason is None
+    )
+
     hard_gate_reasons: List[str] = []
     if submission.get("hasPrivateProof"):
         hard_gate_reasons.append("private proof present")
@@ -124,6 +141,8 @@ def _decide(ai_result: Mapping[str, Any], context: Mapping[str, Any]) -> Dict[st
         hard_gate_reasons.append(
             f"brigade confidence {ai_result['brigadeConfidence']}/5"
         )
+    if subjective_rating_flag:
+        hard_gate_reasons.append("rating integrity (needs human review)")
 
     hard_gate_reason = ", ".join(hard_gate_reasons)
     recommended_action = ai_result["recommendedAction"]
@@ -137,13 +156,6 @@ def _decide(ai_result: Mapping[str, Any], context: Mapping[str, Any]) -> Dict[st
     else:
         status = _ACTION_TO_STATUS[recommended_action]
         ai_action_enum = _ACTION_TO_ENUM[recommended_action]
-
-    rating_muted = (
-        is_high_conf_brigade
-        or bool(ai_result.get("isSpam"))
-        or bool(ai_result.get("ratingShouldBeDisabled"))
-    )
-    rating_mute_reason = _pick_mute_reason(ai_result, context, is_high_conf_brigade)
 
     public_note = ai_result.get("contextNote") or None
     if public_note is not None and not public_note.strip():

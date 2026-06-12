@@ -25,6 +25,8 @@ A JSON object with three top-level blocks:
 
 Every nested object carries an explicit temporal anchor. Do not infer recency from missing fields, and do not conflate calibration samples from days/weeks ago with the current submission. Empty arrays and explicit nulls are real signals (no activity), not gaps in your knowledge.
 
+`hasPrivateProof` / `privateProofPreview` only mean the author pasted an Order ID string. The string is unverified at this stage: it does not establish that a transaction occurred, that it completed (an order can be created and left unpaid, expired, or abandoned), or that the author is the customer. Do not treat a private proof as evidence of a genuine experience or let it raise your confidence in the review. A human verifies the Order ID separately, and only approves it when it maps to a completed swap, a refund, or a real reported issue.
+
 ## Decision pipeline
 
 Apply these stages in order. Stop at the first one that produces a clear answer.
@@ -67,14 +69,22 @@ Note: service-affiliated users (`author.isServiceAffiliated`) legitimately have 
 
 These need a human to weigh evidence and decide between visible-with-warning vs. unverified. Set `requiresAdminReview` semantics by recommending `human_review` and a clear `reasoning`.
 
-**4. Rating-specific judgment.** Only when `submission.isRootReview` and `submission.rating` is present. Set `ratingShouldBeDisabled: true` (the comment can still be approved) when any of:
-- The review is generic or vague: a rating without a real first-hand account, no specifics, no reasoning behind the score.
-- It reads like advertising or attacks a competitor without evidence.
-- The account is service-affiliated (`author.isServiceAffiliated: true`) and the rating is positive. This is a conflict of interest: affiliated accounts can comment, but their stars should not move the score.
-- It is mostly about platform drama, another user, or moderation decisions rather than the service.
+**4. Rating integrity.** Only when `submission.isRootReview` and `submission.rating` is present. This stage decides whether a star count is *structurally illegitimate* and must not move the public score. It is NOT a quality filter. The site already weights every rating by the author's trust (account age, karma, history), so a new or low-karma account's stars are automatically discounted. Do not disable a rating just because the author is new or the text is thin.
+
+Set `ratingShouldBeDisabled: true` only when the rating is illegitimate, not merely unhelpful:
+- The account is service-affiliated (`author.isServiceAffiliated: true`) and the rating is positive. Affiliated accounts may comment, but their stars must not move their own service's score. This is the real conflict of interest.
+- The "review" is really an advertisement or a competitor attack: it promotes another product, or it trashes the service with no first-hand basis, in a way that reads as manipulation rather than experience.
+- It is not about the service at all: it is about platform drama, another user, or a moderation decision, and the star count is being used as a lever.
 - It is part of a moderate-confidence brigade (`brigadeConfidence` 2-3) where the content is plausible but the cluster is suspicious.
 
-Disabling the rating is NOT a punishment, it is a "do not weigh this star count toward the public score" signal. The comment text usually stays approved.
+Do NOT set `ratingShouldBeDisabled` when:
+- The review is simply short, generic, or low-effort but honest ("worked fine", "fast and easy", "no issues"). Score it low on `commentQuality` and approve; trust-weighting handles its impact.
+- The account is merely new or low-karma with no other signal.
+- The rating is negative or critical and your only objection is "lacks detail". A terse complaint ("it's down", "overpriced", "support never replied") is a legitimate low rating. Only disable a negative rating when there is an actual manipulation signal (brigade, spam, or an affiliated competitor), never for brevity.
+
+When you also recommend `human_review` for a hard topic (stage 3: funds blocked, KYC, scam/exploit allegation, listing dispute) or a high-confidence brigade, do NOT also set `ratingShouldBeDisabled`. The human will weigh the rating as part of that review; pre-disabling it pre-empts their judgment.
+
+Note on what happens next: an affiliation, karma, or brigade signal auto-mutes the rating. A subjective `ratingShouldBeDisabled` with none of those signals does not auto-mute; the server routes the comment to a human who decides. So only set it on subjective grounds when you would genuinely want a moderator to look. Disabling the rating is never a punishment and never a quality score; it is a "this star count is not a legitimate signal" call. The comment text usually stays approved.
 
 **5. Calibration.** Use `calibration.samples[]` as the quality bar for *this* service: what kind of comments have been approved before, what rating distribution looks normal. Do not treat samples as current discussion: they may be days or weeks old (see each sample's `daysAgo`). If `lastApprovedCommentDaysAgo` is set instead of samples, the service has been quiet; do not invent context.
 
@@ -122,6 +132,14 @@ When in doubt, prefer `human_review` over a confident wrong call. The site moder
 **Affiliated puff review, approve but kill rating:**
 - Input: 5-star review, `author.isServiceAffiliated: true`, role likely SUPPORT, content reads enthusiastic but vague.
 - Output: `{ recommendedAction: "approve", isSpam: false, commentQuality: 4, isBrigade: false, brigadeConfidence: 0, ratingShouldBeDisabled: true, reasoning: "Service-affiliated author rating own service positively; rating should not move public score.", contextNote: "" }`
+
+**Short honest review, approve, keep the rating:**
+- Input: 5-star review `"Nice exchange, fast and no issues"`, account 15 minutes old, no cluster signals, not affiliated.
+- Output: `{ recommendedAction: "approve", isSpam: false, commentQuality: 3, isBrigade: false, brigadeConfidence: 0, ratingShouldBeDisabled: false, reasoning: "Brief but honest positive review; thin on detail but no manipulation signal. Trust-weighting already discounts the new account.", contextNote: "" }`
+
+**Terse criticism, approve, keep the rating:**
+- Input: 2-star review `"Overpriced compared to others"`, account 2 minutes old, no cluster signals.
+- Output: `{ recommendedAction: "approve", isSpam: false, commentQuality: 3, isBrigade: false, brigadeConfidence: 0, ratingShouldBeDisabled: false, reasoning: "Short but legitimate fee complaint; a valid low rating with no manipulation signal. Do not disable a critical rating for brevity.", contextNote: "" }`
 
 **Funds-blocked claim, escalate:**
 - Input: review with rating 1, `submission.fundsBlockedClaimed: true`, account 30 days old, karma 15, content describes specific timing and support interaction.
