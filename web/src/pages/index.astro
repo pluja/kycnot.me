@@ -85,7 +85,7 @@ const {
       ),
     'min-score': z.coerce.number().default(0),
     'user-rating': z.coerce.number().int().min(0).max(5).default(0),
-    q: z.string().default(''),
+    q: z.string().max(100).default(''),
     currencies: z.array(currenciesZodEnumBySlug.transform((slug) => currencySlugToId(slug))),
     'currency-mode': zodEnumFromConstant(modeOptions, 'value').default('or'),
     'attribute-mode': zodEnumFromConstant(modeOptions, 'value').default('or'),
