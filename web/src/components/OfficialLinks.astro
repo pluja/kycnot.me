@@ -1,0 +1,57 @@
+---
+import { Icon } from 'astro-icon/components'
+import { SOURCE_CODE_URL } from 'astro:env/client'
+import { I2P_ADDRESS, ONION_ADDRESS } from 'astro:env/server'
+
+import { socialLinks } from '../constants/socialLinks'
+
+const networkLinks = [
+  {
+    name: 'Tor',
+    detail: 'Onion service',
+    href: ONION_ADDRESS,
+    icon: 'onion',
+  },
+  {
+    name: 'I2P',
+    detail: 'Eepsite',
+    href: I2P_ADDRESS,
+    icon: 'i2p',
+  },
+  {
+    name: 'Source code',
+    detail: new URL(SOURCE_CODE_URL).hostname,
+    href: SOURCE_CODE_URL,
+    icon: 'ri:git-repository-line',
+  },
+]
+
+const links = [
+  ...networkLinks,
+  ...socialLinks.map((social) => ({
+    name: social.name,
+    detail: social.handle,
+    href: social.href,
+    icon: social.icon,
+  })),
+].filter((link) => Boolean(link.href))
+---
+
+<div class="not-prose grid grid-cols-1 gap-3 sm:grid-cols-2">
+  {
+    links.map(({ name, detail, href, icon }) => (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener"
+        class="group flex items-center gap-3 rounded-xl border border-night-400 bg-night-800/40 px-4 py-3 transition-colors hover:border-green-700 hover:bg-night-800"
+      >
+        <Icon name={icon} class="size-6 shrink-0 text-green-500" />
+        <span class="flex min-w-0 flex-col">
+          <span class="text-sm font-semibold text-day-200 group-hover:text-green-400">{name}</span>
+          <span class="truncate text-xs text-day-500">{detail}</span>
+        </span>
+      </a>
+    ))
+  }
+</div>

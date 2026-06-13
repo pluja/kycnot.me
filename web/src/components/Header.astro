@@ -45,7 +45,7 @@ const splashText = showSplashText ? sample(splashTexts) : null
       <a href="/" class="relative inline-flex h-full items-center px-4 @[2rem]:pr-0">
         <Logo
           class={cn(
-            'h-6 text-green-500 transition-colors hover:text-green-400',
+            'h-5 text-green-500 transition-colors hover:text-green-400 xs:h-6',
             {
               'hue-rotate-227 saturate-800': DEPLOYMENT_MODE === 'development',
               'hue-rotate-60 saturate-800': DEPLOYMENT_MODE === 'staging',
@@ -106,7 +106,7 @@ const splashText = showSplashText ? sample(splashTexts) : null
           aria-hidden="true"
         >
           <span
-            class="line-clamp-2 hidden shrink text-center font-title text-xs text-balance text-lime-500 @[6rem]:inline @4xl:ml-0"
+            class="line-clamp-2 hidden shrink text-center font-title text-xs text-balance text-lime-500 @[10rem]:inline @4xl:ml-0"
             data-splash-text
           >
             {splashText}
@@ -117,6 +117,18 @@ const splashText = showSplashText ? sample(splashTexts) : null
     }
 
     <div class="flex items-center">
+      <Tooltip
+        as="a"
+        href="/about"
+        class="flex h-full items-center gap-1.5 px-1 text-day-700 transition-colors hover:text-day-300 2xs:px-2 xs:px-3"
+        text="About & FAQ"
+        position="bottom"
+        aria-label="About and FAQ"
+      >
+        <Icon name="ri:information-line" class="size-5" />
+        <span class="hidden text-sm font-medium xs:inline">About</span>
+      </Tooltip>
+
       <Tooltip
         as="a"
         href="/swap"
