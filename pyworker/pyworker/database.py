@@ -380,7 +380,18 @@ def fetch_all_services() -> List[Dict[str, Any]]:
 
 def fetch_services_with_pending_comments() -> List[Dict[str, Any]]:
     """
-    Fetch all public and verified services that have at least one pending comment.
+    Fetch every service that has at least one comment awaiting AI review.
+
+    Deliberately unfiltered by serviceVisibility / verificationStatus: comment
+    moderation judges the comment, not the service's listing state. Users can
+    still comment on unlisted, archived, hidden, or verification-failed
+    services, and those comments must be moderated too. Filtering them out here
+    leaves them PENDING with no AI verdict forever, so they never surface in the
+    moderator queue.
+
+    Matches get_pending_comments(): only services with an un-reviewed,
+    human-untouched comment, so the worker does not wake for services whose only
+    pending rows are already held or decided.
 
     Returns:
         A list of service dictionaries.
@@ -397,10 +408,8 @@ def fetch_services_with_pending_comments() -> List[Dict[str, Any]]:
                     FROM "Service" s
                     JOIN "Comment" c ON s.id = c."serviceId"
                     WHERE c.status = 'PENDING'
-                        AND s."serviceVisibility" = 'PUBLIC'
-                        AND (s."verificationStatus" = 'VERIFICATION_SUCCESS'
-                        OR s."verificationStatus" = 'COMMUNITY_CONTRIBUTED'
-                        OR s."verificationStatus" = 'APPROVED')
+                      AND c."aiDecidedAt" IS NULL
+                      AND c."humanAction" IS NULL
                     ORDER BY s.id
                 """)
                 services = cursor.fetchall()
@@ -808,9 +817,14 @@ def get_comments(service_id: int, status: str = "APPROVED") -> List[Dict[str, An
 
 def get_pending_comments(service_id: int) -> List[Dict[str, Any]]:
     """
-    Return the IDs of PENDING comments for a service, oldest first.
-    The full moderation context comes from get_moderation_context(); callers
-    only need the id to fan out per-comment work.
+    Return the IDs of comments awaiting AI review for a service, oldest first.
+
+    Selects only rows the AI has never decided (aiDecidedAt IS NULL) and that no
+    human has touched (humanAction IS NULL): review-once. This stops the worker
+    from re-deciding held comments every run and, critically, from overwriting a
+    moderator's HOLD by re-approving on a later pass. The predicate is exactly
+    the AWAITING_AI moderationState; it stays as raw columns so the worker does
+    not depend on the trigger-maintained column existing.
     """
     comments = []
     try:
@@ -820,7 +834,10 @@ def get_pending_comments(service_id: int) -> List[Dict[str, Any]]:
                     """
                     SELECT c.id
                     FROM "Comment" c
-                    WHERE c."serviceId" = %s AND c.status = 'PENDING'
+                    WHERE c."serviceId" = %s
+                      AND c.status = 'PENDING'
+                      AND c."aiDecidedAt" IS NULL
+                      AND c."humanAction" IS NULL
                     ORDER BY c."createdAt" ASC
                     """,
                     (service_id,),
