@@ -25,3 +25,4 @@ sync-all.sh
 *.md
 !README.md
 !pyworker/pyworker/prompts/*.md
+!web/src/content/blog/**/*.md
