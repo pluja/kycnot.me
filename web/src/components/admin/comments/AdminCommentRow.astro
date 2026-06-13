@@ -1,17 +1,18 @@
 ---
 import { Icon } from 'astro-icon/components'
 
+import { commentModerationStateById } from '../../../constants/commentModerationState'
+import { commentStatusById } from '../../../constants/commentStatus'
+import { cn } from '../../../lib/cn'
 import BadgeSmall from '../../BadgeSmall.astro'
 import CommentModeration from '../../CommentModeration.astro'
 import MyPicture from '../../MyPicture.astro'
 import TimeFormatted from '../../TimeFormatted.astro'
 import Tooltip from '../../Tooltip.astro'
 import UserBadge from '../../UserBadge.astro'
+
 import AdminCommentContext from './AdminCommentContext.astro'
 
-import { commentModerationStateById } from '../../../constants/commentModerationState'
-import { commentStatusById } from '../../../constants/commentStatus'
-import { cn } from '../../../lib/cn'
 
 import type { TailwindColor } from '../../../lib/colors'
 import type { ModerationAction, Prisma } from '@prisma/client'
@@ -23,6 +24,7 @@ type Props = {
       content: true
       status: true
       moderationState: true
+      parentId: true
       rating: true
       ratingActive: true
       ratingMuted: true
@@ -110,12 +112,19 @@ const aiActionLabel: Record<ModerationAction, string> = {
 
 const statusInfo = commentStatusById[comment.status]
 
-const proofStatusColor: Record<NonNullable<typeof comment.privateProofStatus>, string> = {
-  APPROVED: 'bg-green-500/20 text-green-300 border border-green-500/30',
-  REJECTED: 'bg-red-500/20 text-red-300 border border-red-500/30',
-  PENDING: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
-  WITHDRAWN: 'bg-zinc-500/20 text-zinc-300 border border-zinc-500/30',
-}
+// Proof gate: Approve/Verify is blocked from the quick rail too while a private
+// proof is still pending, matching the moderate action's server-side guard.
+const proofPendingGate = comment.privateProof !== null && comment.privateProofStatus === 'PENDING'
+
+const proofIconClass = comment.privateProof
+  ? comment.privateProofStatus === 'APPROVED'
+    ? 'text-green-400'
+    : comment.privateProofStatus === 'REJECTED'
+      ? 'text-red-400'
+      : comment.privateProofStatus === 'WITHDRAWN'
+        ? 'text-zinc-400'
+        : 'text-amber-300'
+  : ''
 
 // "Penalty" mute reasons: ratingMuted + one of these = the comment is
 // treated as spam (collapse, badge, bottom-sort). Other mute reasons just
@@ -152,9 +161,12 @@ const ribbonClass = ratingMutePenalty
     'has-[summary:focus-visible]:ring-2 has-[summary:focus-visible]:ring-blue-500/60'
   )}
 >
+  {/* Table-like grid so author / service / date line up across every row.
+      Tracks are fixed widths (each row is its own grid, so only fixed tracks
+      align across rows). Collapses to a wrapping flex layout below md. */}
   <summary
     tabindex="0"
-    class="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm select-none"
+    class="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2.5 text-sm select-none md:grid md:grid-cols-[auto_14rem_9rem_6rem_minmax(0,1fr)_auto] md:gap-x-3"
   >
     <Icon
       name="ri:arrow-right-s-line"
@@ -162,11 +174,7 @@ const ribbonClass = ratingMutePenalty
     />
 
     <!-- Author -->
-    <span class="shrink-0">
-      <UserBadge user={comment.author} size="sm" noLink class="-my-1" />
-    </span>
-
-    <span class="text-zinc-600">·</span>
+    <UserBadge user={comment.author} size="sm" noLink class="-my-1 md:min-w-0" />
 
     <!-- Service. The ?comment param tells the service page to fold/highlight
          the linked comment's branch (needed when the comment is a reply). -->
@@ -175,7 +183,7 @@ const ribbonClass = ratingMutePenalty
       target="_blank"
       rel="noopener"
       data-row-no-toggle
-      class="inline-flex shrink-0 items-center gap-1 text-blue-400 hover:underline"
+      class="flex items-center gap-1 text-blue-400 hover:underline md:min-w-0"
     >
       {
         comment.service.imageUrl && (
@@ -183,136 +191,101 @@ const ribbonClass = ratingMutePenalty
             src={comment.service.imageUrl}
             height={14}
             width={14}
-            class="inline size-3.5 rounded-full object-contain"
+            class="inline size-3.5 shrink-0 rounded-full object-contain"
             alt=""
           />
         )
       }
-      {comment.service.name}
+      <span class="truncate">{comment.service.name}</span>
     </a>
 
-    <span class="text-zinc-600">·</span>
+    <TimeFormatted
+      date={comment.createdAt}
+      hourPrecision
+      class="overflow-hidden whitespace-nowrap text-zinc-400"
+    />
 
-    <TimeFormatted date={comment.createdAt} hourPrecision class="shrink-0 text-zinc-400" />
+    {/* State chips + comment preview share the flexible column. The metadata
+        columns (author/service/date) stay aligned; chips/preview flow. */}
+    <div class="flex min-w-0 items-center gap-2">
+      {/* Queue-state chip for the two actionable states. AWAITING_AI is the one
+          the row could otherwise show nothing for (no aiAction yet), which is
+          exactly the case that used to go unnoticed. Resolved rows stay quiet. */}
+      {
+        comment.moderationState !== 'RESOLVED' && (
+          <span
+            class={cn(
+              'inline-flex shrink-0 items-center gap-0.5 rounded-sm px-1.5 py-0.5 text-[10px]',
+              comment.moderationState === 'AWAITING_AI'
+                ? 'bg-zinc-500/15 text-zinc-300'
+                : 'bg-yellow-500/15 text-yellow-300'
+            )}
+          >
+            <Icon name={commentModerationStateById[comment.moderationState].icon} class="size-3" />
+            {commentModerationStateById[comment.moderationState].label}
+          </span>
+        )
+      }
 
-    {/* Status is conveyed by the left ribbon color and the highlighted
-        action-rail button. The full status badge lives in the expanded
-        Context section so the summary stays scannable. */}
+      {/* AI verdict chip. Tooltip spells out the abbreviations. */}
+      {
+        comment.aiAction && (
+          <Tooltip
+            as="span"
+            text={`AI: ${aiActionLabel[comment.aiAction]}${
+              typeof comment.aiQuality === 'number' ? `, quality ${comment.aiQuality}/10` : ''
+            }. Click to expand for full reasoning.`}
+            class={cn(
+              'inline-flex shrink-0 items-center gap-0.5 rounded-sm px-1.5 py-0.5 text-[10px]',
+              aiActionColor[comment.aiAction] === 'green' && 'bg-green-500/15 text-green-300',
+              aiActionColor[comment.aiAction] === 'red' && 'bg-red-500/15 text-red-300',
+              aiActionColor[comment.aiAction] === 'yellow' && 'bg-yellow-500/15 text-yellow-300'
+            )}
+          >
+            <Icon name="ri:robot-2-line" class="size-3" />
+            {aiActionLabel[comment.aiAction]}
+            {typeof comment.aiQuality === 'number' && <span class="text-day-500">· q{comment.aiQuality}</span>}
+          </Tooltip>
+        )
+      }
 
-    {/* Queue-state chip for the two actionable states. AWAITING_AI is the one
-        the row could otherwise show nothing for (no aiAction yet), which is
-        exactly the case that used to go unnoticed. Resolved rows stay quiet. */}
-    {
-      comment.moderationState !== 'RESOLVED' && (
-        <span
-          class={cn(
-            'inline-flex shrink-0 items-center gap-0.5 rounded-sm px-1.5 py-0.5 text-[10px]',
-            comment.moderationState === 'AWAITING_AI'
-              ? 'bg-zinc-500/15 text-zinc-300'
-              : 'bg-yellow-500/15 text-yellow-300'
-          )}
-        >
-          <Icon name={commentModerationStateById[comment.moderationState].icon} class="size-3" />
-          {commentModerationStateById[comment.moderationState].label}
-        </span>
-      )
-    }
+      {/* Compact flag cluster: only the signals that demand careful human
+          attention before deciding (claims to verify, proof to check). Spam,
+          brigade and rating-mute state live in the expanded AI verdict and
+          review line, so they don't crowd the collapsed row. */}
+      {
+        (comment.privateProof !== null || comment.issues.length > 0) && (
+          <span class="flex shrink-0 items-center gap-1">
+            {comment.privateProof && (
+              <Tooltip
+                as="span"
+                text={`Private proof ${comment.privateProofStatus?.toLowerCase() ?? 'pending'}`}
+                class={cn('inline-flex items-center', proofIconClass)}
+              >
+                <Icon name="ri:key-2-line" class="size-3.5" />
+              </Tooltip>
+            )}
+            {comment.issues.map((issue) => (
+              <Tooltip
+                as="span"
+                text={issue === 'KYC_REQUESTED' ? 'KYC requested' : 'Funds blocked'}
+                class="inline-flex items-center text-red-400"
+              >
+                <Icon name={issue === 'KYC_REQUESTED' ? 'ri:bank-card-line' : 'ri:lock-line'} class="size-3.5" />
+              </Tooltip>
+            ))}
+          </span>
+        )
+      }
 
-    <!-- AI verdict chip. Tooltip spells out the abbreviations. -->
-    {
-      comment.aiAction && (
-        <Tooltip
-          as="span"
-          text={`AI: ${aiActionLabel[comment.aiAction]}${
-            typeof comment.aiQuality === 'number'
-              ? `, quality ${comment.aiQuality}/10`
-              : ''
-          }. Click to expand for full reasoning.`}
-          class={cn(
-            'inline-flex shrink-0 items-center gap-0.5 rounded-sm px-1.5 py-0.5 text-[10px]',
-            aiActionColor[comment.aiAction] === 'green' &&
-              'bg-green-500/15 text-green-300',
-            aiActionColor[comment.aiAction] === 'red' && 'bg-red-500/15 text-red-300',
-            aiActionColor[comment.aiAction] === 'yellow' &&
-              'bg-yellow-500/15 text-yellow-300'
-          )}
-        >
-          <Icon name="ri:robot-2-line" class="size-3" />
-          {aiActionLabel[comment.aiAction]}
-          {typeof comment.aiQuality === 'number' && (
-            <span class="text-day-500">· q{comment.aiQuality}</span>
-          )}
-        </Tooltip>
-      )
-    }
-
-    <!-- Brigade chip -->
-    {
-      comment.aiIsBrigade && typeof comment.aiBrigadeConfidence === 'number' && (
-        <span class="shrink-0 rounded-sm bg-orange-500/15 px-1.5 py-0.5 text-[10px] text-orange-300">
-          Brigade {comment.aiBrigadeConfidence}/5
-        </span>
-      )
-    }
-
-    <!-- Spam chip. Driven by the rating-mute reason since that's what
-         actually triggers the public-side collapse + badge + bottom-sort. -->
-    {
-      ratingMutePenalty && (
-        <span class="shrink-0 rounded-sm bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">
-          Spam
-        </span>
-      )
-    }
-
-    <!-- Rating muted chip -->
-    {
-      comment.ratingMuted && (
-        <span
-          class={cn(
-            'shrink-0 rounded-sm px-1.5 py-0.5 text-[10px]',
-            ratingMutePenalty
-              ? 'bg-red-500/15 text-red-300'
-              : 'bg-yellow-500/15 text-yellow-300'
-          )}
-        >
-          {ratingMutePenalty ? 'Rating flagged' : 'Rating muted'}
-        </span>
-      )
-    }
-
-    <!-- Private proof chip -->
-    {
-      comment.privateProof && comment.privateProofStatus && (
-        <span
-          class={cn(
-            'shrink-0 rounded-sm px-1.5 py-0.5 text-[10px]',
-            proofStatusColor[comment.privateProofStatus]
-          )}
-        >
-          Proof {comment.privateProofStatus.toLowerCase()}
-        </span>
-      )
-    }
-
-    <!-- Issue chips -->
-    {
-      comment.issues.map((issue) => (
-        <span class="shrink-0 rounded-sm bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">
-          {issue.replace('_', ' ').toLowerCase()}
-        </span>
-      ))
-    }
-
-    <!-- Preview text -->
-    <span class="ml-1 hidden flex-1 truncate text-zinc-500 sm:inline">
-      {comment.content.slice(0, 140).replace(/\s+/g, ' ')}
-    </span>
-
-    <span class="grow sm:hidden"></span>
+      <!-- Preview text -->
+      <span class="hidden flex-1 truncate text-zinc-500 md:block">
+        {comment.content.slice(0, 140).replace(/\s+/g, ' ')}
+      </span>
+    </div>
 
     <!-- Action rail -->
-    <div class="flex shrink-0 gap-0.5" data-row-no-toggle>
+    <div class="ml-auto flex shrink-0 gap-0.5 md:ml-0" data-row-no-toggle>
       {
         (['APPROVE', 'REJECT', 'HOLD'] as const).map((act) => {
           const effective =
@@ -321,9 +294,7 @@ const ribbonClass = ratingMutePenalty
               ? 'APPROVE'
               : comment.status === 'REJECTED'
                 ? 'REJECT'
-                : comment.status === 'PENDING'
-                  ? 'HOLD'
-                  : null)
+                : 'HOLD')
           const isActive = effective === act
           const iconName =
             act === 'APPROVE'
@@ -333,16 +304,23 @@ const ribbonClass = ratingMutePenalty
                 : 'ri:pause-line'
           const colorBase =
             act === 'APPROVE' ? 'green' : act === 'REJECT' ? 'red' : 'yellow'
+          const gated = proofPendingGate && act === 'APPROVE'
           return (
             <button
               type="button"
+              disabled={gated}
               data-action="human-action"
               data-value={act}
               data-comment-id={comment.id}
               data-user-id={Astro.locals.user?.id}
-              title={`${act === 'APPROVE' ? 'Approve' : act === 'REJECT' ? 'Reject' : 'Hold'} (${act === 'APPROVE' ? 'a' : act === 'REJECT' ? 'r' : 'h'})`}
+              title={
+                gated
+                  ? 'Resolve the private proof before approving'
+                  : `${act === 'APPROVE' ? 'Approve' : act === 'REJECT' ? 'Reject' : 'Hold'} (${act === 'APPROVE' ? 'a' : act === 'REJECT' ? 'r' : 'h'})`
+              }
               class={cn(
                 'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
+                gated && 'cursor-not-allowed opacity-40',
                 isActive
                   ? colorBase === 'green'
                     ? 'border border-green-500/30 bg-green-500/20 text-green-400'
@@ -365,13 +343,21 @@ const ribbonClass = ratingMutePenalty
         (comment.status === 'APPROVED' || comment.status === 'VERIFIED') && (
           <button
             type="button"
+            disabled={proofPendingGate}
             data-action="status"
             data-value={comment.status === 'VERIFIED' ? 'APPROVED' : 'VERIFIED'}
             data-comment-id={comment.id}
             data-user-id={Astro.locals.user?.id}
-            title={comment.status === 'VERIFIED' ? 'Unverify (v)' : 'Verify (v)'}
+            title={
+              proofPendingGate
+                ? 'Resolve the private proof before verifying'
+                : comment.status === 'VERIFIED'
+                  ? 'Unverify (v)'
+                  : 'Verify (v)'
+            }
             class={cn(
               'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
+              proofPendingGate && 'cursor-not-allowed opacity-40',
               comment.status === 'VERIFIED'
                 ? 'border border-blue-500/30 bg-blue-500/20 text-blue-400'
                 : 'bg-night-600 hover:bg-blue-500/20 hover:text-blue-400'
@@ -416,7 +402,7 @@ const ribbonClass = ratingMutePenalty
               <TimeFormatted
                 date={comment.aiDecidedAt}
                 hourPrecision
-                class="font-normal normal-case text-indigo-400/70"
+                class="font-normal text-indigo-400/70 normal-case"
               />
             )}
           </header>
@@ -485,7 +471,7 @@ const ribbonClass = ratingMutePenalty
     }
 
     <!-- The comment itself: the thing being judged. Read this, then act. -->
-    <section class="rounded-md border border-zinc-700 border-l-4 border-l-zinc-500 bg-night-900 p-3.5">
+    <section class="rounded-md border border-l-4 border-zinc-700 border-l-zinc-500 bg-night-900 p-3.5">
       <header class="mb-1.5 flex items-center gap-1 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
         <Icon name="ri:chat-quote-line" class="size-3" />
         Comment

@@ -467,6 +467,8 @@ export const commentActions = {
             rating: true,
             serviceId: true,
             authorId: true,
+            privateProof: true,
+            privateProofStatus: true,
           },
         })
 
@@ -474,6 +476,20 @@ export const commentActions = {
           throw new ActionError({
             code: 'NOT_FOUND',
             message: 'Comment not found',
+          })
+        }
+
+        // Proof gate: a comment carrying a private proof cannot be approved
+        // (or verified) while that proof is still pending. The moderator must
+        // first resolve the proof (approve / reject / withdraw it). Resolving
+        // the proof to APPROVED is itself the approval path, handled below.
+        const isApproveIntent =
+          (input.action === 'human-action' && input.value === 'APPROVE') ||
+          (input.action === 'status' && (input.value === 'APPROVED' || input.value === 'VERIFIED'))
+        if (isApproveIntent && comment.privateProof !== null && comment.privateProofStatus === 'PENDING') {
+          throw new ActionError({
+            code: 'BAD_REQUEST',
+            message: 'Resolve the private proof (approve, reject, or withdraw it) before approving this comment.',
           })
         }
 
@@ -566,8 +582,6 @@ export const commentActions = {
             })
           }
         })
-
-        return { success: true }
       } catch (error) {
         if (error instanceof ActionError) throw error
 

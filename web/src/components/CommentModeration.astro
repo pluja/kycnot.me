@@ -13,15 +13,16 @@ import type { HTMLAttributes } from 'astro/types'
 
 type Props = HTMLAttributes<'div'> & {
   /**
-   * When true, drops the outer toggle wrapper and any blocks the embedding
-   * parent already renders (author context, AI verdict block, Decide row).
-   * Layout becomes a tight grid so it fits inside an expanded admin row.
+   * When true, drops the outer toggle wrapper and the blocks the embedding
+   * admin row already renders (author context, AI verdict). The component then
+   * starts at the decision bar so a moderator can act inside the expanded row.
    */
   compact?: boolean
   comment: Prisma.CommentGetPayload<{
     select: {
       id: true
       status: true
+      parentId: true
       issues: true
       publicNote: true
       adminNote: true
@@ -92,20 +93,20 @@ const humanActionMeta: Record<
   APPROVE: {
     label: 'Approve',
     icon: 'ri:check-line',
-    activeClasses: 'border border-green-500/30 bg-green-500/20 text-green-400',
-    hoverClasses: 'bg-night-700 hover:bg-green-500/20 hover:text-green-400',
+    activeClasses: 'border border-green-500/40 bg-green-500/20 text-green-300',
+    hoverClasses: 'border border-night-500 bg-night-700 hover:bg-green-500/15 hover:text-green-300',
   },
   REJECT: {
     label: 'Reject',
     icon: 'ri:close-line',
-    activeClasses: 'border border-red-500/30 bg-red-500/20 text-red-400',
-    hoverClasses: 'bg-night-700 hover:bg-red-500/20 hover:text-red-400',
+    activeClasses: 'border border-red-500/40 bg-red-500/20 text-red-300',
+    hoverClasses: 'border border-night-500 bg-night-700 hover:bg-red-500/15 hover:text-red-300',
   },
   HOLD: {
     label: 'Hold',
     icon: 'ri:pause-line',
-    activeClasses: 'border border-yellow-500/30 bg-yellow-500/20 text-yellow-400',
-    hoverClasses: 'bg-night-700 hover:bg-yellow-500/20 hover:text-yellow-400',
+    activeClasses: 'border border-yellow-500/40 bg-yellow-500/20 text-yellow-300',
+    hoverClasses: 'border border-night-500 bg-night-700 hover:bg-yellow-500/15 hover:text-yellow-300',
   },
 }
 
@@ -122,6 +123,37 @@ const aiActionClasses: Record<ModerationAction, string> = {
 }
 
 const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
+
+// The effective decision falls back to status for legacy comments that pre-date
+// humanAction tracking, so the active button reflects reality either way.
+const effectiveAction: ModerationAction =
+  comment.humanAction ??
+  (comment.status === 'APPROVED' || comment.status === 'VERIFIED'
+    ? 'APPROVE'
+    : comment.status === 'REJECTED'
+      ? 'REJECT'
+      : 'HOLD')
+
+// Proof gate: a pending private proof must be resolved (approve / reject /
+// withdraw) before the comment itself can be approved or verified. Mirrors the
+// server-side guard in the moderate action.
+const proofPendingGate = comment.privateProof !== null && comment.privateProofStatus === 'PENDING'
+
+const isSpamReason =
+  comment.ratingMuted &&
+  (comment.ratingMuteReason === 'TEMPLATE_SPAM' || comment.ratingMuteReason === 'SUSPICIOUS_PATTERN')
+const canMuteRating = comment.rating !== null && !comment.parentId
+
+const proofStatusMeta = [
+  { value: 'APPROVED', label: 'Approve', icon: 'ri:check-line', active: 'border border-green-500/40 bg-green-500/20 text-green-300', hover: 'border border-night-500 bg-night-700 hover:bg-green-500/15 hover:text-green-300' },
+  { value: 'REJECTED', label: 'Reject', icon: 'ri:close-line', active: 'border border-red-500/40 bg-red-500/20 text-red-300', hover: 'border border-night-500 bg-night-700 hover:bg-red-500/15 hover:text-red-300' },
+  { value: 'WITHDRAWN', label: 'Withdrawn', icon: 'ri:arrow-go-back-line', active: 'border border-night-400 bg-night-500/50 text-night-200', hover: 'border border-night-500 bg-night-700 hover:bg-night-500/50 hover:text-night-200' },
+  { value: 'PENDING', label: 'Pending', icon: 'ri:time-line', active: 'border border-purple-500/40 bg-purple-500/20 text-purple-300', hover: 'border border-night-500 bg-night-700 hover:bg-purple-500/15 hover:text-purple-300' },
+] as const
+
+const sectionLabel = 'shrink-0 text-[10px] font-semibold tracking-wide text-day-500 uppercase'
+const noteFieldClass =
+  'field-sizing-content w-full resize-y rounded-sm border border-night-500 bg-night-700 px-2 py-1 text-xs leading-snug outline-hidden focus:ring-1 focus:ring-blue-500'
 ---
 
 <div {...divProps} class={cn('text-xs', className)} data-comment-moderation>
@@ -144,16 +176,16 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
   <div
     class={cn(
       compact
-        ? 'space-y-2'
-        : 'mt-2 hidden rounded-md border border-night-500 bg-night-600 peer-checked:block peer-checked:p-2'
+        ? 'space-y-2.5'
+        : 'mt-2 hidden space-y-2.5 rounded-md border border-night-500 bg-night-600 peer-checked:block peer-checked:p-2'
     )}
   >
-    {!compact && <AdminCommentContext comment={comment} class="mb-2 border-b border-night-500 pb-2" />}
+    {!compact && <AdminCommentContext comment={comment} class="border-b border-night-500 pb-2" />}
 
-    {/* AI verdict (read-only). Hidden in compact mode because the embedding row already shows it. */}
+    {/* AI verdict (read-only). Hidden in compact mode because the admin row shows it above. */}
     {
       !compact && hasAiVerdict && (
-        <div class="mb-2 rounded-sm border border-indigo-500/30 bg-indigo-500/10 px-2 py-1.5">
+        <div class="rounded-sm border border-indigo-500/30 bg-indigo-500/10 px-2 py-1.5">
           <div class="mb-1 flex flex-wrap items-center gap-1.5 text-[10px] text-indigo-300">
             <Icon name="ri:robot-2-line" class="size-3.5" />
             <span class="font-semibold tracking-wide uppercase">AI verdict</span>
@@ -199,11 +231,11 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
       )
     }
 
-    {/* Human verdict (read-only) */}
+    {/* Who moderated last (audit context for the decision below). */}
     {
       comment.humanAction && (
-        <div class="mb-2 flex flex-wrap items-center gap-1 rounded-sm bg-night-700 px-2 py-1 text-[11px] text-day-400">
-          <Icon name="ri:user-settings-line" class="size-3.5 shrink-0" />
+        <div class="flex flex-wrap items-center gap-1 text-[10px] text-day-500">
+          <Icon name="ri:user-settings-line" class="size-3 shrink-0" />
           <span>Last moderated</span>
           {comment.humanDecidedBy && (
             <>
@@ -213,370 +245,306 @@ const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
           )}
           {comment.humanDecidedAt && (
             <>
-              <span>at</span>
+              <span>·</span>
               <TimeFormatted date={comment.humanDecidedAt} hourPrecision />
             </>
           )}
-          <span>as</span>
-          <span class={cn('rounded-sm px-1.5 py-0.5 font-medium', aiActionClasses[comment.humanAction])}>
-            {aiActionLabels[comment.humanAction]}
-          </span>
         </div>
       )
     }
 
-    {
-      /* Moderation action buttons (audit-trailed). Shown in both modes; also
-        in compact (admin row), so a moderator can decide without scrolling
-        back up to the row's action rail. The effective action falls back
-        to status for legacy comments that pre-date humanAction tracking. */
-    }
-    <div class="mb-2 flex flex-wrap items-center gap-1 border-b border-night-500 pb-2">
-      <span class="mr-1 text-[10px] text-day-500">Decide:</span>
+    {/* DECISION: the one action this whole view exists to support. */}
+    <div class="rounded-md border border-night-500 bg-night-800/40 p-2">
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class={cn(sectionLabel, 'mr-0.5')}>Decision</span>
+        {
+          (['APPROVE', 'REJECT', 'HOLD'] as const).map((act) => {
+            const meta = humanActionMeta[act]
+            const isActive = effectiveAction === act
+            const gated = proofPendingGate && act === 'APPROVE'
+            return (
+              <button
+                disabled={gated}
+                class={cn(
+                  'inline-flex items-center gap-1 rounded-sm px-2.5 py-1 text-xs font-medium transition-colors',
+                  gated && 'cursor-not-allowed opacity-40',
+                  isActive ? meta.activeClasses : meta.hoverClasses
+                )}
+                data-action="human-action"
+                data-value={act}
+                data-comment-id={comment.id}
+                data-user-id={user.id}
+                title={gated ? 'Resolve the private proof before approving' : meta.label}
+              >
+                <Icon name={meta.icon} class="size-3.5" />
+                <span>{meta.label}</span>
+              </button>
+            )
+          })
+        }
+
+        <div class="mx-0.5 h-5 w-px bg-night-500"></div>
+
+        {/* Verify = approve + trust badge, so it shares the proof gate. */}
+        <button
+          disabled={proofPendingGate}
+          class={cn(
+            'inline-flex items-center gap-1 rounded-sm px-2 py-1 text-xs transition-colors',
+            proofPendingGate && 'cursor-not-allowed opacity-40',
+            comment.status === 'VERIFIED'
+              ? 'border border-blue-500/40 bg-blue-500/20 text-blue-300'
+              : 'border border-night-500 bg-night-700 hover:bg-blue-500/15 hover:text-blue-300'
+          )}
+          data-action="status"
+          data-value={comment.status === 'VERIFIED' ? 'APPROVED' : 'VERIFIED'}
+          data-comment-id={comment.id}
+          data-user-id={user.id}
+          title={
+            proofPendingGate
+              ? 'Resolve the private proof before verifying'
+              : comment.status === 'VERIFIED'
+                ? 'Remove the verified badge'
+                : 'Approve and mark as verified'
+          }
+        >
+          <Icon name="ri:verified-badge-line" class="size-3.5" />
+          <span>{comment.status === 'VERIFIED' ? 'Unverify' : 'Verify'}</span>
+        </button>
+      </div>
       {
-        (['APPROVE', 'REJECT', 'HOLD'] as const).map((act) => {
-          const meta = humanActionMeta[act]
-          const effectiveAction: ModerationAction | null =
-            comment.humanAction ??
-            (comment.status === 'APPROVED' || comment.status === 'VERIFIED'
-              ? 'APPROVE'
-              : comment.status === 'REJECTED'
-                ? 'REJECT'
-                : comment.status === 'PENDING'
-                  ? 'HOLD'
-                  : null)
-          const isActive = effectiveAction === act
-          return (
-            <button
-              class={cn(
-                'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-                isActive ? meta.activeClasses : meta.hoverClasses
-              )}
-              data-action="human-action"
-              data-value={act}
-              data-comment-id={comment.id}
-              data-user-id={user.id}
-            >
-              <Icon name={meta.icon} class="size-3.5" />
-              <span>{meta.label}</span>
-            </button>
-          )
-        })
-      }
-
-      <div class="h-5 w-px bg-night-500"></div>
-
-      {/* Verify is a mod-direct status elevation, no associated human action */}
-      <button
-        class={cn(
-          'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-          comment.status === 'VERIFIED'
-            ? 'border border-blue-500/30 bg-blue-500/20 text-blue-400'
-            : 'bg-night-700 hover:bg-blue-500/20 hover:text-blue-400'
-        )}
-        data-action="status"
-        data-value={comment.status === 'VERIFIED' ? 'APPROVED' : 'VERIFIED'}
-        data-comment-id={comment.id}
-        data-user-id={user.id}
-      >
-        <Icon name="ri:verified-badge-line" class="size-3.5" />
-        <span>{comment.status === 'VERIFIED' ? 'Unverify' : 'Verify'}</span>
-      </button>
-    </div>
-
-    {
-      /* Issue toggles. Mods can mark/unmark whether the user flagged KYC
-        or funds-blocked problems with the service. Pyworker treats these
-        as hard gates, so accuracy matters. */
-    }
-    <div class="mb-2 flex flex-wrap items-center gap-1 border-b border-night-500 pb-2">
-      <span class="mr-1 text-[10px] text-day-500">Issues:</span>
-      {
-        (
-          [
-            { value: 'KYC_REQUESTED', label: 'KYC issue', icon: 'ri:bank-card-line' },
-            { value: 'FUNDS_BLOCKED', label: 'Funds blocked', icon: 'ri:lock-line' },
-          ] as const
-        ).map((issue) => {
-          const active = comment.issues.includes(issue.value)
-          return (
-            <button
-              class={cn(
-                'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-                active
-                  ? 'border border-red-500/30 bg-red-500/20 text-red-400'
-                  : 'bg-night-700 hover:bg-red-500/20 hover:text-red-400'
-              )}
-              data-action={active ? 'remove-issue' : 'add-issue'}
-              data-value={issue.value}
-              data-comment-id={comment.id}
-              data-user-id={user.id}
-              title={active ? 'Click to clear this issue flag' : 'Mark this comment as reporting the issue'}
-            >
-              <Icon name={issue.icon} class="size-3.5" />
-              <span>{active ? issue.label : `Mark ${issue.label}`}</span>
-            </button>
-          )
-        })
+        proofPendingGate && (
+          <p class="mt-1.5 flex items-center gap-1 text-[10px] text-amber-300">
+            <Icon name="ri:lock-line" class="size-3 shrink-0" />
+            Resolve the private proof below (approve, reject, or withdraw) before approving this review.
+          </p>
+        )
       }
     </div>
 
+    {/* PRIVATE PROOF: a gate, so it sits right under the decision and is
+        highlighted while pending. */}
     {
-      /* Mute controls. `ratingMuted` is the unified flag: when true it
-        always disables the rating from counting; when the reason is
-        SUSPICIOUS_PATTERN or TEMPLATE_SPAM it also collapses the comment,
-        adds the "Potential SPAM" badge, and sinks the row to the bottom of
-        the thread (see CommentItem.astro + commentsWithReplies.ts).
-
-        Mute Rating only shows for rated root comments — for replies and
-        unrated comments the only meaningful mute is spam, so the Spam
-        button stands alone there and doubles as a toggle (click an active
-        Spam button to clear the mute). */
-    }
-    {
-      (() => {
-        const canMuteRating = comment.rating !== null && !comment.parentId
-        const isSpamReason =
-          comment.ratingMuted &&
-          (comment.ratingMuteReason === 'TEMPLATE_SPAM' || comment.ratingMuteReason === 'SUSPICIOUS_PATTERN')
-        return (
-          <div class="mb-2 flex flex-wrap items-center gap-1.5 border-b border-night-500 pb-2">
-            <span class="mr-1 text-[10px] text-day-500">{canMuteRating ? 'Rating:' : 'Mute:'}</span>
-
-            {canMuteRating && (
+      comment.privateProof && (
+        <div
+          class={cn(
+            'space-y-1.5 rounded-md border p-2',
+            proofPendingGate ? 'border-amber-500/40 bg-amber-500/5' : 'border-night-500 bg-night-800/40'
+          )}
+        >
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span class={cn(sectionLabel, 'flex items-center gap-1')}>
+              <Icon name="ri:key-2-line" class="size-3" />
+              Private proof
+            </span>
+            <span class="min-w-0 flex-1 rounded-sm bg-night-700 px-1.5 py-0.5 text-[11px] break-all text-day-200">
+              {comment.privateProof}
+            </span>
+          </div>
+          <p class="text-[10px] leading-snug text-day-500">
+            Approve only when this Order ID maps to a completed swap, a refund, or a real reported issue. An
+            order that is unpaid, expired, abandoned, or unrelated to the review is not enough.
+          </p>
+          <div class="flex flex-wrap items-center gap-1">
+            {proofStatusMeta.map((s) => (
               <button
                 class={cn(
                   'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-                  comment.ratingMuted
-                    ? 'border border-orange-500/30 bg-orange-500/20 text-orange-400'
-                    : 'bg-night-700 hover:bg-orange-500/20 hover:text-orange-400'
+                  comment.privateProofStatus === s.value ? s.active : s.hover
                 )}
-                data-action="rating-mute"
-                data-value={(!comment.ratingMuted).toString()}
+                data-action="private-proof-status"
+                data-value={s.value}
                 data-comment-id={comment.id}
                 data-user-id={user.id}
-                title="Mute the rating so it stops counting toward the service score. The comment stays visible unless the reason is also marked as spam."
               >
-                <Icon
-                  name={comment.ratingMuted ? 'ri:volume-up-line' : 'ri:volume-mute-line'}
-                  class="size-3.5"
-                />
-                <span>{comment.ratingMuted ? 'Unmute Rating' : 'Mute Rating'}</span>
+                <Icon name={s.icon} class="size-3.5" />
+                <span>{s.label}</span>
               </button>
-            )}
-
-            {/* Spam shortcut. In the rated-root context it's purely additive
-              (Mute Rating handles unmuting). In the reply / unrated context
-              it doubles as a toggle: clicking an active Spam button clears
-              the mute entirely, since there's no Mute Rating button to do
-              that job. */}
-            <button
-              class={cn(
-                'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-                isSpamReason
-                  ? 'border border-red-500/30 bg-red-500/20 text-red-400'
-                  : 'bg-night-700 hover:bg-red-500/20 hover:text-red-400'
-              )}
-              data-action={!canMuteRating && isSpamReason ? 'rating-mute' : 'rating-mute-reason'}
-              data-value={!canMuteRating && isSpamReason ? 'false' : 'TEMPLATE_SPAM'}
-              data-comment-id={comment.id}
-              data-user-id={user.id}
-              title={
-                isSpamReason
-                  ? canMuteRating
-                    ? 'This comment is currently flagged as spam. Use Unmute Rating to clear, or pick a different reason below.'
-                    : 'Click to clear the spam flag on this comment.'
-                  : 'Mark as spam: collapses the comment, adds the SPAM badge, sinks it to the bottom of the thread.'
-              }
-            >
-              <Icon name="ri:spam-2-line" class="size-3.5" />
-              <span>{isSpamReason ? (canMuteRating ? 'Spam' : 'Unmark spam') : 'Mark spam'}</span>
-            </button>
-
-            {comment.ratingMuted && (
-              <label class="inline-flex items-center gap-1 text-[10px] text-day-500">
-                Reason:
-                <select
-                  class="rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
-                  data-action="rating-mute-reason"
-                  data-comment-id={comment.id}
-                  data-user-id={user.id}
-                  title="Suspicious pattern and Template spam additionally collapse and grey out the comment. Other reasons leave the comment displayed normally."
-                >
-                  {muteReasonOptions.map((opt) => (
-                    <option value={opt.value} selected={comment.ratingMuteReason === opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+            ))}
           </div>
-        )
-      })()
-    }
-
-    {/* Rating trust display. Hidden in compact mode (shown in Context panel). */}
-    {
-      !compact && comment.rating !== null && (
-        <div class="mb-2 rounded-sm border border-night-500 bg-night-700 px-1.5 py-1 text-[10px] text-day-400">
-          <span class="font-medium text-day-300">Rating trust:</span> {comment.ratingTrustLabel ?? 'Unknown'}{' '}
-          · weight {comment.ratingWeight.toFixed(2)}
-          {comment.ratingTrustReason && <span> · {comment.ratingTrustReason}</span>}
         </div>
       )
     }
 
-    {/* Notes. In compact mode, three columns side-by-side. */}
-    <div class={cn('space-y-1.5', compact && 'md:grid md:grid-cols-3 md:gap-3 md:space-y-0')}>
-      <div class="space-y-1">
-        <label class="block text-[10px] font-medium text-day-400">
-          <Icon name="ri:global-line" class="mr-0.5 inline size-3 align-[-0.15em] text-emerald-400" />
-          Public note <span class="text-day-600">(visible to everyone)</span>
-        </label>
-        <textarea
-          rows="2"
-          placeholder="Add a context note..."
-          class="field-sizing-content w-full resize-y rounded-sm border border-night-500 bg-night-700 px-2 py-1 text-xs leading-snug outline-hidden focus:ring-1 focus:ring-blue-500"
-          data-action="public-note"
-          data-comment-id={comment.id}
-          data-user-id={user.id}>{comment.publicNote ?? ''}</textarea
-        >
-        <details class="mt-1">
-          <summary class="cursor-pointer text-[10px] text-day-500 hover:text-day-300"> Presets </summary>
-          <div class="mt-1 flex flex-wrap gap-1">
-            {
-              communityNotePresets.map((preset) => (
-                <button
-                  type="button"
-                  class="rounded-sm bg-night-700 px-1.5 py-0.5 text-[10px] text-day-400 transition-colors hover:bg-blue-500/20 hover:text-blue-300"
-                  data-public-note-preset={preset}
-                  data-comment-id={comment.id}
-                >
-                  {preset}
-                </button>
-              ))
-            }
-          </div>
-        </details>
+    {/* Adjustments: quick toggles kept compact and on one band each. */}
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <div class="flex flex-wrap items-center gap-1">
+        <span class={cn(sectionLabel, 'mr-0.5')}>Issues</span>
+        {
+          (
+            [
+              { value: 'KYC_REQUESTED', label: 'KYC', icon: 'ri:bank-card-line' },
+              { value: 'FUNDS_BLOCKED', label: 'Funds blocked', icon: 'ri:lock-line' },
+            ] as const
+          ).map((issue) => {
+            const active = comment.issues.includes(issue.value)
+            return (
+              <button
+                class={cn(
+                  'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
+                  active
+                    ? 'border border-red-500/40 bg-red-500/20 text-red-300'
+                    : 'border border-night-500 bg-night-700 hover:bg-red-500/15 hover:text-red-300'
+                )}
+                data-action={active ? 'remove-issue' : 'add-issue'}
+                data-value={issue.value}
+                data-comment-id={comment.id}
+                data-user-id={user.id}
+                title={active ? 'Click to clear this issue flag' : 'Mark this comment as reporting the issue'}
+              >
+                <Icon name={issue.icon} class="size-3.5" />
+                <span>{issue.label}</span>
+              </button>
+            )
+          })
+        }
       </div>
 
-      <div class="space-y-1">
-        <label class="block text-[10px] font-medium text-day-400">
-          <Icon name="ri:shield-keyhole-line" class="mr-0.5 inline size-3 align-[-0.15em] text-amber-400" />
-          Admin note <span class="text-day-600">(mods only)</span>
-        </label>
-        <textarea
-          rows="2"
-          placeholder="Internal note..."
-          class="field-sizing-content w-full resize-y rounded-sm border border-night-500 bg-night-700 px-2 py-1 text-xs leading-snug outline-hidden focus:ring-1 focus:ring-blue-500"
-          data-action="admin-note"
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class={cn(sectionLabel, 'mr-0.5')}>Rating</span>
+        {
+          canMuteRating && (
+            <button
+              class={cn(
+                'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
+                comment.ratingMuted
+                  ? 'border border-orange-500/40 bg-orange-500/20 text-orange-300'
+                  : 'border border-night-500 bg-night-700 hover:bg-orange-500/15 hover:text-orange-300'
+              )}
+              data-action="rating-mute"
+              data-value={(!comment.ratingMuted).toString()}
+              data-comment-id={comment.id}
+              data-user-id={user.id}
+              title="Mute the rating so it stops counting toward the service score. The comment stays visible unless the reason is also marked as spam."
+            >
+              <Icon
+                name={comment.ratingMuted ? 'ri:volume-up-line' : 'ri:volume-mute-line'}
+                class="size-3.5"
+              />
+              <span>{comment.ratingMuted ? 'Counted' : 'Mute'}</span>
+            </button>
+          )
+        }
+        <button
+          class={cn(
+            'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
+            isSpamReason
+              ? 'border border-red-500/40 bg-red-500/20 text-red-300'
+              : 'border border-night-500 bg-night-700 hover:bg-red-500/15 hover:text-red-300'
+          )}
+          data-action={!canMuteRating && isSpamReason ? 'rating-mute' : 'rating-mute-reason'}
+          data-value={!canMuteRating && isSpamReason ? 'false' : 'TEMPLATE_SPAM'}
           data-comment-id={comment.id}
-          data-user-id={user.id}>{comment.adminNote ?? ''}</textarea
+          data-user-id={user.id}
+          title={
+            isSpamReason
+              ? canMuteRating
+                ? 'Flagged as spam. Use Counted/Mute to change, or pick a reason.'
+                : 'Click to clear the spam flag on this comment.'
+              : 'Mark as spam: collapses the comment, adds the SPAM badge, sinks it to the bottom of the thread.'
+          }
         >
-      </div>
-
-      <div class="space-y-1">
-        <label class="block text-[10px] font-medium text-day-400">
-          <Icon name="ri:user-line" class="mr-0.5 inline size-3 align-[-0.15em] text-sky-400" />
-          Author note <span class="text-day-600">(author + mods)</span>
-        </label>
-        <textarea
-          rows="2"
-          placeholder="Visible to comment author..."
-          class="field-sizing-content w-full resize-y rounded-sm border border-night-500 bg-night-700 px-2 py-1 text-xs leading-snug outline-hidden focus:ring-1 focus:ring-blue-500"
-          data-action="author-note"
-          data-comment-id={comment.id}
-          data-user-id={user.id}>{comment.authorNote ?? ''}</textarea
-        >
+          <Icon name="ri:spam-2-line" class="size-3.5" />
+          <span>{isSpamReason ? (canMuteRating ? 'Spam' : 'Unmark spam') : 'Spam'}</span>
+        </button>
+        {
+          comment.ratingMuted && (
+            <select
+              class="rounded-sm border border-night-500 bg-night-700 px-1.5 py-0.5 text-xs outline-hidden focus:ring-1 focus:ring-blue-500"
+              data-action="rating-mute-reason"
+              data-comment-id={comment.id}
+              data-user-id={user.id}
+              title="Suspicious pattern and Template spam additionally collapse and grey out the comment. Other reasons leave the comment displayed normally."
+            >
+              {muteReasonOptions.map((opt) => (
+                <option value={opt.value} selected={comment.ratingMuteReason === opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          )
+        }
       </div>
     </div>
-    <div class="space-y-1.5">
-      {/* Private proof */}
-      {
-        comment.privateProof && (
-          <div class="mt-3 space-y-1.5 border-t border-night-500 pt-2">
-            <div class="flex min-w-0 items-start gap-1.5">
-              <span class="shrink-0 text-[10px] text-day-500">Private proof:</span>
-              <div class="min-w-0 flex-1 rounded-sm bg-night-700 px-1.5 py-0.5 text-xs break-all">
-                {comment.privateProof}
-              </div>
-            </div>
 
-            <p class="text-[10px] leading-snug text-day-500">
-              Approve only when this Order ID maps to a completed swap, a refund, or a real reported issue.
-              An order that is unpaid, expired, abandoned, or unrelated to the review is not enough.
-            </p>
-
-            <div class="flex items-center gap-1.5">
-              <span class="text-[10px] text-day-500">Status:</span>
-              <div class="flex gap-1">
-                <button
-                  class={cn(
-                    'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-                    comment.privateProofStatus === 'APPROVED'
-                      ? 'border border-green-500/30 bg-green-500/20 text-green-400'
-                      : 'bg-night-700 hover:bg-green-500/20 hover:text-green-400'
-                  )}
-                  data-action="private-proof-status"
-                  data-value="APPROVED"
-                  data-comment-id={comment.id}
-                  data-user-id={user.id}
-                >
-                  <Icon name="ri:check-line" class="size-3.5" />
-                  <span>Approve</span>
-                </button>
-                <button
-                  class={cn(
-                    'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-                    comment.privateProofStatus === 'REJECTED'
-                      ? 'border border-red-500/30 bg-red-500/20 text-red-400'
-                      : 'bg-night-700 hover:bg-red-500/20 hover:text-red-400'
-                  )}
-                  data-action="private-proof-status"
-                  data-value="REJECTED"
-                  data-comment-id={comment.id}
-                  data-user-id={user.id}
-                >
-                  <Icon name="ri:close-line" class="size-3.5" />
-                  <span>Reject</span>
-                </button>
-                <button
-                  class={cn(
-                    'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-                    comment.privateProofStatus === 'PENDING'
-                      ? 'border border-blue-500/30 bg-blue-500/20 text-blue-400'
-                      : 'bg-night-700 hover:bg-blue-500/20 hover:text-blue-400'
-                  )}
-                  data-action="private-proof-status"
-                  data-value="PENDING"
-                  data-comment-id={comment.id}
-                  data-user-id={user.id}
-                >
-                  <Icon name="ri:time-line" class="size-3.5" />
-                  <span>Pending</span>
-                </button>
-                <button
-                  class={cn(
-                    'inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
-                    comment.privateProofStatus === 'WITHDRAWN'
-                      ? 'border border-night-400 bg-night-500/50 text-night-300'
-                      : 'bg-night-700 hover:bg-night-500/50 hover:text-night-300'
-                  )}
-                  data-action="private-proof-status"
-                  data-value="WITHDRAWN"
-                  data-comment-id={comment.id}
-                  data-user-id={user.id}
-                >
-                  <Icon name="ri:arrow-go-back-line" class="size-3.5" />
-                  <span>Withdrawn</span>
-                </button>
-              </div>
+    {/* Notes: least-used and the most verbose (the AI dump lands in the admin
+        note), so they are collapsed by default to keep the view calm. */}
+    <details class="group/notes rounded-md border border-night-500 bg-night-800/40">
+      <summary class="flex cursor-pointer list-none items-center gap-1 px-2 py-1.5 text-[10px] font-semibold tracking-wide text-day-500 uppercase select-none hover:text-day-300">
+        <Icon name="ri:sticky-note-line" class="size-3" />
+        Notes
+        <span class="font-normal lowercase">(public · admin · author)</span>
+        <Icon name="ri:arrow-down-s-line" class="ml-auto size-3.5 transition-transform group-open/notes:rotate-180" />
+      </summary>
+      <div class={cn('px-2 pb-2', compact ? 'space-y-2 md:grid md:grid-cols-3 md:gap-3 md:space-y-0' : 'space-y-2')}>
+        <div class="space-y-1">
+          <label class="block space-y-1">
+            <span class="block text-[10px] font-medium text-day-400">
+              <Icon name="ri:global-line" class="mr-0.5 inline size-3 align-[-0.15em] text-emerald-400" />
+              Public note <span class="text-day-600">(everyone)</span>
+            </span>
+            <textarea
+              rows="2"
+              placeholder="Add a context note..."
+              class={noteFieldClass}
+              data-action="public-note"
+              data-comment-id={comment.id}
+              data-user-id={user.id}>{comment.publicNote ?? ''}</textarea
+            >
+          </label>
+          <details class="mt-1">
+            <summary class="cursor-pointer text-[10px] text-day-500 hover:text-day-300"> Presets </summary>
+            <div class="mt-1 flex flex-wrap gap-1">
+              {
+                communityNotePresets.map((preset) => (
+                  <button
+                    type="button"
+                    class="rounded-sm bg-night-700 px-1.5 py-0.5 text-[10px] text-day-400 transition-colors hover:bg-blue-500/20 hover:text-blue-300"
+                    data-public-note-preset={preset}
+                    data-comment-id={comment.id}
+                  >
+                    {preset}
+                  </button>
+                ))
+              }
             </div>
-          </div>
-        )
-      }
-    </div>
+          </details>
+        </div>
+
+        <div class="space-y-1">
+          <label class="block space-y-1">
+            <span class="block text-[10px] font-medium text-day-400">
+              <Icon name="ri:shield-keyhole-line" class="mr-0.5 inline size-3 align-[-0.15em] text-amber-400" />
+              Admin note <span class="text-day-600">(mods only)</span>
+            </span>
+            <textarea
+              rows="2"
+              placeholder="Internal note..."
+              class={noteFieldClass}
+              data-action="admin-note"
+              data-comment-id={comment.id}
+              data-user-id={user.id}>{comment.adminNote ?? ''}</textarea
+            >
+          </label>
+        </div>
+
+        <div class="space-y-1">
+          <label class="block space-y-1">
+            <span class="block text-[10px] font-medium text-day-400">
+              <Icon name="ri:user-line" class="mr-0.5 inline size-3 align-[-0.15em] text-sky-400" />
+              Author note <span class="text-day-600">(author + mods)</span>
+            </span>
+            <textarea
+              rows="2"
+              placeholder="Visible to comment author..."
+              class={noteFieldClass}
+              data-action="author-note"
+              data-comment-id={comment.id}
+              data-user-id={user.id}>{comment.authorNote ?? ''}</textarea
+            >
+          </label>
+        </div>
+      </div>
+    </details>
   </div>
 </div>
 

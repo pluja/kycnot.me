@@ -12,6 +12,7 @@ import {
 } from '../../constants/adminCommentSortOptions'
 import {
   commentStatusFilters,
+  commentStatusFiltersById,
   commentStatusFiltersZodEnum,
   getCommentStatusFilterInfo,
 } from '../../constants/commentStatusFilters'
@@ -21,6 +22,7 @@ import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
 import { prisma } from '../../lib/prisma'
 import { urlWithParams } from '../../lib/urls'
 
+import type { CommentStatusFilter } from '../../constants/commentStatusFilters'
 import type { CommentStatus, Prisma, VerificationStatus } from '@prisma/client'
 
 if (!Astro.locals.userCan('comments:moderate')) {
@@ -46,6 +48,39 @@ const PRIORITY_PAGE_SIZE = 30
 
 const statusFilter = getCommentStatusFilterInfo(params.status)
 const sortBy = getAdminCommentSortOptionInfo(params['sort-by'])
+
+// Legend for the left-border ribbon on each row. Mirrors AdminCommentRow's
+// ribbonClass (Spam is the override that wins over the lifecycle status).
+const ribbonLegend = [
+  { label: 'Pending', swatch: 'bg-yellow-600' },
+  { label: 'Approved', swatch: 'bg-green-700' },
+  { label: 'Verified', swatch: 'bg-cyan-700' },
+  { label: 'Rejected', swatch: 'bg-red-700' },
+  { label: 'Spam', swatch: 'bg-orange-700' },
+] as const
+
+// The filter list is long; only the everyday filters stay as visible pills.
+// The rest live in a grouped "More filters" dropdown so the header stays short.
+const primaryFilterValues: CommentStatusFilter[] = ['all', 'mod-work', 'pending', 'rejected']
+const filterGroups: { label: string; values: CommentStatusFilter[] }[] = [
+  { label: 'Status', values: ['approved', 'verified'] },
+  { label: 'Queue', values: ['needs-human', 'on-hold', 'unmoderated-by-ai'] },
+  { label: 'AI', values: ['ai-reject', 'ai-auto-decided', 'brigade'] },
+  {
+    label: 'Flags',
+    values: ['suspicious', 'rating-muted', 'has-proof', 'proof-pending', 'issue-kyc', 'issue-funds', 'affiliated'],
+  },
+]
+
+const primaryFilters = primaryFilterValues.map((value) => commentStatusFiltersById[value])
+// Safety net: any filter not listed above still appears under "Other" so a
+// newly added filter can never become unreachable.
+const placedValues = new Set<string>([...primaryFilterValues, ...filterGroups.flatMap((g) => g.values)])
+const ungrouped = commentStatusFilters.filter((f) => !placedValues.has(f.value))
+const moreFilterGroups = ungrouped.length
+  ? [...filterGroups, { label: 'Other', values: ungrouped.map((f) => f.value) }]
+  : filterGroups
+const activeFilterInMore = !primaryFilterValues.includes(params.status)
 
 const listedServiceStatuses = ['APPROVED', 'VERIFICATION_SUCCESS'] satisfies VerificationStatus[]
 const pendingCommentStatuses = ['PENDING'] satisfies CommentStatus[]
@@ -80,6 +115,7 @@ const commentSelect = {
   content: true,
   status: true,
   moderationState: true,
+  parentId: true,
   rating: true,
   ratingActive: true,
   ratingMuted: true,
@@ -226,7 +262,7 @@ const makePriorityPageUrl = (page: number) => {
 <BaseLayout pageTitle="Comment Moderation" widthClassName="max-w-screen-2xl">
   <div class="mb-4 flex items-baseline justify-between gap-3">
     <h1 class="font-title text-2xl text-green-500">&gt; comments.moderate</h1>
-    <details id="hotkey-help" class="group relative">
+    <details id="hotkey-help" data-dismissible class="group relative">
       <summary
         class="inline-flex cursor-pointer list-none items-center gap-1 rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
       >
@@ -308,16 +344,12 @@ const makePriorityPageUrl = (page: number) => {
     </a>
   </div>
 
-  <!-- Filters -->
-  <div class="mb-3 flex flex-wrap gap-1.5">
+  <!-- Filters: a few everyday pills + a grouped dropdown for the rest. -->
+  <div class="mb-3 flex flex-wrap items-center gap-1.5">
     {
-      commentStatusFilters.map((filter) => (
+      primaryFilters.map((filter) => (
         <a
-          href={urlWithParams(Astro.url, {
-            status: filter.value,
-            page: null,
-            'priority-page': null,
-          })}
+          href={urlWithParams(Astro.url, { status: filter.value, page: null, 'priority-page': null })}
           class={cn(
             'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs',
             params.status === filter.value
@@ -330,6 +362,51 @@ const makePriorityPageUrl = (page: number) => {
         </a>
       ))
     }
+
+    <details data-dismissible class="group/filters relative">
+      <summary
+        class={cn(
+          'flex cursor-pointer list-none items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs select-none',
+          activeFilterInMore
+            ? statusFilter.classNames.filter
+            : 'border-zinc-700 transition-colors hover:border-green-500/50'
+        )}
+      >
+        <Icon name={activeFilterInMore ? statusFilter.icon : 'ri:filter-3-line'} class="size-3.5 shrink-0" />
+        {activeFilterInMore ? statusFilter.label : 'More filters'}
+        <Icon name="ri:arrow-down-s-line" class="size-3.5 transition-transform group-open/filters:rotate-180" />
+      </summary>
+      <div
+        class="absolute left-0 z-20 mt-1 w-[min(92vw,32rem)] space-y-2.5 rounded-md border border-zinc-700 bg-night-800 p-3 shadow-lg"
+      >
+        {
+          moreFilterGroups.map((group) => (
+            <div class="space-y-1">
+              <div class="text-[10px] font-semibold tracking-wide text-day-600 uppercase">{group.label}</div>
+              <div class="flex flex-wrap gap-1">
+                {group.values.map((value) => {
+                  const filter = commentStatusFiltersById[value]
+                  return (
+                    <a
+                      href={urlWithParams(Astro.url, { status: value, page: null, 'priority-page': null })}
+                      class={cn(
+                        'flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs',
+                        params.status === value
+                          ? filter.classNames.filter
+                          : 'border-zinc-700 transition-colors hover:border-green-500/50'
+                      )}
+                    >
+                      <Icon name={filter.icon} class="size-3.5 shrink-0" />
+                      {filter.label}
+                    </a>
+                  )
+                })}
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </details>
   </div>
 
   <!-- Sort -->
@@ -362,6 +439,19 @@ const makePriorityPageUrl = (page: number) => {
       ))
     }
     <span class="text-zinc-500">{params['sort-order'] === 'desc' ? 'newest' : 'oldest'} first</span>
+
+    {/* Ribbon color legend, kept on the sort line to save vertical space. */}
+    <span class="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-day-500">
+      <span class="text-[10px] font-semibold tracking-wide text-day-600 uppercase">Row color</span>
+      {
+        ribbonLegend.map((item) => (
+          <span class="flex items-center gap-1.5">
+            <span class={cn('inline-block h-3 w-1 rounded-full', item.swatch)} />
+            {item.label}
+          </span>
+        ))
+      }
+    </span>
   </div>
 
   <!-- Priority section: pending on listed services -->
@@ -544,6 +634,33 @@ const makePriorityPageUrl = (page: number) => {
           break
         }
       }
+    })
+  })
+</script>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Dismiss open dropdowns (filters menu, shortcuts panel)  //
+  // on an outside click or Escape. The panels are plain     //
+  // <details>, so they still work without this; it only     //
+  // adds the close-on-outside-click niceties. Closing is    //
+  // idempotent, so re-running on navigation is harmless.    //
+  ////////////////////////////////////////////////////////////
+  document.addEventListener('astro:page-load', () => {
+    const closeAll = (except: Element | null) => {
+      document.querySelectorAll<HTMLDetailsElement>('details[data-dismissible][open]').forEach((details) => {
+        if (details !== except) details.open = false
+      })
+    }
+
+    document.addEventListener('click', (event) => {
+      const target = event.target as Node | null
+      const insideDetails = target instanceof Element ? target.closest('details[data-dismissible]') : null
+      closeAll(insideDetails)
+    })
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeAll(null)
     })
   })
 </script>

@@ -2,11 +2,11 @@
 import { Icon } from 'astro-icon/components'
 import { differenceInDays } from 'date-fns'
 
+import { cn } from '../../../lib/cn'
 import BadgeSmall from '../../BadgeSmall.astro'
 import TimeFormatted from '../../TimeFormatted.astro'
 import Tooltip from '../../Tooltip.astro'
 
-import { cn } from '../../../lib/cn'
 
 import type {
   CommentIssueType,
@@ -44,7 +44,7 @@ type Props = HTMLAttributes<'div'> & {
 const { comment, class: className, ...htmlProps } = Astro.props
 
 const accountAgeDays = differenceInDays(new Date(), comment.author.createdAt)
-const accountAgeLabel = accountAgeDays === 0 ? 'Today' : `${accountAgeDays.toLocaleString()}d old`
+const accountAgeLabel = accountAgeDays === 0 ? 'today' : `${accountAgeDays.toLocaleString()}d old`
 const commentCount = comment.author._count.comments
 const commentCountLabel = `${commentCount.toLocaleString()} ${commentCount === 1 ? 'comment' : 'comments'}`
 const ratingInfluence = Math.round(comment.ratingWeight * 100)
@@ -69,121 +69,123 @@ const muteReasonLabels: Record<RatingMuteReason, string> = {
   MODERATOR_DISCRETION: 'Moderator discretion',
 }
 
-const proofColor: Record<PrivateProofStatus, TailwindColor> = {
-  APPROVED: 'green',
-  REJECTED: 'red',
-  PENDING: 'purple',
-  WITHDRAWN: 'gray',
+const proofTextClass: Record<PrivateProofStatus, string> = {
+  APPROVED: 'text-green-400',
+  REJECTED: 'text-red-400',
+  PENDING: 'text-purple-300',
+  WITHDRAWN: 'text-day-500',
 }
 
-type TailwindColor = Parameters<typeof BadgeSmall>[0]['color']
+// Color only the alarming author signals so the eye lands on what should move
+// a decision (new account, negative karma, first-timer). Everything else stays
+// neutral.
+const karmaClass =
+  comment.author.totalKarma < 0
+    ? 'text-red-400 font-medium'
+    : comment.author.totalKarma >= 25
+      ? 'text-lime-400'
+      : 'text-day-300'
+const ageClass = accountAgeDays < 7 ? 'text-purple-300' : 'text-day-300'
+const countClass = commentCount <= 1 ? 'text-yellow-300' : 'text-day-300'
+
+const labelClass = 'w-12 shrink-0 text-[10px] font-semibold tracking-wide text-day-600 uppercase'
+const dotClass = 'text-day-700'
 ---
 
-<div {...htmlProps} class:list={['space-y-2', className]}>
-  <!-- Top row: all author + comment metadata badges grouped together. -->
-  <div class="flex flex-wrap items-center gap-1.5 text-xs">
+<div {...htmlProps} class:list={['space-y-1.5 text-xs', className]}>
+  <!-- Author: trust signals, ordered by how much each should move a decision. -->
+  <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+    <span class={labelClass}>Author</span>
+    <Tooltip text="Author karma (trust score)">
+      <span class={karmaClass}>{comment.author.totalKarma.toLocaleString()} karma</span>
+    </Tooltip>
+    <span class={dotClass}>·</span>
     <Tooltip text={`Account created ${comment.author.createdAt.toLocaleString()}`}>
-      <BadgeSmall
-        icon="ri:user-line"
-        color={accountAgeDays < 7 ? 'purple' : 'gray'}
-        text={accountAgeLabel}
-        inlineIcon
-      />
+      <span class={ageClass}>{accountAgeLabel}</span>
     </Tooltip>
-
-    <Tooltip text={`Last login ${comment.author.lastLoginAt.toLocaleString()}`}>
-      <BadgeSmall icon="ri:login-circle-line" color="gray" inlineIcon>
-        <TimeFormatted date={comment.author.lastLoginAt} hourPrecision />
-      </BadgeSmall>
-    </Tooltip>
-
-    <BadgeSmall
-      icon="ri:sparkling-2-line"
-      color={comment.author.totalKarma >= 25 ? 'lime' : comment.author.totalKarma < 0 ? 'red' : 'gray'}
-      inlineIcon
-    >
-      {comment.author.totalKarma.toLocaleString()} karma
-    </BadgeSmall>
-
-    <BadgeSmall
-      icon="ri:chat-3-line"
-      color={commentCount <= 1 ? 'yellow' : 'gray'}
-      text={commentCountLabel}
-      inlineIcon
-    />
-
+    <span class={dotClass}>·</span>
+    <span class={countClass}>{commentCountLabel}</span>
     {
       comment.author.verified && (
         <BadgeSmall icon="ri:verified-badge-fill" color="cyan" text="Verified" inlineIcon />
       )
     }
     {comment.author.spammer && <BadgeSmall icon="ri:spam-2-fill" color="red" text="Spammer" inlineIcon />}
+    <span class={dotClass}>·</span>
+    <Tooltip text={`Last login ${comment.author.lastLoginAt.toLocaleString()}`}>
+      <span class="text-day-500">seen <TimeFormatted date={comment.author.lastLoginAt} hourPrecision /></span>
+    </Tooltip>
+  </div>
 
-    {/* Issues and proof live in the same band so all metadata badges read as one group. */}
+  <!-- This review: how the rating is treated, then the claims flagged on it. -->
+  <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+    <span class={labelClass}>Review</span>
+    {
+      comment.rating !== null ? (
+        <>
+          <span
+            class={cn(
+              'flex items-center gap-0.5',
+              ratingCounts ? 'text-yellow-400' : 'text-zinc-500 line-through decoration-zinc-600'
+            )}
+            title={`User rating: ${comment.rating}/5`}
+          >
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Icon name={i < (comment.rating ?? 0) ? 'ri:star-fill' : 'ri:star-line'} class="size-3.5" />
+            ))}
+            <span class="ml-0.5 text-[11px] font-medium">{comment.rating}/5</span>
+          </span>
+          <Tooltip text={comment.ratingTrustReason ?? 'Rating trust'}>
+            <span class="text-[11px] text-day-500">
+              {ratingCounts ? (
+                <>
+                  counts · weight <span class="text-day-200">{comment.ratingWeight.toFixed(2)}</span> ·{' '}
+                  {ratingInfluence}% influence
+                </>
+              ) : (
+                <>
+                  not counted
+                  {comment.ratingMuted && comment.ratingMuteReason
+                    ? ` · ${muteReasonLabels[comment.ratingMuteReason]}`
+                    : comment.ratingTrustReason
+                      ? ` · ${comment.ratingTrustReason}`
+                      : ''}
+                </>
+              )}
+            </span>
+          </Tooltip>
+        </>
+      ) : (
+        <span class="text-day-500">No rating</span>
+      )
+    }
     {
       comment.issues.map((issue) => (
-        <BadgeSmall icon="ri:alert-line" color="red" text={issueLabels[issue]} inlineIcon />
+        <>
+          <span class={dotClass}>·</span>
+          <span class="flex items-center gap-0.5 text-red-400" title="Issue flagged on this review">
+            <Icon name="ri:alert-line" class="size-3" />
+            {issueLabels[issue]}
+          </span>
+        </>
       ))
     }
     {
       comment.privateProof && (
-        <BadgeSmall
-          icon="ri:key-2-line"
-          color={comment.privateProofStatus ? proofColor[comment.privateProofStatus] : 'purple'}
-          text={`Proof ${comment.privateProofStatus?.toLowerCase() ?? 'pending'}`}
-          inlineIcon
-        />
+        <>
+          <span class={dotClass}>·</span>
+          <span
+            class={cn(
+              'flex items-center gap-0.5',
+              comment.privateProofStatus ? proofTextClass[comment.privateProofStatus] : 'text-purple-300'
+            )}
+            title="Private proof of usage attached to this review"
+          >
+            <Icon name="ri:key-2-line" class="size-3" />
+            proof {comment.privateProofStatus?.toLowerCase() ?? 'pending'}
+          </span>
+        </>
       )
     }
   </div>
-
-  <!-- Rating row stands alone so the score is easy to read. -->
-  {
-    comment.rating !== null && (
-      <div class="flex flex-wrap items-center gap-2 rounded-md bg-night-800/60 px-2 py-1.5">
-        <div
-          class={cn(
-            'flex items-center gap-0.5',
-            ratingCounts ? 'text-yellow-400' : 'text-zinc-500 line-through decoration-zinc-600'
-          )}
-          title={`User rating: ${comment.rating}/5`}
-        >
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Icon
-              name={i < (comment.rating ?? 0) ? 'ri:star-fill' : 'ri:star-line'}
-              class="size-3.5"
-            />
-          ))}
-          <span class="ml-1 text-[11px] font-medium">{comment.rating}/5</span>
-        </div>
-
-        <span class="text-zinc-700">·</span>
-
-        <Tooltip text={comment.ratingTrustReason ?? 'Rating trust reason'}>
-          <span class="text-[11px] text-day-400">
-            {ratingCounts ? (
-              <>
-                weight <span class="font-medium text-day-200">{comment.ratingWeight.toFixed(2)}</span>
-                {' · '}
-                <span class="text-day-300">{comment.ratingTrustLabel ?? 'counted'}</span>
-                {' · '}
-                <span class="text-day-500">{ratingInfluence}% influence</span>
-              </>
-            ) : (
-              <span class="text-day-500">
-                Not counted
-                {comment.ratingMuted && comment.ratingMuteReason
-                  ? ` · ${muteReasonLabels[comment.ratingMuteReason]}`
-                  : comment.ratingTrustReason
-                    ? ` · ${comment.ratingTrustReason}`
-                    : ''}
-              </span>
-            )}
-          </span>
-        </Tooltip>
-
-      </div>
-    )
-  }
-
 </div>
