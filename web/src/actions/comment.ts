@@ -480,9 +480,18 @@ export const commentActions = {
         const updateData: Prisma.CommentUpdateInput = {}
 
         switch (input.action) {
-          case 'status':
+          case 'status': {
             updateData.status = input.value
+            // A status set from the dropdown is a human decision; record it so
+            // the audit trail captures who acted and moderationState classifies
+            // the row as human-resolved rather than AI-auto-decided. VERIFIED is
+            // an approve-with-badge; PENDING means "send back to the queue".
+            updateData.humanAction =
+              input.value === 'REJECTED' ? 'REJECT' : input.value === 'PENDING' ? 'HOLD' : 'APPROVE'
+            updateData.humanDecidedAt = new Date()
+            updateData.humanDecidedBy = { connect: { id: context.locals.user.id } }
             break
+          }
           case 'human-action': {
             updateData.humanAction = input.value
             updateData.humanDecidedAt = new Date()

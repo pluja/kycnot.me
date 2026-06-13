@@ -20,6 +20,17 @@ enum CommentStatus {
   REJECTED
 }
 
+/// Derived moderation/queue state. Computed via trigger from status +
+/// aiAction + humanAction + aiDecidedAt; it never replaces those columns
+/// (kept raw for AI-vs-human dataset analysis). Every PENDING row resolves to
+/// AWAITING_AI or AWAITING_HUMAN, so a pending comment can never be invisible
+/// to the moderator queue.
+enum CommentModerationState {
+  AWAITING_AI
+  AWAITING_HUMAN
+  RESOLVED
+}
+
 enum PrivateProofStatus {
   PENDING
   APPROVED
@@ -57,6 +68,8 @@ model Comment {
   /// Computed via trigger. Do not update through prisma.
   upvotes Int           @default(0)
   status  CommentStatus @default(PENDING)
+  /// Computed via trigger. Do not update through prisma.
+  moderationState CommentModerationState @default(AWAITING_AI)
 
   content String
   rating  Int?   @db.SmallInt
@@ -127,6 +140,7 @@ model Comment {
 
   @@unique([serviceId, privateProof], name: "unique_privateProof_per_service")
   @@index([status])
+  @@index([moderationState])
   @@index([createdAt])
   @@index([approvedAt])
   @@index([serviceId])

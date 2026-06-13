@@ -9,6 +9,7 @@ import Tooltip from '../../Tooltip.astro'
 import UserBadge from '../../UserBadge.astro'
 import AdminCommentContext from './AdminCommentContext.astro'
 
+import { commentModerationStateById } from '../../../constants/commentModerationState'
 import { commentStatusById } from '../../../constants/commentStatus'
 import { cn } from '../../../lib/cn'
 
@@ -21,6 +22,7 @@ type Props = {
       id: true
       content: true
       status: true
+      moderationState: true
       rating: true
       ratingActive: true
       ratingMuted: true
@@ -196,6 +198,25 @@ const ribbonClass = ratingMutePenalty
     {/* Status is conveyed by the left ribbon color and the highlighted
         action-rail button. The full status badge lives in the expanded
         Context section so the summary stays scannable. */}
+
+    {/* Queue-state chip for the two actionable states. AWAITING_AI is the one
+        the row could otherwise show nothing for (no aiAction yet), which is
+        exactly the case that used to go unnoticed. Resolved rows stay quiet. */}
+    {
+      comment.moderationState !== 'RESOLVED' && (
+        <span
+          class={cn(
+            'inline-flex shrink-0 items-center gap-0.5 rounded-sm px-1.5 py-0.5 text-[10px]',
+            comment.moderationState === 'AWAITING_AI'
+              ? 'bg-zinc-500/15 text-zinc-300'
+              : 'bg-yellow-500/15 text-yellow-300'
+          )}
+        >
+          <Icon name={commentModerationStateById[comment.moderationState].icon} class="size-3" />
+          {commentModerationStateById[comment.moderationState].label}
+        </span>
+      )
+    }
 
     <!-- AI verdict chip. Tooltip spells out the abbreviations. -->
     {

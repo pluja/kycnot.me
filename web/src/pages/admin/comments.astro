@@ -79,6 +79,7 @@ const commentSelect = {
   id: true,
   content: true,
   status: true,
+  moderationState: true,
   rating: true,
   ratingActive: true,
   ratingMuted: true,
@@ -171,17 +172,22 @@ const [comments = [], totalComments = 0] = await Astro.locals.banners.try(
   []
 )
 
+// A comment awaiting AI for longer than this means the worker is likely
+// stuck: the pyworker moderates hourly, so a multi-hour backlog is abnormal.
+const STALE_AWAITING_AI_HOURS = 3
+
 // Header stats. Counts the global table since the user clicks them to jump
 // to that filter, which then applies its own where clause.
 const [headerStats] = await Astro.locals.banners.try(
   'Error fetching dashboard stats',
   async () => {
+    const staleAwaitingAiBefore = new Date(Date.now() - STALE_AWAITING_AI_HOURS * 60 * 60 * 1000)
     const totalPending = await prisma.comment.count({ where: { status: 'PENDING' } })
     const modWork = await prisma.comment.count({
-      where: {
-        status: 'PENDING',
-        OR: [{ aiAction: 'HOLD', humanAction: null }, { humanAction: 'HOLD' }],
-      },
+      where: { moderationState: 'AWAITING_HUMAN' },
+    })
+    const staleAwaitingAi = await prisma.comment.count({
+      where: { moderationState: 'AWAITING_AI', createdAt: { lt: staleAwaitingAiBefore } },
     })
     const brigade = await prisma.comment.count({
       where: { aiIsBrigade: true, status: 'PENDING' },
@@ -189,9 +195,9 @@ const [headerStats] = await Astro.locals.banners.try(
     const proofPending = await prisma.comment.count({
       where: { privateProof: { not: null }, privateProofStatus: 'PENDING', status: 'PENDING' },
     })
-    return [{ totalPending, modWork, brigade, proofPending }]
+    return [{ totalPending, modWork, staleAwaitingAi, brigade, proofPending }]
   },
-  [{ totalPending: 0, modWork: 0, brigade: 0, proofPending: 0 }]
+  [{ totalPending: 0, modWork: 0, staleAwaitingAi: 0, brigade: 0, proofPending: 0 }]
 )
 
 const totalPages = Math.ceil(totalComments / PAGE_SIZE)
@@ -254,6 +260,21 @@ const makePriorityPageUrl = (page: number) => {
       </div>
     </details>
   </div>
+
+  {
+    headerStats.staleAwaitingAi > 0 && (
+      <a
+        href={urlWithParams(Astro.url, { status: 'unmoderated-by-ai', page: null, 'priority-page': null })}
+        class="mb-4 flex items-center gap-2 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300 transition-colors hover:border-red-500/70"
+      >
+        <Icon name="ri:error-warning-line" class="size-4 shrink-0" />
+        <span>
+          <strong>{headerStats.staleAwaitingAi}</strong> comment{headerStats.staleAwaitingAi === 1 ? '' : 's'} have
+          been awaiting AI review for over {STALE_AWAITING_AI_HOURS}h. The moderation worker may be stuck.
+        </span>
+      </a>
+    )
+  }
 
   <!-- Header stats -->
   <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">

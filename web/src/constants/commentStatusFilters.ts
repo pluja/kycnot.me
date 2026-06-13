@@ -51,13 +51,9 @@ export const {
       color: 'yellow',
       icon: 'ri:shield-user-line',
       // The primary moderator queue: fresh AI handoffs plus mod-deferred items.
-      // Pinned to status=PENDING so any code path that flips status without
-      // setting humanAction (e.g. proof-status side-channels) can't leave a
-      // finished row stuck in the queue.
-      whereClause: {
-        status: 'PENDING',
-        OR: [{ aiAction: 'HOLD', humanAction: null }, { humanAction: 'HOLD' }],
-      },
+      // Reads the trigger-maintained moderationState so queue membership is one
+      // column, not a hand-rolled status/aiAction/humanAction combination.
+      whereClause: { moderationState: 'AWAITING_HUMAN' },
       classNames: { filter: 'border-yellow-500 bg-yellow-500/20 text-yellow-400' },
     },
     {
@@ -154,8 +150,9 @@ export const {
       color: 'gray',
       icon: 'ri:robot-2-line',
       // AI hasn't analyzed this comment yet. Pyworker runs hourly, so this
-      // should drain naturally; useful for catching worker outages.
-      whereClause: { aiAction: null, status: 'PENDING' },
+      // should drain naturally; a non-trivial backlog here means the worker is
+      // stuck (see the stale-AI banner on the comments dashboard).
+      whereClause: { moderationState: 'AWAITING_AI' },
       classNames: { filter: 'border-zinc-500 bg-zinc-500/20 text-zinc-300' },
     },
     {
