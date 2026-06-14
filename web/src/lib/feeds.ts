@@ -116,10 +116,14 @@ const eventSelect = {
   title: true,
   content: true,
   type: true,
+  class: true,
   startedAt: true,
   endedAt: true,
   source: true,
   createdAt: true,
+  incident: {
+    select: { severity: true, state: true, resolvedAt: true },
+  },
   service: {
     select: {
       name: true,
@@ -164,7 +168,29 @@ export async function getEventsForService(slug: string | undefined): Promise<
   return { success: true, data: { service, events } }
 }
 
-export async function getEvents(): Promise<
+// Feed views over the events taxonomy. `curated` mirrors the /events default
+// (real events + incidents, hiding the ~2k auto-recorded service changes).
+export const eventFeedViews = ['curated', 'incidents', 'alerts', 'all'] as const
+export type EventFeedView = (typeof eventFeedViews)[number]
+
+export function isEventFeedView(value: string | null | undefined): value is EventFeedView {
+  return value != null && (eventFeedViews as readonly string[]).includes(value)
+}
+
+function eventViewWhere(view: EventFeedView): Prisma.EventWhereInput {
+  switch (view) {
+    case 'incidents':
+      return { class: 'INCIDENT' }
+    case 'alerts':
+      return { OR: [{ class: 'INCIDENT' }, { sentiment: 'NEGATIVE' }] }
+    case 'all':
+      return {}
+    case 'curated':
+      return { class: { in: ['EVENT', 'INCIDENT'] } }
+  }
+}
+
+export async function getEvents(view: EventFeedView = 'curated'): Promise<
   SafeResult<{
     events: Prisma.EventGetPayload<{ select: typeof eventSelect }>[]
   }>
@@ -175,6 +201,7 @@ export async function getEvents(): Promise<
       service: {
         serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
       },
+      ...eventViewWhere(view),
     },
     select: eventSelect,
     orderBy: {

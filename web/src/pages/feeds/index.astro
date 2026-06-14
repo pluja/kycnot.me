@@ -7,7 +7,16 @@ import { siteOrigin } from '../../lib/urls'
 
 const user = Astro.locals.user
 
-const feeds = [
+type Feed = {
+  title: string
+  description: string
+  rss: `/blog/${string}` | `/feeds/${string}`
+  icon: string
+  replacementDescription: string | null
+  variants?: { label: string; rss: `/feeds/${string}` }[]
+}
+
+const feeds: Feed[] = [
   {
     title: user ? 'Your notifications' : 'User notifications',
     description: `Last ${takeCounts.userNotifications.toLocaleString()} of your notifications`,
@@ -33,10 +42,15 @@ const feeds = [
   },
   {
     title: 'All events',
-    description: `Last ${takeCounts.allEvents.toLocaleString()} events from all listed services`,
+    description: `Last ${takeCounts.allEvents.toLocaleString()} events and incidents from all listed services`,
     rss: '/feeds/events.xml',
     icon: 'ri:calendar-2-line',
     replacementDescription: null,
+    variants: [
+      { label: 'Security incidents only', rss: '/feeds/events.xml?view=incidents' },
+      { label: 'Alerts, warnings & incidents', rss: '/feeds/events.xml?view=alerts' },
+      { label: 'Everything, including auto-recorded changes', rss: '/feeds/events.xml?view=all' },
+    ],
   },
   {
     title: 'Blog',
@@ -45,13 +59,7 @@ const feeds = [
     icon: 'ri:article-line',
     replacementDescription: null,
   },
-] as const satisfies {
-  title: string
-  description: string
-  rss: `/blog/${string}` | `/feeds/${string}`
-  icon: string
-  replacementDescription: string | null
-}[]
+]
 ---
 
 <MiniLayout
@@ -87,6 +95,19 @@ const feeds = [
           />
           {!!feed.replacementDescription && (
             <p class="mt-1 text-center text-xs text-day-500 italic">{feed.replacementDescription}</p>
+          )}
+          {feed.variants && (
+            <div class="mt-3 space-y-2">
+              {feed.variants.map((variant) => (
+                <div>
+                  <p class="text-center text-xs font-medium text-day-400">{variant.label}</p>
+                  <div
+                    class="relative mt-1 rounded-lg border border-night-500/60 bg-night-700 px-4 py-1.5 font-mono text-xs break-all text-day-200"
+                    set:text={`${siteOrigin}${variant.rss}`}
+                  />
+                </div>
+              ))}
+            </div>
           )}
         </div>
       ))
