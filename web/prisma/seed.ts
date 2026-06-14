@@ -1250,6 +1250,10 @@ async function createFakeContactThread({
   const thread = await prisma.contactThread.create({
     data: {
       category,
+      requestedRole:
+        category === ContactCategory.ACCOUNT_VERIFICATION
+          ? faker.helpers.arrayElement(Object.values(ServiceUserRole))
+          : null,
       status,
       authorId,
       createdAt,

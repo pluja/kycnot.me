@@ -12,6 +12,7 @@ import InputCheckbox from '../../components/InputCheckbox.astro'
 import InputHoneypotTrap from '../../components/InputHoneypotTrap.astro'
 import InputSubmitButton from '../../components/InputSubmitButton.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
+import { serviceUserRoles } from '../../constants/serviceUserRoles'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
 import { getFormReplay } from '../../lib/formReplay'
@@ -236,7 +237,31 @@ const categoryOptions = [
       <p class="mt-2 text-xs text-day-500">
         <a href="/about#account-verification" class="underline hover:text-blue-200">Full how-to</a>.
       </p>
+      <div class="mt-3 border-t border-blue-500/20 pt-3">
+        <InputCheckbox
+          name="confirmTxtRecord"
+          label="I have published the TXT record on the service's domain."
+          checked={replay.checked('confirmTxtRecord')}
+          error={inputErrors.confirmTxtRecord}
+        />
+      </div>
     </aside>
+
+    <div data-category-field="ACCOUNT_VERIFICATION">
+      <InputCardGroup
+        name="requestedRole"
+        label="Your role at the service"
+        options={serviceUserRoles.map((role) => ({
+          value: role.value,
+          label: role.label,
+          icon: role.icon,
+        }))}
+        selectedValue={replay.text('requestedRole')}
+        cardSize="sm"
+        iconSize="sm"
+        error={inputErrors.requestedRole}
+      />
+    </div>
 
     <InputTextArea
       label="Message"
@@ -275,11 +300,14 @@ const categoryOptions = [
   /* Category-specific help panels: hidden by default, shown only when the
      matching radio inside the same form is selected. Pure CSS so the panel
      works without JS. */
-  [data-category-help] {
+  [data-category-help],
+  [data-category-field] {
     display: none;
   }
   [data-contact-form]:has(input[name='category'][value='ACCOUNT_VERIFICATION']:checked)
-    [data-category-help='ACCOUNT_VERIFICATION'] {
+    [data-category-help='ACCOUNT_VERIFICATION'],
+  [data-contact-form]:has(input[name='category'][value='ACCOUNT_VERIFICATION']:checked)
+    [data-category-field='ACCOUNT_VERIFICATION'] {
     display: block;
   }
 </style>

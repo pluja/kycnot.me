@@ -1,4 +1,4 @@
-import { ContactCategory } from '@prisma/client'
+import { ContactCategory, ServiceUserRole } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 import { formatDistanceStrict } from 'date-fns'
@@ -28,6 +28,10 @@ export const contactActions = {
         category: z.nativeEnum(ContactCategory, {
           errorMap: () => ({ message: 'Pick a category' }),
         }),
+        // Affiliation role the author claims, only meaningful for
+        // ACCOUNT_VERIFICATION. Requiredness is enforced in the superRefine
+        // below since the field is hidden for other categories.
+        requestedRole: z.nativeEnum(ServiceUserRole).optional(),
         message: z
           .string()
           .min(
@@ -44,11 +48,32 @@ export const contactActions = {
         confirmRules: z.literal('on', {
           errorMap: () => ({ message: 'You must confirm you have read the rules above.' }),
         }),
+        // Conditional attestation that the TXT record is live. Only required for
+        // ACCOUNT_VERIFICATION; enforced in the superRefine below since the
+        // field is hidden for other categories.
+        confirmTxtRecord: z.literal('on').optional(),
         // Honeypot. Real users never see this field. Bots fill everything.
         website: z.string().max(0).optional(),
         ...captchaFormSchemaProperties,
       })
-      .superRefine(captchaFormSchemaSuperRefine),
+      .superRefine(captchaFormSchemaSuperRefine)
+      .superRefine((input, ctx) => {
+        if (input.category !== ContactCategory.ACCOUNT_VERIFICATION) return
+        if (!input.requestedRole) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['requestedRole'],
+            message: 'Pick the role you have at the service.',
+          })
+        }
+        if (input.confirmTxtRecord !== 'on') {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['confirmTxtRecord'],
+            message: 'Confirm you have published the TXT record before sending.',
+          })
+        }
+      }),
     handler: async (input, context) => {
       const user = context.locals.user
 
@@ -97,6 +122,8 @@ export const contactActions = {
       const thread = await prisma.contactThread.create({
         data: {
           category: input.category,
+          requestedRole:
+            input.category === ContactCategory.ACCOUNT_VERIFICATION ? input.requestedRole : null,
           authorId: user.id,
           status: 'AWAITING_STAFF',
           messages: {

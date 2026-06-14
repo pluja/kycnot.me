@@ -5,6 +5,7 @@ import BadgeSmall from '../../components/BadgeSmall.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import UserBadge from '../../components/UserBadge.astro'
 import { contactCategoryBadges, contactCategoryLabels } from '../../constants/contactCategories'
+import { getServiceUserRoleInfo } from '../../constants/serviceUserRoles'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
 import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
@@ -64,6 +65,7 @@ const [threads, counts] = await Astro.locals.banners.tryMany([
         select: {
           id: true,
           category: true,
+          requestedRole: true,
           status: true,
           readAt: true,
           lastMessageAt: true,
@@ -129,6 +131,7 @@ const [threads, counts] = await Astro.locals.banners.tryMany([
         {threads.map((t) => {
           const status = statusStyles[t.status]
           const category = contactCategoryBadges[t.category]
+          const role = t.requestedRole ? getServiceUserRoleInfo(t.requestedRole) : null
           const latest = t.messages[0]
           return (
             <li>
@@ -146,6 +149,9 @@ const [threads, counts] = await Astro.locals.banners.tryMany([
                   {!t.readAt && <span class="size-2 shrink-0 rounded-full bg-rose-400" title="Unread" />}
                   <BadgeSmall color={status.color} text={status.label} icon={status.icon} />
                   <BadgeSmall color={category.color} variant="faded" text={contactCategoryLabels[t.category]} icon={category.icon} />
+                  {role && (
+                    <BadgeSmall color={role.color} variant="faded" text={role.label} icon={role.icon} />
+                  )}
                   {t.author ? (
                     <UserBadge user={t.author} size="sm" noLink />
                   ) : (

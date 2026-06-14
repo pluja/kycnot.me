@@ -7,6 +7,7 @@ import Chat from '../../components/Chat.astro'
 import type { ChatMessage } from '../../components/ChatMessages.astro'
 import { CONTACT_MESSAGE_MAX_LENGTH } from '../../actions/contact'
 import { contactCategoryBadges, contactCategoryLabels } from '../../constants/contactCategories'
+import { getServiceUserRoleInfo } from '../../constants/serviceUserRoles'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { canUserSendMessage } from '../../lib/contactThread'
 import { parseIntWithFallback } from '../../lib/numbers'
@@ -28,6 +29,7 @@ const thread = await Astro.locals.banners.try('Error fetching conversation', asy
     select: {
       id: true,
       category: true,
+      requestedRole: true,
       status: true,
       readAt: true,
       createdAt: true,
@@ -67,6 +69,8 @@ const status =
   thread.status === 'AWAITING_STAFF' && thread.readAt
     ? { label: 'Seen by the team', color: 'blue' as const, icon: 'ri:eye-line' }
     : statusBadge[thread.status]
+
+const role = thread.requestedRole ? getServiceUserRoleInfo(thread.requestedRole) : null
 
 const fallbackAuthor = { id: -1, name: 'removed', displayName: 'Removed user', picture: null }
 const messages: ChatMessage[] = thread.messages.map((m) => ({
@@ -118,6 +122,18 @@ const canSend = canUserSendMessage({ status: thread.status, unansweredUserMessag
         class="h-auto gap-1.5 px-3 py-1 text-sm"
         classNames={{ icon: 'size-4' }}
       />
+      {
+        role && (
+          <BadgeSmall
+            color={role.color}
+            variant="faded"
+            text={role.label}
+            icon={role.icon}
+            class="h-auto gap-1.5 px-3 py-1 text-sm"
+            classNames={{ icon: 'size-4' }}
+          />
+        )
+      }
     </div>
   </div>
 

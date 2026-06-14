@@ -719,6 +719,9 @@ model ContactThread {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @default(now()) @updatedAt
   category      ContactCategory
+  /// Affiliation role the author claims on ACCOUNT_VERIFICATION requests. Null
+  /// for other categories. A claim until the TXT record is verified.
+  requestedRole ServiceUserRole?
   status        ContactStatus   @default(AWAITING_STAFF)
   readAt        DateTime?
   repliedAt     DateTime?
