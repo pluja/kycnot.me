@@ -1,5 +1,5 @@
 ---
-import { VerificationStepStatus, EventType } from '@prisma/client'
+import { VerificationStepStatus, EventType, ServiceVisibility } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
 import { Schema } from 'astro-seo-schema'
 import { actions } from 'astro:actions'
@@ -69,9 +69,9 @@ const result = Astro.getActionResult(actions.service.requestVerification)
 const now = new Date()
 
 const canSeeHidden = Astro.locals.userCan('services:edit')
-const visibleStatuses = canSeeHidden
-  ? (['PUBLIC', 'UNLISTED', 'ARCHIVED', 'HIDDEN'] as const)
-  : (['PUBLIC', 'UNLISTED', 'ARCHIVED'] as const)
+const visibleStatuses: ServiceVisibility[] = canSeeHidden
+  ? ['PUBLIC', 'UNLISTED', 'ARCHIVED', 'HIDDEN']
+  : ['PUBLIC', 'UNLISTED', 'ARCHIVED']
 
 const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany([
   [
@@ -269,7 +269,7 @@ if (!service) {
   return Astro.rewrite('/404')
 }
 
-if (!visibleStatuses.includes(service.serviceVisibility as (typeof visibleStatuses)[number])) {
+if (!visibleStatuses.includes(service.serviceVisibility)) {
   return Astro.rewrite('/404')
 }
 

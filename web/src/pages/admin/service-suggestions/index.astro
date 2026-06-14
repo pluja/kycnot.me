@@ -52,7 +52,7 @@ const { data: filters } = zodParseQueryParamsStoringErrors(
   Astro
 )
 
-const statusFilter =
+const statusFilter: Prisma.ServiceSuggestionWhereInput['status'] =
   filters.status === 'all'
     ? undefined
     : filters.status === 'pending-review'
