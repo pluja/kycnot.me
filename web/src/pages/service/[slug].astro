@@ -20,6 +20,7 @@ import InputTextArea from '../../components/InputTextArea.astro'
 import Markdown from '../../components/Markdown.astro'
 import MyPicture from '../../components/MyPicture.astro'
 import { makeOgImageUrl, type OgImageAllTemplatesWithProps } from '../../components/OgImage'
+import IncidentCard from '../../components/IncidentCard.astro'
 import ScoreGauge from '../../components/ScoreGauge.astro'
 import ScoreSquare from '../../components/ScoreSquare.astro'
 import ServiceLinkButton from '../../components/ServiceLinkButton.astro'
@@ -34,6 +35,7 @@ import { baseScoreType, getAttributeTypeInfo } from '../../constants/attributeTy
 import { formatContactMethod } from '../../constants/contactMethods'
 import { currencies, getCurrencyInfo } from '../../constants/currencies'
 import { getEventTypeInfo } from '../../constants/eventTypes'
+import { incidentSeverities } from '../../constants/incidentSeverities'
 import { getKycLevelInfo, kycLevels } from '../../constants/kycLevels'
 import { getServiceVisibilityInfo } from '../../constants/serviceVisibility'
 import { getTosHighlightRatingInfo } from '../../constants/tosHighlightRating'
@@ -44,6 +46,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro'
 import { someButNotAll, undefinedIfEmpty } from '../../lib/arrays'
 import { makeNonDbAttributes, sortAttributes } from '../../lib/attributes'
 import { cn } from '../../lib/cn'
+import { computeIncidentTrustPenalty, totalIncidentTrustPenalty } from '../../lib/incidentPenalty'
 import { getSupportedProviderSlugs } from '../../lib/exchange/supportedProviders'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
 import { pluralize } from '../../lib/pluralize'
@@ -159,12 +162,27 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
               visible: true,
             },
             select: {
+              id: true,
               title: true,
               content: true,
               type: true,
+              class: true,
+              sentiment: true,
               startedAt: true,
               endedAt: true,
               source: true,
+              incident: {
+                select: {
+                  type: true,
+                  severity: true,
+                  state: true,
+                  occurredAt: true,
+                  resolvedAt: true,
+                  outcome: true,
+                  amountText: true,
+                  trustOverride: true,
+                },
+              },
             },
           },
           suggestions: {
@@ -480,6 +498,39 @@ const activeAlertOrWarningEvents = service.events
   .filter((event) => event.typeInfo.showBanner && (event.endedAt === null || event.endedAt >= now))
 const activeEventToShow =
   activeAlertOrWarningEvents.find((event) => event.type === EventType.ALERT) ?? activeAlertOrWarningEvents[0]
+
+// Incidents (trust-affecting) are shown in their own section and pulled out of
+// the general events timeline below. Their current trust penalty mirrors the
+// value baked into trustScore by 02_service_score.sql.
+const incidents = service.events
+  .flatMap((event) =>
+    event.class === 'INCIDENT' && event.incident ? [{ ...event, incident: event.incident }] : []
+  )
+  .sort((a, b) => b.incident.occurredAt.getTime() - a.incident.occurredAt.getTime())
+
+const incidentTrustPenalty = totalIncidentTrustPenalty(
+  incidents.map((entry) => entry.incident),
+  now
+)
+
+// Incidents whose penalty has decayed to zero are kept for the record but moved
+// out of the active list into a collapsed "Past incidents" group.
+const incidentsByImpact = incidents.map((entry) => ({
+  ...entry,
+  faded: computeIncidentTrustPenalty(entry.incident, now).points === 0,
+}))
+const activeIncidents = incidentsByImpact.filter((entry) => !entry.faded)
+const pastIncidents = incidentsByImpact.filter((entry) => entry.faded)
+
+const pastSeverityBreakdown = [...incidentSeverities]
+  .sort((a, b) => b.order - a.order)
+  .map((info) => ({
+    info,
+    count: pastIncidents.filter((entry) => entry.incident.severity === info.id).length,
+  }))
+  .filter((entry) => entry.count > 0)
+
+const timelineEvents = service.events.filter((event) => event.class !== 'INCIDENT')
 
 // Sort verification steps: failed first, then warnings, then others, newest first within each group
 const getVerificationStepPriority = (status: VerificationStepStatus) => {
@@ -1180,6 +1231,20 @@ const verificationStatusDate =
   </div>
 
   {
+    incidentTrustPenalty < 0 && (
+      <p class="mt-3 flex items-center justify-center gap-1.5 text-sm text-red-300 sm:justify-start">
+        <Icon name="ri:alarm-warning-line" class="size-4 shrink-0" />
+        <span>
+          <strong>{incidentTrustPenalty}</strong> trust from active incidents.{' '}
+          <a href="#incidents" class="underline hover:text-red-200">
+            See details
+          </a>
+        </span>
+      </p>
+    )
+  }
+
+  {
     (kycAttributes.length > 0 || service.kycPolicyMd) && (
       <section class="mt-4 rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
         <header class="mb-2 flex items-center gap-2 text-xs font-bold tracking-wider text-blue-300 uppercase">
@@ -1408,6 +1473,105 @@ const verificationStatusDate =
     )
   }
 
+  {
+    incidents.length > 0 && (
+      <>
+        <div
+          class="mt-6 mb-3 flex items-center justify-between gap-3 border-b border-day-500 pb-1"
+          id="incidents"
+        >
+          <h2 class="flex items-center gap-2 font-title text-lg font-bold text-day-100">
+            <Icon
+              name={activeIncidents.length > 0 ? 'ri:alarm-warning-line' : 'ri:history-line'}
+              class={cn('size-5', activeIncidents.length > 0 ? 'text-red-400' : 'text-day-500')}
+            />
+            Security incidents
+          </h2>
+          <a
+            href="/about#service-scores"
+            class="inline-flex shrink-0 items-center gap-1 text-xs text-day-500 transition-colors hover:text-day-200 hover:underline"
+          >
+            How trust is affected
+            <Icon name="ri:arrow-right-s-line" class="size-4" />
+          </a>
+        </div>
+
+        {activeIncidents.length > 1 && incidentTrustPenalty < 0 && (
+          <p class="mb-3 text-sm text-day-400">
+            Combined trust impact across {activeIncidents.length} active incidents:{' '}
+            <strong class="text-red-300">{incidentTrustPenalty} trust</strong>
+          </p>
+        )}
+
+        {activeIncidents.length > 0 && (
+          <ul class="mb-2 space-y-2.5">
+            {activeIncidents.map((entry) => (
+              <li>
+                <IncidentCard
+                  title={entry.title}
+                  content={entry.content}
+                  source={entry.source}
+                  severity={entry.incident.severity}
+                  state={entry.incident.state}
+                  occurredAt={entry.incident.occurredAt}
+                  resolvedAt={entry.incident.resolvedAt}
+                  outcome={entry.incident.outcome}
+                  amountText={entry.incident.amountText}
+                  trustOverride={entry.incident.trustOverride}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {pastIncidents.length > 0 && (
+          <details class="group mb-2">
+            <summary class="flex w-fit cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 py-1 text-sm text-day-500 transition-colors hover:text-day-300 [&::-webkit-details-marker]:hidden">
+              <span class="inline-flex items-center gap-1.5">
+                <Icon name="ri:history-line" class="size-4 shrink-0" />
+                {activeIncidents.length > 0 ? 'Past incidents' : 'Incidents'} ({pastIncidents.length})
+              </span>
+              <span class="flex flex-wrap items-center gap-x-1.5 text-2xs font-semibold tracking-wide uppercase">
+                {pastSeverityBreakdown.map(({ info, count }, i) => (
+                  <>
+                    {i > 0 && (
+                      <span class="text-day-700" aria-hidden="true">
+                        ·
+                      </span>
+                    )}
+                    <span class={info.classNames.text}>
+                      {count} {info.label}
+                    </span>
+                  </>
+                ))}
+              </span>
+              <Icon name="ri:arrow-down-s-line" class="size-4 shrink-0 transition-transform group-open:rotate-180" />
+            </summary>
+            <ul class="mt-2 space-y-2">
+              {pastIncidents.map((entry) => (
+                <li>
+                  <IncidentCard
+                    faded
+                    title={entry.title}
+                    content={entry.content}
+                    source={entry.source}
+                    severity={entry.incident.severity}
+                    state={entry.incident.state}
+                    occurredAt={entry.incident.occurredAt}
+                    resolvedAt={entry.incident.resolvedAt}
+                    outcome={entry.incident.outcome}
+                    amountText={entry.incident.amountText}
+                    trustOverride={entry.incident.trustOverride}
+                  />
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </>
+    )
+  }
+
   <div class="mt-6 mb-3 flex items-center justify-between border-b border-day-500" id="events">
     <h2 class="font-title text-lg font-bold text-day-100">Events</h2>
     <a
@@ -1419,10 +1583,10 @@ const verificationStatusDate =
     </a>
   </div>
   {
-    service.events.length > 0 ? (
+    timelineEvents.length > 0 ? (
       <ol class="-mx-4 -mt-1 mb-2 flex items-start overflow-x-auto px-4 pt-1 lg:mask-x-from-[calc(100%-1rem)]">
         {orderBy(
-          service.events.map((event) => ({
+          timelineEvents.map((event) => ({
             ...event,
             actualEndedAt: event.endedAt ?? now,
           })),
@@ -1458,7 +1622,7 @@ const verificationStatusDate =
                   {event.title}
                 </h3>
 
-                <div class="text-base font-normal text-pretty text-day-400 [&_a]:underline">
+                <div class="prose max-w-none text-pretty text-day-400 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
                   <Markdown content={event.content} linkRel={['nofollow', 'noopener']} />
                 </div>
                 {event.source && (

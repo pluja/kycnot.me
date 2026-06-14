@@ -1,0 +1,161 @@
+---
+import { Icon } from 'astro-icon/components'
+import { format } from 'date-fns'
+
+import { getIncidentSeverityInfo } from '../constants/incidentSeverities'
+import { cn } from '../lib/cn'
+import { computeIncidentTrustPenalty } from '../lib/incidentPenalty'
+
+import IncidentMeta from './IncidentMeta.astro'
+import Markdown from './Markdown.astro'
+
+import type { IncidentOutcome, IncidentSeverity, IncidentState } from '@prisma/client'
+
+type Props = {
+  title: string
+  content: string
+  source: string | null
+  severity: IncidentSeverity
+  state: IncidentState
+  occurredAt: Date
+  resolvedAt: Date | null
+  outcome: IncidentOutcome | null
+  amountText: string | null
+  trustOverride: number | null
+  /// Penalty has decayed to zero: render muted, no penalty number, kept for history.
+  faded?: boolean
+}
+
+const { title, content, source, severity, state, occurredAt, resolvedAt, outcome, amountText, trustOverride, faded = false } =
+  Astro.props
+
+const sev = getIncidentSeverityInfo(severity)
+const penalty = computeIncidentTrustPenalty({ severity, state, resolvedAt, outcome, trustOverride })
+const ongoing = state === 'ONGOING'
+const barWidth = `${Math.max(2, Math.round(penalty.decayRemaining * 100))}%`
+
+const dateLabel = resolvedAt
+  ? `${format(occurredAt, 'MMM d')} → ${format(resolvedAt, 'MMM d, yyyy')}`
+  : `Started ${format(occurredAt, 'MMM d, yyyy')}`
+
+const excerpt = content
+  .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+  .replace(/[#*_`>~]/g, '')
+  .replace(/\s+/g, ' ')
+  .trim()
+
+const railClass = faded ? 'bg-day-700' : sev.classNames.rail
+const borderClass = faded ? 'border-day-800' : sev.classNames.border
+const bgClass = faded ? 'bg-night-800/30' : sev.classNames.bg
+const labelClass = faded ? 'text-day-500' : sev.classNames.text
+---
+
+<article class={cn('relative overflow-hidden rounded-lg border pl-3', borderClass, bgClass)}>
+  <span class={cn('absolute inset-y-0 left-0 w-1', railClass)} aria-hidden="true"></span>
+
+  <div class="flex items-start gap-3 px-3 pt-2.5">
+    <div class="min-w-0 flex-1">
+      <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs font-semibold tracking-wide uppercase">
+        <span class={cn('inline-flex items-center gap-1', labelClass)}>
+          <Icon name={sev.icon} class="size-3.5" />
+          {sev.label}
+        </span>
+        <span class="text-day-700" aria-hidden="true">·</span>
+        {
+          ongoing ? (
+            <span class="inline-flex items-center gap-1.5 text-red-300">
+              <span class="size-1.5 rounded-full bg-red-400 motion-safe:animate-pulse" />
+              Ongoing
+            </span>
+          ) : (
+            <span class={cn('inline-flex items-center gap-1', faded ? 'text-day-500' : 'text-green-400')}>
+              <Icon name="ri:checkbox-circle-fill" class="size-3.5" />
+              Resolved
+            </span>
+          )
+        }
+        <span class="text-day-700" aria-hidden="true">·</span>
+        <span class="inline-flex items-center gap-1 text-sm font-medium text-day-400 normal-case">
+          <Icon name="ri:calendar-event-line" class="size-3.5 shrink-0" />
+          {dateLabel}
+        </span>
+      </div>
+
+      <h3
+        class={cn(
+          'mt-1 font-title text-base leading-snug font-semibold text-pretty',
+          faded ? 'text-day-200' : 'text-white'
+        )}
+      >
+        {title}
+      </h3>
+    </div>
+
+    {
+      !faded && (
+        <div class="shrink-0 text-right">
+          <div class={cn('font-title text-xl leading-none font-bold tabular-nums', sev.classNames.text)}>
+            {penalty.points}
+          </div>
+          <div class="mt-0.5 text-2xs tracking-wider text-day-500 uppercase">trust</div>
+        </div>
+      )
+    }
+  </div>
+
+  {
+    ongoing ? (
+      <div class="px-3 pt-2 pb-3">
+        <div class="prose prose-sm max-w-none text-pretty text-day-400 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
+          <Markdown content={content} linkRel={['nofollow', 'noopener']} />
+        </div>
+        <p class="mt-3 flex items-center gap-1.5 text-xs text-day-500">
+          <span class={cn('inline-block size-1.5 rounded-full', sev.classNames.rail)} />
+          Full penalty applies until resolved.
+        </p>
+        <IncidentMeta amountText={amountText} source={source} />
+      </div>
+    ) : (
+      <details class="group">
+        <summary class="flex cursor-pointer list-none items-center gap-2 px-3 pt-1 pb-2.5 [&::-webkit-details-marker]:hidden">
+          <span class="min-w-0 flex-1 truncate text-sm text-day-400 group-open:hidden">{excerpt}</span>
+          <span class="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-day-400 transition-colors group-hover:text-day-200">
+            <span class="group-open:hidden">Read more</span>
+            <span class="hidden group-open:inline">Show less</span>
+            <Icon name="ri:arrow-down-s-line" class="size-4 transition-transform group-open:rotate-180" />
+          </span>
+        </summary>
+
+        <div class="px-3 pb-3">
+          <div class="prose prose-sm max-w-none text-pretty text-day-400 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
+            <Markdown content={content} linkRel={['nofollow', 'noopener']} />
+          </div>
+
+          <div class="mt-3">
+            {faded ? (
+              <p class="flex items-center gap-1.5 text-xs text-day-500">
+                <Icon name="ri:history-line" class="size-3.5" />
+                Trust impact has fully faded. Kept for the record.
+              </p>
+            ) : (
+              <div>
+                <div class="h-1.5 w-full overflow-hidden rounded-full bg-day-800">
+                  <div
+                    class={cn('h-full rounded-full transition-all', sev.classNames.bar)}
+                    style={`width:${barWidth}`}
+                  />
+                </div>
+                <p class="mt-1.5 text-xs text-day-500">
+                  Stepped down from {penalty.fullPoints} on resolution
+                  {penalty.fadesOn && <> · fades to 0 by {format(penalty.fadesOn, 'MMM yyyy')}</>}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <IncidentMeta amountText={amountText} source={source} />
+        </div>
+      </details>
+    )
+  }
+</article>
