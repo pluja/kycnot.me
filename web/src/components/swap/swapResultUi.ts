@@ -153,9 +153,11 @@ export function findBestRateServiceSlug<T extends SortableSwapResult>(
   results: T[],
   amountSide: SwapAmountSide
 ): string | null {
-  let best: T | null = null
-  for (const item of results) {
-    if (item.quote === null) continue
+  const withQuote = results.filter(
+    (item): item is T & { quote: NonNullable<T['quote']> } => item.quote !== null
+  )
+  let best: (typeof withQuote)[number] | null = null
+  for (const item of withQuote) {
     if (best === null) {
       best = item
       continue

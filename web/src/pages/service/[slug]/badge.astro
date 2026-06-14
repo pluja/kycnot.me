@@ -40,14 +40,15 @@ if (!isEmbeddableBadgeStatus(service.verificationStatus)) {
   return Astro.redirect('/assets')
 }
 
-const serviceUrl = `${siteOrigin}/service/${service.slug}`
+const { name: serviceName, slug: serviceSlug } = service
+const serviceUrl = `${siteOrigin}/service/${serviceSlug}`
 
 function getBadgeImageUrl(sizeId: (typeof badgeSizes)[number]['id'], options: BadgeOptions = defaultBadgeOptions) {
-  return getServiceBadgeImageUrl(service.slug, siteOrigin, sizeId, options)
+  return getServiceBadgeImageUrl(serviceSlug, siteOrigin, sizeId, options)
 }
 
 function getBadgeEmbedCode(sizeId: (typeof badgeSizes)[number]['id'], options: BadgeOptions = defaultBadgeOptions) {
-  return getServiceBadgeEmbedCode(service.name, serviceUrl, getBadgeImageUrl(sizeId, options))
+  return getServiceBadgeEmbedCode(serviceName, serviceUrl, getBadgeImageUrl(sizeId, options))
 }
 ---
 
@@ -245,6 +246,10 @@ function getBadgeEmbedCode(sizeId: (typeof badgeSizes)[number]['id'], options: B
 
     controls.dataset.badgeInitialized = 'true'
 
+    // Narrowed alias: the helper closures below capture this, and the null
+    // guard above does not flow into nested function scopes.
+    const controlsEl = controls
+
     const serviceName = controls.dataset.serviceName
     const serviceNameEscaped = controls.dataset.serviceNameEscaped
     const serviceSlug = controls.dataset.serviceSlug
@@ -268,10 +273,10 @@ function getBadgeEmbedCode(sizeId: (typeof badgeSizes)[number]['id'], options: B
 
     function getState() {
       return {
-        score: controls.querySelector<HTMLInputElement>('[data-badge-toggle="score"]')?.checked ?? true,
-        rating: controls.querySelector<HTMLInputElement>('[data-badge-toggle="rating"]')?.checked ?? true,
-        kyc: controls.querySelector<HTMLInputElement>('[data-badge-toggle="kyc"]')?.checked ?? true,
-        light: controls.querySelector<HTMLInputElement>('[data-badge-toggle="light"]')?.checked ?? false,
+        score: controlsEl.querySelector<HTMLInputElement>('[data-badge-toggle="score"]')?.checked ?? true,
+        rating: controlsEl.querySelector<HTMLInputElement>('[data-badge-toggle="rating"]')?.checked ?? true,
+        kyc: controlsEl.querySelector<HTMLInputElement>('[data-badge-toggle="kyc"]')?.checked ?? true,
+        light: controlsEl.querySelector<HTMLInputElement>('[data-badge-toggle="light"]')?.checked ?? false,
       }
     }
 

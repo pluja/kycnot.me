@@ -63,7 +63,7 @@ const swapHref =
         to: quote.currencyTo,
       })
     : deepLinkHref
-const hasOrangeFrenGuarantee = quote?.orangefrenGuarantee !== null && quote.orangefrenGuarantee > 0
+const hasOrangeFrenGuarantee = quote?.orangefrenGuarantee != null && quote.orangefrenGuarantee > 0
 const guaranteeCoverage = describeGuaranteeCoverage(quote)
 ---
 
