@@ -189,6 +189,47 @@ enum EventType {
   UPDATE
 }
 
+enum EventClass {
+  CHANGE
+  EVENT
+  INCIDENT
+}
+
+enum EventSentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}
+
+enum IncidentType {
+  EXPLOIT
+  CUSTODIAL_HACK
+  DATA_BREACH
+  MASS_FROZEN_FUNDS
+  INSOLVENCY
+  OTHER
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentState {
+  ONGOING
+  RESOLVED
+}
+
+enum IncidentOutcome {
+  FUNDS_RECOVERED
+  USERS_REIMBURSED
+  PARTIAL
+  FUNDS_LOST
+  UNKNOWN
+}
+
 enum ServiceUserRole {
   OWNER
   ADMIN
@@ -362,7 +403,14 @@ model Event {
   title        String
   content      String
   source       String?
+  /// Transitional. Being replaced by `class` + `sentiment`; kept so existing
+  /// consumers (feeds, service page) keep working during the migration.
   type         EventType
+  /// Taxonomy. CHANGE = auto-recorded edits (high volume, low signal),
+  /// EVENT = curated news, INCIDENT = trust-affecting (see 1:1 Incident).
+  class        EventClass     @default(EVENT)
+  /// Tone for EVENT-class entries (color only). INCIDENTs use Incident.severity.
+  sentiment    EventSentiment @default(NEUTRAL)
   visible      Boolean        @default(true)
   startedAt    DateTime
   /// If null, the event is ongoing. If same as startedAt, the event is a one-time event. If startedAt is in the future, the event is upcoming.
@@ -381,16 +429,47 @@ model Event {
   createdById  Int?
   updatedBy    User?          @relation("EventUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   updatedById  Int?
+  /// Present iff class = INCIDENT. Holds the trust-affecting detail.
+  incident     Incident?
 
   @@index([visible])
   @@index([startedAt])
   @@index([createdAt])
   @@index([endedAt])
   @@index([type])
+  @@index([class])
   @@index([serviceId])
   @@index([createdById])
   @@index([updatedById])
   @@index([deletedAt])
+}
+
+/// Trust-affecting detail for an Event of class = INCIDENT (1:1). The trust
+/// penalty is derived from these fields in 02_service_score.sql, not stored.
+/// While ONGOING the penalty is flat at full severity; once RESOLVED it steps
+/// down (by outcome) and decays to zero over a severity-dependent window,
+/// measured from resolvedAt.
+model Incident {
+  id            Int              @id @default(autoincrement())
+  event         Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId       Int              @unique
+  type          IncidentType     @default(OTHER)
+  severity      IncidentSeverity
+  state         IncidentState    @default(ONGOING)
+  /// When the incident actually happened (record/timeline), distinct from when it was logged.
+  occurredAt    DateTime
+  /// Decay clock. Null while ONGOING; set when state becomes RESOLVED.
+  resolvedAt    DateTime?
+  outcome       IncidentOutcome?
+  /// Funds lost or at risk, free text (e.g. "~11 BTC", "$10.7M").
+  amountText    String?
+  /// Audited manual override of the computed penalty. Null = use the formula.
+  trustOverride Int?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @default(now()) @updatedAt
+
+  @@index([state])
+  @@index([severity])
 }
 
 enum ServiceSuggestionStatus {

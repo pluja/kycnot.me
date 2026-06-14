@@ -10,6 +10,9 @@
 DROP TRIGGER IF EXISTS service_score_update_trigger ON "Service";
 DROP TRIGGER IF EXISTS service_attribute_change_trigger ON "ServiceAttribute";
 DROP TRIGGER IF EXISTS attribute_change_trigger ON "Attribute";
+DROP TRIGGER IF EXISTS incident_score_update_trigger ON "Incident";
+DROP TRIGGER IF EXISTS event_incident_update_trigger ON "Event";
+DROP TRIGGER IF EXISTS event_incident_delete_trigger ON "Event";
 
 -- Drop existing functions
 DROP FUNCTION IF EXISTS calculate_service_scores();
@@ -86,6 +89,7 @@ DECLARE
     tos_penalty_factor INT := 0;
     operating_since_factor INT := 0;
     legally_registered_factor INT := 0;
+    incident_penalty_factor INT := 0;
 BEGIN
     -- Get verification status factor
     SELECT 
@@ -159,8 +163,53 @@ BEGIN
         legally_registered_factor := 2;
     END IF;
 
+    -- Incident penalty (resolution-anchored decay). While ONGOING, full penalty
+    -- by severity, flat. Once RESOLVED, it steps down by outcome and decays
+    -- linearly to zero over a severity-dependent window measured from resolvedAt.
+    -- A manual trustOverride wins when set. Only incidents on a visible,
+    -- non-deleted INCIDENT-class event count. Mirrored in src/lib/incidentPenalty.ts.
+    SELECT COALESCE(ROUND(SUM(
+        CASE
+            WHEN i."trustOverride" IS NOT NULL THEN i."trustOverride"
+            ELSE
+                (CASE i.severity
+                    WHEN 'LOW' THEN -5
+                    WHEN 'MEDIUM' THEN -12
+                    WHEN 'HIGH' THEN -22
+                    WHEN 'CRITICAL' THEN -35
+                END)::numeric
+                * (CASE
+                    WHEN i.state <> 'RESOLVED' OR i."resolvedAt" IS NULL THEN 1.0
+                    ELSE
+                        (CASE COALESCE(i.outcome::text, 'UNKNOWN')
+                            WHEN 'FUNDS_RECOVERED' THEN 0.2
+                            WHEN 'USERS_REIMBURSED' THEN 0.3
+                            WHEN 'PARTIAL' THEN 0.5
+                            WHEN 'FUNDS_LOST' THEN 0.75
+                            ELSE 0.5
+                        END)
+                        * GREATEST(0.0, 1.0 - (
+                            EXTRACT(EPOCH FROM (NOW() - i."resolvedAt")) / 86400.0
+                            / (CASE i.severity
+                                WHEN 'LOW' THEN 90
+                                WHEN 'MEDIUM' THEN 180
+                                WHEN 'HIGH' THEN 365
+                                WHEN 'CRITICAL' THEN 540
+                            END)
+                        ))
+                END)
+        END
+    )), 0)::INT
+    INTO incident_penalty_factor
+    FROM "Incident" i
+    JOIN "Event" e ON e.id = i."eventId"
+    WHERE e."serviceId" = service_id
+      AND e.visible = TRUE
+      AND e."deletedAt" IS NULL
+      AND e.class = 'INCIDENT';
+
     -- Calculate final trust score (base 100)
-    trust_score := 50 + verification_factor + attributes_score + recently_approved_factor + tos_penalty_factor + operating_since_factor + legally_registered_factor;
+    trust_score := 50 + verification_factor + attributes_score + recently_approved_factor + tos_penalty_factor + operating_since_factor + legally_registered_factor + incident_penalty_factor;
 
     -- Ensure the score is in reasonable bounds (0-100)
     trust_score := GREATEST(0, LEAST(100, trust_score));
@@ -200,8 +249,25 @@ BEGIN
         ELSE -- INSERT or UPDATE
             service_id := NEW."serviceId";
         END IF;
+    ELSIF TG_TABLE_NAME = 'Incident' THEN
+        IF TG_OP = 'DELETE' THEN
+            SELECT "serviceId" INTO service_id FROM "Event" WHERE id = OLD."eventId";
+        ELSE
+            SELECT "serviceId" INTO service_id FROM "Event" WHERE id = NEW."eventId";
+        END IF;
+    ELSIF TG_TABLE_NAME = 'Event' THEN
+        IF TG_OP = 'DELETE' THEN
+            service_id := OLD."serviceId";
+        ELSE
+            service_id := NEW."serviceId";
+        END IF;
     END IF;
-    
+
+    -- A cascade delete (Event -> Incident) can leave no resolvable service; skip.
+    IF service_id IS NULL THEN
+        RETURN COALESCE(NEW, OLD);
+    END IF;
+
     -- Calculate each score
     privacy_score := calculate_privacy_score(service_id);
     trust_score := calculate_trust_score(service_id);
@@ -242,6 +308,31 @@ CREATE TRIGGER service_attribute_change_trigger
     ON "ServiceAttribute"
     FOR EACH ROW
     WHEN (pg_trigger_depth() < 2)  -- Prevent recursive triggering
+    EXECUTE FUNCTION calculate_service_scores();
+
+-- Recalculate when an incident is added, edited, resolved, or removed.
+CREATE TRIGGER incident_score_update_trigger
+    AFTER INSERT OR UPDATE OR DELETE
+    ON "Incident"
+    FOR EACH ROW
+    WHEN (pg_trigger_depth() < 2)
+    EXECUTE FUNCTION calculate_service_scores();
+
+-- Recalculate when an incident-class event is hidden, restored, or deleted,
+-- since that changes which incidents count toward the penalty. Split by op
+-- because a WHEN clause cannot reference NEW on DELETE.
+CREATE TRIGGER event_incident_update_trigger
+    AFTER UPDATE
+    ON "Event"
+    FOR EACH ROW
+    WHEN (pg_trigger_depth() < 2 AND (NEW.class = 'INCIDENT' OR OLD.class = 'INCIDENT'))
+    EXECUTE FUNCTION calculate_service_scores();
+
+CREATE TRIGGER event_incident_delete_trigger
+    AFTER DELETE
+    ON "Event"
+    FOR EACH ROW
+    WHEN (pg_trigger_depth() < 2 AND OLD.class = 'INCIDENT')
     EXECUTE FUNCTION calculate_service_scores();
 
 -- Function to queue score recalculation for all services with a specific attribute
