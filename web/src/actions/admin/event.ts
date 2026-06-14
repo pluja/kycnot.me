@@ -36,7 +36,8 @@ const eventFields = {
   resolvedAt: z.preprocess(emptyToNull, z.coerce.date().nullable().optional()),
   outcome: z.preprocess(emptyToNull, z.nativeEnum(IncidentOutcome).nullable().optional()),
   amountText: z.preprocess(emptyToNull, z.string().nullable().optional()),
-  trustOverride: z.preprocess(emptyToNull, z.coerce.number().int().nullable().optional()),
+  // A penalty, so never positive: it must not be usable to inflate trust.
+  trustOverride: z.preprocess(emptyToNull, z.coerce.number().int().lte(0).nullable().optional()),
 }
 
 type EventInput = {

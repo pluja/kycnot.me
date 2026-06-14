@@ -1,16 +1,19 @@
 ---
 import { Icon } from 'astro-icon/components'
 
+import { safeHttpUrl } from '../lib/exchange/safeUrl'
+
 type Props = {
   amountText: string | null
   source: string | null
 }
 
 const { amountText, source } = Astro.props
+const safeSource = safeHttpUrl(source)
 ---
 
 {
-  (amountText || source) && (
+  (amountText || safeSource) && (
     <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-day-800/60 pt-2.5 text-xs text-day-500">
       {amountText && (
         <span class="inline-flex items-center gap-1">
@@ -18,9 +21,9 @@ const { amountText, source } = Astro.props
           {amountText}
         </span>
       )}
-      {source && (
+      {safeSource && (
         <a
-          href={source}
+          href={safeSource}
           target="_blank"
           rel="nofollow noopener"
           class="ml-auto inline-flex items-center gap-1 text-blue-400 hover:underline"

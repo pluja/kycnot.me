@@ -46,6 +46,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro'
 import { someButNotAll, undefinedIfEmpty } from '../../lib/arrays'
 import { makeNonDbAttributes, sortAttributes } from '../../lib/attributes'
 import { cn } from '../../lib/cn'
+import { safeHttpUrl } from '../../lib/exchange/safeUrl'
 import { computeIncidentTrustPenalty, totalIncidentTrustPenalty } from '../../lib/incidentPenalty'
 import { getSupportedProviderSlugs } from '../../lib/exchange/supportedProviders'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
@@ -1625,9 +1626,9 @@ const verificationStatusDate =
                 <div class="prose max-w-none text-pretty text-day-400 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
                   <Markdown content={event.content} linkRel={['nofollow', 'noopener']} />
                 </div>
-                {event.source && (
+                {safeHttpUrl(event.source) && (
                   <a
-                    href={event.source}
+                    href={safeHttpUrl(event.source)}
                     target="_blank"
                     rel="nofollow noopener"
                     class="mt-1 inline-block text-xs text-blue-400 hover:underline"

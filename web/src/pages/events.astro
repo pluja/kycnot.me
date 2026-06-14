@@ -13,6 +13,7 @@ import { getServiceVisibilityInfo } from '../constants/serviceVisibility'
 import { getVerificationStatusInfo } from '../constants/verificationStatus'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { cn } from '../lib/cn'
+import { safeHttpUrl } from '../lib/exchange/safeUrl'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { formatDateShort } from '../lib/timeAgo'
@@ -509,9 +510,9 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
                     )}
                   </a>
 
-                  {event.source && (
+                  {safeHttpUrl(event.source) && (
                     <a
-                      href={event.source}
+                      href={safeHttpUrl(event.source)}
                       target="_blank"
                       rel="nofollow noopener"
                       class="inline-block text-xs text-blue-400 hover:underline"
