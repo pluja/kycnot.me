@@ -183,17 +183,17 @@ Services will usually show the verification steps that the admins took to reach 
 
 An attribute is a feature of a service, categorized as:
 
-- **Good** – A positive feature
-- **Warning** – A potential concern
-- **Bad** – A significant drawback
-- **Information** – Neutral details
+- **Good**: A positive feature
+- **Warning**: A potential concern
+- **Bad**: A significant drawback
+- **Information**: Neutral details
 
 You can view all available attributes on the [Attributes page](/attributes).
 
 Attributes are classified into two main types:
 
-1. **Privacy Attributes** – Related to data protection and anonymity.
-1. **Trust Attributes** – Related to reliability and security.
+1. **Privacy Attributes**: Related to data protection and anonymity.
+1. **Trust Attributes**: Related to reliability and security.
 
 These categories **directly influence** a service's Privacy and Trust scores, which contribute to its **overall rating**.
 
@@ -215,7 +215,35 @@ The trust score represents how reliable and trustworthy a service is, based on o
 
 1. **Base Score:** Every service begins with a neutral score of 50 points.
 1. **Trust Attributes:** The total trust points from all attributes categorized as 'TRUST' are added to the score. [See all attributes](/attributes).
+1. **Security Incidents:** A confirmed security incident lowers the score temporarily. The penalty fades back to zero over time, as explained in [Security Incidents](#security-incidents).
 1. **Final Score Range:** The final score is always kept between 0 and 100.
+
+##### Security Incidents
+
+A security incident is a confirmed event where a service put user funds or data at risk: an exchange hack, a smart contract exploit, a custodial breach, mass frozen withdrawals, or insolvency. Each confirmed incident lowers the service's trust score. The penalty is largest while the incident is unresolved and shrinks back to zero over time once the service fixes it.
+
+How many points an incident subtracts, and how long the penalty takes to fade, both depend on its severity:
+
+| Severity | Trust penalty | Fades to zero over |
+| -------- | ------------: | ------------------ |
+| Low      |            -5 | 90 days            |
+| Medium   |           -12 | 180 days           |
+| High     |           -22 | 365 days           |
+| Critical |           -35 | 540 days           |
+
+While an incident is **ongoing**, the full penalty applies and stays flat. Once a service **resolves** it, the penalty first steps down based on the outcome, then decays to zero across the window above, measured from the resolution date:
+
+| Resolution outcome | Penalty kept at resolution |
+| ------------------ | -------------------------: |
+| Funds recovered    |                        20% |
+| Users reimbursed   |                        30% |
+| Partial recovery   |                        50% |
+| Funds lost         |                        75% |
+| Unknown            |                        50% |
+
+So a critical incident where users were fully reimbursed keeps about 30% of its penalty the moment it is resolved, roughly -10 points, then fades to zero over the next eighteen months. An unresolved critical hack stays at the full -35 until the service addresses it.
+
+We assess each incident's severity and outcome from public reporting, and the fixed rules above do the rest. Every recorded incident shows its current trust impact on the service page and in the [incidents timeline](/events?view=incidents).
 
 ##### Overall Score
 
@@ -231,12 +259,13 @@ We aim for accuracy, but the AI may sometimes miss details or highlight less rel
 
 #### Events
 
-There are two types of events:
+Events fall into three kinds:
 
-- Automated events: Created by the system whenever something about a service changes, like its description, supported currencies, attributes, verification status...
-- Manual events: Added by admins when there's important news, such as a service going offline, being hacked, acquired, shut down, or other major updates.
+- Automated events: Created by the system whenever something about a service changes, like its description, supported currencies, attributes, or verification status.
+- Manual events: Added by admins when there is important news, such as a service going offline, being acquired, shutting down, or other major updates.
+- Security incidents: Confirmed hacks, exploits, breaches, or frozen funds. These are the only events that move a service's score, see [Security Incidents](#security-incidents).
 
-You can also take a look at the [global timeline](/events) where you will find all the service's events sorted by date.
+You can take a look at the [global timeline](/events) where you will find every event sorted by date, or filter it down to [security incidents only](/events?view=incidents).
 
 ### Listing Statuses
 
