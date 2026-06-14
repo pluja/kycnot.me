@@ -98,7 +98,7 @@ const statusActions: { status: CaseStatus; label: string; icon: string; color: '
                       <BadgeSmall text={visInfo.label} variant="faded" color={visInfo.color} icon={visInfo.icon} />
                     )}
                   </div>
-                  <div class="mt-1 text-pretty text-day-200">
+                  <div class="prose prose-sm mt-1 max-w-none text-pretty text-day-200 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
                     <Markdown content={update.bodyMd} />
                   </div>
                   {(update.evidence.length > 0 || canManage) && (
