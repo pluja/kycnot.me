@@ -25,6 +25,8 @@ const eventRestoreResult = Astro.getActionResult(actions.admin.event.restore)
 Astro.locals.banners.addIfSuccess(eventRestoreResult, 'Event restored successfully')
 const eventPurgeResult = Astro.getActionResult(actions.admin.event.purge)
 Astro.locals.banners.addIfSuccess(eventPurgeResult, 'Event permanently deleted')
+const eventResolveResult = Astro.getActionResult(actions.admin.event.resolve)
+Astro.locals.banners.addIfSuccess(eventResolveResult, 'Incident resolved')
 
 const service = await Astro.locals.banners.try(
   'Failed to load service',
@@ -41,6 +43,7 @@ const service = await Astro.locals.banners.try(
           include: {
             createdBy: { select: { name: true, displayName: true } },
             updatedBy: { select: { name: true, displayName: true } },
+            incident: true,
           },
         },
       },

@@ -2,12 +2,12 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
-import { eventTypes, getEventTypeInfo } from '../../../../constants/eventTypes'
+import { getEventTypeInfo } from '../../../../constants/eventTypes'
+import { eventToKind } from '../../../../lib/eventKind'
 import BadgeSmall from '../../../BadgeSmall.astro'
 import Button from '../../../Button.astro'
 import FormSection from '../../../FormSection.astro'
 import FormSubSection from '../../../FormSubSection.astro'
-import InputSelect from '../../../InputSelect.astro'
 import InputSubmitButton from '../../../InputSubmitButton.astro'
 import InputText from '../../../InputText.astro'
 import InputTextArea from '../../../InputTextArea.astro'
@@ -15,6 +15,7 @@ import Tooltip from '../../../Tooltip.astro'
 import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
 import EditableListItem from '../../EditableListItem.astro'
 import EditToggleButton from '../../EditToggleButton.astro'
+import IncidentFields from './IncidentFields.astro'
 
 import type { Prisma } from '@prisma/client'
 
@@ -24,6 +25,7 @@ type Props = {
     include: {
       createdBy: { select: { name: true; displayName: true } }
       updatedBy: { select: { name: true; displayName: true } }
+      incident: true
     }
   }>[]
   createInputErrors: Record<string, string[] | undefined>
@@ -76,6 +78,14 @@ const sortedEvents = [...events].sort((a, b) => {
                       color={eventTypeInfo.color}
                       icon={eventTypeInfo.icon}
                     />
+                    {event.incident && (
+                      <BadgeSmall
+                        text={`${event.incident.state === 'RESOLVED' ? 'Resolved' : 'Active'} incident`}
+                        variant="faded"
+                        color={event.incident.state === 'RESOLVED' ? 'green' : 'red'}
+                        icon="ri:alarm-warning-line"
+                      />
+                    )}
                     {event.deletedAt ? (
                       <BadgeSmall text="Deleted" variant="faded" color="red" icon="ri:delete-bin-line" />
                     ) : (
@@ -159,6 +169,26 @@ const sortedEvents = [...events].sort((a, b) => {
                           />
                         </form>
                       </Tooltip>
+                      {event.incident && event.incident.state !== 'RESOLVED' && (
+                        <Tooltip text="Resolve incident (sets resolved now)">
+                          <form
+                            method="POST"
+                            action={`${actions.admin.event.resolve}${sectionHash}`}
+                            class="contents"
+                          >
+                            <input type="hidden" name="eventId" value={event.id} />
+                            <Button
+                              type="submit"
+                              variant="faded"
+                              size="sm"
+                              color="success"
+                              icon="ri:check-double-line"
+                              iconOnly
+                              label="Resolve incident"
+                            />
+                          </form>
+                        </Tooltip>
+                      )}
                       <EditToggleButton for={itemId} />
                       <DeleteConfirmButton action={`${actions.admin.event.delete}${sectionHash}`} id={itemId}>
                         <input type="hidden" name="eventId" value={event.id} />
@@ -224,26 +254,18 @@ const sortedEvents = [...events].sort((a, b) => {
                       </div>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <InputText
-                        label="Source URL"
-                        name="source"
-                        inputProps={{ value: event.source }}
-                        error={updateInputErrors.source}
-                      />
+                    <InputText
+                      label="Source URL"
+                      name="source"
+                      inputProps={{ value: event.source }}
+                      error={updateInputErrors.source}
+                    />
 
-                      <InputSelect
-                        label="Type"
-                        name="type"
-                        options={eventTypes.map((type) => ({
-                          label: type.label,
-                          value: type.id,
-                        }))}
-                        selectedValue={event.type}
-                        selectProps={{ required: true }}
-                        error={updateInputErrors.type}
-                      />
-                    </div>
+                    <IncidentFields
+                      kind={eventToKind(event.class, event.sentiment)}
+                      incident={event.incident}
+                      errors={updateInputErrors}
+                    />
 
                     <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
                   </form>
@@ -300,20 +322,9 @@ const sortedEvents = [...events].sort((a, b) => {
         </div>
       </div>
 
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <InputText label="Source URL" name="source" error={createInputErrors.source} />
+      <InputText label="Source URL" name="source" error={createInputErrors.source} />
 
-        <InputSelect
-          label="Type"
-          name="type"
-          options={eventTypes.map((type) => ({
-            label: type.label,
-            value: type.id,
-          }))}
-          selectProps={{ required: true }}
-          error={createInputErrors.type}
-        />
-      </div>
+      <IncidentFields errors={createInputErrors} />
 
       <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />
     </form>

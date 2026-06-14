@@ -1,0 +1,177 @@
+---
+import { IncidentOutcome, IncidentType } from '@prisma/client'
+
+import { incidentSeverities } from '../../../../constants/incidentSeverities'
+import { eventKindOptions, type EventKind } from '../../../../lib/eventKind'
+import { transformCase } from '../../../../lib/strings'
+import InputCardGroup from '../../../InputCardGroup.astro'
+import InputSelect from '../../../InputSelect.astro'
+import InputText from '../../../InputText.astro'
+
+import type { IncidentSeverity, IncidentState } from '@prisma/client'
+
+type Props = {
+  errors: Record<string, string[] | undefined>
+  kind?: EventKind
+  incident?: {
+    type: IncidentType
+    severity: IncidentSeverity
+    state: IncidentState
+    resolvedAt: Date | null
+    outcome: IncidentOutcome | null
+    amountText: string | null
+    trustOverride: number | null
+  } | null
+}
+
+const { errors, kind = 'INFO', incident = null } = Astro.props
+
+const toLocalDateTime = (date: Date) =>
+  new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+const labelFor = (value: string) => transformCase(value.replaceAll('_', ' '), 'title')
+
+const kindDescriptions: Record<EventKind, { icon: string; description: string }> = {
+  INFO: { icon: 'ri:information-line', description: 'Neutral news about the service. No effect on the trust score.' },
+  UPDATE: { icon: 'ri:arrow-up-circle-line', description: 'A positive change or announcement.' },
+  WARNING: {
+    icon: 'ri:alert-line',
+    description: 'A negative development that is **not** a security incident (downtime, reputation, policy).',
+  },
+  INCIDENT: {
+    icon: 'ri:alarm-warning-line',
+    description: 'An exploit, hack, breach or fund loss. **Penalises the trust score.**',
+  },
+}
+const kindCards = eventKindOptions.map((option) => ({
+  value: option.value,
+  label: option.label,
+  ...kindDescriptions[option.value],
+}))
+
+const severityPenalty: Record<IncidentSeverity, number> = { LOW: -5, MEDIUM: -12, HIGH: -22, CRITICAL: -35 }
+const severityBlurb: Record<IncidentSeverity, string> = {
+  LOW: 'Minor, quickly patched, little or no funds at risk.',
+  MEDIUM: 'Real but limited exposure.',
+  HIGH: 'Serious exploit, partly contained.',
+  CRITICAL: 'Catastrophic, major fund loss.',
+}
+const severityCards = [...incidentSeverities]
+  .sort((a, b) => a.order - b.order)
+  .map((s) => ({
+    value: s.id,
+    label: s.label,
+    icon: s.icon,
+    iconClass: s.classNames.text,
+    description: `${severityBlurb[s.id]} **${severityPenalty[s.id]} trust** while ongoing.`,
+  }))
+
+const stateCards = [
+  { value: 'ONGOING', label: 'Ongoing', icon: 'ri:time-line', description: 'Unresolved. Full penalty applies.' },
+  {
+    value: 'RESOLVED',
+    label: 'Resolved',
+    icon: 'ri:checkbox-circle-line',
+    description: 'Fixed. The penalty steps down, then fades to zero over time.',
+  },
+]
+
+const typeOptions = Object.values(IncidentType).map((value) => ({ label: labelFor(value), value }))
+const outcomeOptions = [
+  { label: 'Not set', value: '' },
+  ...Object.values(IncidentOutcome).map((value) => ({ label: labelFor(value), value })),
+]
+---
+
+<div data-incident-block class="space-y-4">
+  <InputCardGroup
+    label="Kind"
+    name="kind"
+    options={kindCards}
+    selectedValue={kind}
+    cardSize="md"
+    error={errors.kind}
+  />
+
+  <div data-incident-fields class="space-y-4 rounded-lg border border-red-500/25 bg-red-500/[0.03] p-3">
+    <p class="text-xs font-semibold tracking-wider text-red-300 uppercase">Incident details</p>
+
+    <InputCardGroup
+      label="Severity"
+      name="severity"
+      options={severityCards}
+      selectedValue={incident?.severity ?? ''}
+      cardSize="md"
+      error={errors.severity}
+    />
+
+    <InputSelect
+      label="What happened"
+      name="incidentType"
+      options={typeOptions}
+      selectedValue={incident?.type ?? 'OTHER'}
+      error={errors.incidentType}
+    />
+
+    <InputCardGroup
+      label="Status"
+      name="state"
+      options={stateCards}
+      selectedValue={incident?.state ?? 'ONGOING'}
+      cardSize="md"
+      error={errors.state}
+    />
+
+    <div data-resolution-fields class="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <InputText
+        label="Resolved at"
+        name="resolvedAt"
+        inputProps={{
+          type: 'datetime-local',
+          value: incident?.resolvedAt ? toLocalDateTime(new Date(incident.resolvedAt)) : '',
+        }}
+        description="The trust penalty starts fading from here."
+        error={errors.resolvedAt}
+      />
+      <InputSelect
+        label="Outcome"
+        name="outcome"
+        options={outcomeOptions}
+        selectedValue={incident?.outcome ?? ''}
+        error={errors.outcome}
+      />
+    </div>
+
+    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <InputText
+        label="Funds at risk / lost"
+        name="amountText"
+        inputProps={{ value: incident?.amountText ?? '', placeholder: 'e.g. ~11 BTC, $10.7M' }}
+        error={errors.amountText}
+      />
+      <InputText
+        label="Trust override (advanced)"
+        name="trustOverride"
+        inputProps={{ type: 'number', value: incident?.trustOverride ?? '', placeholder: 'Auto from severity' }}
+        description="Optional. A negative number forces a fixed penalty instead of the computed one."
+        error={errors.trustOverride}
+      />
+    </div>
+  </div>
+</div>
+
+<style>
+  /* No-JS reveal (same pattern as the contact form): incident fields show only
+     for a security incident, resolution fields only when the status is Resolved. */
+  [data-incident-block] [data-incident-fields] {
+    display: none;
+  }
+  [data-incident-block]:has(input[name='kind'][value='INCIDENT']:checked) [data-incident-fields] {
+    display: block;
+  }
+  [data-incident-block] [data-resolution-fields] {
+    display: none;
+  }
+  [data-incident-block]:has(input[name='state'][value='RESOLVED']:checked) [data-resolution-fields] {
+    display: grid;
+  }
+</style>
