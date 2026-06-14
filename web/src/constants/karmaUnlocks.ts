@@ -15,7 +15,7 @@ export type KarmaUnlockInfo<T extends string | null | undefined = string> = {
 
 export const APPROVED_ORDER_ID_REVIEW_WEIGHT = 0.9
 
-export const { dataArray: karmaUnlocks, dataObject: karmaUnlocksById } = makeHelpersForOptions(
+const karmaUnlockHelpers = makeHelpersForOptions(
   'id',
   (id): KarmaUnlockInfo<typeof id> => ({
     id,
@@ -139,6 +139,16 @@ export const { dataArray: karmaUnlocks, dataObject: karmaUnlocksById } = makeHel
     },
   ] as const satisfies KarmaUnlockInfo[]
 )
+
+export const karmaUnlocksById = karmaUnlockHelpers.dataObject
+
+export type KarmaUnlockId = (typeof karmaUnlockHelpers.dataArray)[number]['id']
+
+// Widened view of the options: each member keeps its literal id (so
+// karmaUnlocksById lookups and user.karmaUnlocks[id] stay type-safe) while the
+// per-member-optional fields (reviewWeight, unlockDirection, karmaLabel) become
+// reachable when iterating, instead of existing only on the members that set them.
+export const karmaUnlocks: readonly KarmaUnlockInfo<KarmaUnlockId>[] = karmaUnlockHelpers.dataArray
 
 // keep reviewWeight unlocks in sync with calculate_comment_rating_trust() in prisma/triggers/03_service_user_rating.sql.
 // changing review weight thresholds requires updating the trigger and its drift test.

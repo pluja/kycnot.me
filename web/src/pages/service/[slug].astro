@@ -512,7 +512,7 @@ const bannerVerificationSteps = sortedVerificationSteps.filter(
       step.status === VerificationStepStatus.FAILED)
 )
 
-const exchangeSlugs = ['exchange', 'cex', 'dex'] as const satisfies string[]
+const exchangeSlugs = ['exchange', 'cex', 'dex']
 const isExchange = service.categories.some((c) => exchangeSlugs.includes(c.slug))
 
 // Show swap CTA / compare section only when the aggregator can actually quote
@@ -553,7 +553,7 @@ const checkSegments = [
     icon: 'ri:hourglass-line' as const,
     iconClass: 'text-day-500',
   },
-].filter((s): s is { text: string; icon: string; iconClass: string; textClass?: string } => !!s)
+].filter((s): s is Exclude<typeof s, false> => !!s)
 const verificationStatusDateLabel =
   service.verificationStatus === 'VERIFICATION_SUCCESS'
     ? 'Verified'
