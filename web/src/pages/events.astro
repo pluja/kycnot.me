@@ -5,6 +5,7 @@ import { orderBy } from 'lodash-es'
 
 import Button from '../components/Button.astro'
 import FormatTimeInterval from '../components/FormatTimeInterval.astro'
+import Markdown from '../components/Markdown.astro'
 import MyPicture from '../components/MyPicture.astro'
 import TimeFormatted from '../components/TimeFormatted.astro'
 import { getEventTypeInfo } from '../constants/eventTypes'
@@ -522,9 +523,9 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
                     </a>
                   )}
                 </div>
-                <p class="mt-2 line-clamp-3 text-base font-normal text-pretty text-zinc-400">
-                  {event.content}
-                </p>
+                <div class="prose mt-2 max-w-none text-pretty text-zinc-400 prose-invert prose-p:my-0 prose-p:line-clamp-3 prose-a:text-current">
+                  <Markdown content={event.content} linkRel={['nofollow', 'noopener']} />
+                </div>
               </div>
                 </li>
               </>
