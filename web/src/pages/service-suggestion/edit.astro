@@ -7,11 +7,13 @@ import {
   SUGGESTION_NOTES_MAX_LENGTH,
 } from '../../actions/serviceSuggestion'
 import Captcha from '../../components/Captcha.astro'
+import FormReplay from '../../components/FormReplay.astro'
 import InputHoneypotTrap from '../../components/InputHoneypotTrap.astro'
 import InputSubmitButton from '../../components/InputSubmitButton.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
 import ServiceCard from '../../components/ServiceCard.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import { getFormReplay } from '../../lib/formReplay'
 import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
@@ -26,6 +28,10 @@ if (result && !result.error) {
   return Astro.redirect(`/service-suggestion/${result.data.serviceSuggestion.id}`)
 }
 const inputErrors = isInputError(result?.error) ? result.error.fields : {}
+
+// Replay the previous submission into the notes field so a failed validation
+// (e.g. a wrong captcha) does not wipe what the user typed.
+const replay = getFormReplay(Astro.locals.actionFormValues)
 
 const { data: params } = zodParseQueryParamsStoringErrors(
   {
@@ -100,7 +106,7 @@ if (!service) return Astro.rewrite('/404')
     <InputTextArea
       label="Note for Moderators"
       name="notes"
-      value={params.notes}
+      value={replay.text('notes', params.notes)}
       description={`Required. Explain the requested changes with enough detail for moderators to act on them. Minimum ${SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH.toLocaleString()} characters.`}
       inputProps={{
         rows: 10,
@@ -114,6 +120,8 @@ if (!service) return Astro.rewrite('/404')
     />
 
     <Captcha action={actions.serviceSuggestion.editService} />
+
+    <FormReplay />
 
     <InputHoneypotTrap name="message" />
 
