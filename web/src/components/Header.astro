@@ -117,17 +117,14 @@ const splashText = showSplashText ? sample(splashTexts) : null
     }
 
     <div class="flex items-center">
-      <Tooltip
-        as="a"
+      <a
         href="/about"
         class="flex h-full items-center gap-1.5 px-1 text-day-700 transition-colors hover:text-day-300 2xs:px-2 xs:px-3"
-        text="About & FAQ"
-        position="bottom"
         aria-label="About and FAQ"
       >
         <Icon name="ri:information-line" class="size-5" />
         <span class="hidden text-sm font-medium xs:inline">About</span>
-      </Tooltip>
+      </a>
 
       <Tooltip
         as="a"
