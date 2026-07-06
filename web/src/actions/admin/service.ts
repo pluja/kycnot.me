@@ -93,6 +93,7 @@ const updateServiceInputSchema = serviceSchemaBase
 const evidenceImageAddSchema = z.object({
   serviceId: z.number().int().positive(),
   imageFile: imageFileSchema,
+  watermark: z.coerce.boolean().default(false),
 })
 
 const evidenceImageDeleteSchema = z.object({
@@ -498,7 +499,8 @@ export const adminServiceActions = {
         const imageUrl = await saveFileLocally(
           input.imageFile,
           input.imageFile.name,
-          `evidence/${service.slug}`
+          `evidence/${service.slug}`,
+          { watermark: input.watermark }
         )
 
         return { imageUrl }

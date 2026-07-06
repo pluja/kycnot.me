@@ -1,4 +1,5 @@
 ---
+import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
 import Button from '../../../Button.astro'
@@ -22,6 +23,7 @@ const { serviceId, evidenceImages, addInputErrors, id = 'evidence-images' } = As
 const addImageSectionId = `${id}-add`
 const sectionHash = `#${id}`
 const addImageSectionHash = `#${addImageSectionId}`
+const watermarkId = `${id}-watermark`
 ---
 
 <FormSection title="Evidence Images" id={id}>
@@ -99,6 +101,20 @@ const addImageSectionHash = `#${addImageSectionId}`
         error={addInputErrors.imageFile}
         required
       />
+      <div class="flex items-center gap-3 rounded-lg border border-night-400 bg-night-600 p-3">
+        <input
+          type="checkbox"
+          id={watermarkId}
+          name="watermark"
+          value="true"
+          checked
+          class="size-4 rounded-sm border-zinc-600 bg-zinc-800 text-blue-500 focus:ring-blue-500"
+        />
+        <label for={watermarkId} class="flex items-center gap-2 text-sm text-day-200">
+          <Icon name="ri:drop-line" class="size-4 text-day-400" />
+          Apply KYCNOT.ME watermark to the image
+        </label>
+      </div>
       <InputSubmitButton label="Add Image" icon="ri:add-line" hideCancel />
     </form>
   </FormSubSection>
