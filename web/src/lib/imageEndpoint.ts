@@ -13,6 +13,8 @@ import { getConfiguredImageService, imageConfig } from 'astro:assets'
 import { UPLOAD_DIR } from 'astro:env/server'
 import * as mime from 'mrmime'
 
+import { validateImageParams } from './imageRequestValidation'
+
 import type { APIContext, APIRoute } from 'astro'
 
 const FILES_PREFIX = '/files/'
@@ -34,6 +36,12 @@ async function defaultImageEndpoint(context: APIContext): Promise<Response> {
 export const GET: APIRoute = async (context) => {
   const { request } = context
   const url = new URL(request.url)
+
+  const paramError = validateImageParams(url.searchParams)
+  if (paramError) {
+    return new Response(paramError, { status: 400 })
+  }
+
   const href = url.searchParams.get('href') ?? ''
 
   if (extractFilesSubpath(href) === null) {
