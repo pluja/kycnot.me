@@ -61,3 +61,12 @@ void test('allows position and background params that Astro can emit', () => {
   assert.equal(check('href=/files/x.png&w=100&h=100&fit=cover&position=top'), null)
   assert.equal(check('href=/files/x.png&background=%23ffffff'), null)
 })
+
+void test('only allows f=svg for an svg source', () => {
+  // Astro emits f=svg solely for .svg sources; a tampered f=svg on a raster
+  // would otherwise be served as image/svg+xml (the reported XML-error bug).
+  assert.equal(check('href=/files/logo.svg&f=svg'), null)
+  assert.equal(check('href=https://kycnot.me/files/logo.svg&f=svg'), null)
+  assert.notEqual(check('href=/files/services/pictures/135b5950cd.png&f=svg'), null)
+  assert.notEqual(check('href=/files/x.png&f=svg'), null)
+})

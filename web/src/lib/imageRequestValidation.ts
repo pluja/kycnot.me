@@ -43,5 +43,16 @@ export function validateImageParams(params: URLSearchParams): string | null {
     return 'Invalid "f" parameter'
   }
 
+  // Astro only emits `f=svg` for an SVG source (MyPicture keys on the `.svg`
+  // extension). A tampered `f=svg` on a raster would otherwise be returned by
+  // sharp's service as the raster bytes labelled `image/svg+xml`, so gate it on
+  // the href actually being an SVG.
+  if (format === 'svg') {
+    const hrefPath = (params.get('href') ?? '').split(/[?#]/)[0] ?? ''
+    if (!hrefPath.toLowerCase().endsWith('.svg')) {
+      return 'Invalid "f" parameter'
+    }
+  }
+
   return null
 }
