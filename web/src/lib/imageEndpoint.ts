@@ -14,10 +14,25 @@ import { UPLOAD_DIR } from 'astro:env/server'
 import * as mime from 'mrmime'
 
 import { validateImageParams } from './imageRequestValidation'
+import { LruByteCache } from './lruByteCache'
+import { Semaphore } from './semaphore'
 
 import type { APIContext, APIRoute } from 'astro'
 
 const FILES_PREFIX = '/files/'
+
+// Transforms are CPU-heavy (sharp/libvips) and allocate native memory, so
+// bursts must queue behind a small concurrency cap and shed beyond a
+// bounded backlog rather than balloon RSS (2026-07-15 outage).
+const transformSemaphore = new Semaphore(4, 100)
+
+// Transformed uploads are immutable per (file, params); the byte-capped LRU
+// turns the homepage's thumbnail set into cache hits instead of repeated
+// sharp work per new visitor.
+const transformCache = new LruByteCache<{ data: Uint8Array<ArrayBuffer>; format: string }>(
+  32 * 1024 * 1024,
+  1024 * 1024
+)
 
 // Non-upload images (content/asset images like blog covers) are handed back to
 // Astro's built-in endpoint. The `node` build endpoint walks a built server
@@ -45,8 +60,9 @@ export const GET: APIRoute = async (context) => {
   const href = url.searchParams.get('href') ?? ''
 
   if (extractFilesSubpath(href) === null) {
-    // Not one of our uploads, let Astro's default endpoint handle it.
-    return defaultImageEndpoint(context)
+    // Not one of our uploads, let Astro's default endpoint handle it. It
+    // transforms too, so it shares the concurrency cap.
+    return transformSemaphore.run(() => defaultImageEndpoint(context)) ?? busyResponse()
   }
 
   try {
@@ -63,27 +79,72 @@ export const GET: APIRoute = async (context) => {
     const filesSubpath = extractFilesSubpath(transform.src)
     if (filesSubpath === null) {
       // parseURL may have rewritten src; fall back rather than 403.
-      return await defaultImageEndpoint(context)
+      return (await transformSemaphore.run(() => defaultImageEndpoint(context))) ?? busyResponse()
     }
 
-    const inputBuffer = await readUpload(filesSubpath)
-    if (!inputBuffer) {
+    const uploadPath = resolveUploadPath(filesSubpath)
+    if (!uploadPath) {
       return new Response('Not found', { status: 404 })
     }
 
-    const { data, format } = await imageService.transform(inputBuffer, transform, imageConfig)
+    let stat
+    try {
+      stat = await fs.stat(uploadPath)
+    } catch {
+      return new Response('Not found', { status: 404 })
+    }
 
-    return new Response(new Uint8Array(data), {
-      status: 200,
-      headers: {
-        'Content-Type': mime.lookup(format) ?? `image/${format}`,
-        'Cache-Control': 'public, max-age=31536000, immutable',
-      },
-    })
+    // mtime+size in the key so a replaced file under the same name never
+    // serves a stale transform.
+    const cacheKey = [
+      filesSubpath,
+      stat.mtimeMs,
+      stat.size,
+      transform.width ?? '',
+      transform.height ?? '',
+      transform.format ?? '',
+      transform.quality ?? '',
+    ].join('|')
+
+    const cached = transformCache.get(cacheKey)
+    if (cached) {
+      return imageResponse(cached.data, cached.format)
+    }
+
+    const inputBuffer = await fs.readFile(uploadPath)
+    const pending = transformSemaphore.run(() =>
+      imageService.transform(inputBuffer, transform, imageConfig)
+    )
+    if (!pending) {
+      return busyResponse()
+    }
+
+    const { data, format } = await pending
+    const bytes = new Uint8Array(data)
+    transformCache.set(cacheKey, { data: bytes, format }, bytes.byteLength)
+
+    return imageResponse(bytes, format)
   } catch (error) {
     console.error('[imageEndpoint] Could not process image request:', error)
     return new Response('Internal Server Error', { status: 500 })
   }
+}
+
+function busyResponse(): Response {
+  return new Response('Image service busy', {
+    status: 503,
+    headers: { 'Retry-After': '5' },
+  })
+}
+
+function imageResponse(data: Uint8Array<ArrayBuffer>, format: string): Response {
+  return new Response(data, {
+    status: 200,
+    headers: {
+      'Content-Type': mime.lookup(format) ?? `image/${format}`,
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    },
+  })
 }
 
 function extractFilesSubpath(src: string): string | null {
@@ -101,7 +162,7 @@ function extractFilesSubpath(src: string): string | null {
   return null
 }
 
-async function readUpload(subpath: string): Promise<Buffer | undefined> {
+function resolveUploadPath(subpath: string): string | undefined {
   const uploadPath = path.isAbsolute(UPLOAD_DIR)
     ? UPLOAD_DIR
     : path.join(process.cwd(), UPLOAD_DIR)
@@ -111,10 +172,5 @@ async function readUpload(subpath: string): Promise<Buffer | undefined> {
   if (!fullPath.startsWith(uploadPath + path.sep) && fullPath !== uploadPath) {
     return undefined
   }
-
-  try {
-    return await fs.readFile(fullPath)
-  } catch {
-    return undefined
-  }
+  return fullPath
 }
