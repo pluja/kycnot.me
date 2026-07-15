@@ -45,6 +45,9 @@ RUN chmod +x /usr/local/bin/knm-entrypoint
 
 ENV HOST=0.0.0.0
 ENV PORT=4321
+# glibc malloc fragments under sharp/libvips' thread pool and RSS never
+# returns to the OS; two arenas keep it bounded (2026-07-15 outage).
+ENV MALLOC_ARENA_MAX=2
 EXPOSE 4321
 
 CMD ["knm-entrypoint"]
