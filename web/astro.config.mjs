@@ -174,7 +174,14 @@ export default defineConfig({
   },
   security: {
     checkOrigin: true,
-    allowedDomains: [{ hostname: new URL(SITE_URL).hostname, protocol: 'https' }],
+    // Onion/I2P entries are required: hosts missing from allowedDomains get
+    // their Host header discarded by the node adapter, which breaks the
+    // checkOrigin comparison and 403s every form POST on those mirrors.
+    allowedDomains: [
+      { hostname: new URL(SITE_URL).hostname, protocol: 'https' },
+      { hostname: new URL(ONION_ADDRESS).hostname, protocol: 'http' },
+      { hostname: new URL(I2P_ADDRESS).hostname, protocol: 'http' },
+    ],
     // Must stay above MAX_IMAGE_SIZE (5MB, see src/lib/zodUtils.ts) to allow image uploads
     // through Astro Actions, accounting for multipart/form-data overhead.
     actionBodySizeLimit: 6 * 1024 * 1024,
