@@ -62,6 +62,21 @@ void test('allows position and background params that Astro can emit', () => {
   assert.equal(check('href=/files/x.png&background=%23ffffff'), null)
 })
 
+void test('accepts the href shapes Astro emits', () => {
+  assert.equal(check('href=/files/services/pictures/135b5950cd.png'), null)
+  assert.equal(check('href=/_astro/cover.abc123.png'), null)
+  assert.equal(check('href=https://kycnot.me/files/x.png&w=96'), null)
+})
+
+void test('rejects malformed href before it can 500 the default endpoint', () => {
+  assert.notEqual(check('w=96&h=96&f=webp'), null) // missing href
+  assert.notEqual(check('href=&w=96'), null) // empty href
+  assert.notEqual(check('href=a&w=96&h=96&f=webp'), null) // bare word
+  assert.notEqual(check('href=kycnot.me/files/x.png&w=96'), null) // no scheme
+  assert.notEqual(check('href=//evil.com/x&w=96'), null) // protocol-relative
+  assert.notEqual(check('href=ftp://x/y&w=96'), null) // non-http scheme
+})
+
 void test('only allows f=svg for an svg source', () => {
   // Astro emits f=svg solely for .svg sources; a tampered f=svg on a raster
   // would otherwise be served as image/svg+xml (the reported XML-error bug).

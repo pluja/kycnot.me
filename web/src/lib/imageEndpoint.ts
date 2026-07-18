@@ -59,13 +59,13 @@ export const GET: APIRoute = async (context) => {
 
   const href = url.searchParams.get('href') ?? ''
 
-  if (extractFilesSubpath(href) === null) {
-    // Not one of our uploads, let Astro's default endpoint handle it. It
-    // transforms too, so it shares the concurrency cap.
-    return transformSemaphore.run(() => defaultImageEndpoint(context)) ?? busyResponse()
-  }
-
   try {
+    if (extractFilesSubpath(href) === null) {
+      // Not one of our uploads, let Astro's default endpoint handle it. It
+      // transforms too, so it shares the concurrency cap.
+      return (await transformSemaphore.run(() => defaultImageEndpoint(context))) ?? busyResponse()
+    }
+
     const imageService = await getConfiguredImageService()
     if (!('transform' in imageService)) {
       throw new Error('Configured image service is not a local service')
@@ -119,7 +119,17 @@ export const GET: APIRoute = async (context) => {
       return busyResponse()
     }
 
-    const { data, format } = await pending
+    let result
+    try {
+      result = await pending
+    } catch (error) {
+      // A stored upload libvips can't decode (e.g. an .ico) is a bad asset, not
+      // a server fault; 415 keeps it out of the 5xx count while staying logged.
+      console.error('[imageEndpoint] Could not transform image:', error)
+      return new Response('Unsupported image', { status: 415 })
+    }
+
+    const { data, format } = result
     const bytes = new Uint8Array(data)
     transformCache.set(cacheKey, { data: bytes, format }, bytes.byteLength)
 
@@ -132,7 +142,7 @@ export const GET: APIRoute = async (context) => {
 
 function busyResponse(): Response {
   return new Response('Image service busy', {
-    status: 503,
+    status: 429,
     headers: { 'Retry-After': '5' },
   })
 }

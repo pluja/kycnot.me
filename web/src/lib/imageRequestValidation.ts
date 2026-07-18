@@ -20,12 +20,32 @@ function parsedIntInRange(raw: string, min: number, max: number): boolean {
   return !Number.isNaN(value) && value >= min && value <= max
 }
 
+// isProcessableHref accepts only the href shapes Astro emits: a root-relative
+// path (site assets and /files/ uploads) or an absolute http/https URL. Anything
+// else (bare word, scheme-relative //host, junk) would otherwise reach Astro's
+// default image endpoint and throw an uncaught 500.
+function isProcessableHref(href: string): boolean {
+  if (href.startsWith('//')) return false
+  if (href.startsWith('/')) return true
+  try {
+    const { protocol } = new URL(href)
+    return protocol === 'http:' || protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 // validateImageParams rejects `/_image` requests whose parameters fall outside
 // what Astro generates. Without it a user-supplied `w`/`h` reaches sharp
 // unbounded, so one request can upscale a tiny source into a multi-gigapixel
 // bitmap and exhaust CPU and memory. Returns an error message when invalid, or
 // null when safe to process.
 export function validateImageParams(params: URLSearchParams): string | null {
+  const href = params.get('href')
+  if (href === null || !isProcessableHref(href)) {
+    return 'Invalid "href" parameter'
+  }
+
   for (const key of ['w', 'h'] as const) {
     const raw = params.get(key)
     if (raw !== null && !parsedIntInRange(raw, 1, MAX_IMAGE_DIMENSION)) {
