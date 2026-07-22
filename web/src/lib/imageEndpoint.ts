@@ -13,6 +13,7 @@ import { getConfiguredImageService, imageConfig } from 'astro:assets'
 import { UPLOAD_DIR } from 'astro:env/server'
 import * as mime from 'mrmime'
 
+import { isPublicUploadSubpath } from './fileStorage'
 import { validateImageParams } from './imageRequestValidation'
 import { LruByteCache } from './lruByteCache'
 import { Semaphore } from './semaphore'
@@ -59,8 +60,15 @@ export const GET: APIRoute = async (context) => {
 
   const href = url.searchParams.get('href') ?? ''
 
+  const requestedSubpath = extractFilesSubpath(href)
+  if (requestedSubpath !== null && !isPublicUploadSubpath(requestedSubpath)) {
+    // Private upload subtrees (case evidence) are never served here; they go
+    // through the access-checked /case-media route.
+    return new Response('Not found', { status: 404 })
+  }
+
   try {
-    if (extractFilesSubpath(href) === null) {
+    if (requestedSubpath === null) {
       // Not one of our uploads, let Astro's default endpoint handle it. It
       // transforms too, so it shares the concurrency cap.
       return (await transformSemaphore.run(() => defaultImageEndpoint(context))) ?? busyResponse()

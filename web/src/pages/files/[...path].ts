@@ -4,6 +4,8 @@ import path from 'node:path'
 import { UPLOAD_DIR } from 'astro:env/server'
 import { lookup } from 'mime-types'
 
+import { isPublicUploadSubpath } from '../../lib/fileStorage'
+
 import type { APIRoute } from 'astro'
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -18,6 +20,12 @@ const ALLOWED_MIME_TYPES = new Set([
 export const GET: APIRoute = async ({ params }) => {
   const filePath = params.path
   if (!filePath) {
+    return new Response('File not found', { status: 404 })
+  }
+
+  // Only public upload subtrees are served here. Private subtrees (case
+  // evidence) are access-controlled and served by /case-media.
+  if (!isPublicUploadSubpath(filePath)) {
     return new Response('File not found', { status: 404 })
   }
 

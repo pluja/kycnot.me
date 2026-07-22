@@ -41,6 +41,18 @@ function hashContent(buffer: Buffer): string {
   return createHash('sha1').update(buffer).digest('hex').substring(0, 10)
 }
 
+// PUBLIC_UPLOAD_PREFIXES are the upload subtrees the unauthenticated /files and
+// /_image routes may serve. Anything outside them (e.g. `cases/` evidence) is
+// access-controlled and must go through a route that checks the viewer. The
+// allow-list defaults any new upload type to private.
+export const PUBLIC_UPLOAD_PREFIXES = ['services/', 'users/', 'evidence/'] as const
+
+// isPublicUploadSubpath reports whether an upload subpath (the part after
+// `/files/`, e.g. `services/pictures/x.png`) may be served publicly.
+export function isPublicUploadSubpath(subpath: string): boolean {
+  return PUBLIC_UPLOAD_PREFIXES.some((prefix) => subpath.startsWith(prefix))
+}
+
 /**
  * Save a file locally and return its web-accessible URL path. When
  * `watermark` is set, the image is tiled with the KYCNOT.ME watermark before
