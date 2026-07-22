@@ -90,6 +90,12 @@ export const GET: APIRoute = async (context) => {
       return (await transformSemaphore.run(() => defaultImageEndpoint(context))) ?? busyResponse()
     }
 
+    // Authoritative gate: the path actually read must be a public subtree, even
+    // if parseURL rewrote src away from the already-checked href.
+    if (!isPublicUploadSubpath(filesSubpath)) {
+      return new Response('Not found', { status: 404 })
+    }
+
     const uploadPath = resolveUploadPath(filesSubpath)
     if (!uploadPath) {
       return new Response('Not found', { status: 404 })
