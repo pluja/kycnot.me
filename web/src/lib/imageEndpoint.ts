@@ -13,10 +13,10 @@ import { getConfiguredImageService, imageConfig } from 'astro:assets'
 import { UPLOAD_DIR } from 'astro:env/server'
 import * as mime from 'mrmime'
 
-import { isPublicUploadSubpath } from './fileStorage'
 import { validateImageParams } from './imageRequestValidation'
 import { LruByteCache } from './lruByteCache'
 import { Semaphore } from './semaphore'
+import { isPublicUploadSubpath } from './uploadAccess'
 
 import type { APIContext, APIRoute } from 'astro'
 

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { UPLOAD_DIR } from 'astro:env/server'
 import { lookup } from 'mime-types'
 
-import { isPublicUploadSubpath } from '../../lib/fileStorage'
+import { isPublicUploadSubpath } from '../../lib/uploadAccess'
 
 import type { APIRoute } from 'astro'
 
