@@ -4,6 +4,7 @@ import { actions } from 'astro:actions'
 
 import { caseEvidenceTypes, getCaseEvidenceTypeInfo } from '../../../constants/caseEvidenceTypes'
 import { caseVisibilities, getCaseVisibilityInfo } from '../../../constants/caseVisibility'
+import { caseEvidenceMediaUrl } from '../../../lib/caseMedia'
 import { cn } from '../../../lib/cn'
 import BadgeSmall from '../../BadgeSmall.astro'
 import InputImageFile from '../../InputImageFile.astro'
@@ -11,7 +12,6 @@ import InputSelect from '../../InputSelect.astro'
 import InputSubmitButton from '../../InputSubmitButton.astro'
 import InputText from '../../InputText.astro'
 import InputTextArea from '../../InputTextArea.astro'
-import MyPicture from '../../MyPicture.astro'
 import TimeFormatted from '../../TimeFormatted.astro'
 import DeleteConfirmButton from '../DeleteConfirmButton.astro'
 
@@ -61,6 +61,7 @@ const textItems = evidence.filter((item) => !item.imageUrl)
         {mediaItems.map((item) => {
           const typeInfo = getCaseEvidenceTypeInfo(item.type)
           const visInfo = getCaseVisibilityInfo(item.visibility)
+          const mediaUrl = caseEvidenceMediaUrl(item.imageUrl ?? '')
           return (
             <div class="group relative flex flex-col rounded-md border border-night-600 bg-night-800 p-2">
               {canManage && (
@@ -79,13 +80,15 @@ const textItems = evidence.filter((item) => !item.imageUrl)
                 type="button"
                 class="block w-full cursor-zoom-in"
                 data-lightbox-trigger
-                data-lightbox-src={item.imageUrl}
+                data-lightbox-src={mediaUrl}
               >
-                <MyPicture
-                  src={item.imageUrl}
+                <img
+                  src={mediaUrl}
                   alt={item.description ?? 'Case evidence'}
-                  width={220}
-                  height={220}
+                  width="220"
+                  height="220"
+                  loading="lazy"
+                  decoding="async"
                   class="aspect-square w-full rounded-sm object-cover"
                 />
               </button>
@@ -102,7 +105,7 @@ const textItems = evidence.filter((item) => !item.imageUrl)
                 <input
                   type="text"
                   readonly
-                  value={`![${item.description ?? 'evidence'}](${item.imageUrl})`}
+                  value={`![${item.description ?? 'evidence'}](${mediaUrl})`}
                   class="w-full cursor-text rounded-sm border border-night-600 bg-night-700 p-1 font-mono text-[10px] text-day-200 select-all"
                 />
                 <TimeFormatted date={item.createdAt} class="block text-[10px] text-day-500" hourPrecision />

@@ -42,3 +42,18 @@ export function caseVisibilityTiersFor(user: CaseAccessUser, caseRow: CaseForAcc
   if (canParticipateInCase(user, caseRow)) return [CaseVisibility.PUBLIC, CaseVisibility.PARTICIPANTS]
   return [CaseVisibility.PUBLIC]
 }
+
+type CaseEvidenceForAccess = {
+  visibility: CaseVisibility
+  case: CaseForAccess & { status: CaseStatus }
+}
+
+// canViewCaseEvidence mirrors the case page's gate for a single evidence item:
+// staff see everything; everyone else needs the case published and the
+// evidence's tier within their reach. It is the authority for serving the
+// underlying evidence file, which lives outside the public upload routes.
+export function canViewCaseEvidence(user: CaseAccessUser, evidence: CaseEvidenceForAccess): boolean {
+  if (isCaseStaff(user)) return true
+  if (!isCasePublished(evidence.case.status)) return false
+  return caseVisibilityTiersFor(user, evidence.case).includes(evidence.visibility)
+}
