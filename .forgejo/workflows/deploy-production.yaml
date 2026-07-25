@@ -10,8 +10,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  ASTRO_IMAGE: codeberg.org/pluja/kycnot/astro
-  PYWORKER_IMAGE: codeberg.org/pluja/kycnot/pyworker
+  ASTRO_IMAGE: tig.cx/pluja/kycnot/astro
+  PYWORKER_IMAGE: tig.cx/pluja/kycnot/pyworker
 
 jobs:
   build:
@@ -55,21 +55,28 @@ jobs:
             exit 1
           fi
 
-      - name: Login to Codeberg registry
+      - name: Login to tig.cx registry
         run: |
           set -euo pipefail
           export DOCKER_CONFIG="$FORGEJO_WORKSPACE/.docker"
           mkdir -p "$DOCKER_CONFIG"
 
-          if [ -z "${{ secrets.CODEBERG_PACKAGE_USER }}" ] || [ -z "${{ secrets.CODEBERG_PACKAGE_TOKEN }}" ]; then
-            echo "Missing CODEBERG_PACKAGE_USER or CODEBERG_PACKAGE_TOKEN action secret." >&2
+          if [ -z "${{ secrets.TIG_PACKAGE_USER }}" ] || [ -z "${{ secrets.TIG_PACKAGE_TOKEN }}" ]; then
+            echo "Missing TIG_PACKAGE_USER or TIG_PACKAGE_TOKEN action secret." >&2
             exit 1
           fi
 
-          printf '%s' "${{ secrets.CODEBERG_PACKAGE_TOKEN }}" \
-            | docker login codeberg.org \
-              --username "${{ secrets.CODEBERG_PACKAGE_USER }}" \
+          printf '%s' "${{ secrets.TIG_PACKAGE_TOKEN }}" \
+            | docker login tig.cx \
+              --username "${{ secrets.TIG_PACKAGE_USER }}" \
               --password-stdin
+
+      - name: Reclaim disk from old deploy images
+        run: |
+          set -euo pipefail
+          # Each deploy builds a new tagged image; without pruning these
+          # accumulate until the disk fills and the build (and Postgres) die.
+          docker image prune -af || true
 
       - name: Build and push images
         id: images
