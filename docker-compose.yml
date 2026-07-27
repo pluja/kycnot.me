@@ -22,7 +22,7 @@ services:
   pyworker:
     build:
       context: ./pyworker
-    image: codeberg.org/pluja/kycnot/pyworker:${PYWORKER_IMAGE_TAG:-latest}
+    image: tig.cx/pluja/kycnot/pyworker:${PYWORKER_IMAGE_TAG:-latest}
     restart: always
     init: true
     stop_grace_period: 30s
@@ -56,7 +56,7 @@ services:
   astro:
     build:
       dockerfile: web/Dockerfile
-    image: codeberg.org/pluja/kycnot/astro:${ASTRO_IMAGE_TAG:-latest}
+    image: tig.cx/pluja/kycnot/astro:${ASTRO_IMAGE_TAG:-latest}
     restart: unless-stopped
     init: true
     stop_grace_period: 30s

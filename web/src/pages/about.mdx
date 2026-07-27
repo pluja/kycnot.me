@@ -7,6 +7,8 @@ description: 'Learn what KYCnot.me is, how we score and verify crypto services, 
 icon: 'ri:information-line'
 ---
 
+import { SOURCE_CODE_URL } from 'astro:env/client'
+
 import DonationAddress from '../components/DonationAddress.astro'
 import OfficialLinks from '../components/OfficialLinks.astro'
 
@@ -199,7 +201,7 @@ These categories **directly influence** a service's Privacy and Trust scores, wh
 
 #### Service Scores
 
-Scores are calculated **automatically** using clear, fixed rules based on the attributes of the service ([See all attributes](/attributes)). We do not change or adjust scores by hand. The scoring system is [**open-source**](https://codeberg.org/pluja/kycnotme) and anyone can review or suggest improvements.
+Scores are calculated **automatically** using clear, fixed rules based on the attributes of the service ([See all attributes](/attributes)). We do not change or adjust scores by hand. The scoring system is <a href={SOURCE_CODE_URL}><strong>open-source</strong></a> and anyone can review or suggest improvements.
 
 ##### Privacy Score
 
@@ -386,7 +388,7 @@ Use the right channel for what you need:
 
 - **Suggest a new service**: [service suggestion form](/service-suggestion/new). Submissions get a tracking page where moderators reply. Use this channel for any inquiries about your service listing.
 - **Edit or report an issue with a listed service**: use the edit link on the service page itself and create an Edit Suggestion.
-- **Report a website bug**: open an issue on the [source code repository](https://codeberg.org/pluja/kycnotme/issues), not the contact form.
+- **Report a website bug**: open an issue on the [public mirror](https://github.com/pluja/kycnot.me/issues), not the contact form.
 - **Asking about listing, approval, or verification timing**: the answer is in [Listings](#listings). We can't give estimates.
 - **Anything else that genuinely needs a human**: [contact form](/contact). Expect a reply within a few days, or none if your question is already answered above.
 

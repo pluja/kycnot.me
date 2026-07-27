@@ -64,4 +64,4 @@ I'm a one-person team, dedicating my free time to this project. I hope to keep d
 > The full case for why this site exists is in [KYC? No, thanks](/blog/kyc-no-thanks). For practical guides, start with the [5 rules to avoid scams and frozen funds](/blog/stay-safe-using-services), [a DIY metal seed backup for under €20](/blog/diy-seed-backup), and [the history of Monero](/blog/monero-history).
 
 [^1]: https://x.com/freedomtech/status/1796190018588872806
-[^2]: https://codeberg.org/pluja/kycnot.me
+[^2]: https://tig.cx/pluja/kycnotme

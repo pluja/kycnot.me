@@ -1,7 +1,7 @@
 set dotenv-load
 
-astro_image := env_var_or_default("ASTRO_IMAGE", "codeberg.org/pluja/kycnot/astro")
-pyworker_image := env_var_or_default("PYWORKER_IMAGE", "codeberg.org/pluja/kycnot/pyworker")
+astro_image := env_var_or_default("ASTRO_IMAGE", "tig.cx/pluja/kycnot/astro")
+pyworker_image := env_var_or_default("PYWORKER_IMAGE", "tig.cx/pluja/kycnot/pyworker")
 
 @default:
   just --list
@@ -59,7 +59,8 @@ deploy-prod flag="":
 
   exec just _deploy prod production SSH_PROD_TARGET APP_DIR_PROD yes "$image_tag"
 
-# Fast-forward master to dev and push. Run after a verified prod deploy.
+# Fast-forward master to dev and push. Run after preprod is verified, before
+# tagging: deploy-prod refuses a tag that is not already on master.
 promote-to-master:
   #!/usr/bin/env bash
   set -euo pipefail

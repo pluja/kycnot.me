@@ -37,4 +37,4 @@ The swap page is live and running. From here, expect improvements. If you spot s
 
 ## Transparency
 
-The comparison feature is powered by a partnership with **OrangeFren**, limited strictly to the swap page. The rest of KYCnot.me works exactly as it always has. As always, the code is [open source](https://codeberg.org/pluja/kycnotme).
+The comparison feature is powered by a partnership with **OrangeFren**, limited strictly to the swap page. The rest of KYCnot.me works exactly as it always has. As always, the code is [open source](https://tig.cx/pluja/kycnotme).
