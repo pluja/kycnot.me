@@ -190,7 +190,7 @@ const sourceUrl =
       }
     </div>
 
-    <div class="prose prose-sm mt-4 max-w-none text-pretty text-day-200 prose-invert">
+    <div class="prose prose-sm mt-4 max-w-none text-pretty wrap-anywhere text-day-200 prose-invert">
       <Markdown content={caseRow.summaryMd} />
     </div>
 
@@ -198,7 +198,7 @@ const sourceUrl =
       caseRow.resolutionMd && (
         <div class="mt-4 rounded-lg border border-green-500/30 bg-green-950/20 p-3">
           <p class="mb-1 text-xs font-semibold text-green-300">Resolution</p>
-          <div class="prose prose-sm max-w-none text-pretty text-day-200 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
+          <div class="prose prose-sm max-w-none text-pretty wrap-anywhere text-day-200 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
             <Markdown content={caseRow.resolutionMd} />
           </div>
         </div>
