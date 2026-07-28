@@ -8,9 +8,8 @@ export const PUBLIC_UPLOAD_PREFIXES = ['services/', 'users/', 'evidence/'] as co
 
 // isPublicUploadSubpath reports whether an upload subpath (the part after
 // `/files/`, e.g. `services/pictures/x.png`) may be served publicly. The path is
-// normalized first so a traversal such as `evidence/../cases/x` — which resolves
-// into the private subtree but textually starts with a public prefix — cannot
-// slip past the check.
+// normalized first so a traversal such as `evidence/../cases/x` cannot slip past:
+// it textually starts with a public prefix but resolves into the private subtree.
 export function isPublicUploadSubpath(subpath: string): boolean {
   const normalized = path.posix.normalize(subpath)
   if (path.posix.isAbsolute(normalized) || normalized === '..' || normalized.startsWith('../')) {
