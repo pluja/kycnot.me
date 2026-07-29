@@ -1,5 +1,5 @@
 ---
-import { VerificationStepStatus, EventType, ServiceVisibility } from '@prisma/client'
+import { VerificationStepStatus, EventType } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
 import { Schema } from 'astro-seo-schema'
 import { actions } from 'astro:actions'
@@ -15,12 +15,12 @@ import DropdownButton from '../../components/DropdownButton.astro'
 import DropdownButtonItemForm from '../../components/DropdownButtonItemForm.astro'
 import DropdownButtonItemLink from '../../components/DropdownButtonItemLink.astro'
 import FormatTimeInterval from '../../components/FormatTimeInterval.astro'
+import IncidentCard from '../../components/IncidentCard.astro'
 import InputSubmitButton from '../../components/InputSubmitButton.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
 import Markdown from '../../components/Markdown.astro'
 import MyPicture from '../../components/MyPicture.astro'
 import { makeOgImageUrl, type OgImageAllTemplatesWithProps } from '../../components/OgImage'
-import IncidentCard from '../../components/IncidentCard.astro'
 import ScoreGauge from '../../components/ScoreGauge.astro'
 import ScoreSquare from '../../components/ScoreSquare.astro'
 import ServiceLinkButton from '../../components/ServiceLinkButton.astro'
@@ -47,21 +47,22 @@ import { someButNotAll, undefinedIfEmpty } from '../../lib/arrays'
 import { makeNonDbAttributes, sortAttributes } from '../../lib/attributes'
 import { cn } from '../../lib/cn'
 import { safeHttpUrl } from '../../lib/exchange/safeUrl'
-import { computeIncidentTrustPenalty, totalIncidentTrustPenalty } from '../../lib/incidentPenalty'
 import { getSupportedProviderSlugs } from '../../lib/exchange/supportedProviders'
+import { computeIncidentTrustPenalty, totalIncidentTrustPenalty } from '../../lib/incidentPenalty'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
 import { pluralize } from '../../lib/pluralize'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
 import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
 import { isEmbeddableBadgeStatus } from '../../lib/serviceBadges'
+import { serviceDetailSelect } from '../../lib/serviceDetail'
 import { getServiceVerificationOverview } from '../../lib/serviceVerification'
 import { transformCase } from '../../lib/strings'
 import { formatDateShort } from '../../lib/timeAgo'
 import { absoluteSiteUrl, siteOrigin, urlDomain, urlWithParams } from '../../lib/urls'
 
 import type { BreadcrumArray } from '../../components/BaseHead.astro'
-import type { Prisma } from '@prisma/client'
+import type { Prisma, ServiceVisibility } from '@prisma/client'
 import type { ContactPoint, ListItem, Organization, Review, WebPage, WithContext } from 'schema-dts'
 
 const { slug } = Astro.params
@@ -86,162 +87,7 @@ const [service, dbNotificationPreferences] = await Astro.locals.banners.tryMany(
           slug,
           serviceVisibility: { in: visibleStatuses },
         },
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-          description: true,
-          kycLevel: true,
-          kycPolicyMd: true,
-          overallScore: true,
-          privacyScore: true,
-          trustScore: true,
-          verificationStatus: true,
-          serviceVisibility: true,
-          verificationSummary: true,
-          verificationProofMd: true,
-          tosUrls: true,
-          serviceUrls: true,
-          onionUrls: true,
-          i2pUrls: true,
-          referral: true,
-          imageUrl: true,
-          listedAt: true,
-          approvedAt: true,
-          verifiedAt: true,
-          createdAt: true,
-          acceptedCurrencies: true,
-          operatingSince: true,
-          registrationCountryCode: true,
-          registeredCompanyName: true,
-          tosReview: true,
-          tosReviewAt: true,
-          userSentiment: true,
-          userSentimentAt: true,
-          averageUserRating: true,
-          trustWeightedUserRating: true,
-          userRatingCount: true,
-          trustedUserRatingCount: true,
-          userRatingWeight: true,
-          isRecentlyApproved: true,
-          strictCommentingEnabled: true,
-          commentSectionMessage: true,
-          contactMethods: {
-            select: {
-              value: true,
-              label: true,
-            },
-          },
-          affiliatedUsers: {
-            where: { userId: user?.id ?? -1 },
-            select: { id: true },
-          },
-          attributes: {
-            select: {
-              attribute: {
-                select: {
-                  id: true,
-                  type: true,
-                  category: true,
-                  title: true,
-                  description: true,
-                  privacyPoints: true,
-                  trustPoints: true,
-                },
-              },
-            },
-          },
-          categories: {
-            select: {
-              icon: true,
-              name: true,
-              slug: true,
-            },
-          },
-          events: {
-            where: {
-              visible: true,
-            },
-            select: {
-              id: true,
-              title: true,
-              content: true,
-              type: true,
-              class: true,
-              sentiment: true,
-              startedAt: true,
-              endedAt: true,
-              source: true,
-              incident: {
-                select: {
-                  type: true,
-                  severity: true,
-                  state: true,
-                  occurredAt: true,
-                  resolvedAt: true,
-                  outcome: true,
-                  amountText: true,
-                  trustOverride: true,
-                },
-              },
-            },
-          },
-          suggestions: {
-            select: {
-              id: true,
-              status: true,
-            },
-            where: {
-              userId: user?.id,
-            },
-          },
-          verificationRequests: {
-            select: {
-              id: true,
-              userId: true,
-            },
-          },
-          verificationSteps: {
-            select: {
-              title: true,
-              description: true,
-              status: true,
-              evidenceMd: true,
-              showBanner: true,
-              createdAt: true,
-              updatedAt: true,
-            },
-          },
-          internalNotes: {
-            select: {
-              id: true,
-              content: true,
-              createdAt: true,
-              addedByUser: {
-                select: {
-                  name: true,
-                  displayName: true,
-                  picture: true,
-                },
-              },
-            },
-            orderBy: { createdAt: 'desc' },
-          },
-          _count: {
-            select: {
-              comments: {
-                where: {
-                  ratingActive: true,
-                  status: {
-                    in: ['APPROVED', 'VERIFIED'],
-                  },
-                  parentId: null,
-                  ratingMuted: false,
-                },
-              },
-            },
-          },
-        },
+        select: serviceDetailSelect(user?.id ?? -1),
       }),
     null,
   ],
@@ -434,7 +280,10 @@ const formatRating = (rating: number) => {
 const formatLimitedList = (values: string[], maxVisible = 4) => {
   if (values.length <= maxVisible) return sentenceListFormatter.format(values)
   const hiddenCount = values.length - maxVisible
-  return sentenceListFormatter.format([...values.slice(0, maxVisible), `${hiddenCount.toLocaleString()} more`])
+  return sentenceListFormatter.format([
+    ...values.slice(0, maxVisible),
+    `${hiddenCount.toLocaleString()} more`,
+  ])
 }
 const getArticle = (text: string) => (/^[aeiou]/i.test(text) ? 'an' : 'a')
 const getKycPolicySummary = (kycLevel: number) => {
@@ -570,8 +419,7 @@ const sortedVerificationSteps = orderBy(
 const bannerVerificationSteps = sortedVerificationSteps.filter(
   (step) =>
     step.showBanner &&
-    (step.status === VerificationStepStatus.WARNING ||
-      step.status === VerificationStepStatus.FAILED)
+    (step.status === VerificationStepStatus.WARNING || step.status === VerificationStepStatus.FAILED)
 )
 
 const exchangeSlugs = ['exchange', 'cex', 'dex']
@@ -583,8 +431,7 @@ const isExchange = service.categories.some((c) => exchangeSlugs.includes(c.slug)
 const supportedProviderSlugs = isExchange ? await getSupportedProviderSlugs() : null
 const isSwapSupported =
   !!supportedProviderSlugs &&
-  (supportedProviderSlugs.has(service.slug) ||
-    (import.meta.env.DEV && supportedProviderSlugs.size === 0))
+  (supportedProviderSlugs.has(service.slug) || (import.meta.env.DEV && supportedProviderSlugs.size === 0))
 
 const verificationOverview = getServiceVerificationOverview(service)
 
@@ -743,7 +590,9 @@ const verificationStatusDate =
         <div class="inline [&_a]:underline [&_p]:inline">
           <Markdown content={activeEventToShow.content} linkRel={['nofollow', 'noopener']} />
         </div>
-        {activeAlertOrWarningEvents.length >= 2 && <> +{activeAlertOrWarningEvents.length - 1} more events.</>}{' '}
+        {activeAlertOrWarningEvents.length >= 2 && (
+          <> +{activeAlertOrWarningEvents.length - 1} more events.</>
+        )}{' '}
         <a href="#events" class="underline hover:opacity-80">
           Go to events
         </a>
@@ -764,8 +613,14 @@ const verificationStatusDate =
               : 'border-yellow-500/30 bg-yellow-500/10 text-yellow-100'
           )}
         >
-          <Icon name={statusInfo.icon} class={cn('me-1.5 inline-block size-4 align-[-0.15em]', statusInfo.iconClass)} />
-          <span class="font-bold">{statusInfo.label}: {step.title}.</span> {step.description}{' '}
+          <Icon
+            name={statusInfo.icon}
+            class={cn('me-1.5 inline-block size-4 align-[-0.15em]', statusInfo.iconClass)}
+          />
+          <span class="font-bold">
+            {statusInfo.label}: {step.title}.
+          </span>{' '}
+          {step.description}{' '}
           <a href="#verification-steps" class="underline hover:opacity-80">
             See verification
           </a>
@@ -1065,8 +920,12 @@ const verificationStatusDate =
     {
       serviceSummary && (
         <p class="!mt-4 text-day-300">
-          <span aria-hidden="true" class="font-bold tracking-wide text-day-500 uppercase">Summary</span>
-          <span aria-hidden="true" class="mx-1 font-bold text-day-500">•</span>
+          <span aria-hidden="true" class="font-bold tracking-wide text-day-500 uppercase">
+            Summary
+          </span>
+          <span aria-hidden="true" class="mx-1 font-bold text-day-500">
+            •
+          </span>
           {serviceSummary}
         </p>
       )
@@ -1561,7 +1420,10 @@ const verificationStatusDate =
                   </>
                 ))}
               </span>
-              <Icon name="ri:arrow-down-s-line" class="size-4 shrink-0 transition-transform group-open:rotate-180" />
+              <Icon
+                name="ri:arrow-down-s-line"
+                class="size-4 shrink-0 transition-transform group-open:rotate-180"
+              />
             </summary>
             <ul class="mt-2 space-y-2">
               {pastIncidents.map((entry) => (
