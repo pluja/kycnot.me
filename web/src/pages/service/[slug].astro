@@ -40,7 +40,7 @@ import { getKycLevelInfo, kycLevels } from '../../constants/kycLevels'
 import { getServiceVisibilityInfo } from '../../constants/serviceVisibility'
 import { getTosHighlightRatingInfo } from '../../constants/tosHighlightRating'
 import { getUserSentimentInfo } from '../../constants/userSentiment'
-import { getVerificationStatusInfo, verificationStatusesByValue } from '../../constants/verificationStatus'
+import { getServiceStatusIcon, getVerificationStatusInfo } from '../../constants/verificationStatus'
 import { getVerificationStepStatusInfo } from '../../constants/verificationStepStatus'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { someButNotAll, undefinedIfEmpty } from '../../lib/arrays'
@@ -329,10 +329,7 @@ const makeWatchingDetails = (
 
 const watchingDetails = makeWatchingDetails(dbNotificationPreferences, service.id)
 
-const statusIcon = {
-  ...verificationStatusesByValue,
-  APPROVED: undefined,
-}[service.verificationStatus]
+const statusBadge = getServiceStatusIcon(service.verificationStatus)
 
 const shuffledLinks = {
   clearnet: shuffle(service.serviceUrls),
@@ -461,9 +458,15 @@ const categorySummary = service.categories.length
   ? `${sentenceListFormatter.format(service.categories.map((category) => category.name.toLowerCase()))} service`
   : 'service'
 const acceptedCurrencyNames = service.acceptedCurrencies.map((currency) => getCurrencyInfo(currency).name)
+// A flagged service leads with the verdict. The neutral facts below otherwise
+// read as a feature list, and this string is also the meta description, so a
+// scam would advertise its own no-KYC policy in search results.
 const serviceFactsSummary = [
+  isFlaggedScam ? `${service.name} is flagged as a scam on KYCnot.me. ${statusInfo.headline}.` : null,
   `${service.name} is ${getArticle(categorySummary)} ${categorySummary}${acceptedCurrencyNames.length > 0 ? ` that accepts ${formatLimitedList(acceptedCurrencyNames)}` : ''}.`,
-  `It ${getKycPolicySummary(kycLevelInfo.value)} and has a score of ${formatRating(service.overallScore)}/10.`,
+  isFlaggedScam
+    ? `It has a score of ${formatRating(service.overallScore)}/10.`
+    : `It ${getKycPolicySummary(kycLevelInfo.value)} and has a score of ${formatRating(service.overallScore)}/10.`,
   service.userRatingCount > 0 &&
     service.averageUserRating !== null &&
     `There ${service.userRatingCount === 1 ? 'is' : 'are'} ${service.userRatingCount.toLocaleString()} user ${pluralize('rating', service.userRatingCount)} averaging ${formatRating(service.averageUserRating)}/5.`,
@@ -471,13 +474,20 @@ const serviceFactsSummary = [
   .filter((sentence): sentence is string => !!sentence)
   .join(' ')
 const serviceSummary = transformCase(serviceFactsSummary, 'first-upper')
-const pageDescription =
-  [
-    serviceSummary,
-    `${service.name} review: ${kycTitlePhrase}${categoryTitlePhrase}, KYC policy notes, ${Math.round(service.privacyScore).toLocaleString()}% privacy score, ${Math.round(service.trustScore).toLocaleString()}% trust score, supported currencies, and user feedback.`,
-    `${service.name} review: ${kycTitlePhrase}${categoryTitlePhrase}, KYC policy notes, privacy score, trust score, supported currencies, and user feedback.`,
-    `Review ${service.name} on KYCnot.me. Check KYC policy notes, privacy score, trust score, supported currencies, and user feedback.`,
-  ].find((description) => description.length <= 200) ?? `Review ${service.name} on KYCnot.me. Check KYC policy, privacy score, trust score, supported currencies, and user feedback.`
+// The shorter fallbacks stay scam-led too: the meta description is what search
+// results show, so a flagged service must never fall back to a neutral blurb.
+const scamDescription = `${service.name} is flagged as a scam on KYCnot.me. ${statusInfo.headline}.`
+const pageDescription = isFlaggedScam
+  ? ([serviceSummary, `${scamDescription} See the scores, review history, and user reports.`].find(
+      (description) => description.length <= 200
+    ) ?? scamDescription)
+  : ([
+      serviceSummary,
+      `${service.name} review: ${kycTitlePhrase}${categoryTitlePhrase}, KYC policy notes, ${Math.round(service.privacyScore).toLocaleString()}% privacy score, ${Math.round(service.trustScore).toLocaleString()}% trust score, supported currencies, and user feedback.`,
+      `${service.name} review: ${kycTitlePhrase}${categoryTitlePhrase}, KYC policy notes, privacy score, trust score, supported currencies, and user feedback.`,
+      `Review ${service.name} on KYCnot.me. Check KYC policy notes, privacy score, trust score, supported currencies, and user feedback.`,
+    ].find((description) => description.length <= 200) ??
+    `Review ${service.name} on KYCnot.me. Check KYC policy, privacy score, trust score, supported currencies, and user feedback.`)
 
 const ogImageTemplateData = {
   template: 'service',
@@ -810,19 +820,24 @@ const verificationStatusDate =
     <div class="flex min-w-0 flex-1 flex-col gap-2">
       <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
         <h1 class="font-title text-2xl/tight font-bold tracking-wider text-white">
-          {service.name}{
-            !!statusIcon && (
-              <Tooltip text={statusIcon.label} position="right">
-                <Icon
-                  name={statusIcon.icon}
-                  class={cn('ms-2 box-content inline-block size-6 shrink-0 pb-0.5', statusIcon.classNames.icon)}
-                />
-              </Tooltip>
-            )
-          }
+          {service.name}
         </h1>
 
         <ul class="flex flex-wrap gap-2" aria-label="Categories">
+          {
+            !!statusBadge && (
+              <li>
+                {/* Leads the row so the verdict is read before the category. */}
+                <Tooltip class="inline-flex" text={statusBadge.description} position="bottom">
+                  <BadgeStandard
+                    icon={statusBadge.icon}
+                    text={statusBadge.labelShort}
+                    class={cn('font-bold', statusBadge.classNames.badgeBig)}
+                  />
+                </Tooltip>
+              </li>
+            )
+          }
           <li class="contents">
             {
               service.categories.map((category) => (

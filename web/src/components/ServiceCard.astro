@@ -100,29 +100,37 @@ const kycLevelInfo = getKycLevelInfo(`${kycLevel}`)
       <div class="flex min-w-0 flex-1 flex-col justify-center self-stretch">
         <h2 class="font-title text-lg leading-none font-medium tracking-wide text-white">
           {name}{
-            statusIcon && (
-              <Tooltip
-                text={statusIcon.label}
-                position="right"
-                class="-my-2 shrink-0 whitespace-nowrap"
-                enabled={verificationStatus !== 'VERIFICATION_FAILED'}
-              >
-                {[
+            statusIcon &&
+              (verificationStatus === 'VERIFICATION_FAILED' ? (
+                /* Filled badge rather than a bare icon: the verdict has to be
+                   readable at a glance in a dense listing. */
+                <Tooltip
+                  text={statusIcon.description}
+                  position="right"
+                  class="ms-2 inline-flex align-[-0.2em]"
+                >
+                  <span
+                    class={cn(
+                      'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap',
+                      statusIcon.classNames.badgeBig
+                    )}
+                  >
+                    <Icon is:inline={inlineIcons} name={statusIcon.icon} class="size-3.5" />
+                    {statusIcon.labelShort}
+                  </span>
+                </Tooltip>
+              ) : (
+                <Tooltip text={statusIcon.label} position="right" class="-my-2 shrink-0 whitespace-nowrap">
                   <Icon
                     is:inline={inlineIcons}
                     name={statusIcon.icon}
                     class={cn(
                       'inline-block size-6 shrink-0 rounded-lg p-1 align-[-0.37em]',
-                      verificationStatus === 'VERIFICATION_FAILED' && 'pr-0',
                       statusIcon.classNames.icon
                     )}
-                  />,
-                  verificationStatus === 'VERIFICATION_FAILED' && (
-                    <span class="text-sm font-bold text-red-500">SCAM</span>
-                  ),
-                ]}
-              </Tooltip>
-            )
+                  />
+                </Tooltip>
+              ))
           }{
             serviceVisibility === 'ARCHIVED' && (
               <Tooltip

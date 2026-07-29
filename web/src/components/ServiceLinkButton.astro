@@ -142,7 +142,9 @@ const Tag = isScam ? 'span' : 'a'
   rel={isScam ? undefined : 'nofollow noopener'}
   class={cn(
     'inline-flex h-6 items-center gap-1 rounded-full bg-white text-xs whitespace-nowrap text-black focus-visible:ring-4 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-night-700 focus-visible:outline-none 2xs:h-8 2xs:gap-2 2xs:text-sm',
-    isScam && 'cursor-not-allowed bg-day-800 text-red-300',
+    // The trailing arrow supplies the right-hand spacing; without it (scam) the
+    // pill needs its own padding or the text sits flush against the edge.
+    isScam && 'cursor-not-allowed bg-day-800 pr-3 text-red-300 2xs:pr-4',
     className
   )}
   title={link.url}
