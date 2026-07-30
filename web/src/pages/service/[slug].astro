@@ -678,21 +678,20 @@ const verificationStatusDate =
           {service.name}
         </h1>
 
+        {
+          /* Outside the category list: it is a verdict, not a category. */
+          !!statusBadge && (
+            <Tooltip class="inline-flex" text={statusBadge.description} position="bottom">
+              <BadgeStandard
+                icon={statusBadge.icon}
+                text={statusBadge.labelShort}
+                class={cn('font-bold', statusBadge.classNames.badgeBig)}
+              />
+            </Tooltip>
+          )
+        }
+
         <ul class="flex flex-wrap gap-2" aria-label="Categories">
-          {
-            !!statusBadge && (
-              <li>
-                {/* Leads the row so the verdict is read before the category. */}
-                <Tooltip class="inline-flex" text={statusBadge.description} position="bottom">
-                  <BadgeStandard
-                    icon={statusBadge.icon}
-                    text={statusBadge.labelShort}
-                    class={cn('font-bold', statusBadge.classNames.badgeBig)}
-                  />
-                </Tooltip>
-              </li>
-            )
-          }
           <li class="contents">
             {
               service.categories.map((category) => (
