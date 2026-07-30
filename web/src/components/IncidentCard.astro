@@ -5,13 +5,18 @@ import { format } from 'date-fns'
 import { getIncidentSeverityInfo } from '../constants/incidentSeverities'
 import { cn } from '../lib/cn'
 import { computeIncidentTrustPenalty } from '../lib/incidentPenalty'
+import { stripMarkdown } from '../lib/strings'
 
+import CaseReportsStrip from './cases/CaseReportsStrip.astro'
 import IncidentMeta from './IncidentMeta.astro'
 import Markdown from './Markdown.astro'
 
-import type { IncidentOutcome, IncidentSeverity, IncidentState } from '@prisma/client'
+import type { CaseStatus, IncidentOutcome, IncidentSeverity, IncidentState } from '@prisma/client'
 
 type Props = {
+  /// The owning Event's id. Anchors like the service page banner, the case page
+  /// link and the RSS feed all point at `#event-<id>`, so it has to be rendered.
+  eventId: number
   title: string
   content: string
   source: string | null
@@ -22,12 +27,29 @@ type Props = {
   outcome: IncidentOutcome | null
   amountText: string | null
   trustOverride: number | null
+  serviceSlug: string
+  /// Published reports judged to substantiate this incident.
+  cases?: { publicId: string; title: string; status: CaseStatus }[]
   /// Penalty has decayed to zero: render muted, no penalty number, kept for history.
   faded?: boolean
 }
 
-const { title, content, source, severity, state, occurredAt, resolvedAt, outcome, amountText, trustOverride, faded = false } =
-  Astro.props
+const {
+  eventId,
+  title,
+  content,
+  source,
+  severity,
+  state,
+  occurredAt,
+  resolvedAt,
+  outcome,
+  amountText,
+  trustOverride,
+  serviceSlug,
+  cases = [],
+  faded = false,
+} = Astro.props
 
 const sev = getIncidentSeverityInfo(severity)
 const penalty = computeIncidentTrustPenalty({ severity, state, resolvedAt, outcome, trustOverride })
@@ -38,11 +60,7 @@ const dateLabel = resolvedAt
   ? `${format(occurredAt, 'MMM d')} → ${format(resolvedAt, 'MMM d, yyyy')}`
   : `Started ${format(occurredAt, 'MMM d, yyyy')}`
 
-const excerpt = content
-  .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-  .replace(/[#*_`>~]/g, '')
-  .replace(/\s+/g, ' ')
-  .trim()
+const excerpt = stripMarkdown(content)
 
 const railClass = faded ? 'bg-day-700' : sev.classNames.rail
 const borderClass = faded ? 'border-day-800' : sev.classNames.border
@@ -50,12 +68,17 @@ const bgClass = faded ? 'bg-night-800/30' : sev.classNames.bg
 const labelClass = faded ? 'text-day-500' : sev.classNames.text
 ---
 
-<article class={cn('relative overflow-hidden rounded-lg border pl-3', borderClass, bgClass)}>
+<article
+  id={`event-${eventId.toString()}`}
+  class={cn('relative scroll-mt-24 overflow-hidden rounded-lg border pl-3', borderClass, bgClass)}
+>
   <span class={cn('absolute inset-y-0 left-0 w-1', railClass)} aria-hidden="true"></span>
 
   <div class="flex items-start gap-3 px-3 pt-2.5">
     <div class="min-w-0 flex-1">
-      <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs font-semibold tracking-wide uppercase">
+      <div
+        class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs font-semibold tracking-wide uppercase"
+      >
         <span class={cn('inline-flex items-center gap-1', labelClass)}>
           <Icon name={sev.icon} class="size-3.5" />
           {sev.label}
@@ -106,7 +129,7 @@ const labelClass = faded ? 'text-day-500' : sev.classNames.text
   {
     ongoing ? (
       <div class="px-3 pt-2 pb-3">
-        <div class="prose prose-sm max-w-none text-pretty text-day-400 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
+        <div class="prose prose-sm max-w-none text-pretty wrap-anywhere text-day-400 prose-invert prose-a:text-current prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
           <Markdown content={content} linkRel={['nofollow', 'noopener']} />
         </div>
         <p class="mt-3 flex items-center gap-1.5 text-xs text-day-500">
@@ -114,11 +137,14 @@ const labelClass = faded ? 'text-day-500' : sev.classNames.text
           Full penalty applies until resolved.
         </p>
         <IncidentMeta amountText={amountText} source={source} />
+        <CaseReportsStrip serviceSlug={serviceSlug} cases={cases} faded={faded} class="mt-3" />
       </div>
     ) : (
       <details class="group">
         <summary class="flex cursor-pointer list-none items-center gap-2 px-3 pt-1 pb-2.5 [&::-webkit-details-marker]:hidden">
-          <span class="min-w-0 flex-1 truncate text-sm text-day-400 group-open:hidden">{excerpt}</span>
+          <span class="min-w-0 flex-1 truncate text-sm text-day-400 group-open:hidden" aria-hidden="true">
+            {excerpt}
+          </span>
           <span class="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-day-400 transition-colors group-hover:text-day-200">
             <span class="group-open:hidden">Read more</span>
             <span class="hidden group-open:inline">Show less</span>
@@ -127,7 +153,7 @@ const labelClass = faded ? 'text-day-500' : sev.classNames.text
         </summary>
 
         <div class="px-3 pb-3">
-          <div class="prose prose-sm max-w-none text-pretty text-day-400 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
+          <div class="prose prose-sm max-w-none text-pretty wrap-anywhere text-day-400 prose-invert prose-a:text-current prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
             <Markdown content={content} linkRel={['nofollow', 'noopener']} />
           </div>
 
@@ -154,6 +180,7 @@ const labelClass = faded ? 'text-day-500' : sev.classNames.text
           </div>
 
           <IncidentMeta amountText={amountText} source={source} />
+          <CaseReportsStrip serviceSlug={serviceSlug} cases={cases} faded={faded} class="mt-3" />
         </div>
       </details>
     )

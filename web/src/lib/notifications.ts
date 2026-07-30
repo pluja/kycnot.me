@@ -1,6 +1,6 @@
 import { accountStatusChangesById } from '../constants/accountStatusChange'
 import { commentStatusChangesById } from '../constants/commentStatusChange'
-import { eventTypesById } from '../constants/eventTypes'
+import { getEventDisplay } from './eventKind'
 import { getKarmaTransactionActionInfo } from '../constants/karmaTransactionActions'
 import { serviceVerificationStatusChangesById } from '../constants/serviceStatusChange'
 import { getServiceSuggestionTypeInfo } from '../constants/serviceSuggestionType'
@@ -78,6 +78,10 @@ export function makeNotificationTitle(
       aboutEvent: {
         select: {
           type: true
+          class: true
+          sentiment: true
+          startedAt: true
+          endedAt: true
           service: {
             select: {
               name: true
@@ -187,8 +191,7 @@ export function makeNotificationTitle(
     case 'EVENT_CREATED': {
       if (!notification.aboutEvent) return 'New event on a service'
       const service = notification.aboutEvent.service.name
-      const eventType = eventTypesById[notification.aboutEvent.type].label
-      return `${eventType} event on ${service}`
+      return `${getEventDisplay(notification.aboutEvent).label} on ${service}`
     }
     case 'SERVICE_VERIFICATION_STATUS_CHANGE': {
       if (!notification.aboutService) return 'Service verification status updated'

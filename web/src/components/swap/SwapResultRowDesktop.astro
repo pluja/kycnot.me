@@ -1,8 +1,8 @@
 ---
 import { getCountryInfo } from '../../constants/countries'
-import { getEventTypeInfo } from '../../constants/eventTypes'
 import { getVerificationStatusInfo } from '../../constants/verificationStatus'
 import { cn } from '../../lib/cn'
+import { getEventDisplay } from '../../lib/eventKind'
 
 import KycPolicyPanel from './KycPolicyPanel.astro'
 import { describeGuaranteeCoverage } from './swapResultUi'
@@ -37,7 +37,7 @@ const quote = item.quote
 const kycAttributes = service?.attributes.map((a) => a.attribute) ?? []
 const activeEvents = (service?.events ?? []).map((event) => ({
   ...event,
-  typeInfo: getEventTypeInfo(event.type),
+  display: getEventDisplay(event),
 }))
 const operatingSinceYear = service?.operatingSince ? service.operatingSince.getUTCFullYear() : null
 const onionUrls = service?.onionUrls ?? []

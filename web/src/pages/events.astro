@@ -3,18 +3,17 @@ import { z } from 'astro/zod'
 import { Icon } from 'astro-icon/components'
 import { orderBy } from 'lodash-es'
 
+import BadgeSmall from '../components/BadgeSmall.astro'
 import Button from '../components/Button.astro'
-import FormatTimeInterval from '../components/FormatTimeInterval.astro'
-import Markdown from '../components/Markdown.astro'
+import EventCard from '../components/events/EventCard.astro'
+import EventServiceLink from '../components/events/EventServiceLink.astro'
 import MyPicture from '../components/MyPicture.astro'
 import TimeFormatted from '../components/TimeFormatted.astro'
-import { getEventTypeInfo } from '../constants/eventTypes'
 import { getIncidentSeverityInfo } from '../constants/incidentSeverities'
-import { getServiceVisibilityInfo } from '../constants/serviceVisibility'
 import { getVerificationStatusInfo } from '../constants/verificationStatus'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { cn } from '../lib/cn'
-import { safeHttpUrl } from '../lib/exchange/safeUrl'
+import { getEventDisplay } from '../lib/eventKind'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { formatDateShort } from '../lib/timeAgo'
@@ -119,6 +118,8 @@ const [services, [dbEvents, totalEvents]] = await Astro.locals.banners.tryMany([
           source: true,
           type: true,
           class: true,
+          sentiment: true,
+          origin: true,
           incident: {
             select: {
               severity: true,
@@ -138,9 +139,7 @@ const [services, [dbEvents, totalEvents]] = await Astro.locals.banners.tryMany([
             },
           },
         },
-        orderBy: {
-          startedAt: 'desc',
-        },
+        orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
         skip: (params.page - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
       }),
@@ -160,7 +159,9 @@ const groupMeta = {
 
 const events = orderBy(
   dbEvents.map((event) => {
-    const isOngoing = event.endedAt === null || event.endedAt >= params.now
+    // Grouping and the card badge read the same predicate, so a row cannot sit
+    // under "Ongoing" while its badge says resolved.
+    const isOngoing = !getEventDisplay(event, params.now).isResolved
     const group: keyof typeof GROUP_ORDER =
       event.class === 'INCIDENT' && isOngoing ? 'incident' : isOngoing ? 'ongoing' : 'past'
     return {
@@ -168,13 +169,9 @@ const events = orderBy(
       actualEndedAt: event.endedAt ?? params.now,
       isOngoing,
       group,
-      typeInfo: getEventTypeInfo(event.type),
+      display: getEventDisplay(event, params.now),
       severityInfo: event.incident ? getIncidentSeverityInfo(event.incident.severity) : null,
-      service: {
-        ...event.service,
-        verificationStatusInfo: getVerificationStatusInfo(event.service.verificationStatus),
-        serviceVisibilityInfo: getServiceVisibilityInfo(event.service.serviceVisibility),
-      },
+      service: event.service,
     }
   }),
   [(event) => GROUP_ORDER[event.group], 'actualEndedAt', 'startedAt'],
@@ -272,11 +269,13 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
     <label for="view" class="mt-3 mb-1 block text-xs font-medium text-day-400">Show</label>
     <div class="relative">
       <select id="view" name="view" class={cn(fieldClass, 'appearance-none pr-9')}>
-        {eventViews.map((view) => (
-          <option value={view.value} selected={params.view === view.value}>
-            {view.label}
-          </option>
-        ))}
+        {
+          eventViews.map((view) => (
+            <option value={view.value} selected={params.view === view.value}>
+              {view.label}
+            </option>
+          ))
+        }
       </select>
       <Icon
         name="ri:arrow-down-s-line"
@@ -288,11 +287,13 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
     <div class="relative">
       <select id="service" name="service" class={cn(fieldClass, 'appearance-none pr-9')}>
         <option value="">All Services</option>
-        {services.map((service) => (
-          <option value={service.slug} selected={params.service === service.slug}>
-            {service.name}
-          </option>
-        ))}
+        {
+          services.map((service) => (
+            <option value={service.slug} selected={params.service === service.slug}>
+              {service.name}
+            </option>
+          ))
+        }
       </select>
       <Icon
         name="ri:arrow-down-s-line"
@@ -396,7 +397,7 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
 
     {
       events.length > 0 ? (
-        <ol id="events-list" class="mx-auto mt-12 sm:mt-0">
+        <ol id="events-list" class="mx-auto mt-12 space-y-2.5 sm:mt-0">
           {events.map((event, i) => {
             const showHeader = i === 0 || events[i - 1]?.group !== event.group
             const section = groupMeta[event.group]
@@ -405,169 +406,76 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
                 {showHeader && (
                   <li class="mt-7 mb-3 flex items-center gap-2 first:mt-0">
                     <Icon name={section.icon} class={cn('size-4 shrink-0', section.class)} />
-                    <span class="text-xs font-semibold tracking-wider text-day-400 uppercase">
+                    <h2 class="text-xs font-semibold tracking-wider text-day-400 uppercase">
                       {section.label}
-                    </span>
+                    </h2>
                     <span class="h-px flex-1 bg-day-800" />
                   </li>
                 )}
                 <li
-                  class="flex items-stretch gap-2"
                   data-hx-event-item
-              {...(i === events.length - 1 && hasMorePages
-                ? {
-                    'hx-get': createPageUrl(params.page + 1, Astro.url, {
-                      ...Object.fromEntries(Astro.url.searchParams.entries()),
-                      now: params.now.toISOString(),
-                    }),
-                    'hx-trigger': 'revealed',
-                    'hx-swap': 'afterend',
-                    'hx-select': '[data-hx-event-item]',
-                    'hx-indicator': '#infinite-scroll-indicator',
-                  }
-                : {})}
-            >
-              <div class="flex flex-col items-center">
-                <div
-                  class={cn(
-                    'z-10 flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-700 ring-3 ring-zinc-700/50',
-                    event.typeInfo.classNames.dot
-                  )}
+                  {...(i === events.length - 1 && hasMorePages
+                    ? {
+                        'hx-get': createPageUrl(params.page + 1, Astro.url, {
+                          ...Object.fromEntries(Astro.url.searchParams.entries()),
+                          now: params.now.toISOString(),
+                        }),
+                        'hx-trigger': 'revealed',
+                        'hx-swap': 'afterend',
+                        'hx-select': '[data-hx-event-item]',
+                        'hx-indicator': '#infinite-scroll-indicator',
+                      }
+                    : {})}
                 >
-                  <Icon name={event.typeInfo.icon} class="size-3" />
-                </div>
-                <div class="w-0.5 flex-1 bg-zinc-600" />
-              </div>
-
-              <div class="-mt-0.5 flex-1 pb-6">
-                {event.severityInfo && (
-                  <div class="mb-1 flex flex-wrap items-center gap-2 text-2xs font-semibold tracking-wide uppercase">
-                    <span class={cn('inline-flex items-center gap-1', event.severityInfo.classNames.text)}>
-                      <Icon name={event.severityInfo.icon} class="size-3.5" />
-                      {event.severityInfo.label} incident
-                    </span>
-                    {event.incident?.state === 'RESOLVED' && (
-                      <span class="inline-flex items-center gap-1 text-green-400">
-                        <Icon name="ri:checkbox-circle-fill" class="size-3.5" />
-                        Resolved
-                      </span>
-                    )}
-                  </div>
-                )}
-                <h2 class="min-h-5 flex-1 font-title text-lg/tight font-semibold text-pretty text-white">
-                  {event.title}
-                </h2>
-
-                <FormatTimeInterval
-                  as="p"
-                  start={event.startedAt}
-                  end={event.endedAt}
-                  now={params.now}
-                  class="mt-2 block text-sm leading-none font-normal text-balance text-zinc-300"
-                />
-
-                <div class="mt-3 flex items-center gap-4">
-                  <a
-                    href={`/service/${event.service.slug}`}
-                    class="-m-1.5 flex w-fit items-center rounded-md p-1.5 leading-none transition-colors hover:bg-zinc-800"
+                  <EventCard
+                    event={event}
+                    now={params.now}
+                    titleHref={`/service/${event.service.slug}#event-${event.id.toString()}`}
                   >
-                    {event.service.imageUrl && (
-                      <MyPicture
-                        src={event.service.imageUrl}
-                        alt={event.service.name}
-                        width={16}
-                        height={16}
-                        class="size-4 shrink-0 rounded-xs object-contain"
-                      />
-                    )}
+                    <Fragment slot="meta">
+                      <span class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <EventServiceLink service={event.service} />
 
-                    <span
-                      class={cn(
-                        'ms-2 text-sm leading-none text-zinc-300',
-                        event.service.verificationStatus === 'VERIFICATION_FAILED' && 'text-red-200'
-                      )}
-                    >
-                      {event.service.name}
-                    </span>
-
-                    {event.service.verificationStatus !== 'APPROVED' && (
-                      <Icon
-                        name={event.service.verificationStatusInfo.icon}
-                        class={cn(
-                          'ms-1 inline-block size-3 shrink-0',
-                          event.service.verificationStatusInfo.classNames.icon
+                        {event.severityInfo && (
+                          <BadgeSmall
+                            text={`${event.severityInfo.label} severity`}
+                            icon={event.severityInfo.icon}
+                            color={event.severityInfo.color}
+                            variant="faded"
+                          />
                         )}
-                      />
-                    )}
-
-                    {event.service.serviceVisibility === 'ARCHIVED' && (
-                      <Icon
-                        name={event.service.serviceVisibilityInfo.icon}
-                        class={cn(
-                          'ms-1 inline-block size-3 shrink-0',
-                          event.service.serviceVisibilityInfo.iconClass
-                        )}
-                      />
-                    )}
-                  </a>
-
-                  {safeHttpUrl(event.source) && (
-                    <a
-                      href={safeHttpUrl(event.source)}
-                      target="_blank"
-                      rel="nofollow noopener"
-                      class="inline-block text-xs text-blue-400 hover:underline"
-                    >
-                      Source
-                      <Icon name="ri:external-link-line" class="inline-block size-3 align-[-0.1em]" />
-                    </a>
-                  )}
-                </div>
-                <div class="prose mt-2 max-w-none text-pretty text-zinc-400 prose-invert prose-p:my-0 prose-p:line-clamp-3 prose-a:text-current">
-                  <Markdown content={event.content} linkRel={['nofollow', 'noopener']} />
-                </div>
-              </div>
+                      </span>
+                    </Fragment>
+                  </EventCard>
                 </li>
               </>
             )
           })}
 
           {!hasMorePages && (
-            <div class="flex min-h-8 items-center gap-2" data-hx-event-item>
-              <div class="flex w-5 shrink-0 flex-col items-center self-stretch">
-                <div class="w-0.5 flex-1 bg-zinc-600" />
-                <div class="size-2 shrink-0 rounded-full bg-zinc-600" />
-                <div class="flex-1" />
-              </div>
-              <p class="flex-1 text-xs text-zinc-400 italic">
+            <li class="flex items-center gap-2 pt-3" data-hx-event-item>
+              <span class="h-px flex-1 bg-day-800" aria-hidden="true" />
+              <span class="text-xs text-day-500 italic">
                 {params.from
                   ? formatDateShort(params.from, { prefix: false, caseType: 'sentence' })
                   : events.length > 10
                     ? 'Big Bang'
-                    : null}
-              </p>
-            </div>
+                    : 'End of timeline'}
+              </span>
+              <span class="h-px flex-1 bg-day-800" aria-hidden="true" />
+            </li>
           )}
 
-          <div
-            class="hidden min-h-8 items-center gap-2 htmx-request:flex no-js:hidden"
-            id="infinite-scroll-indicator"
-          >
-            <div class="flex w-5 shrink-0 flex-col items-center self-stretch">
-              <div class="w-0.5 flex-1 bg-linear-to-b from-zinc-600 to-transparent" />
-            </div>
-            <p class="flex-1 animate-pulse text-xs text-zinc-400 italic">Loading more events...</p>
-          </div>
+          <li class="hidden pt-3 htmx-request:block no-js:hidden" id="infinite-scroll-indicator">
+            <p class="animate-pulse text-center text-xs text-day-500 italic">Loading more events...</p>
+          </li>
 
-          <div class="hidden min-h-8 items-center gap-2 no-js:flex" id="infinite-scroll-indicator">
-            <div class="flex w-5 shrink-0 flex-col items-center self-stretch">
-              <div class="w-0.5 flex-1 bg-linear-to-b from-zinc-600 to-transparent" />
-            </div>
-            <p class="flex-1 text-xs text-zinc-400 italic">Enable JavaScript to load more events</p>
-          </div>
+          <li class="hidden pt-3 no-js:block">
+            <p class="text-center text-xs text-day-500 italic">Enable JavaScript to load more events</p>
+          </li>
         </ol>
       ) : (
-        <p class="my-12 text-center text-zinc-400">No events reported</p>
+        <p class="my-12 text-center text-day-400">No events reported</p>
       )
     }
   </div>

@@ -1,0 +1,65 @@
+---
+import { Icon } from 'astro-icon/components'
+import { orderBy } from 'lodash-es'
+
+import EventCard from './EventCard.astro'
+
+import type { ComponentProps } from 'astro/types'
+
+type EventProp = ComponentProps<typeof EventCard>['event']
+
+type Props = {
+  events: EventProp[]
+  now?: Date
+}
+
+const { events, now = new Date() } = Astro.props
+
+// Newest activity first, treating an open-ended entry as still running today.
+const sorted = orderBy(
+  events.map((event) => ({ event, effectiveEnd: event.endedAt ?? now })),
+  ['effectiveEnd', 'event.startedAt'],
+  ['desc', 'desc']
+).map((entry) => entry.event)
+
+// Listing edits are high volume and low signal, so they sit behind a disclosure
+// instead of burying curated entries.
+const curated = sorted.filter((event) => event.class !== 'CHANGE')
+const changes = sorted.filter((event) => event.class === 'CHANGE')
+---
+
+{
+  curated.length > 0 ? (
+    <ol class="space-y-2.5">
+      {curated.map((event) => (
+        <li>
+          <EventCard event={event} now={now} />
+        </li>
+      ))}
+    </ol>
+  ) : (
+    changes.length === 0 && <p class="my-10 text-center text-day-400">No events reported</p>
+  )
+}
+
+{
+  changes.length > 0 && (
+    <details class="group mt-3">
+      <summary class="flex w-fit cursor-pointer list-none items-center gap-2 py-1 text-sm text-day-500 transition-colors hover:text-day-300 [&::-webkit-details-marker]:hidden">
+        <Icon name="ri:pencil-line" class="size-4 shrink-0" />
+        Listing edits ({changes.length})
+        <Icon
+          name="ri:arrow-down-s-line"
+          class="size-4 shrink-0 transition-transform group-open:rotate-180"
+        />
+      </summary>
+      <ol class="mt-2 space-y-2">
+        {changes.map((event) => (
+          <li>
+            <EventCard event={event} now={now} />
+          </li>
+        ))}
+      </ol>
+    </details>
+  )
+}

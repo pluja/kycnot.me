@@ -5,12 +5,12 @@ import { cn } from '../../lib/cn'
 import MyPicture from '../MyPicture.astro'
 import Tooltip from '../Tooltip.astro'
 
-import type { getEventTypeInfo } from '../../constants/eventTypes'
 import type { getVerificationStatusInfo } from '../../constants/verificationStatus'
+import type { EventDisplay } from '../../lib/eventKind'
 
 type ActiveEventBadge = {
   title: string
-  typeInfo: ReturnType<typeof getEventTypeInfo>
+  display: EventDisplay
   totalCount: number
 }
 
@@ -95,8 +95,8 @@ const serviceHref = `/service/${encodeURIComponent(serviceSlug)}`
       <Tooltip
         text={
           activeEvent.totalCount > 1
-            ? `${activeEvent.typeInfo.label}: ${activeEvent.title} (+${activeEvent.totalCount - 1} more)`
-            : `${activeEvent.typeInfo.label}: ${activeEvent.title}`
+            ? `${activeEvent.display.label}: ${activeEvent.title} (+${activeEvent.totalCount - 1} more)`
+            : `${activeEvent.display.label}: ${activeEvent.title}`
         }
         position="top"
         >
@@ -104,15 +104,15 @@ const serviceHref = `/service/${encodeURIComponent(serviceSlug)}`
           href={`${serviceHref}#events`}
           target="_blank"
           rel="noopener"
-          aria-label={`Open ${activeEvent.typeInfo.label.toLowerCase()} on provider page`}
+          aria-label={`Open ${activeEvent.display.label.toLowerCase()} on provider page`}
           class={cn(
             'inline-flex size-4 shrink-0 items-center justify-center rounded-full',
-            activeEvent.typeInfo.id === 'ALERT'
+            activeEvent.display.color === 'red'
               ? 'text-red-400 hover:text-red-300'
               : 'text-yellow-400 hover:text-yellow-300'
           )}
         >
-          <Icon name={activeEvent.typeInfo.icon} class="size-4" />
+          <Icon name={activeEvent.display.icon} class="size-4" />
         </a>
       </Tooltip>
     )

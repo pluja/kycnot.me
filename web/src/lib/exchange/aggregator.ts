@@ -114,8 +114,12 @@ const displayServiceSelect = {
     select: {
       id: true,
       type: true,
+      class: true,
+      sentiment: true,
       title: true,
       startedAt: true,
+      endedAt: true,
+      incident: { select: { state: true } },
     },
     take: 3,
   },

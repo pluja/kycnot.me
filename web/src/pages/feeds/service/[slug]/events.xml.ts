@@ -1,6 +1,6 @@
 import rss from '@astrojs/rss'
 
-import { getEventTypeInfo } from '../../../../constants/eventTypes'
+import { getEventDisplay } from '../../../../lib/eventKind'
 import { getEventsForService } from '../../../../lib/feeds'
 import { absoluteSiteUrl, siteOrigin } from '../../../../lib/urls'
 
@@ -20,7 +20,7 @@ export const GET: APIRoute = async (context) => {
       site: origin,
       xmlns: { atom: 'http://www.w3.org/2005/Atom' },
       items: events.map((event) => {
-        const eventTypeInfo = getEventTypeInfo(event.type)
+        const display = getEventDisplay(event)
         const isOngoing = !event.endedAt || event.endedAt > new Date()
         const statusText = isOngoing ? 'Ongoing' : 'Resolved'
 
@@ -29,7 +29,7 @@ export const GET: APIRoute = async (context) => {
           pubDate: event.createdAt,
           description: `${event.content}${event.source ? `\n\nSource: ${event.source}` : ''}`,
           link: `/service/${service.slug}/#event-${String(event.id)}`,
-          categories: [eventTypeInfo.label, statusText],
+          categories: [display.label, statusText],
         }
       }),
       customData: `<language>en-us</language><atom:link href="${absoluteSiteUrl(context.url.pathname)}" rel="self" type="application/rss+xml"/>`,

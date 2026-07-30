@@ -3,6 +3,7 @@ import { Icon } from 'astro-icon/components'
 
 import { cn } from '../lib/cn'
 import { formatNumber, type FormatNumberOptions } from '../lib/numbers'
+import { stripMarkdown } from '../lib/strings'
 
 import Markdown from './Markdown.astro'
 
@@ -25,10 +26,7 @@ type Props = {
 
 const { attribute } = Astro.props
 
-const excerpt = (attribute.description.split('\n')[0] ?? '')
-  .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-  .replace(/[*_`]/g, '')
-  .trim()
+const excerpt = stripMarkdown(attribute.description.split('\n')[0] ?? '')
 
 const baseFormatOptions = {
   roundDigits: 2,

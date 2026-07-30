@@ -3,7 +3,7 @@ import { test } from 'node:test'
 
 import { CaseStatus, CaseVisibility } from '@prisma/client'
 
-import { canViewCaseEvidence } from './caseAccess'
+import { canViewCaseEvidence, isCasePublished, UNPUBLISHED_CASE_STATUSES } from './caseAccess'
 
 type User = { id: number; admin: boolean; capabilities: string[] } | null
 
@@ -59,4 +59,22 @@ void test('a participant sees public and participant tiers but not staff-only', 
 void test('a logged-in non-participant is treated as public-only', () => {
   assert.equal(canViewCaseEvidence(stranger, evidence(CaseVisibility.PUBLIC)), true)
   assert.equal(canViewCaseEvidence(stranger, evidence(CaseVisibility.PARTICIPANTS)), false)
+})
+
+void test('the query filter and the page gate agree on every status', () => {
+  for (const status of Object.values(CaseStatus)) {
+    assert.equal(
+      isCasePublished(status),
+      !UNPUBLISHED_CASE_STATUSES.includes(status),
+      `${status} disagrees between the Prisma filter and the gate`
+    )
+  }
+})
+
+void test('drafts and rejections stay unpublished', () => {
+  assert.equal(isCasePublished(CaseStatus.DRAFT), false)
+  assert.equal(isCasePublished(CaseStatus.REJECTED), false)
+  assert.equal(isCasePublished(CaseStatus.OPEN), true)
+  assert.equal(isCasePublished(CaseStatus.DISPUTED), true)
+  assert.equal(isCasePublished(CaseStatus.RESOLVED), true)
 })

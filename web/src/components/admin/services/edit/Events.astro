@@ -2,8 +2,7 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
-import { getEventTypeInfo } from '../../../../constants/eventTypes'
-import { eventToKind } from '../../../../lib/eventKind'
+import { eventToKind, getEventDisplay } from '../../../../lib/eventKind'
 import BadgeSmall from '../../../BadgeSmall.astro'
 import Button from '../../../Button.astro'
 import FormSection from '../../../FormSection.astro'
@@ -65,7 +64,7 @@ const sortedEvents = [...events].sort((a, b) => {
       ) : (
         <div class="space-y-2">
           {sortedEvents.map((event) => {
-            const eventTypeInfo = getEventTypeInfo(event.type)
+            const display = getEventDisplay(event)
             const itemId = `event-${event.id}`
             return (
               <EditableListItem id={itemId}>
@@ -73,10 +72,10 @@ const sortedEvents = [...events].sort((a, b) => {
                   <div class="flex flex-wrap items-center gap-2">
                     <span class="font-semibold text-day-100">{event.title}</span>
                     <BadgeSmall
-                      text={eventTypeInfo.label}
+                      text={display.label}
                       variant="faded"
-                      color={eventTypeInfo.color}
-                      icon={eventTypeInfo.icon}
+                      color={display.color}
+                      icon={display.icon}
                     />
                     {event.incident && (
                       <BadgeSmall

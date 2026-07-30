@@ -117,6 +117,8 @@ const eventSelect = {
   content: true,
   type: true,
   class: true,
+  sentiment: true,
+  origin: true,
   startedAt: true,
   endedAt: true,
   source: true,
@@ -137,10 +139,16 @@ const serviceEventSelect = {
   title: true,
   content: true,
   type: true,
+  class: true,
+  sentiment: true,
+  origin: true,
   startedAt: true,
   endedAt: true,
   source: true,
   createdAt: true,
+  incident: {
+    select: { state: true },
+  },
 } as const satisfies Prisma.EventSelect
 
 export async function getEventsForService(slug: string | undefined): Promise<
@@ -261,6 +269,10 @@ const notificationSelect = {
       title: true,
       content: true,
       type: true,
+      class: true,
+      sentiment: true,
+      startedAt: true,
+      endedAt: true,
       service: {
         select: {
           slug: true,

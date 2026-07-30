@@ -201,6 +201,16 @@ enum EventSentiment {
   NEGATIVE
 }
 
+/// Who produced an event. Distinct from `Event.source`, which is a citation URL.
+/// Automation may only ever write AI or MONITOR, so unreviewed machine output
+/// stays distinguishable from curated entries.
+enum EventOrigin {
+  STAFF
+  USER
+  AI
+  MONITOR
+}
+
 enum IncidentType {
   EXPLOIT
   CUSTODIAL_HACK
@@ -411,6 +421,7 @@ model Event {
   class        EventClass     @default(EVENT)
   /// Tone for EVENT-class entries (color only). INCIDENTs use Incident.severity.
   sentiment    EventSentiment @default(NEUTRAL)
+  origin       EventOrigin    @default(STAFF)
   visible      Boolean        @default(true)
   startedAt    DateTime
   /// If null, the event is ongoing. If same as startedAt, the event is a one-time event. If startedAt is in the future, the event is upcoming.
@@ -467,6 +478,8 @@ model Incident {
   trustOverride Int?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @default(now()) @updatedAt
+  /// Reports judged to substantiate this incident.
+  cases         Case[]
 
   @@index([state])
   @@index([severity])
@@ -981,6 +994,12 @@ model Case {
   summaryMd      String
   amountText     String?
   externalSource String?
+  /// When the problem happened, as opposed to when it was reported. Null when
+  /// the reporter could not date it; timelines fall back to createdAt.
+  occurredAt     DateTime?
+  /// Set the first time the case leaves DRAFT. Public listings order by this so
+  /// a case triaged months after intake still surfaces as newly published.
+  publishedAt    DateTime?
   resolvedAt     DateTime?
   resolutionMd   String?
   createdAt      DateTime      @default(now())
@@ -992,6 +1011,11 @@ model Case {
   reportedById Int?
   createdBy    User?          @relation("CaseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdById  Int?
+  /// Set when this report was judged to substantiate a service-wide incident.
+  /// The trust penalty stays derived from the Incident alone, so linking many
+  /// reports to one incident cannot multiply the score impact.
+  incident     Incident?      @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  incidentId   Int?
   evidence     CaseEvidence[]
   updates      CaseUpdate[]
   participants User[]         @relation("CaseParticipants")
@@ -999,6 +1023,8 @@ model Case {
   @@index([serviceId])
   @@index([status])
   @@index([createdAt])
+  @@index([publishedAt])
+  @@index([incidentId])
 }
 
 model CaseUpdate {

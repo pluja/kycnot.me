@@ -87,6 +87,10 @@ export async function sendNotification(
         select: {
           title: true,
           type: true,
+          class: true,
+          sentiment: true,
+          startedAt: true,
+          endedAt: true,
           service: {
             select: {
               slug: true,

@@ -1,8 +1,6 @@
 ---
-import { EventType } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
 
-import { getEventTypeInfo } from '../../constants/eventTypes'
 import { getKycLevelInfo } from '../../constants/kycLevels'
 import { getVerificationStatusInfo } from '../../constants/verificationStatus'
 import { cn } from '../../lib/cn'
@@ -14,7 +12,13 @@ import Tooltip from '../Tooltip.astro'
 
 import SwapKycBadge from './SwapKycBadge.astro'
 import SwapProviderLink from './SwapProviderLink.astro'
-import { describeGuaranteeCoverage, formatSwapAmount, formatSwapPercent, formatSwapRate } from './swapResultUi'
+import {
+  describeGuaranteeCoverage,
+  formatSwapAmount,
+  formatSwapPercent,
+  formatSwapRate,
+  makeActiveEventBadge,
+} from './swapResultUi'
 
 import type { AggregatedResultWithService } from '../../lib/exchange/aggregator'
 
@@ -28,26 +32,24 @@ type Props = {
   message?: string
 }
 
-const { item, currencyFromLabel, currencyToLabel, amountSide, isBest, showChevron, message = '' } = Astro.props
+const {
+  item,
+  currencyFromLabel,
+  currencyToLabel,
+  amountSide,
+  isBest,
+  showChevron,
+  message = '',
+} = Astro.props
 
 const { service, serviceSlug } = item
 const quote = item.quote
 const kycInfo = service ? getKycLevelInfo(String(service.kycLevel)) : null
 const verificationInfo = service ? getVerificationStatusInfo(service.verificationStatus) : null
 const scoreInfo = service ? makeOverallScoreInfo(service.overallScore, 10) : null
-const hasAmlPrecheck =
-  service?.attributes.some((a) => a.attribute.slug === 'no-kyc-after-aml-check') ?? false
+const hasAmlPrecheck = service?.attributes.some((a) => a.attribute.slug === 'no-kyc-after-aml-check') ?? false
 
-const events = service?.events ?? []
-const primaryEvent =
-  events.find((e) => e.type === EventType.ALERT) ?? events[0] ?? null
-const activeEvent = primaryEvent
-  ? {
-      title: primaryEvent.title,
-      typeInfo: getEventTypeInfo(primaryEvent.type),
-      totalCount: events.length,
-    }
-  : null
+const activeEvent = makeActiveEventBadge(service?.events ?? [])
 
 const deepLinkHref = quote
   ? (safeHttpUrl(quote.deepLinkUrl) ?? safeHttpUrl(service?.serviceUrls[0]) ?? '#')

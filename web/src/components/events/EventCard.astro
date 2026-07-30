@@ -1,0 +1,137 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { getEventOriginInfo } from '../../constants/eventOrigins'
+import { cn } from '../../lib/cn'
+import { getEventDisplay } from '../../lib/eventKind'
+import { safeHttpUrl } from '../../lib/exchange/safeUrl'
+import { stripMarkdown } from '../../lib/strings'
+import BadgeSmall from '../BadgeSmall.astro'
+import FormatTimeInterval from '../FormatTimeInterval.astro'
+import Markdown from '../Markdown.astro'
+import Tooltip from '../Tooltip.astro'
+
+import type { DisplayableEvent } from '../../lib/eventKind'
+import type { EventOrigin } from '@prisma/client'
+
+type Props = {
+  event: DisplayableEvent & {
+    id: number
+    title: string
+    content: string
+    source: string | null
+    origin: EventOrigin
+  }
+  now?: Date
+  /// Turns the title into a permalink. Needed on lists that are not already on
+  /// the owning service page.
+  titleHref?: string
+  headingLevel?: 'h2' | 'h3'
+}
+
+// Above this many characters the body collapses behind a no-JS disclosure, so a
+// long incident write-up cannot push the rest of the timeline off the screen.
+const INLINE_BODY_LIMIT = 220
+
+const { event, now = new Date(), titleHref, headingLevel: Heading = 'h3' } = Astro.props
+
+const display = getEventDisplay(event, now)
+const originInfo = getEventOriginInfo(event.origin)
+// A listing edit already reads as automated, so the origin chip would only
+// repeat the badge next to it.
+const showOrigin = originInfo.showOnPublicEntries && display.kind !== 'CHANGE'
+const sourceUrl = safeHttpUrl(event.source)
+const excerpt = stripMarkdown(event.content)
+const isCollapsible = excerpt.length > INLINE_BODY_LIMIT
+
+const proseClass =
+  'prose prose-sm max-w-none text-pretty wrap-anywhere text-day-400 prose-invert prose-a:text-current prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0'
+---
+
+<article
+  id={`event-${event.id.toString()}`}
+  class={cn('relative scroll-mt-24 rounded-lg border pl-3', display.classNames.card)}
+>
+  <span class={cn('absolute inset-y-0 left-0 w-1 rounded-l-lg', display.classNames.rail)} aria-hidden="true"
+  ></span>
+
+  <div class="px-3 pt-2.5 pb-3">
+    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <Tooltip text={display.description} position="top">
+        <BadgeSmall text={display.label} icon={display.icon} color={display.color} variant="faded" />
+      </Tooltip>
+
+      <FormatTimeInterval
+        as="span"
+        start={event.startedAt}
+        end={event.endedAt}
+        now={now}
+        class="text-xs text-day-400"
+      />
+
+      {
+        showOrigin && (
+          <Tooltip text={originInfo.description} position="top">
+            <span class="inline-flex items-center gap-1 text-2xs tracking-wide text-day-500 uppercase">
+              <Icon name={originInfo.icon} class="size-3.5" />
+              {originInfo.label}
+            </span>
+          </Tooltip>
+        )
+      }
+    </div>
+
+    <Heading class="mt-1 font-title text-base/snug font-semibold text-pretty wrap-anywhere text-white">
+      {
+        titleHref ? (
+          <a href={titleHref} class="transition-colors hover:text-day-200 hover:underline">
+            {event.title}
+          </a>
+        ) : (
+          event.title
+        )
+      }
+    </Heading>
+
+    <slot name="meta" />
+
+    {
+      isCollapsible ? (
+        <details class="group mt-1.5">
+          <summary class="flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
+            <span class="min-w-0 flex-1 truncate text-sm text-day-400 group-open:hidden" aria-hidden="true">
+              {excerpt}
+            </span>
+            <span class="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-day-400 transition-colors group-hover:text-day-200">
+              <span class="group-open:hidden">Read more</span>
+              <span class="hidden group-open:inline">Show less</span>
+              <Icon name="ri:arrow-down-s-line" class="size-4 transition-transform group-open:rotate-180" />
+            </span>
+          </summary>
+
+          <div class={cn('mt-1.5', proseClass)}>
+            <Markdown content={event.content} linkRel={['nofollow', 'noopener']} />
+          </div>
+        </details>
+      ) : (
+        <div class={cn('mt-1', proseClass)}>
+          <Markdown content={event.content} linkRel={['nofollow', 'noopener']} />
+        </div>
+      )
+    }
+
+    {
+      sourceUrl && (
+        <a
+          href={sourceUrl}
+          target="_blank"
+          rel="nofollow noopener"
+          class="mt-2 inline-flex items-center gap-1 text-xs text-day-400 transition-colors hover:text-day-200 hover:underline"
+        >
+          <Icon name="ri:external-link-line" class="size-3.5" />
+          Source
+        </a>
+      )
+    }
+  </div>
+</article>

@@ -1,5 +1,7 @@
 import { CaseStatus, CaseVisibility } from '@prisma/client'
 
+import { getCaseStatusInfo } from '../constants/caseStatus'
+
 import { userCan } from './permissions'
 
 type CaseAccessUser = { id: number; admin: boolean; capabilities: string[] } | null | undefined
@@ -10,16 +12,19 @@ type CaseForAccess = {
   service: { affiliatedUsers: { userId: number }[] }
 }
 
-const UNPUBLISHED_STATUSES: CaseStatus[] = [CaseStatus.DRAFT, CaseStatus.REJECTED]
+/// Derived from the enum, not the display table, so a status nobody described
+/// yet resolves through the same fail-closed fallback as isCasePublished rather
+/// than dropping out of the filter and reading as published.
+export const UNPUBLISHED_CASE_STATUSES: CaseStatus[] = Object.values(CaseStatus).filter(
+  (status) => !getCaseStatusInfo(status).public
+)
 
 export function isCaseStaff(user: CaseAccessUser): boolean {
   return userCan(user, 'cases:manage')
 }
 
-// isCasePublished reports whether a case is visible outside the staff. DRAFT and
-// REJECTED cases stay staff-only; every other status is publicly reachable.
 export function isCasePublished(status: CaseStatus): boolean {
-  return !UNPUBLISHED_STATUSES.includes(status)
+  return getCaseStatusInfo(status).public
 }
 
 // Staff can always participate. Otherwise a user must be the reporter, an

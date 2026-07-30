@@ -1,3 +1,5 @@
+import { UNPUBLISHED_CASE_STATUSES } from './caseAccess'
+
 import type { Prisma } from '@prisma/client'
 
 // serviceDetailSelect is the field set the public service page renders. It is a
@@ -80,7 +82,9 @@ export function serviceDetailSelect(viewerId: number) {
     events: {
       where: {
         visible: true,
+        deletedAt: null,
       },
+      orderBy: { startedAt: 'desc' },
       select: {
         id: true,
         title: true,
@@ -88,6 +92,7 @@ export function serviceDetailSelect(viewerId: number) {
         type: true,
         class: true,
         sentiment: true,
+        origin: true,
         startedAt: true,
         endedAt: true,
         source: true,
@@ -101,6 +106,17 @@ export function serviceDetailSelect(viewerId: number) {
             outcome: true,
             amountText: true,
             trustOverride: true,
+            // Corroborating reports. Filtered here rather than in the page so an
+            // unpublished case can never reach the markup.
+            cases: {
+              where: { status: { notIn: UNPUBLISHED_CASE_STATUSES } },
+              orderBy: { createdAt: 'desc' },
+              select: {
+                publicId: true,
+                title: true,
+                status: true,
+              },
+            },
           },
         },
       },

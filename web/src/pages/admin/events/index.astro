@@ -2,7 +2,7 @@
 import { Icon } from 'astro-icon/components'
 
 import MyPicture from '../../../components/MyPicture.astro'
-import { getEventTypeInfo } from '../../../constants/eventTypes'
+import { getEventDisplay } from '../../../lib/eventKind'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { cn } from '../../../lib/cn'
 import { prisma } from '../../../lib/prisma'
@@ -25,8 +25,11 @@ const [activeEvents, services] = await Astro.locals.banners.tryMany([
         select: {
           title: true,
           type: true,
+          class: true,
+          sentiment: true,
           startedAt: true,
           endedAt: true,
+          incident: { select: { state: true } },
           service: { select: { name: true, slug: true, imageUrl: true } },
         },
         orderBy: { startedAt: 'desc' },
@@ -74,7 +77,7 @@ const [activeEvents, services] = await Astro.locals.banners.tryMany([
 
         <ul class="space-y-1.5">
           {activeEvents.map((event) => {
-            const typeInfo = getEventTypeInfo(event.type)
+            const display = getEventDisplay(event)
             return (
               <li>
                 <a
@@ -89,14 +92,18 @@ const [activeEvents, services] = await Astro.locals.banners.tryMany([
                     width={24}
                     height={24}
                   />
-                  <span class={cn('inline-flex size-5 shrink-0 items-center justify-center rounded-full', typeInfo.classNames.dot)}>
-                    <Icon name={typeInfo.icon} class="size-3" />
+                  <span
+                    class={cn(
+                      'inline-flex size-5 shrink-0 items-center justify-center rounded-full ring-3',
+                      display.classNames.dot
+                    )}
+                  >
+                    <Icon name={display.icon} class="size-3" />
                   </span>
                   <span class="min-w-0 flex-1 truncate text-sm text-white">{event.title}</span>
                   <span class="shrink-0 text-xs text-day-500">{event.service.name}</span>
                   <span class="shrink-0 text-xs text-day-500">
-                    {new Date(event.startedAt).toLocaleDateString()}
-                    {' '}&rarr;{' '}
+                    {new Date(event.startedAt).toLocaleDateString()} &rarr;{' '}
                     {event.endedAt ? new Date(event.endedAt).toLocaleDateString() : 'ongoing'}
                   </span>
                 </a>

@@ -6,13 +6,20 @@ import CaseEvidenceGallery from '../../../../components/admin/cases/CaseEvidence
 import CaseUpdatesTimeline from '../../../../components/admin/cases/CaseUpdatesTimeline.astro'
 import BadgeSmall from '../../../../components/BadgeSmall.astro'
 import Button from '../../../../components/Button.astro'
+import CaseReportsStrip from '../../../../components/cases/CaseReportsStrip.astro'
 import Lightbox from '../../../../components/Lightbox.astro'
 import Markdown from '../../../../components/Markdown.astro'
 import TimeFormatted from '../../../../components/TimeFormatted.astro'
 import { getCaseIssueTypeInfo } from '../../../../constants/caseIssueTypes'
 import { getCaseStatusInfo } from '../../../../constants/caseStatus'
+import { getIncidentSeverityInfo } from '../../../../constants/incidentSeverities'
 import BaseLayout from '../../../../layouts/BaseLayout.astro'
-import { canParticipateInCase, caseVisibilityTiersFor, isCasePublished } from '../../../../lib/caseAccess'
+import {
+  canParticipateInCase,
+  caseVisibilityTiersFor,
+  isCasePublished,
+  UNPUBLISHED_CASE_STATUSES,
+} from '../../../../lib/caseAccess'
 import { prisma } from '../../../../lib/prisma'
 
 import type { Prisma } from '@prisma/client'
@@ -44,7 +51,10 @@ Astro.locals.banners.addIfSuccess(deleteUpdateResult, 'Update deleted')
 const setStatusResult = Astro.getActionResult(actions.admin.case.setStatus)
 Astro.locals.banners.addIfSuccess(setStatusResult, 'Case status updated')
 
-const evidenceOrderBy = [{ order: 'asc' }, { createdAt: 'asc' }] satisfies Prisma.CaseEvidenceOrderByWithRelationInput[]
+const evidenceOrderBy = [
+  { order: 'asc' },
+  { createdAt: 'asc' },
+] satisfies Prisma.CaseEvidenceOrderByWithRelationInput[]
 const evidenceSelect = {
   id: true,
   type: true,
@@ -69,9 +79,22 @@ const caseRow = await Astro.locals.banners.try(
         summaryMd: true,
         amountText: true,
         externalSource: true,
+        occurredAt: true,
         resolutionMd: true,
         createdAt: true,
         reportedById: true,
+        incident: {
+          select: {
+            severity: true,
+            state: true,
+            event: { select: { id: true, title: true, visible: true, deletedAt: true } },
+            cases: {
+              where: { status: { notIn: UNPUBLISHED_CASE_STATUSES } },
+              orderBy: { createdAt: 'desc' },
+              select: { publicId: true, title: true, status: true },
+            },
+          },
+        },
         participants: { select: { id: true } },
         service: { select: { name: true, slug: true, affiliatedUsers: { select: { userId: true } } } },
       },
@@ -124,6 +147,16 @@ const updates = content?.updates ?? []
 
 const statusInfo = getCaseStatusInfo(caseRow.status)
 const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
+// A hidden or soft-deleted write-up has been retracted from the service page, so
+// its title must not survive here either.
+const incidentEvent = caseRow.incident?.event
+const incident =
+  caseRow.incident && (canManage || (incidentEvent?.visible && !incidentEvent.deletedAt))
+    ? caseRow.incident
+    : null
+const incidentSeverityInfo = incident ? getIncidentSeverityInfo(incident.severity) : null
+// The report reading this page is already the page, so only the siblings matter.
+const siblingReports = incident?.cases.filter((entry) => entry.publicId !== publicId) ?? []
 
 // Only link out to http(s) sources; anything else (javascript:, data:, ...) is dropped.
 const sourceUrl =
@@ -179,10 +212,21 @@ const sourceUrl =
         {caseRow.service.name}
       </a>
       <span>Opened <TimeFormatted date={caseRow.createdAt} /></span>
+      {
+        caseRow.occurredAt && (
+          <span>
+            Happened <TimeFormatted date={caseRow.occurredAt} />
+          </span>
+        )
+      }
       {caseRow.amountText && <span>Amount: {caseRow.amountText}</span>}
       {
         sourceUrl && (
-          <a href={sourceUrl} rel="nofollow noopener" class="inline-flex items-center gap-1 hover:text-day-200">
+          <a
+            href={sourceUrl}
+            rel="nofollow noopener"
+            class="inline-flex items-center gap-1 hover:text-day-200"
+          >
             <Icon name="ri:external-link-line" class="size-4" />
             Source
           </a>
@@ -205,6 +249,57 @@ const sourceUrl =
       )
     }
   </article>
+
+  {
+    incident && incidentSeverityInfo && (
+      <section class="mt-6 rounded-lg border border-red-500/25 bg-red-950/15 p-3">
+        <h2 class="flex items-center gap-1.5 text-2xs font-semibold tracking-wide text-red-300 uppercase">
+          <Icon name="ri:alarm-warning-line" class="size-3.5 shrink-0" />
+          Part of a service-wide incident
+        </h2>
+
+        <a
+          href={`/service/${encodeURIComponent(caseRow.service.slug)}#event-${incident.event.id.toString()}`}
+          class="group mt-1.5 block"
+        >
+          <span class="font-title text-base font-semibold text-pretty wrap-anywhere text-day-100 group-hover:underline">
+            {incident.event.title}
+          </span>
+        </a>
+
+        <div class="mt-1.5 flex flex-wrap items-center gap-2">
+          <BadgeSmall
+            text={`${incidentSeverityInfo.label} severity`}
+            variant="faded"
+            color={incidentSeverityInfo.color}
+            icon={incidentSeverityInfo.icon}
+          />
+          <BadgeSmall
+            text={incident.state === 'RESOLVED' ? 'Resolved' : 'Ongoing'}
+            variant="faded"
+            color={incident.state === 'RESOLVED' ? 'green' : 'red'}
+            icon={incident.state === 'RESOLVED' ? 'ri:checkbox-circle-line' : 'ri:time-line'}
+          />
+        </div>
+
+        <p class="mt-2 text-xs text-day-400">
+          Moderators found this report credible evidence for the incident above. The trust penalty applies
+          once to the incident, not once per report.
+        </p>
+
+        <CaseReportsStrip
+          serviceSlug={caseRow.service.slug}
+          cases={siblingReports}
+          heading={
+            siblingReports.length === 1
+              ? 'One other report in this incident'
+              : `${siblingReports.length.toString()} other reports in this incident`
+          }
+          class="mt-3 border-red-500/20"
+        />
+      </section>
+    )
+  }
 
   <section class="mt-8">
     <h2 class="mb-3 font-title text-xl font-bold">Evidence</h2>

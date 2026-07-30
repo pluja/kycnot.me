@@ -17,6 +17,7 @@ const manageCases = { capability: 'cases:manage' } satisfies { capability: Capab
 const emptyToUndefined = (value: unknown) => (value === '' || value === null ? undefined : value)
 const optionalText = z.preprocess(emptyToUndefined, z.string().optional())
 const optionalPositiveInt = z.preprocess(emptyToUndefined, z.coerce.number().int().positive().optional())
+const optionalDate = z.preprocess(emptyToUndefined, z.coerce.date().optional())
 
 // externalSource is rendered as a link href, so only http(s) URLs are accepted.
 // This blocks javascript:/data: and other script-capable schemes at the source.
@@ -35,6 +36,14 @@ const optionalHttpUrl = z.preprocess(
 function resolvedAtFor(status: CaseStatus, existing: Date | null): Date | null {
   if (status !== CaseStatus.RESOLVED) return null
   return existing ?? new Date()
+}
+
+// publishedAt marks the first time a case became publicly reachable and is never
+// rewritten, so pulling a case back to DRAFT and republishing keeps its original
+// place in the public listing.
+function publishedAtFor(status: CaseStatus, existing: Date | null): Date | null {
+  if (existing) return existing
+  return isCasePublished(status) ? new Date() : null
 }
 
 async function assertReporterExists(reportedById: number | null | undefined) {
@@ -57,6 +66,7 @@ export const adminCaseActions = {
       summaryMd: z.string().min(1),
       amountText: optionalText,
       externalSource: optionalHttpUrl,
+      occurredAt: optionalDate,
       reportedById: optionalPositiveInt,
     }),
     handler: async (input, context) => {
@@ -77,6 +87,8 @@ export const adminCaseActions = {
           summaryMd: input.summaryMd,
           amountText: input.amountText,
           externalSource: input.externalSource,
+          occurredAt: input.occurredAt,
+          publishedAt: publishedAtFor(input.status, null),
           service: { connect: { id: input.serviceId } },
           createdBy: { connect: { id: context.locals.user.id } },
           ...(input.reportedById ? { reportedBy: { connect: { id: input.reportedById } } } : {}),
@@ -99,6 +111,7 @@ export const adminCaseActions = {
       summaryMd: z.string().min(1),
       amountText: optionalText,
       externalSource: optionalHttpUrl,
+      occurredAt: optionalDate,
       resolutionMd: optionalText,
       reportedById: z.preprocess(
         (value) => (value === '' || value === null ? null : value),
@@ -108,7 +121,7 @@ export const adminCaseActions = {
     handler: async (input) => {
       const existing = await prisma.case.findUnique({
         where: { id: input.caseId },
-        select: { id: true, resolvedAt: true },
+        select: { id: true, resolvedAt: true, publishedAt: true },
       })
       if (!existing) {
         throw new ActionError({ code: 'BAD_REQUEST', message: 'Case not found' })
@@ -124,8 +137,10 @@ export const adminCaseActions = {
           summaryMd: input.summaryMd,
           amountText: input.amountText ?? null,
           externalSource: input.externalSource ?? null,
+          occurredAt: input.occurredAt ?? null,
           resolutionMd: input.resolutionMd ?? null,
           resolvedAt: resolvedAtFor(input.status, existing.resolvedAt),
+          publishedAt: publishedAtFor(input.status, existing.publishedAt),
           reportedBy: input.reportedById ? { connect: { id: input.reportedById } } : { disconnect: true },
         },
         select: { id: true },
@@ -145,7 +160,7 @@ export const adminCaseActions = {
     handler: async (input) => {
       const existing = await prisma.case.findUnique({
         where: { id: input.caseId },
-        select: { id: true, resolvedAt: true },
+        select: { id: true, resolvedAt: true, publishedAt: true },
       })
       if (!existing) {
         throw new ActionError({ code: 'BAD_REQUEST', message: 'Case not found' })
@@ -153,8 +168,63 @@ export const adminCaseActions = {
 
       const updated = await prisma.case.update({
         where: { id: input.caseId },
-        data: { status: input.status, resolvedAt: resolvedAtFor(input.status, existing.resolvedAt) },
+        data: {
+          status: input.status,
+          resolvedAt: resolvedAtFor(input.status, existing.resolvedAt),
+          publishedAt: publishedAtFor(input.status, existing.publishedAt),
+        },
         select: { id: true },
+      })
+
+      return { case: updated }
+    },
+  }),
+
+  linkIncident: defineProtectedAction({
+    accept: 'form',
+    permissions: manageCases,
+    input: z.object({
+      caseId: z.coerce.number().int().positive(),
+      // Empty clears the link.
+      incidentId: z.preprocess(
+        (value) => (value === '' || value === null ? null : value),
+        z.coerce.number().int().positive().nullable()
+      ),
+    }),
+    handler: async (input) => {
+      const existing = await prisma.case.findUnique({
+        where: { id: input.caseId },
+        select: { id: true, serviceId: true },
+      })
+      if (!existing) {
+        throw new ActionError({ code: 'BAD_REQUEST', message: 'Case not found' })
+      }
+
+      if (input.incidentId !== null) {
+        // A cross-service link would list this report under an unrelated
+        // service's incident, so the incident must belong to the same service.
+        const incident = await prisma.incident.findUnique({
+          where: { id: input.incidentId },
+          select: { id: true, event: { select: { serviceId: true } } },
+        })
+        if (!incident) {
+          throw new ActionError({ code: 'BAD_REQUEST', message: 'Incident not found' })
+        }
+        if (incident.event.serviceId !== existing.serviceId) {
+          throw new ActionError({
+            code: 'BAD_REQUEST',
+            message: 'That incident belongs to a different service',
+          })
+        }
+      }
+
+      const updated = await prisma.case.update({
+        where: { id: input.caseId },
+        data:
+          input.incidentId === null
+            ? { incident: { disconnect: true } }
+            : { incident: { connect: { id: input.incidentId } } },
+        select: { id: true, incidentId: true },
       })
 
       return { case: updated }

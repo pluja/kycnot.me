@@ -2,7 +2,7 @@
 import { IncidentOutcome, IncidentType } from '@prisma/client'
 
 import { incidentSeverities } from '../../../../constants/incidentSeverities'
-import { eventKindOptions, type EventKind } from '../../../../lib/eventKind'
+import { EVENT_KINDS, type EventKind } from '../../../../lib/eventKind'
 import { transformCase } from '../../../../lib/strings'
 import InputCardGroup from '../../../InputCardGroup.astro'
 import InputSelect from '../../../InputSelect.astro'
@@ -30,23 +30,31 @@ const toLocalDateTime = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 const labelFor = (value: string) => transformCase(value.replaceAll('_', ' '), 'title')
 
-const kindDescriptions: Record<EventKind, { icon: string; description: string }> = {
-  INFO: { icon: 'ri:information-line', description: 'Neutral news about the service. No effect on the trust score.' },
-  UPDATE: { icon: 'ri:arrow-up-circle-line', description: 'A positive change or announcement.' },
+// Moderator-facing wording: it explains which one to pick, where the public
+// eventKinds descriptions explain what a published entry means to a reader.
+const kindCardData: Record<EventKind, { label: string; icon: string; description: string }> = {
+  INFO: {
+    label: 'Information',
+    icon: 'ri:information-line',
+    description: 'Neutral news about the service. No effect on the trust score.',
+  },
+  UPDATE: {
+    label: 'Update',
+    icon: 'ri:arrow-up-circle-line',
+    description: 'A positive change or announcement.',
+  },
   WARNING: {
+    label: 'Warning',
     icon: 'ri:alert-line',
     description: 'A negative development that is **not** a security incident (downtime, reputation, policy).',
   },
   INCIDENT: {
+    label: 'Security incident',
     icon: 'ri:alarm-warning-line',
     description: 'An exploit, hack, breach or fund loss. **Penalises the trust score.**',
   },
 }
-const kindCards = eventKindOptions.map((option) => ({
-  value: option.value,
-  label: option.label,
-  ...kindDescriptions[option.value],
-}))
+const kindCards = EVENT_KINDS.map((value) => ({ value, ...kindCardData[value] }))
 
 const severityPenalty: Record<IncidentSeverity, number> = { LOW: -5, MEDIUM: -12, HIGH: -22, CRITICAL: -35 }
 const severityBlurb: Record<IncidentSeverity, string> = {
@@ -66,7 +74,12 @@ const severityCards = [...incidentSeverities]
   }))
 
 const stateCards = [
-  { value: 'ONGOING', label: 'Ongoing', icon: 'ri:time-line', description: 'Unresolved. Full penalty applies.' },
+  {
+    value: 'ONGOING',
+    label: 'Ongoing',
+    icon: 'ri:time-line',
+    description: 'Unresolved. Full penalty applies.',
+  },
   {
     value: 'RESOLVED',
     label: 'Resolved',
@@ -151,7 +164,11 @@ const outcomeOptions = [
       <InputText
         label="Trust override (advanced)"
         name="trustOverride"
-        inputProps={{ type: 'number', value: incident?.trustOverride ?? '', placeholder: 'Auto from severity' }}
+        inputProps={{
+          type: 'number',
+          value: incident?.trustOverride ?? '',
+          placeholder: 'Auto from severity',
+        }}
         description="Optional. A negative number forces a fixed penalty instead of the computed one."
         error={errors.trustOverride}
       />

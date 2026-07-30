@@ -1,0 +1,55 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { getServiceVisibilityInfo } from '../../constants/serviceVisibility'
+import { getVerificationStatusInfo } from '../../constants/verificationStatus'
+import { cn } from '../../lib/cn'
+import MyPicture from '../MyPicture.astro'
+
+import type { ServiceVisibility, VerificationStatus } from '@prisma/client'
+
+type Props = {
+  service: {
+    slug: string
+    name: string
+    imageUrl: string | null
+    verificationStatus: VerificationStatus
+    serviceVisibility: ServiceVisibility
+  }
+}
+
+const { service } = Astro.props
+
+const verificationInfo = getVerificationStatusInfo(service.verificationStatus)
+const visibilityInfo = getServiceVisibilityInfo(service.serviceVisibility)
+---
+
+<a
+  href={`/service/${encodeURIComponent(service.slug)}`}
+  class="inline-flex items-center gap-1.5 text-xs text-day-400 transition-colors hover:text-day-200"
+>
+  {
+    service.imageUrl && (
+      <MyPicture
+        src={service.imageUrl}
+        alt=""
+        width={16}
+        height={16}
+        class="size-4 shrink-0 rounded-xs object-contain"
+      />
+    )
+  }
+  <span class={cn(service.verificationStatus === 'VERIFICATION_FAILED' && 'text-red-200')}>
+    {service.name}
+  </span>
+  {
+    service.verificationStatus !== 'APPROVED' && (
+      <Icon name={verificationInfo.icon} class={cn('size-3 shrink-0', verificationInfo.classNames.icon)} />
+    )
+  }
+  {
+    service.serviceVisibility === 'ARCHIVED' && (
+      <Icon name={visibilityInfo.icon} class={cn('size-3 shrink-0', visibilityInfo.iconClass)} />
+    )
+  }
+</a>

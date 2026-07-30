@@ -1,5 +1,5 @@
 ---
-import { VerificationStepStatus, EventType } from '@prisma/client'
+import { VerificationStepStatus } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
 import { Schema } from 'astro-seo-schema'
 import { actions } from 'astro:actions'
@@ -15,6 +15,7 @@ import DropdownButton from '../../components/DropdownButton.astro'
 import DropdownButtonItemForm from '../../components/DropdownButtonItemForm.astro'
 import DropdownButtonItemLink from '../../components/DropdownButtonItemLink.astro'
 import FormatTimeInterval from '../../components/FormatTimeInterval.astro'
+import EventTimeline from '../../components/events/EventTimeline.astro'
 import IncidentCard from '../../components/IncidentCard.astro'
 import InputSubmitButton from '../../components/InputSubmitButton.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
@@ -34,7 +35,6 @@ import { getAttributeCategoryInfo } from '../../constants/attributeCategories'
 import { baseScoreType, getAttributeTypeInfo } from '../../constants/attributeTypes'
 import { formatContactMethod } from '../../constants/contactMethods'
 import { currencies, getCurrencyInfo } from '../../constants/currencies'
-import { getEventTypeInfo } from '../../constants/eventTypes'
 import { incidentSeverities } from '../../constants/incidentSeverities'
 import { getKycLevelInfo, kycLevels } from '../../constants/kycLevels'
 import { getServiceVisibilityInfo } from '../../constants/serviceVisibility'
@@ -46,7 +46,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro'
 import { someButNotAll, undefinedIfEmpty } from '../../lib/arrays'
 import { makeNonDbAttributes, sortAttributes } from '../../lib/attributes'
 import { cn } from '../../lib/cn'
-import { safeHttpUrl } from '../../lib/exchange/safeUrl'
+import { getEventDisplay, pickPrimaryEvent } from '../../lib/eventKind'
 import { getSupportedProviderSlugs } from '../../lib/exchange/supportedProviders'
 import { computeIncidentTrustPenalty, totalIncidentTrustPenalty } from '../../lib/incidentPenalty'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
@@ -57,7 +57,7 @@ import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
 import { isEmbeddableBadgeStatus } from '../../lib/serviceBadges'
 import { serviceDetailSelect } from '../../lib/serviceDetail'
 import { getServiceVerificationOverview } from '../../lib/serviceVerification'
-import { transformCase } from '../../lib/strings'
+import { stripMarkdown, transformCase } from '../../lib/strings'
 import { formatDateShort } from '../../lib/timeAgo'
 import { absoluteSiteUrl, siteOrigin, urlDomain, urlWithParams } from '../../lib/urls'
 
@@ -351,13 +351,9 @@ const ogImageTemplateData = {
 const serviceVisibilityInfo = getServiceVisibilityInfo(service.serviceVisibility)
 
 const activeAlertOrWarningEvents = service.events
-  .map((event) => ({
-    ...event,
-    typeInfo: getEventTypeInfo(event.type),
-  }))
-  .filter((event) => event.typeInfo.showBanner && (event.endedAt === null || event.endedAt >= now))
-const activeEventToShow =
-  activeAlertOrWarningEvents.find((event) => event.type === EventType.ALERT) ?? activeAlertOrWarningEvents[0]
+  .map((event) => ({ ...event, display: getEventDisplay(event, now) }))
+  .filter((event) => event.display.showBanner && (event.endedAt === null || event.endedAt >= now))
+const activeEventToShow = pickPrimaryEvent(activeAlertOrWarningEvents, now)
 
 // Incidents (trust-affecting) are shown in their own section and pulled out of
 // the general events timeline below. Their current trust penalty mirrors the
@@ -579,24 +575,34 @@ const verificationStatusDate =
 >
   {
     !!activeEventToShow && (
-      <div
+      <a
+        href={`#event-${activeEventToShow.id.toString()}`}
+        aria-label={`${activeEventToShow.display.label}: ${activeEventToShow.title}. Jump to this entry.`}
         class={cn(
-          'group mb-3 rounded-lg border border-day-500/10 px-3 py-2 text-sm',
-          activeEventToShow.typeInfo.classNames.banner
+          'mb-3 block rounded-lg border border-day-500/10 px-3 py-2 text-sm transition-colors',
+          activeEventToShow.display.classNames.banner
         )}
       >
-        <Icon name={activeEventToShow.typeInfo.icon} class="me-1.5 inline-block size-4 align-[-0.15em]" />
-        <span class="font-bold">{activeEventToShow.title}</span>:{' '}
-        <div class="inline [&_a]:underline [&_p]:inline">
-          <Markdown content={activeEventToShow.content} linkRel={['nofollow', 'noopener']} />
-        </div>
-        {activeAlertOrWarningEvents.length >= 2 && (
-          <> +{activeAlertOrWarningEvents.length - 1} more events.</>
-        )}{' '}
-        <a href="#events" class="underline hover:opacity-80">
-          Go to events
-        </a>
-      </div>
+        <span class="flex items-start gap-1.5">
+          <Icon name={activeEventToShow.display.icon} class="mt-0.5 size-4 shrink-0" />
+          <span class="min-w-0">
+            <span class="block font-bold wrap-anywhere">{activeEventToShow.title}</span>
+            <span class="line-clamp-2 wrap-anywhere text-current/80">
+              {stripMarkdown(activeEventToShow.content)}
+            </span>
+          </span>
+        </span>
+        <span class="mt-1 flex items-center gap-1 text-xs text-current/70">
+          {activeAlertOrWarningEvents.length >= 2 && (
+            <>
+              +{activeAlertOrWarningEvents.length - 1} more active
+              <span aria-hidden="true">·</span>
+            </>
+          )}
+          <span class="underline">Read this entry</span>
+          <Icon name="ri:arrow-right-s-line" class="size-4" />
+        </span>
+      </a>
     )
   }
 
@@ -1382,6 +1388,7 @@ const verificationStatusDate =
             {activeIncidents.map((entry) => (
               <li>
                 <IncidentCard
+                  eventId={entry.id}
                   title={entry.title}
                   content={entry.content}
                   source={entry.source}
@@ -1392,6 +1399,8 @@ const verificationStatusDate =
                   outcome={entry.incident.outcome}
                   amountText={entry.incident.amountText}
                   trustOverride={entry.incident.trustOverride}
+                  serviceSlug={service.slug}
+                  cases={entry.incident.cases}
                 />
               </li>
             ))}
@@ -1428,6 +1437,7 @@ const verificationStatusDate =
               {pastIncidents.map((entry) => (
                 <li>
                   <IncidentCard
+                    eventId={entry.id}
                     faded
                     title={entry.title}
                     content={entry.content}
@@ -1439,6 +1449,8 @@ const verificationStatusDate =
                     outcome={entry.incident.outcome}
                     amountText={entry.incident.amountText}
                     trustOverride={entry.incident.trustOverride}
+                    serviceSlug={service.slug}
+                    cases={entry.incident.cases}
                   />
                 </li>
               ))}
@@ -1459,72 +1471,7 @@ const verificationStatusDate =
       <Icon name="ri:arrow-right-s-line" class="size-4" />
     </a>
   </div>
-  {
-    timelineEvents.length > 0 ? (
-      <ol class="-mx-4 -mt-1 mb-2 flex items-start overflow-x-auto px-4 pt-1 lg:mask-x-from-[calc(100%-1rem)]">
-        {orderBy(
-          timelineEvents.map((event) => ({
-            ...event,
-            actualEndedAt: event.endedAt ?? now,
-          })),
-          ['actualEndedAt', 'startedAt'],
-          'desc'
-        ).map((event) => {
-          const typeInfo = getEventTypeInfo(event.type)
-
-          return (
-            <li class="relative w-xs max-w-[calc(100vw-3rem)] shrink-0">
-              <div class="flex items-center gap-2">
-                <div
-                  class={cn(
-                    'z-10 flex size-5 shrink-0 items-center justify-center rounded-full bg-night-400 ring-3 ring-night-400/50',
-                    typeInfo.classNames.dot
-                  )}
-                >
-                  <Icon name={typeInfo.icon} class="size-3" />
-                </div>
-                <FormatTimeInterval
-                  as="p"
-                  start={event.startedAt}
-                  end={event.endedAt}
-                  now={now}
-                  class="text-sm leading-none font-normal text-balance text-day-300"
-                />
-                <div class="mr-2 flex h-0.5 flex-1 bg-day-700" />
-              </div>
-
-              <div class="mt-3 max-w-md pe-8">
-                <h3 class="font-title text-lg/tight font-semibold text-pretty text-white">
-                  {typeInfo.isSolved && <BadgeSmall text="Solved" icon="ri:check-line" color="green" />}
-                  {event.title}
-                </h3>
-
-                <div class="prose max-w-none text-pretty text-day-400 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
-                  <Markdown content={event.content} linkRel={['nofollow', 'noopener']} />
-                </div>
-                {safeHttpUrl(event.source) && (
-                  <a
-                    href={safeHttpUrl(event.source)}
-                    target="_blank"
-                    rel="nofollow noopener"
-                    class="mt-1 inline-block text-xs text-blue-400 hover:underline"
-                  >
-                    Source
-                  </a>
-                )}
-              </div>
-            </li>
-          )
-        })}
-        <li
-          class="mt-2.25 flex h-0.5 w-full flex-1 self-start bg-linear-[to_right,var(--color-day-700)_50%,transparent_50%] mask-r-from-25% bg-size-[1rem]"
-          aria-hidden
-        />
-      </ol>
-    ) : (
-      <p class="my-12 text-center text-day-400">No events reported</p>
-    )
-  }
+  <EventTimeline events={timelineEvents} now={now} />
 
   <div class="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs xs:gap-x-6">
     <a

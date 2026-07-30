@@ -16,7 +16,14 @@ import {
   ContactCategory,
   ContactStatus,
   Currency,
+  EventClass,
+  EventOrigin,
+  EventSentiment,
   EventType,
+  IncidentOutcome,
+  IncidentSeverity,
+  IncidentState,
+  IncidentType,
   PrismaClient,
   RatingMuteReason,
   ServiceSuggestionStatus,
@@ -32,9 +39,11 @@ import { differenceInDays, isPast } from 'date-fns'
 import { uniqBy } from 'lodash-es'
 import { generateUsername } from 'unique-username-generator'
 
+import { getCaseStatusInfo } from '../src/constants/caseStatus'
 import { countries } from '../src/constants/countries'
 import { kycLevels } from '../src/constants/kycLevels'
 import { undefinedIfEmpty } from '../src/lib/arrays'
+import { eventKindToFields, type EventKind } from '../src/lib/eventKind'
 import { transformCase } from '../src/lib/strings'
 
 // Exit if not in development mode
@@ -594,10 +603,25 @@ const eventTitles = [
   'Holiday operating hours',
 ]
 
+const incidentTitles = [
+  'Hot wallet drained in an exploit',
+  'Withdrawals halted after a custodial breach',
+  'User database exposed by a misconfigured backup',
+  'Mass account freezes following a compliance review',
+  'Operator went dark with user balances',
+  'Third-party payment processor seized funds',
+]
+
 const generateFakeCase = (serviceId: number, userIds: number[]) => {
   const status = faker.helpers.arrayElement(Object.values(CaseStatus))
   const isResolved = status === CaseStatus.RESOLVED
   const evidenceCount = faker.number.int({ min: 1, max: 3 })
+  // Keep the dates in the order they happen: the problem, then the report, then
+  // publication, then any resolution.
+  const createdAt = faker.date.recent({ days: 120 })
+  const publishedAt = getCaseStatusInfo(status).public
+    ? faker.date.between({ from: createdAt, to: new Date() })
+    : null
 
   return {
     title: faker.helpers.arrayElement([
@@ -615,7 +639,12 @@ const generateFakeCase = (serviceId: number, userIds: number[]) => {
       { probability: 0.6 }
     ),
     externalSource: faker.helpers.maybe(() => faker.internet.url(), { probability: 0.7 }),
-    resolvedAt: isResolved ? faker.date.recent({ days: 30 }) : null,
+    occurredAt: faker.helpers.maybe(() => faker.date.recent({ days: 30, refDate: createdAt }), {
+      probability: 0.7,
+    }),
+    createdAt,
+    publishedAt,
+    resolvedAt: isResolved ? faker.date.between({ from: publishedAt ?? createdAt, to: new Date() }) : null,
     resolutionMd: isResolved ? faker.lorem.sentence() : null,
     service: { connect: { id: serviceId } },
     createdBy: { connect: { id: faker.helpers.arrayElement(userIds) } },
@@ -650,36 +679,83 @@ const generateFakeCase = (serviceId: number, userIds: number[]) => {
 }
 
 const generateFakeEvent = (serviceId: number) => {
-  const type = faker.helpers.arrayElement(Object.values(EventType))
-  const visible = faker.datatype.boolean(0.9) // 90% chance of being visible
+  // Weighted like production: listing edits dominate, incidents are rare.
+  const kind = faker.helpers.weightedArrayElement<EventKind | 'CHANGE'>([
+    { weight: 50, value: 'CHANGE' },
+    { weight: 20, value: 'INFO' },
+    { weight: 12, value: 'UPDATE' },
+    { weight: 12, value: 'WARNING' },
+    { weight: 6, value: 'INCIDENT' },
+  ])
+  const fields =
+    kind === 'CHANGE'
+      ? { class: EventClass.CHANGE, sentiment: EventSentiment.NEUTRAL, type: EventType.UPDATE }
+      : eventKindToFields(kind)
+
+  const visible = faker.datatype.boolean(0.9)
   const startedAt = faker.date.between({
-    from: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000), // 90 days ago
-    to: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days in future
+    from: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+    to: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
   })
   const endedAt = faker.helpers.arrayElement([
-    // Option 1: Future date (1-14 days after start)
     faker.date.between({
       from: startedAt,
       to: new Date(startedAt.getTime() + faker.number.int({ min: 1, max: 14 }) * 24 * 60 * 60 * 1000),
     }),
-    // Option 2: null (ongoing event)
     null,
-    // Option 3: Same date as startedAt (one-time event)
     new Date(startedAt),
   ])
 
-  const title = faker.helpers.arrayElement(eventTitles)
+  // CHANGE rows come from the edit pipeline; the rest are curated or automated.
+  const origin =
+    kind === 'CHANGE'
+      ? EventOrigin.MONITOR
+      : faker.helpers.weightedArrayElement<EventOrigin>([
+          { weight: 6, value: EventOrigin.STAFF },
+          { weight: 2, value: EventOrigin.USER },
+          { weight: 1, value: EventOrigin.AI },
+          { weight: 1, value: EventOrigin.MONITOR },
+        ])
+
+  const state = endedAt && endedAt > startedAt ? IncidentState.RESOLVED : IncidentState.ONGOING
 
   return {
-    title,
-    content: faker.lorem.sentence({ min: 1, max: 10 }),
+    title: faker.helpers.arrayElement(kind === 'INCIDENT' ? incidentTitles : eventTitles),
+    content: faker.lorem.paragraphs({ min: 1, max: 3 }),
     source: faker.helpers.maybe(() => faker.internet.url(), { probability: 0.7 }),
-    type,
+    ...fields,
+    origin,
     visible,
     startedAt,
     endedAt,
     service: { connect: { id: serviceId } },
-  } as const satisfies Prisma.EventCreateInput
+    ...(kind === 'INCIDENT'
+      ? {
+          incident: {
+            create: {
+              type: faker.helpers.arrayElement(Object.values(IncidentType)),
+              severity: faker.helpers.weightedArrayElement<IncidentSeverity>([
+                { weight: 3, value: IncidentSeverity.LOW },
+                { weight: 4, value: IncidentSeverity.MEDIUM },
+                { weight: 3, value: IncidentSeverity.HIGH },
+                { weight: 2, value: IncidentSeverity.CRITICAL },
+              ]),
+              state,
+              occurredAt: startedAt,
+              resolvedAt: state === IncidentState.RESOLVED ? endedAt : null,
+              outcome:
+                state === IncidentState.RESOLVED
+                  ? faker.helpers.arrayElement(Object.values(IncidentOutcome))
+                  : null,
+              amountText: faker.helpers.maybe(
+                () => `~${faker.number.float({ min: 0.5, max: 400, fractionDigits: 1 }).toString()} BTC`,
+                { probability: 0.6 }
+              ),
+            },
+          },
+        }
+      : {}),
+  } satisfies Prisma.EventCreateInput
 }
 
 const generateFakeService = (users: User[]) => {
@@ -1401,7 +1477,8 @@ async function main() {
     {
       slug: 'aml-refund-without-kyc',
       title: 'Refunds without KYC on AML flag',
-      description: 'If a deposit is flagged by the AML system, the service returns the funds without demanding identity verification.',
+      description:
+        'If a deposit is flagged by the AML system, the service returns the funds without demanding identity verification.',
       category: 'KYC' as const,
       type: 'GOOD' as const,
       privacyPoints: 8,
@@ -1410,7 +1487,8 @@ async function main() {
     {
       slug: 'aml-kyc-required-for-refund',
       title: 'KYC required for refund on AML flag',
-      description: 'If a deposit is flagged by the AML system, the service requires identity verification before returning the funds.',
+      description:
+        'If a deposit is flagged by the AML system, the service requires identity verification before returning the funds.',
       category: 'KYC' as const,
       type: 'BAD' as const,
       privacyPoints: -10,
@@ -1419,7 +1497,8 @@ async function main() {
     {
       slug: 'aml-risk-based-refund',
       title: 'Risk-based refund on AML flag',
-      description: 'Refund behaviour on AML flags depends on the transaction risk score. Low-risk deposits are returned; high-risk deposits may require KYC.',
+      description:
+        'Refund behaviour on AML flags depends on the transaction risk score. Low-risk deposits are returned; high-risk deposits may require KYC.',
       category: 'KYC' as const,
       type: 'WARNING' as const,
       privacyPoints: -4,
@@ -1428,7 +1507,8 @@ async function main() {
     {
       slug: 'lp-may-block-funds',
       title: 'Liquidity Provider may block funds',
-      description: 'Even if the service itself is permissive, the upstream Liquidity Provider can independently freeze funds and demand KYC/Source-of-Funds.',
+      description:
+        'Even if the service itself is permissive, the upstream Liquidity Provider can independently freeze funds and demand KYC/Source-of-Funds.',
       category: 'KYC' as const,
       type: 'WARNING' as const,
       privacyPoints: -3,
@@ -1437,7 +1517,8 @@ async function main() {
     {
       slug: 'own-liquidity',
       title: 'Uses own liquidity',
-      description: 'The service runs its own liquidity, so there is no third-party LP that could independently demand KYC or block funds.',
+      description:
+        'The service runs its own liquidity, so there is no third-party LP that could independently demand KYC or block funds.',
       category: 'KYC' as const,
       type: 'GOOD' as const,
       privacyPoints: 5,
@@ -1447,7 +1528,7 @@ async function main() {
       slug: 'transaction-screening',
       title: 'Transaction screening',
       description:
-        'Incoming deposits are screened against AML and sanctions databases (Chainalysis, Elliptic, and similar). The screening itself does not require identity from the user, but flagged deposits may be held for review. Outcomes vary by service: refund without ID, KYC required for refund, risk-based resolution, or seizure. See the service\'s specific flag-outcome attributes and policy notes.',
+        "Incoming deposits are screened against AML and sanctions databases (Chainalysis, Elliptic, and similar). The screening itself does not require identity from the user, but flagged deposits may be held for review. Outcomes vary by service: refund without ID, KYC required for refund, risk-based resolution, or seizure. See the service's specific flag-outcome attributes and policy notes.",
       category: 'KYC' as const,
       type: 'WARNING' as const,
       privacyPoints: -3,
@@ -1466,7 +1547,8 @@ async function main() {
     {
       slug: 'depends-on-partners',
       title: 'KYC depends on partners',
-      description: 'This service routes through partner providers whose KYC policies vary. Your actual experience depends on which partner is used for a given swap.',
+      description:
+        'This service routes through partner providers whose KYC policies vary. Your actual experience depends on which partner is used for a given swap.',
       category: 'KYC' as const,
       type: 'WARNING' as const,
       privacyPoints: -5,
@@ -1474,9 +1556,7 @@ async function main() {
     },
   ]
 
-  const kycAttributes = await Promise.all(
-    kycAttributeSeeds.map((data) => prisma.attribute.create({ data }))
-  )
+  const kycAttributes = await Promise.all(kycAttributeSeeds.map((data) => prisma.attribute.create({ data })))
 
   const attributes = [
     ...kycAttributes,
@@ -1526,25 +1606,43 @@ async function main() {
       )
 
       // Create events for the service
-      await Promise.all(
-        Array.from({ length: faker.number.int({ min: 0, max: 5 }) }, () =>
+      const serviceEvents = await Promise.all(
+        Array.from({ length: faker.number.int({ min: 0, max: 6 }) }, () =>
           prisma.event.create({
             data: generateFakeEvent(service.id),
+            select: { incident: { select: { id: true } } },
           })
         )
       )
 
       // Create cases for the service
-      await Promise.all(
+      const serviceCases = await Promise.all(
         Array.from({ length: faker.number.int({ min: 0, max: 3 }) }, () =>
           prisma.case.create({
             data: generateFakeCase(
               service.id,
               users.map((user) => user.id)
             ),
+            select: { id: true },
           })
         )
       )
+
+      // Attach some reports to this service's incidents so the two-way link
+      // between a case and the incident it substantiates is visible locally.
+      const serviceIncidentIds = serviceEvents.flatMap((event) => (event.incident ? [event.incident.id] : []))
+      if (serviceIncidentIds.length > 0) {
+        await Promise.all(
+          serviceCases
+            .filter(() => faker.datatype.boolean(0.5))
+            .map((caseRow) =>
+              prisma.case.update({
+                where: { id: caseRow.id },
+                data: { incidentId: faker.helpers.arrayElement(serviceIncidentIds) },
+              })
+            )
+        )
+      }
 
       return service
     })
@@ -1710,11 +1808,7 @@ async function main() {
     [specialUsers.normal, specialUsers.verified, ...users.slice(0, 4)],
     'id'
   ).map((u) => u.id)
-  const contactStaffIds = [
-    specialUsers.admin.id,
-    specialUsers.moderator.id,
-    specialUsers.contactManager.id,
-  ]
+  const contactStaffIds = [specialUsers.admin.id, specialUsers.moderator.id, specialUsers.contactManager.id]
   const contactCombos = Object.values(ContactCategory).flatMap((category) =>
     Object.values(ContactStatus).map((status) => ({ category, status }))
   )

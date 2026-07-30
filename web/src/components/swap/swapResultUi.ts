@@ -1,3 +1,6 @@
+import { getEventDisplay, pickPrimaryEvent } from '../../lib/eventKind'
+import type { DisplayableEvent, EventDisplay } from '../../lib/eventKind'
+
 export type SwapAmountSide = 'receive' | 'send'
 export type SwapSortBy = 'kyc' | 'rate' | 'score'
 
@@ -111,8 +114,7 @@ export function sortSwapResults<T extends SortableSwapResult>(
 ): T[] {
   const withIndex = results.map((item, index) => ({ item, index }))
   withIndex.sort((left, right) => {
-    const byQuotePresence =
-      Number(right.item.quote !== null) - Number(left.item.quote !== null)
+    const byQuotePresence = Number(right.item.quote !== null) - Number(left.item.quote !== null)
     if (byQuotePresence !== 0) return byQuotePresence
     if (left.item.quote === null || right.item.quote === null) {
       return left.index - right.index
@@ -171,4 +173,19 @@ export function findBestRateServiceSlug<T extends SortableSwapResult>(
     }
   }
   return best?.serviceSlug ?? null
+}
+
+/// makeActiveEventBadge reduces a service's active warnings to the single badge a
+/// swap row shows. The aggregator has already filtered the list to active
+/// warnings and alerts, so only severity ranking is left to do.
+export function makeActiveEventBadge<T extends DisplayableEvent & { title: string }>(
+  events: readonly T[]
+): { title: string; display: EventDisplay; totalCount: number } | null {
+  const primaryEvent = pickPrimaryEvent(events)
+  if (!primaryEvent) return null
+  return {
+    title: primaryEvent.title,
+    display: getEventDisplay(primaryEvent),
+    totalCount: events.length,
+  }
 }

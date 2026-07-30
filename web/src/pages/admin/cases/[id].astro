@@ -1,6 +1,7 @@
 ---
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
+import { format } from 'date-fns'
 
 import CaseEvidenceGallery from '../../../components/admin/cases/CaseEvidenceGallery.astro'
 import CaseUpdatesTimeline from '../../../components/admin/cases/CaseUpdatesTimeline.astro'
@@ -18,6 +19,7 @@ import MyPicture from '../../../components/MyPicture.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
 import { caseIssueTypes, getCaseIssueTypeInfo } from '../../../constants/caseIssueTypes'
 import { caseStatuses, getCaseStatusInfo } from '../../../constants/caseStatus'
+import { getIncidentSeverityInfo } from '../../../constants/incidentSeverities'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { prisma } from '../../../lib/prisma'
 
@@ -37,6 +39,10 @@ if (deleteResult && !deleteResult.error) return Astro.redirect('/admin/cases')
 const updateResult = Astro.getActionResult(actions.admin.case.update)
 Astro.locals.banners.addIfSuccess(updateResult, 'Case updated')
 const updateInputErrors = errorsOf(updateResult)
+
+const linkIncidentResult = Astro.getActionResult(actions.admin.case.linkIncident)
+Astro.locals.banners.addIfSuccess(linkIncidentResult, 'Incident link updated')
+const linkIncidentInputErrors = errorsOf(linkIncidentResult)
 
 const setStatusResult = Astro.getActionResult(actions.admin.case.setStatus)
 Astro.locals.banners.addIfSuccess(setStatusResult, 'Case status updated')
@@ -61,7 +67,10 @@ Astro.locals.banners.addIfSuccess(addParticipantResult, 'Participant added')
 const removeParticipantResult = Astro.getActionResult(actions.admin.case.participants.remove)
 Astro.locals.banners.addIfSuccess(removeParticipantResult, 'Participant removed')
 
-const evidenceOrderBy = [{ order: 'asc' }, { createdAt: 'asc' }] satisfies Prisma.CaseEvidenceOrderByWithRelationInput[]
+const evidenceOrderBy = [
+  { order: 'asc' },
+  { createdAt: 'asc' },
+] satisfies Prisma.CaseEvidenceOrderByWithRelationInput[]
 const evidenceSelect = {
   id: true,
   type: true,
@@ -86,9 +95,12 @@ const caseRow = await Astro.locals.banners.try(
         summaryMd: true,
         amountText: true,
         externalSource: true,
+        occurredAt: true,
+        incidentId: true,
         resolvedAt: true,
         resolutionMd: true,
         createdAt: true,
+        serviceId: true,
         service: { select: { name: true, slug: true } },
         reportedBy: { select: { id: true, name: true, displayName: true, picture: true } },
         createdBy: { select: { name: true } },
@@ -115,11 +127,35 @@ const caseRow = await Astro.locals.banners.try(
 
 if (!caseRow) return Astro.rewrite('/404')
 
+// Only this service's incidents can be linked, matching the action's own guard.
+const incidents = await Astro.locals.banners.try(
+  'Failed to load incidents',
+  () =>
+    prisma.incident.findMany({
+      where: { event: { serviceId: caseRow.serviceId, deletedAt: null } },
+      orderBy: { occurredAt: 'desc' },
+      select: {
+        id: true,
+        severity: true,
+        occurredAt: true,
+        event: { select: { title: true } },
+      },
+    }),
+  []
+)
+
 const statusInfo = getCaseStatusInfo(caseRow.status)
 const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
+const toDateInput = (date: Date | null) => (date ? format(date, 'yyyy-MM-dd') : '')
 ---
 
-<BaseLayout pageTitle={`Case: ${caseRow.title}`} description="Manage case" widthClassName="max-w-3xl" noindex htmx>
+<BaseLayout
+  pageTitle={`Case: ${caseRow.title}`}
+  description="Manage case"
+  widthClassName="max-w-3xl"
+  noindex
+  htmx
+>
   <div class="mt-10 flex flex-wrap items-center justify-between gap-2">
     <a
       href="/admin/cases"
@@ -213,6 +249,14 @@ const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
         />
       </div>
 
+      <InputText
+        label="Occurred on"
+        name="occurredAt"
+        inputProps={{ type: 'date', value: toDateInput(caseRow.occurredAt) }}
+        description="When the problem happened, if the reporter could date it. Leave empty if unknown."
+        error={updateInputErrors.occurredAt}
+      />
+
       <div>
         <span class="mb-1 block text-sm font-medium text-day-200">Reporter user</span>
         <p class="mb-2 text-xs text-day-400">Optional. The user who reported this case.</p>
@@ -235,6 +279,42 @@ const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
 
       <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
     </form>
+  </FormSection>
+
+  <FormSection title="Linked incident" id="incident" class="mt-12">
+    <p class="mb-3 text-sm text-day-400">
+      Link this report to a service-wide incident once you judge that it substantiates one. The trust penalty
+      stays derived from the incident itself, so linking more reports never multiplies the score impact.
+      Published linked reports are listed on the incident on the public service page.
+    </p>
+
+    {
+      incidents.length === 0 ? (
+        <p class="rounded-lg border border-night-600 bg-night-800 p-4 text-center text-sm text-day-400">
+          {caseRow.service.name} has no incidents recorded yet. Create one from the service's events first.
+        </p>
+      ) : (
+        <form method="POST" action={`${actions.admin.case.linkIncident}#incident`} class="space-y-4">
+          <input type="hidden" name="caseId" value={caseRow.id} />
+
+          <InputSelect
+            name="incidentId"
+            label="Incident"
+            options={[
+              { label: 'Not linked', value: '' },
+              ...incidents.map((incident) => ({
+                label: `${getIncidentSeverityInfo(incident.severity).label} · ${format(incident.occurredAt, 'MMM yyyy')} · ${incident.event.title}`,
+                value: incident.id.toString(),
+              })),
+            ]}
+            selectedValue={caseRow.incidentId?.toString() ?? ''}
+            error={linkIncidentInputErrors.incidentId}
+          />
+
+          <InputSubmitButton label="Save link" icon="ri:link" hideCancel />
+        </form>
+      )
+    }
   </FormSection>
 
   <FormSection title="Participants" id="participants" class="mt-12">
@@ -328,8 +408,12 @@ const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
   </FormSection>
 
   <FormSection title="Danger zone" class="mt-12">
-    <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-950/20 p-4">
-      <p class="text-sm text-day-300">Deleting a case removes its updates and all evidence. This cannot be undone.</p>
+    <div
+      class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-950/20 p-4"
+    >
+      <p class="text-sm text-day-300">
+        Deleting a case removes its updates and all evidence. This cannot be undone.
+      </p>
       <DeleteConfirmButton action={actions.admin.case.delete} id="case" label="Delete case">
         <input type="hidden" name="caseId" value={caseRow.id} />
       </DeleteConfirmButton>

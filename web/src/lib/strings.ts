@@ -14,6 +14,22 @@ const normalize = (str: string): string => {
 }
 
 /**
+ * Flatten markdown to a single line of plain text, for excerpts and previews.
+ * Link text survives, the target is dropped.
+ *
+ * @example
+ * stripMarkdown('## See [docs](https://x.dev)\n\n**now**') // 'See docs now'
+ */
+export const stripMarkdown = (markdown: string): string => {
+  return markdown
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/[#*_`>~]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
  * Compare two strings after normalizing them.
  */
 export const areSameNormalized = (str1: string, str2: string): boolean => {
