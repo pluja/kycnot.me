@@ -2,18 +2,13 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
-import { eventToKind, getEventDisplay } from '../../../../lib/eventKind'
-import BadgeSmall from '../../../BadgeSmall.astro'
-import Button from '../../../Button.astro'
 import FormSection from '../../../FormSection.astro'
 import FormSubSection from '../../../FormSubSection.astro'
 import InputSubmitButton from '../../../InputSubmitButton.astro'
 import InputText from '../../../InputText.astro'
 import InputTextArea from '../../../InputTextArea.astro'
-import Tooltip from '../../../Tooltip.astro'
-import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
-import EditableListItem from '../../EditableListItem.astro'
-import EditToggleButton from '../../EditToggleButton.astro'
+import AdminEventEditItem from '../../events/AdminEventEditItem.astro'
+import EventTimingFields from '../../events/EventTimingFields.astro'
 import IncidentFields from './IncidentFields.astro'
 
 import type { Prisma } from '@prisma/client'
@@ -40,292 +35,108 @@ const toLocalDateTime = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 const sectionHash = `#${id}`
 
-// Active events (ongoing or not yet ended, matching the events index) sort
-// first; within each group, ongoing events lead and the rest go by latest end.
-const now = Date.now()
-const isActiveEvent = (event: (typeof events)[number]) =>
-  event.endedAt === null || event.endedAt.getTime() >= now
-const sortedEvents = [...events].sort((a, b) => {
-  const activeDiff = Number(isActiveEvent(b)) - Number(isActiveEvent(a))
-  if (activeDiff !== 0) return activeDiff
-  const aEnd = a.endedAt ? a.endedAt.getTime() : Infinity
-  const bEnd = b.endedAt ? b.endedAt.getTime() : Infinity
-  return bEnd - aEnd
-})
+const sortedEvents = [...events].sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
+// Listing edits are auto-recorded and outnumber curated entries many times over,
+// so they stay behind a disclosure.
+const curatedEvents = sortedEvents.filter((event) => event.class !== 'CHANGE')
+const changeEvents = sortedEvents.filter((event) => event.class === 'CHANGE')
 ---
 
 <FormSection title="Events" id={id}>
-  <FormSubSection title="Existing Events">
+  <FormSubSection title="Add an event">
+    <details class="group" open={events.length === 0}>
+      <summary
+        class="mb-3 flex w-fit cursor-pointer list-none items-center gap-2 rounded-md border border-night-500 px-3 py-1.5 text-sm text-day-200 transition-colors hover:border-green-500/50 hover:text-white [&::-webkit-details-marker]:hidden"
+      >
+        <Icon name="ri:add-line" class="size-4 shrink-0" />
+        <span class="group-open:hidden">New event</span>
+        <span class="hidden group-open:inline">Close</span>
+        <Icon
+          name="ri:arrow-down-s-line"
+          class="size-4 shrink-0 transition-transform group-open:rotate-180"
+        />
+      </summary>
+
+      <form method="POST" action={`${actions.admin.event.create}${sectionHash}`} class="space-y-3">
+        <input type="hidden" name="serviceId" value={serviceId} />
+
+        <InputText
+          label="Title"
+          name="title"
+          inputProps={{ required: true, placeholder: 'Short, factual headline' }}
+          error={createInputErrors.title}
+        />
+
+        <InputTextArea
+          label="Content"
+          name="content"
+          inputProps={{ required: true, rows: 3 }}
+          error={createInputErrors.content}
+          description="Markdown supported. Say what happened and what it means for users."
+        />
+
+        <EventTimingFields startedAt={toLocalDateTime(new Date())} errors={createInputErrors} />
+
+        <InputText
+          label="Source URL"
+          name="source"
+          inputProps={{ type: 'url', placeholder: 'https://...' }}
+          error={createInputErrors.source}
+          description="Optional. Where this was reported, so readers can check it."
+        />
+
+        <IncidentFields errors={createInputErrors} />
+
+        <InputSubmitButton label="Add event" icon="ri:add-line" hideCancel />
+      </form>
+    </details>
+  </FormSubSection>
+
+  <FormSubSection title="Timeline">
     {
       events.length === 0 ? (
         <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
           No events yet.
         </p>
       ) : (
-        <div class="space-y-2">
-          {sortedEvents.map((event) => {
-            const display = getEventDisplay(event)
-            const itemId = `event-${event.id}`
-            return (
-              <EditableListItem id={itemId}>
-                <Fragment slot="header">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <span class="font-semibold text-day-100">{event.title}</span>
-                    <BadgeSmall
-                      text={display.label}
-                      variant="faded"
-                      color={display.color}
-                      icon={display.icon}
-                    />
-                    {event.incident && (
-                      <BadgeSmall
-                        text={`${event.incident.state === 'RESOLVED' ? 'Resolved' : 'Active'} incident`}
-                        variant="faded"
-                        color={event.incident.state === 'RESOLVED' ? 'green' : 'red'}
-                        icon="ri:alarm-warning-line"
-                      />
-                    )}
-                    {event.deletedAt ? (
-                      <BadgeSmall text="Deleted" variant="faded" color="red" icon="ri:delete-bin-line" />
-                    ) : (
-                      !event.visible && (
-                        <BadgeSmall text="Hidden" variant="faded" color="gray" icon="ri:eye-off-line" />
-                      )
-                    )}
-                  </div>
-                  <p class="text-sm text-pretty text-day-400">{event.content}</p>
-                  <div class="flex flex-wrap items-center gap-3 text-xs text-day-500">
-                    <span>Started: {new Date(event.startedAt).toLocaleDateString()}</span>
-                    <span>
-                      Ended:
-                      {event.endedAt
-                        ? event.endedAt === event.startedAt
-                          ? '1-time event'
-                          : new Date(event.endedAt).toLocaleDateString()
-                        : 'Ongoing'}
-                    </span>
-                    {event.source && <span>Source: {event.source}</span>}
-                  </div>
-                  {(event.createdBy ?? event.updatedBy) && (
-                    <div class="flex flex-wrap items-center gap-3 text-xs text-day-600">
-                      {event.createdBy && (
-                        <span>Created by {event.createdBy.displayName ?? event.createdBy.name}</span>
-                      )}
-                      {event.updatedBy && (
-                        <span>Last edited by {event.updatedBy.displayName ?? event.updatedBy.name}</span>
-                      )}
-                    </div>
-                  )}
-                </Fragment>
+        <>
+          {curatedEvents.length > 0 && (
+            <div class="space-y-2">
+              {curatedEvents.map((event) => (
+                <AdminEventEditItem
+                  event={event}
+                  updateInputErrors={updateInputErrors}
+                  sectionHash={sectionHash}
+                  isAdmin={isAdmin}
+                />
+              ))}
+            </div>
+          )}
 
-                <Fragment slot="actions">
-                  {event.deletedAt ? (
-                    <>
-                      <Tooltip text="Restore">
-                        <form
-                          method="POST"
-                          action={`${actions.admin.event.restore}${sectionHash}`}
-                          class="contents"
-                        >
-                          <input type="hidden" name="eventId" value={event.id} />
-                          <Button
-                            type="submit"
-                            variant="faded"
-                            size="sm"
-                            color="success"
-                            icon="ri:arrow-go-back-line"
-                            iconOnly
-                            label="Restore"
-                          />
-                        </form>
-                      </Tooltip>
-                      {isAdmin && (
-                        <DeleteConfirmButton
-                          action={`${actions.admin.event.purge}${sectionHash}`}
-                          id={itemId}
-                          label="Permanently delete"
-                        >
-                          <input type="hidden" name="eventId" value={event.id} />
-                        </DeleteConfirmButton>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Tooltip text={event.visible ? 'Hide' : 'Show'}>
-                        <form
-                          method="POST"
-                          action={`${actions.admin.event.toggle}${sectionHash}`}
-                          class="contents"
-                        >
-                          <input type="hidden" name="eventId" value={event.id} />
-                          <Button
-                            type="submit"
-                            variant="faded"
-                            size="sm"
-                            icon={event.visible ? 'ri:eye-off-line' : 'ri:eye-line'}
-                            iconOnly
-                            label={event.visible ? 'Hide' : 'Show'}
-                          />
-                        </form>
-                      </Tooltip>
-                      {event.incident && event.incident.state !== 'RESOLVED' && (
-                        <Tooltip text="Resolve incident (sets resolved now)">
-                          <form
-                            method="POST"
-                            action={`${actions.admin.event.resolve}${sectionHash}`}
-                            class="contents"
-                          >
-                            <input type="hidden" name="eventId" value={event.id} />
-                            <Button
-                              type="submit"
-                              variant="faded"
-                              size="sm"
-                              color="success"
-                              icon="ri:check-double-line"
-                              iconOnly
-                              label="Resolve incident"
-                            />
-                          </form>
-                        </Tooltip>
-                      )}
-                      <EditToggleButton for={itemId} />
-                      <DeleteConfirmButton action={`${actions.admin.event.delete}${sectionHash}`} id={itemId}>
-                        <input type="hidden" name="eventId" value={event.id} />
-                      </DeleteConfirmButton>
-                    </>
-                  )}
-                </Fragment>
-
-                <Fragment slot="edit">
-                  <form
-                    method="POST"
-                    action={`${actions.admin.event.update}${sectionHash}`}
-                    class="space-y-3"
-                  >
-                    <input type="hidden" name="eventId" value={event.id} />
-
-                    <InputText
-                      label="Title"
-                      name="title"
-                      inputProps={{ required: true, value: event.title }}
-                      error={updateInputErrors.title}
-                    />
-
-                    <InputTextArea
-                      label="Content"
-                      name="content"
-                      inputProps={{ required: true, rows: 3 }}
-                      value={event.content}
-                      error={updateInputErrors.content}
-                    />
-
-                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <InputText
-                        label="Started At"
-                        name="startedAt"
-                        inputProps={{
-                          type: 'datetime-local',
-                          required: true,
-                          value: toLocalDateTime(new Date(event.startedAt)),
-                        }}
-                        error={updateInputErrors.startedAt}
-                      />
-
-                      <div>
-                        <InputText
-                          label="Ended At"
-                          name="endedAt"
-                          inputProps={{
-                            type: 'datetime-local',
-                            value: event.endedAt ? toLocalDateTime(new Date(event.endedAt)) : '',
-                          }}
-                          error={updateInputErrors.endedAt}
-                          description="- Empty: Event is ongoing.\n- Filled: Event with specific end date.\n- Same as start date: One-time event."
-                        />
-                        <button
-                          type="button"
-                          data-clear-datetime="endedAt"
-                          class="mt-1 inline-flex items-center gap-1 text-xs text-day-500 transition-colors hover:text-day-200"
-                        >
-                          <Icon name="ri:close-circle-line" class="size-3.5" />
-                          Clear (event is ongoing)
-                        </button>
-                      </div>
-                    </div>
-
-                    <InputText
-                      label="Source URL"
-                      name="source"
-                      inputProps={{ value: event.source }}
-                      error={updateInputErrors.source}
-                    />
-
-                    <IncidentFields
-                      kind={eventToKind(event.class, event.sentiment)}
-                      incident={event.incident}
-                      errors={updateInputErrors}
-                    />
-
-                    <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
-                  </form>
-                </Fragment>
-              </EditableListItem>
-            )
-          })}
-        </div>
+          {changeEvents.length > 0 && (
+            <details class="group mt-3">
+              <summary class="flex w-fit cursor-pointer list-none items-center gap-2 py-1 text-sm text-day-500 transition-colors hover:text-day-300 [&::-webkit-details-marker]:hidden">
+                <Icon name="ri:pencil-line" class="size-4 shrink-0" />
+                Listing edits ({changeEvents.length})
+                <Icon
+                  name="ri:arrow-down-s-line"
+                  class="size-4 shrink-0 transition-transform group-open:rotate-180"
+                />
+              </summary>
+              <div class="mt-2 space-y-2">
+                {changeEvents.map((event) => (
+                  <AdminEventEditItem
+                    event={event}
+                    updateInputErrors={updateInputErrors}
+                    sectionHash={sectionHash}
+                    isAdmin={isAdmin}
+                  />
+                ))}
+              </div>
+            </details>
+          )}
+        </>
       )
     }
-  </FormSubSection>
-
-  <FormSubSection title="Add New Event">
-    <form method="POST" action={`${actions.admin.event.create}${sectionHash}`} class="space-y-2">
-      <input type="hidden" name="serviceId" value={serviceId} />
-
-      <InputText label="Title" name="title" inputProps={{ required: true }} error={createInputErrors.title} />
-
-      <InputTextArea
-        label="Content"
-        name="content"
-        inputProps={{ required: true, rows: 3 }}
-        error={createInputErrors.content}
-      />
-
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <InputText
-          label="Started At"
-          name="startedAt"
-          inputProps={{
-            type: 'datetime-local',
-            required: true,
-            value: toLocalDateTime(new Date()),
-          }}
-          error={createInputErrors.startedAt}
-        />
-
-        <div>
-          <InputText
-            label="Ended At"
-            name="endedAt"
-            inputProps={{ type: 'datetime-local' }}
-            error={createInputErrors.endedAt}
-            description="- Empty: Event is ongoing.\n- Filled: Event with specific end date.\n- Same as start date: One-time event."
-          />
-          <button
-            type="button"
-            data-clear-datetime="endedAt"
-            class="mt-1 inline-flex items-center gap-1 text-xs text-day-500 transition-colors hover:text-day-200"
-          >
-            <Icon name="ri:close-circle-line" class="size-3.5" />
-            Clear (event is ongoing)
-          </button>
-        </div>
-      </div>
-
-      <InputText label="Source URL" name="source" error={createInputErrors.source} />
-
-      <IncidentFields errors={createInputErrors} />
-
-      <InputSubmitButton label="Add" icon="ri:add-line" hideCancel />
-    </form>
   </FormSubSection>
 </FormSection>

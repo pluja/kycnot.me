@@ -2,6 +2,7 @@
 import { IncidentOutcome, IncidentType } from '@prisma/client'
 
 import { incidentSeverities } from '../../../../constants/incidentSeverities'
+import { FULL_PENALTY } from '../../../../lib/incidentPenalty'
 import { EVENT_KINDS, type EventKind } from '../../../../lib/eventKind'
 import { transformCase } from '../../../../lib/strings'
 import InputCardGroup from '../../../InputCardGroup.astro'
@@ -56,7 +57,6 @@ const kindCardData: Record<EventKind, { label: string; icon: string; description
 }
 const kindCards = EVENT_KINDS.map((value) => ({ value, ...kindCardData[value] }))
 
-const severityPenalty: Record<IncidentSeverity, number> = { LOW: -5, MEDIUM: -12, HIGH: -22, CRITICAL: -35 }
 const severityBlurb: Record<IncidentSeverity, string> = {
   LOW: 'Minor, quickly patched, little or no funds at risk.',
   MEDIUM: 'Real but limited exposure.',
@@ -70,7 +70,7 @@ const severityCards = [...incidentSeverities]
     label: s.label,
     icon: s.icon,
     iconClass: s.classNames.text,
-    description: `${severityBlurb[s.id]} **${severityPenalty[s.id]} trust** while ongoing.`,
+    description: `${severityBlurb[s.id]} **${FULL_PENALTY[s.id].toString()} trust** while ongoing.`,
   }))
 
 const stateCards = [

@@ -1,160 +1,341 @@
 ---
 import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+import { z } from 'astro/zod'
 
-import MyPicture from '../../../components/MyPicture.astro'
-import { getEventDisplay } from '../../../lib/eventKind'
+import AdminEventRow from '../../../components/admin/events/AdminEventRow.astro'
+import Button from '../../../components/Button.astro'
+import { eventClassFilterFor, eventViews, eventViewsZodEnum } from '../../../constants/eventViews'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { cn } from '../../../lib/cn'
+import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
 import { prisma } from '../../../lib/prisma'
+import { urlWithParams } from '../../../lib/urls'
 
-const q = (Astro.url.searchParams.get('q') ?? '').trim()
+import type { Prisma } from '@prisma/client'
+
+const PAGE_SIZE = 60
+
+const toggleResult = Astro.getActionResult(actions.admin.event.toggle)
+Astro.locals.banners.addIfSuccess(toggleResult, 'Event visibility updated')
+const resolveResult = Astro.getActionResult(actions.admin.event.resolve)
+Astro.locals.banners.addIfSuccess(resolveResult, 'Incident resolved')
+
+const eventStates = [
+  { value: 'live', label: 'Live (visible, not deleted)' },
+  { value: 'ongoing', label: 'Ongoing only' },
+  { value: 'ended', label: 'Ended only' },
+  { value: 'hidden', label: 'Hidden' },
+  { value: 'deleted', label: 'Deleted' },
+] as const
+
+const { data: filters, hasDefaultData } = zodParseQueryParamsStoringErrors(
+  {
+    view: eventViewsZodEnum.default('curated'),
+    state: z.enum(['live', 'ongoing', 'ended', 'hidden', 'deleted']).default('live'),
+    service: z.string().optional(),
+    q: z.string().optional(),
+    page: z.coerce.number().int().min(1).default(1),
+  },
+  Astro
+)
 
 const now = new Date()
 
-const [activeEvents, services] = await Astro.locals.banners.tryMany([
+const stateFilters: Record<(typeof eventStates)[number]['value'], Prisma.EventWhereInput> = {
+  live: { visible: true, deletedAt: null },
+  ongoing: {
+    visible: true,
+    deletedAt: null,
+    OR: [{ endedAt: null }, { endedAt: { gte: now } }],
+  },
+  ended: { visible: true, deletedAt: null, endedAt: { lt: now } },
+  hidden: { visible: false, deletedAt: null },
+  deleted: { deletedAt: { not: null } },
+}
+
+const where: Prisma.EventWhereInput = {
+  ...stateFilters[filters.state],
+  class: eventClassFilterFor(filters.view),
+  ...(filters.service ? { service: { slug: filters.service } } : {}),
+  ...(filters.q
+    ? {
+        OR: [
+          { title: { contains: filters.q, mode: 'insensitive' } },
+          { content: { contains: filters.q, mode: 'insensitive' } },
+        ],
+      }
+    : {}),
+}
+
+const [events, totalEvents] = await Astro.locals.banners.try(
+  'Failed to load events',
+  () =>
+    prisma.event.findManyAndCount({
+      where,
+      // Most recently started first: what a moderator is looking for is almost
+      // always the newest thing that happened.
+      orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+      skip: (filters.page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        type: true,
+        class: true,
+        sentiment: true,
+        origin: true,
+        visible: true,
+        deletedAt: true,
+        startedAt: true,
+        endedAt: true,
+        incident: { select: { state: true, severity: true } },
+        service: { select: { name: true, slug: true, imageUrl: true } },
+      },
+    }),
+  [[], 0] as const
+)
+
+// Counts drive the triage shortcuts, so they ignore the current filters.
+const [openIncidents, openWarnings, hiddenCount, deletedCount, services] = await Astro.locals.banners.tryMany(
   [
-    'Failed to load active events',
-    () =>
-      prisma.event.findMany({
-        where: {
-          visible: true,
-          deletedAt: null,
-          startedAt: { lte: now },
-          OR: [{ endedAt: null }, { endedAt: { gte: now } }],
-        },
-        select: {
-          title: true,
-          type: true,
-          class: true,
-          sentiment: true,
-          startedAt: true,
-          endedAt: true,
-          incident: { select: { state: true } },
-          service: { select: { name: true, slug: true, imageUrl: true } },
-        },
-        orderBy: { startedAt: 'desc' },
-      }),
-    [] as [],
-  ],
-  [
-    'Failed to load services',
-    () =>
-      prisma.service.findMany({
-        where: q
-          ? { name: { contains: q, mode: 'insensitive' } }
-          : { serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] } },
-        select: {
-          name: true,
-          slug: true,
-          imageUrl: true,
-          _count: { select: { events: { where: { deletedAt: null } } } },
-        },
-        orderBy: { name: 'asc' },
-        take: 60,
-      }),
-    [] as [],
-  ],
-])
+    [
+      'Failed to count incidents',
+      () =>
+        prisma.event.count({
+          where: { visible: true, deletedAt: null, class: 'INCIDENT', incident: { state: 'ONGOING' } },
+        }),
+      0,
+    ],
+    [
+      'Failed to count warnings',
+      () =>
+        prisma.event.count({
+          where: {
+            visible: true,
+            deletedAt: null,
+            class: 'EVENT',
+            sentiment: 'NEGATIVE',
+            OR: [{ endedAt: null }, { endedAt: { gte: now } }],
+          },
+        }),
+      0,
+    ],
+    [
+      'Failed to count hidden events',
+      () => prisma.event.count({ where: { visible: false, deletedAt: null } }),
+      0,
+    ],
+    ['Failed to count deleted events', () => prisma.event.count({ where: { deletedAt: { not: null } } }), 0],
+    [
+      'Failed to load services',
+      () =>
+        prisma.service.findMany({
+          select: { name: true, slug: true, _count: { select: { events: { where: { deletedAt: null } } } } },
+          orderBy: { name: 'asc' },
+        }),
+      [] as [],
+    ],
+  ]
+)
+
+const selectedService = services.find((service) => service.slug === filters.service)
+const totalPages = Math.max(1, Math.ceil(totalEvents / PAGE_SIZE))
+const rangeStart = totalEvents === 0 ? 0 : (filters.page - 1) * PAGE_SIZE + 1
+const rangeEnd = Math.min(filters.page * PAGE_SIZE, totalEvents)
+
+const shortcuts = [
+  {
+    label: 'Open incidents',
+    count: openIncidents,
+    icon: 'ri:alarm-warning-line',
+    color: 'text-red-300',
+    params: { view: 'incidents', state: 'ongoing', service: undefined, q: undefined, page: undefined },
+  },
+  {
+    label: 'Active warnings',
+    count: openWarnings,
+    icon: 'ri:alert-line',
+    color: 'text-amber-300',
+    params: { view: 'curated', state: 'ongoing', service: undefined, q: undefined, page: undefined },
+  },
+  {
+    label: 'Hidden',
+    count: hiddenCount,
+    icon: 'ri:eye-off-line',
+    color: 'text-day-300',
+    params: { view: 'all', state: 'hidden', service: undefined, q: undefined, page: undefined },
+  },
+  {
+    label: 'Deleted',
+    count: deletedCount,
+    icon: 'ri:delete-bin-line',
+    color: 'text-day-400',
+    params: { view: 'all', state: 'deleted', service: undefined, q: undefined, page: undefined },
+  },
+]
+
+const fieldClass =
+  'w-full rounded-md border border-night-500 bg-night-900 px-2.5 py-1.5 text-sm text-day-100 transition-colors [color-scheme:dark] focus:border-green-500/60 focus:outline-none'
 ---
 
-<BaseLayout pageTitle="Manage events" widthClassName="max-w-3xl">
-  <header class="mt-8 mb-4">
-    <h1 class="font-title text-2xl font-bold text-white">Manage service events</h1>
-    <p class="mt-1 text-sm text-day-400">Pick a service to manage its timeline events.</p>
+<BaseLayout pageTitle="Manage events" widthClassName="max-w-6xl" noindex>
+  <header class="mt-10 mb-5 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="font-title text-3xl font-bold text-white">Events</h1>
+      <p class="mt-1 text-sm text-day-400">
+        Newest first. Pick a service to add an event or edit its timeline.
+      </p>
+    </div>
+
+    {
+      selectedService && (
+        <Button
+          as="a"
+          href={`/admin/events/${encodeURIComponent(selectedService.slug)}`}
+          color="success"
+          icon="ri:add-line"
+          size="sm"
+          label={`Add event to ${selectedService.name}`}
+        />
+      )
+    }
   </header>
 
-  {
-    activeEvents.length > 0 && (
-      <section class="mb-8">
-        <h2 class="mb-3 flex items-center gap-2 text-sm font-semibold text-day-300">
-          <span class="relative flex size-2">
-            <span class="absolute inline-flex size-full animate-ping rounded-full bg-green-500/60" />
-            <span class="relative inline-flex size-2 rounded-full bg-green-500" />
+  <div class="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+    {
+      shortcuts.map((shortcut) => (
+        <a
+          href={urlWithParams(Astro.url, shortcut.params)}
+          class="rounded-lg border border-night-600 bg-night-800 px-3 py-2 transition-colors hover:border-night-400"
+        >
+          <span class="flex items-center gap-1.5 text-xs text-day-400">
+            <Icon name={shortcut.icon} class={cn('size-3.5 shrink-0', shortcut.color)} />
+            {shortcut.label}
           </span>
-          Active events
-          <span class="text-day-500">({activeEvents.length})</span>
-        </h2>
+          <span class={cn('font-title text-xl font-bold tabular-nums', shortcut.color)}>
+            {shortcut.count.toLocaleString()}
+          </span>
+        </a>
+      ))
+    }
+  </div>
 
-        <ul class="space-y-1.5">
-          {activeEvents.map((event) => {
-            const display = getEventDisplay(event)
-            return (
-              <li>
-                <a
-                  href={`/admin/events/${event.service.slug}`}
-                  class="flex items-center gap-3 rounded-lg border border-night-700 bg-night-900 px-3 py-2 transition-colors hover:border-green-500/50"
-                >
-                  <MyPicture
-                    src={event.service.imageUrl}
-                    fallback="service"
-                    alt={`${event.service.name} logo`}
-                    class="size-6 shrink-0 rounded-sm object-contain"
-                    width={24}
-                    height={24}
-                  />
-                  <span
-                    class={cn(
-                      'inline-flex size-5 shrink-0 items-center justify-center rounded-full ring-3',
-                      display.classNames.dot
-                    )}
-                  >
-                    <Icon name={display.icon} class="size-3" />
-                  </span>
-                  <span class="min-w-0 flex-1 truncate text-sm text-white">{event.title}</span>
-                  <span class="shrink-0 text-xs text-day-500">{event.service.name}</span>
-                  <span class="shrink-0 text-xs text-day-500">
-                    {new Date(event.startedAt).toLocaleDateString()} &rarr;{' '}
-                    {event.endedAt ? new Date(event.endedAt).toLocaleDateString() : 'ongoing'}
-                  </span>
-                </a>
-              </li>
-            )
-          })}
-        </ul>
-      </section>
-    )
-  }
+  <form method="GET" class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto]">
+    <div>
+      <label for="q" class="sr-only">Search events</label>
+      <input
+        type="search"
+        id="q"
+        name="q"
+        value={filters.q}
+        placeholder="Search title or content..."
+        class={fieldClass}
+      />
+    </div>
 
-  <form method="GET" class="mb-6">
-    <input
-      type="search"
-      name="q"
-      value={q}
-      placeholder="Search services..."
-      class="w-full rounded-md border border-night-600 bg-night-900 p-2 text-white placeholder-day-500 focus:border-green-500 focus:outline-hidden"
-    />
+    <div>
+      <label for="view" class="sr-only">Show</label>
+      <select id="view" name="view" class={fieldClass}>
+        {
+          eventViews.map((view) => (
+            <option value={view.value} selected={filters.view === view.value}>
+              {view.label}
+            </option>
+          ))
+        }
+      </select>
+    </div>
+
+    <div>
+      <label for="state" class="sr-only">State</label>
+      <select id="state" name="state" class={fieldClass}>
+        {
+          eventStates.map((state) => (
+            <option value={state.value} selected={filters.state === state.value}>
+              {state.label}
+            </option>
+          ))
+        }
+      </select>
+    </div>
+
+    <div>
+      <label for="service" class="sr-only">Service</label>
+      <select id="service" name="service" class={fieldClass}>
+        <option value="">All services</option>
+        {
+          services.map((service) => (
+            <option value={service.slug} selected={filters.service === service.slug}>
+              {service.name} ({service._count.events})
+            </option>
+          ))
+        }
+      </select>
+    </div>
+
+    <div class="flex gap-2 sm:col-span-2 lg:col-span-4">
+      <Button type="submit" label="Apply filters" icon="ri:filter-3-line" size="sm" color="success" />
+      {
+        !hasDefaultData && (
+          <Button as="a" href="/admin/events" label="Reset" icon="ri:close-line" size="sm" variant="faded" />
+        )
+      }
+    </div>
   </form>
 
+  <p class="mb-2 text-xs text-day-500">
+    {
+      totalEvents === 0
+        ? 'No events match these filters.'
+        : `Showing ${rangeStart.toLocaleString()} to ${rangeEnd.toLocaleString()} of ${totalEvents.toLocaleString()}`
+    }
+  </p>
+
   {
-    services.length === 0 ? (
-      <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
-        No services found.
-      </p>
-    ) : (
+    events.length > 0 && (
       <ul class="space-y-2">
-        {services.map((service) => (
+        {events.map((event) => (
           <li>
-            <a
-              href={`/admin/events/${service.slug}`}
-              class="flex items-center gap-3 rounded-lg border border-night-600 bg-night-800 p-3 transition-colors hover:border-green-500/50"
-            >
-              <MyPicture
-                src={service.imageUrl}
-                fallback="service"
-                alt={`${service.name} logo`}
-                class="size-9 shrink-0 rounded-sm object-contain"
-                width={36}
-                height={36}
-              />
-              <span class="font-title font-medium text-white">{service.name}</span>
-              <span class="ml-auto inline-flex items-center gap-1 text-sm text-day-400">
-                <Icon name="ri:calendar-event-line" class="size-4" />
-                {service._count.events}
-              </span>
-            </a>
+            <AdminEventRow event={event} now={now} />
           </li>
         ))}
       </ul>
+    )
+  }
+
+  {
+    totalPages > 1 && (
+      <nav class="mt-5 flex items-center justify-between gap-3" aria-label="Pagination">
+        {filters.page > 1 ? (
+          <Button
+            as="a"
+            href={urlWithParams(Astro.url, { page: filters.page - 1 })}
+            label="Previous"
+            icon="ri:arrow-left-line"
+            size="sm"
+            variant="faded"
+          />
+        ) : (
+          <span />
+        )}
+        <span class="text-xs text-day-500">
+          Page {filters.page} of {totalPages}
+        </span>
+        {filters.page < totalPages ? (
+          <Button
+            as="a"
+            href={urlWithParams(Astro.url, { page: filters.page + 1 })}
+            label="Next"
+            icon="ri:arrow-right-line"
+            size="sm"
+            variant="faded"
+          />
+        ) : (
+          <span />
+        )}
+      </nav>
     )
   }
 </BaseLayout>

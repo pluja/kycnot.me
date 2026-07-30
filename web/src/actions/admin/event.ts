@@ -105,6 +105,9 @@ export const adminEventActions = {
           type,
           class: eventClass,
           sentiment,
+          // Stated, not inherited from the column default: STAFF is the claim
+          // that a human wrote this, so it should never be set by omission.
+          origin: 'STAFF',
           startedAt: input.startedAt,
           endedAt: input.endedAt,
           visible: true,

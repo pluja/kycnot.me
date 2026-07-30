@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 
 import CaseEvidenceGallery from '../../../components/admin/cases/CaseEvidenceGallery.astro'
 import CaseUpdatesTimeline from '../../../components/admin/cases/CaseUpdatesTimeline.astro'
+import AdminPageNav from '../../../components/admin/AdminPageNav.astro'
 import ReporterField from '../../../components/admin/cases/ReporterField.astro'
 import DeleteConfirmButton from '../../../components/admin/DeleteConfirmButton.astro'
 import BadgeSmall from '../../../components/BadgeSmall.astro'
@@ -23,7 +24,8 @@ import { getIncidentSeverityInfo } from '../../../constants/incidentSeverities'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { prisma } from '../../../lib/prisma'
 
-import type { Prisma } from '@prisma/client'
+import type { ComponentProps } from 'astro/types'
+import type { CaseStatus, Prisma } from '@prisma/client'
 
 if (!Astro.locals.userCan('cases:manage')) return Astro.rewrite('/404')
 
@@ -147,12 +149,41 @@ const incidents = await Astro.locals.banners.try(
 const statusInfo = getCaseStatusInfo(caseRow.status)
 const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
 const toDateInput = (date: Date | null) => (date ? format(date, 'yyyy-MM-dd') : '')
+
+const navItems = [
+  { id: 'details', label: 'Details', icon: 'ri:file-text-line' },
+  {
+    id: 'incident',
+    label: 'Linked incident',
+    icon: 'ri:alarm-warning-line',
+    badge: caseRow.incidentId ? '1' : undefined,
+  },
+  {
+    id: 'participants',
+    label: 'Participants',
+    icon: 'ri:group-line',
+    badge: caseRow.participants.length,
+  },
+  { id: 'evidence', label: 'Evidence', icon: 'ri:attachment-2', badge: caseRow.evidence.length },
+  { id: 'updates', label: 'Conversation', icon: 'ri:chat-3-line', badge: caseRow.updates.length },
+  { id: 'danger', label: 'Danger zone', icon: 'ri:delete-bin-line' },
+]
+
+// One click per transition beats opening the details form to change a status.
+const statusButtonColor: Record<CaseStatus, ComponentProps<typeof Button>['color']> = {
+  DRAFT: 'gray',
+  OPEN: 'warning',
+  RESOLVED: 'success',
+  DISPUTED: 'warning',
+  REJECTED: 'danger',
+}
+const otherStatuses = caseStatuses.filter((status) => status.value !== caseRow.status)
 ---
 
 <BaseLayout
   pageTitle={`Case: ${caseRow.title}`}
   description="Manage case"
-  widthClassName="max-w-3xl"
+  widthClassName="max-w-6xl"
   noindex
   htmx
 >
@@ -189,236 +220,263 @@ const toDateInput = (date: Date | null) => (date ? format(date, 'yyyy-MM-dd') : 
       <span>Created <TimeFormatted date={caseRow.createdAt} /></span>
       {caseRow.createdBy && <span>by {caseRow.createdBy.name}</span>}
     </div>
+    <div class="mt-3 flex flex-wrap items-center gap-1.5">
+      <span class="text-xs text-day-500">Move to:</span>
+      {
+        otherStatuses.map((status) => (
+          <form method="POST" action={`${actions.admin.case.setStatus}#details`} class="contents">
+            <input type="hidden" name="caseId" value={caseRow.id} />
+            <input type="hidden" name="status" value={status.value} />
+            <Button
+              type="submit"
+              size="sm"
+              variant="faded"
+              color={statusButtonColor[status.value]}
+              icon={status.icon}
+              label={status.label}
+            />
+          </form>
+        ))
+      }
+    </div>
+
     <p class="mt-2 text-xs text-day-500">
       Public id: <code class="rounded-sm bg-night-700 px-1.5 py-0.5">{caseRow.publicId}</code>
     </p>
   </div>
 
-  <FormSection title="Details">
-    <form method="POST" action={`${actions.admin.case.update}#details`} class="space-y-4">
-      <input type="hidden" name="caseId" value={caseRow.id} />
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-[14rem_1fr]">
+    <AdminPageNav items={navItems} class="lg:py-2" />
 
-      <InputText
-        label="Title"
-        name="title"
-        inputProps={{ required: true, maxlength: 200, value: caseRow.title }}
-        error={updateInputErrors.title}
-      />
-
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <InputSelect
-          name="issueType"
-          label="Issue type"
-          options={caseIssueTypes.map((issue) => ({ label: issue.label, value: issue.value }))}
-          selectedValue={caseRow.issueType}
-          selectProps={{ required: true }}
-          error={updateInputErrors.issueType}
-        />
-
-        <InputSelect
-          name="status"
-          label="Status"
-          options={caseStatuses.map((status) => ({ label: status.label, value: status.value }))}
-          selectedValue={caseRow.status}
-          selectProps={{ required: true }}
-          error={updateInputErrors.status}
-        />
-      </div>
-
-      <InputTextArea
-        label="Summary"
-        name="summaryMd"
-        inputProps={{ required: true, rows: 8 }}
-        value={caseRow.summaryMd}
-        error={updateInputErrors.summaryMd}
-        description="Markdown supported."
-      />
-
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <InputText
-          label="Amount"
-          name="amountText"
-          inputProps={{ value: caseRow.amountText ?? '' }}
-          error={updateInputErrors.amountText}
-        />
-        <InputText
-          label="External source"
-          name="externalSource"
-          inputProps={{ type: 'url', value: caseRow.externalSource ?? '' }}
-          error={updateInputErrors.externalSource}
-        />
-      </div>
-
-      <InputText
-        label="Occurred on"
-        name="occurredAt"
-        inputProps={{ type: 'date', value: toDateInput(caseRow.occurredAt) }}
-        description="When the problem happened, if the reporter could date it. Leave empty if unknown."
-        error={updateInputErrors.occurredAt}
-      />
-
-      <div>
-        <span class="mb-1 block text-sm font-medium text-day-200">Reporter user</span>
-        <p class="mb-2 text-xs text-day-400">Optional. The user who reported this case.</p>
-        <ReporterField selected={caseRow.reportedBy} />
-        {
-          updateInputErrors.reportedById && (
-            <p class="mt-1 text-sm text-red-400">{updateInputErrors.reportedById}</p>
-          )
-        }
-      </div>
-
-      <InputTextArea
-        label="Resolution"
-        name="resolutionMd"
-        inputProps={{ rows: 3 }}
-        value={caseRow.resolutionMd}
-        error={updateInputErrors.resolutionMd}
-        description="Shown when the case is resolved. Markdown supported."
-      />
-
-      <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
-    </form>
-  </FormSection>
-
-  <FormSection title="Linked incident" id="incident" class="mt-12">
-    <p class="mb-3 text-sm text-day-400">
-      Link this report to a service-wide incident once you judge that it substantiates one. The trust penalty
-      stays derived from the incident itself, so linking more reports never multiplies the score impact.
-      Published linked reports are listed on the incident on the public service page.
-    </p>
-
-    {
-      incidents.length === 0 ? (
-        <p class="rounded-lg border border-night-600 bg-night-800 p-4 text-center text-sm text-day-400">
-          {caseRow.service.name} has no incidents recorded yet. Create one from the service's events first.
-        </p>
-      ) : (
-        <form method="POST" action={`${actions.admin.case.linkIncident}#incident`} class="space-y-4">
+    <div class="max-w-3xl min-w-0">
+      <FormSection title="Details" id="details">
+        <form method="POST" action={`${actions.admin.case.update}#details`} class="space-y-4">
           <input type="hidden" name="caseId" value={caseRow.id} />
 
-          <InputSelect
-            name="incidentId"
-            label="Incident"
-            options={[
-              { label: 'Not linked', value: '' },
-              ...incidents.map((incident) => ({
-                label: `${getIncidentSeverityInfo(incident.severity).label} · ${format(incident.occurredAt, 'MMM yyyy')} · ${incident.event.title}`,
-                value: incident.id.toString(),
-              })),
-            ]}
-            selectedValue={caseRow.incidentId?.toString() ?? ''}
-            error={linkIncidentInputErrors.incidentId}
+          <InputText
+            label="Title"
+            name="title"
+            inputProps={{ required: true, maxlength: 200, value: caseRow.title }}
+            error={updateInputErrors.title}
           />
 
-          <InputSubmitButton label="Save link" icon="ri:link" hideCancel />
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <InputSelect
+              name="issueType"
+              label="Issue type"
+              options={caseIssueTypes.map((issue) => ({ label: issue.label, value: issue.value }))}
+              selectedValue={caseRow.issueType}
+              selectProps={{ required: true }}
+              error={updateInputErrors.issueType}
+            />
+
+            <InputSelect
+              name="status"
+              label="Status"
+              options={caseStatuses.map((status) => ({ label: status.label, value: status.value }))}
+              selectedValue={caseRow.status}
+              selectProps={{ required: true }}
+              error={updateInputErrors.status}
+            />
+          </div>
+
+          <InputTextArea
+            label="Summary"
+            name="summaryMd"
+            inputProps={{ required: true, rows: 8 }}
+            value={caseRow.summaryMd}
+            error={updateInputErrors.summaryMd}
+            description="Markdown supported."
+          />
+
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <InputText
+              label="Amount"
+              name="amountText"
+              inputProps={{ value: caseRow.amountText ?? '' }}
+              error={updateInputErrors.amountText}
+            />
+            <InputText
+              label="External source"
+              name="externalSource"
+              inputProps={{ type: 'url', value: caseRow.externalSource ?? '' }}
+              error={updateInputErrors.externalSource}
+            />
+          </div>
+
+          <InputText
+            label="Occurred on"
+            name="occurredAt"
+            inputProps={{ type: 'date', value: toDateInput(caseRow.occurredAt) }}
+            description="When the problem happened, if the reporter could date it. Leave empty if unknown."
+            error={updateInputErrors.occurredAt}
+          />
+
+          <div>
+            <span class="mb-1 block text-sm font-medium text-day-200">Reporter user</span>
+            <p class="mb-2 text-xs text-day-400">Optional. The user who reported this case.</p>
+            <ReporterField selected={caseRow.reportedBy} />
+            {
+              updateInputErrors.reportedById && (
+                <p class="mt-1 text-sm text-red-400">{updateInputErrors.reportedById}</p>
+              )
+            }
+          </div>
+
+          <InputTextArea
+            label="Resolution"
+            name="resolutionMd"
+            inputProps={{ rows: 3 }}
+            value={caseRow.resolutionMd}
+            error={updateInputErrors.resolutionMd}
+            description="Shown when the case is resolved. Markdown supported."
+          />
+
+          <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
         </form>
-      )
-    }
-  </FormSection>
+      </FormSection>
 
-  <FormSection title="Participants" id="participants" class="mt-12">
-    <p class="mb-3 text-sm text-day-400">
-      Attached users, the reporter, and the service's affiliated accounts can read and post in the
-      conversation once the case is published.
-    </p>
-
-    {
-      caseRow.participants.length === 0 ? (
-        <p class="rounded-lg border border-night-600 bg-night-800 p-4 text-center text-sm text-day-400">
-          No participants attached yet.
+      <FormSection title="Linked incident" id="incident" class="mt-12">
+        <p class="mb-3 text-sm text-day-400">
+          Link this report to a service-wide incident once you judge that it substantiates one. The trust
+          penalty stays derived from the incident itself, so linking more reports never multiplies the score
+          impact. Published linked reports are listed on the incident on the public service page.
         </p>
-      ) : (
-        <ul class="space-y-2">
-          {caseRow.participants.map((participant) => (
-            <li class="flex items-center gap-2 rounded-lg border border-night-600 bg-night-800 p-2">
-              <MyPicture
-                src={participant.picture}
-                fallback="service"
-                alt=""
-                class="size-7 shrink-0 rounded-full object-cover"
-                width={28}
-                height={28}
+
+        {
+          incidents.length === 0 ? (
+            <p class="rounded-lg border border-night-600 bg-night-800 p-4 text-center text-sm text-day-400">
+              {caseRow.service.name} has no incidents recorded yet. Create one from the service's events
+              first.
+            </p>
+          ) : (
+            <form method="POST" action={`${actions.admin.case.linkIncident}#incident`} class="space-y-4">
+              <input type="hidden" name="caseId" value={caseRow.id} />
+
+              <InputSelect
+                name="incidentId"
+                label="Incident"
+                options={[
+                  { label: 'Not linked', value: '' },
+                  ...incidents.map((incident) => ({
+                    label: `${getIncidentSeverityInfo(incident.severity).label} · ${format(incident.occurredAt, 'MMM yyyy')} · ${incident.event.title}`,
+                    value: incident.id.toString(),
+                  })),
+                ]}
+                selectedValue={caseRow.incidentId?.toString() ?? ''}
+                error={linkIncidentInputErrors.incidentId}
               />
-              <span class="font-medium text-day-100">{participant.displayName ?? participant.name}</span>
-              <span class="text-xs text-day-500">
-                @{participant.name} · #{participant.id}
-              </span>
-              <form
-                method="POST"
-                action={`${actions.admin.case.participants.remove}#participants`}
-                class="contents"
-              >
-                <input type="hidden" name="caseId" value={caseRow.id} />
-                <input type="hidden" name="userId" value={participant.id} />
-                <Button
-                  type="submit"
-                  label="Remove participant"
-                  icon="ri:close-line"
-                  iconOnly
-                  size="sm"
-                  variant="faded"
-                  color="danger"
-                  class="ml-auto"
-                />
-              </form>
-            </li>
-          ))}
-        </ul>
-      )
-    }
 
-    <div class="mt-3">
-      <input
-        type="search"
-        name="q"
-        aria-label="Search users to add as participants"
-        placeholder="Search users by name or id..."
-        autocomplete="off"
-        hx-get={`/admin/cases/participant-search?caseId=${caseRow.id}`}
-        hx-trigger="input changed delay:300ms"
-        hx-target="#participant-results"
-        hx-swap="innerHTML"
-        class="w-full rounded-md border border-night-600 bg-night-900 p-2 text-white placeholder-day-500 focus:border-green-500 focus:outline-hidden"
-      />
-      <div id="participant-results" class="mt-2"></div>
+              <InputSubmitButton label="Save link" icon="ri:link" hideCancel />
+            </form>
+          )
+        }
+      </FormSection>
+
+      <FormSection title="Participants" id="participants" class="mt-12">
+        <p class="mb-3 text-sm text-day-400">
+          Attached users, the reporter, and the service's affiliated accounts can read and post in the
+          conversation once the case is published.
+        </p>
+
+        {
+          caseRow.participants.length === 0 ? (
+            <p class="rounded-lg border border-night-600 bg-night-800 p-4 text-center text-sm text-day-400">
+              No participants attached yet.
+            </p>
+          ) : (
+            <ul class="space-y-2">
+              {caseRow.participants.map((participant) => (
+                <li class="flex items-center gap-2 rounded-lg border border-night-600 bg-night-800 p-2">
+                  <MyPicture
+                    src={participant.picture}
+                    fallback="service"
+                    alt=""
+                    class="size-7 shrink-0 rounded-full object-cover"
+                    width={28}
+                    height={28}
+                  />
+                  <span class="font-medium text-day-100">{participant.displayName ?? participant.name}</span>
+                  <span class="text-xs text-day-500">
+                    @{participant.name} · #{participant.id}
+                  </span>
+                  <form
+                    method="POST"
+                    action={`${actions.admin.case.participants.remove}#participants`}
+                    class="contents"
+                  >
+                    <input type="hidden" name="caseId" value={caseRow.id} />
+                    <input type="hidden" name="userId" value={participant.id} />
+                    <Button
+                      type="submit"
+                      label="Remove participant"
+                      icon="ri:close-line"
+                      iconOnly
+                      size="sm"
+                      variant="faded"
+                      color="danger"
+                      class="ml-auto"
+                    />
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )
+        }
+
+        <div class="mt-3">
+          <input
+            type="search"
+            name="q"
+            aria-label="Search users to add as participants"
+            placeholder="Search users by name or id..."
+            autocomplete="off"
+            hx-get={`/admin/cases/participant-search?caseId=${caseRow.id}`}
+            hx-trigger="input changed delay:300ms"
+            hx-target="#participant-results"
+            hx-swap="innerHTML"
+            class="w-full rounded-md border border-night-600 bg-night-900 p-2 text-white placeholder-day-500 focus:border-green-500 focus:outline-hidden"
+          />
+          <div id="participant-results" class="mt-2"></div>
+        </div>
+      </FormSection>
+
+      <FormSection title="Evidence" id="evidence" class="mt-12">
+        <CaseEvidenceGallery
+          caseId={caseRow.id}
+          evidence={caseRow.evidence}
+          canManage
+          id="evidence"
+          addOpen
+          addInputErrors={errorsOf(addEvidenceResult)}
+        />
+      </FormSection>
+
+      <FormSection title="Conversation" id="updates" class="mt-12">
+        <CaseUpdatesTimeline
+          caseId={caseRow.id}
+          status={caseRow.status}
+          updates={caseRow.updates}
+          canManage
+          addInputErrors={errorsOf(addUpdateResult)}
+          editInputErrors={errorsOf(editUpdateResult)}
+        />
+      </FormSection>
+
+      <FormSection title="Danger zone" id="danger" class="mt-12">
+        <div
+          class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-950/20 p-4"
+        >
+          <p class="text-sm text-day-300">
+            Deleting a case removes its updates and all evidence. This cannot be undone.
+          </p>
+          <DeleteConfirmButton action={actions.admin.case.delete} id="case" label="Delete case">
+            <input type="hidden" name="caseId" value={caseRow.id} />
+          </DeleteConfirmButton>
+        </div>
+      </FormSection>
     </div>
-  </FormSection>
-
-  <FormSection title="Evidence" class="mt-12">
-    <CaseEvidenceGallery
-      caseId={caseRow.id}
-      evidence={caseRow.evidence}
-      canManage
-      id="evidence"
-      addOpen
-      addInputErrors={errorsOf(addEvidenceResult)}
-    />
-  </FormSection>
-
-  <FormSection title="Updates" class="mt-12">
-    <CaseUpdatesTimeline
-      caseId={caseRow.id}
-      status={caseRow.status}
-      updates={caseRow.updates}
-      canManage
-      addInputErrors={errorsOf(addUpdateResult)}
-      editInputErrors={errorsOf(editUpdateResult)}
-    />
-  </FormSection>
-
-  <FormSection title="Danger zone" class="mt-12">
-    <div
-      class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-950/20 p-4"
-    >
-      <p class="text-sm text-day-300">
-        Deleting a case removes its updates and all evidence. This cannot be undone.
-      </p>
-      <DeleteConfirmButton action={actions.admin.case.delete} id="case" label="Delete case">
-        <input type="hidden" name="caseId" value={caseRow.id} />
-      </DeleteConfirmButton>
-    </div>
-  </FormSection>
+  </div>
 
   <Lightbox />
 </BaseLayout>

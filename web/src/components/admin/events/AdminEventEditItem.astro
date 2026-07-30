@@ -1,0 +1,203 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import { eventToKind, getEventDisplay } from '../../../lib/eventKind'
+import BadgeSmall from '../../BadgeSmall.astro'
+import Button from '../../Button.astro'
+import InputSubmitButton from '../../InputSubmitButton.astro'
+import InputText from '../../InputText.astro'
+import InputTextArea from '../../InputTextArea.astro'
+import Tooltip from '../../Tooltip.astro'
+import DeleteConfirmButton from '../DeleteConfirmButton.astro'
+import EditableListItem from '../EditableListItem.astro'
+import EditToggleButton from '../EditToggleButton.astro'
+import IncidentFields from '../services/edit/IncidentFields.astro'
+import EventTimingFields from './EventTimingFields.astro'
+
+import type { Prisma } from '@prisma/client'
+
+type Props = {
+  event: Prisma.EventGetPayload<{
+    include: {
+      createdBy: { select: { name: true; displayName: true } }
+      updatedBy: { select: { name: true; displayName: true } }
+      incident: true
+    }
+  }>
+  updateInputErrors: Record<string, string[] | undefined>
+  /// Appended to every action so the page returns to this section after a POST.
+  sectionHash: string
+  /// Purging a soft-deleted event is irreversible, so it stays admin-only.
+  isAdmin: boolean
+}
+
+const { event, updateInputErrors, sectionHash, isAdmin } = Astro.props
+
+const display = getEventDisplay(event)
+const itemId = `event-${event.id.toString()}`
+
+const toLocalDateTime = (date: Date) =>
+  new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+---
+
+<EditableListItem id={itemId}>
+  <Fragment slot="header">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="font-semibold text-day-100">{event.title}</span>
+      <BadgeSmall text={display.label} variant="faded" color={display.color} icon={display.icon} />
+      {
+        event.incident && (
+          <BadgeSmall
+            text={`${event.incident.state === 'RESOLVED' ? 'Resolved' : 'Active'} incident`}
+            variant="faded"
+            color={event.incident.state === 'RESOLVED' ? 'green' : 'red'}
+            icon="ri:alarm-warning-line"
+          />
+        )
+      }
+      {
+        event.deletedAt ? (
+          <BadgeSmall text="Deleted" variant="faded" color="red" icon="ri:delete-bin-line" />
+        ) : (
+          !event.visible && <BadgeSmall text="Hidden" variant="faded" color="gray" icon="ri:eye-off-line" />
+        )
+      }
+    </div>
+    <p class="text-sm text-pretty text-day-400">{event.content}</p>
+    <div class="flex flex-wrap items-center gap-3 text-xs text-day-500">
+      <span>Started: {new Date(event.startedAt).toLocaleDateString()}</span>
+      <span>
+        Ended:
+        {
+          event.endedAt
+            ? event.endedAt === event.startedAt
+              ? '1-time event'
+              : new Date(event.endedAt).toLocaleDateString()
+            : 'Ongoing'
+        }
+      </span>
+      {event.source && <span>Source: {event.source}</span>}
+    </div>
+    {
+      (event.createdBy ?? event.updatedBy) && (
+        <div class="flex flex-wrap items-center gap-3 text-xs text-day-600">
+          {event.createdBy && <span>Created by {event.createdBy.displayName ?? event.createdBy.name}</span>}
+          {event.updatedBy && (
+            <span>Last edited by {event.updatedBy.displayName ?? event.updatedBy.name}</span>
+          )}
+        </div>
+      )
+    }
+  </Fragment>
+
+  <Fragment slot="actions">
+    {
+      event.deletedAt ? (
+        <>
+          <Tooltip text="Restore">
+            <form method="POST" action={`${actions.admin.event.restore}${sectionHash}`} class="contents">
+              <input type="hidden" name="eventId" value={event.id} />
+              <Button
+                type="submit"
+                variant="faded"
+                size="sm"
+                color="success"
+                icon="ri:arrow-go-back-line"
+                iconOnly
+                label="Restore"
+              />
+            </form>
+          </Tooltip>
+          {isAdmin && (
+            <DeleteConfirmButton
+              action={`${actions.admin.event.purge}${sectionHash}`}
+              id={itemId}
+              label="Permanently delete"
+            >
+              <input type="hidden" name="eventId" value={event.id} />
+            </DeleteConfirmButton>
+          )}
+        </>
+      ) : (
+        <>
+          <Tooltip text={event.visible ? 'Hide' : 'Show'}>
+            <form method="POST" action={`${actions.admin.event.toggle}${sectionHash}`} class="contents">
+              <input type="hidden" name="eventId" value={event.id} />
+              <Button
+                type="submit"
+                variant="faded"
+                size="sm"
+                icon={event.visible ? 'ri:eye-off-line' : 'ri:eye-line'}
+                iconOnly
+                label={event.visible ? 'Hide' : 'Show'}
+              />
+            </form>
+          </Tooltip>
+          {event.incident && event.incident.state !== 'RESOLVED' && (
+            <Tooltip text="Resolve incident (sets resolved now)">
+              <form method="POST" action={`${actions.admin.event.resolve}${sectionHash}`} class="contents">
+                <input type="hidden" name="eventId" value={event.id} />
+                <Button
+                  type="submit"
+                  variant="faded"
+                  size="sm"
+                  color="success"
+                  icon="ri:check-double-line"
+                  iconOnly
+                  label="Resolve incident"
+                />
+              </form>
+            </Tooltip>
+          )}
+          <EditToggleButton for={itemId} />
+          <DeleteConfirmButton action={`${actions.admin.event.delete}${sectionHash}`} id={itemId}>
+            <input type="hidden" name="eventId" value={event.id} />
+          </DeleteConfirmButton>
+        </>
+      )
+    }
+  </Fragment>
+
+  <Fragment slot="edit">
+    <form method="POST" action={`${actions.admin.event.update}${sectionHash}`} class="space-y-3">
+      <input type="hidden" name="eventId" value={event.id} />
+
+      <InputText
+        label="Title"
+        name="title"
+        inputProps={{ required: true, value: event.title }}
+        error={updateInputErrors.title}
+      />
+
+      <InputTextArea
+        label="Content"
+        name="content"
+        inputProps={{ required: true, rows: 3 }}
+        value={event.content}
+        error={updateInputErrors.content}
+      />
+
+      <EventTimingFields
+        startedAt={toLocalDateTime(new Date(event.startedAt))}
+        endedAt={event.endedAt ? toLocalDateTime(new Date(event.endedAt)) : ''}
+        errors={updateInputErrors}
+      />
+
+      <InputText
+        label="Source URL"
+        name="source"
+        inputProps={{ type: 'url', value: event.source }}
+        error={updateInputErrors.source}
+      />
+
+      <IncidentFields
+        kind={eventToKind(event.class, event.sentiment)}
+        incident={event.incident}
+        errors={updateInputErrors}
+      />
+
+      <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
+    </form>
+  </Fragment>
+</EditableListItem>

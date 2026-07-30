@@ -10,6 +10,7 @@ import EventServiceLink from '../components/events/EventServiceLink.astro'
 import MyPicture from '../components/MyPicture.astro'
 import TimeFormatted from '../components/TimeFormatted.astro'
 import { getIncidentSeverityInfo } from '../constants/incidentSeverities'
+import { eventClassFilterFor, eventViews, eventViewsZodEnum } from '../constants/eventViews'
 import { getVerificationStatusInfo } from '../constants/verificationStatus'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { cn } from '../lib/cn'
@@ -31,28 +32,12 @@ const { data: params, hasDefaultData: hasDefaultFilters } = zodParseQueryParamsS
     to: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
     /** Service's slug */
     service: z.string().optional(),
-    view: z.enum(['curated', 'incidents', 'changes', 'all']).default('curated'),
+    view: eventViewsZodEnum.default('curated'),
   },
   Astro
 )
 
-// The timeline defaults to curated entries (events + incidents); the ~2k
-// auto-recorded service changes are hidden unless explicitly requested.
-const eventViews = [
-  { value: 'curated', label: 'Events & incidents' },
-  { value: 'incidents', label: 'Incidents' },
-  { value: 'changes', label: 'Service changes' },
-  { value: 'all', label: 'Everything' },
-] as const
-
-const classFilter: Prisma.EventWhereInput['class'] =
-  params.view === 'incidents'
-    ? 'INCIDENT'
-    : params.view === 'changes'
-      ? 'CHANGE'
-      : params.view === 'all'
-        ? undefined
-        : { in: ['EVENT', 'INCIDENT'] }
+const classFilter = eventClassFilterFor(params.view)
 
 const fieldClass =
   'w-full rounded-md border border-night-400 bg-night-900 px-3 py-2 text-sm text-day-100 transition-colors [color-scheme:dark] focus:border-green-500/60 focus:ring-1 focus:ring-green-500/30 focus:outline-none'

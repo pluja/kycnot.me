@@ -1,10 +1,10 @@
 ---
 import { Icon } from 'astro-icon/components'
+import { z } from 'astro/zod'
 
-import BadgeSmall from '../../../components/BadgeSmall.astro'
+import AdminCaseRow from '../../../components/admin/cases/AdminCaseRow.astro'
 import Button from '../../../components/Button.astro'
-import TimeFormatted from '../../../components/TimeFormatted.astro'
-import { getCaseIssueTypeInfo } from '../../../constants/caseIssueTypes'
+import { caseIssueTypes, caseIssueTypesZodEnum } from '../../../constants/caseIssueTypes'
 import { caseStatuses, caseStatusesZodEnum, getCaseStatusInfo } from '../../../constants/caseStatus'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { cn } from '../../../lib/cn'
@@ -12,23 +12,50 @@ import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
 import { prisma } from '../../../lib/prisma'
 import { urlWithParams } from '../../../lib/urls'
 
+import type { Prisma } from '@prisma/client'
+
 if (!Astro.locals.userCan('cases:manage')) return Astro.rewrite('/404')
 
-const { data: filters } = zodParseQueryParamsStoringErrors(
-  { status: caseStatusesZodEnum.optional() },
+const PAGE_SIZE = 50
+
+const { data: filters, hasDefaultData } = zodParseQueryParamsStoringErrors(
+  {
+    status: caseStatusesZodEnum.optional(),
+    issueType: caseIssueTypesZodEnum.optional(),
+    service: z.string().optional(),
+    linked: z.enum(['any', 'yes', 'no']).default('any'),
+    q: z.string().optional(),
+    page: z.coerce.number().int().min(1).default(1),
+  },
   Astro
 )
 
-const where = filters.status ? { status: filters.status } : {}
+const where: Prisma.CaseWhereInput = {
+  ...(filters.status ? { status: filters.status } : {}),
+  ...(filters.issueType ? { issueType: filters.issueType } : {}),
+  ...(filters.service ? { service: { slug: filters.service } } : {}),
+  ...(filters.linked === 'yes' ? { incidentId: { not: null } } : {}),
+  ...(filters.linked === 'no' ? { incidentId: null } : {}),
+  ...(filters.q
+    ? {
+        OR: [
+          { title: { contains: filters.q, mode: 'insensitive' } },
+          { summaryMd: { contains: filters.q, mode: 'insensitive' } },
+        ],
+      }
+    : {}),
+}
 
-const [cases, statusCounts] = await Astro.locals.banners.tryMany([
+const [[cases, totalCases], statusCounts, services] = await Astro.locals.banners.tryMany([
   [
     'Failed to fetch cases',
     () =>
-      prisma.case.findMany({
+      prisma.case.findManyAndCount({
         where,
-        orderBy: { createdAt: 'desc' },
-        take: 200,
+        // Newest report first, which is what triage works through.
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (filters.page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
         select: {
           id: true,
           title: true,
@@ -36,93 +63,187 @@ const [cases, statusCounts] = await Astro.locals.banners.tryMany([
           issueType: true,
           amountText: true,
           createdAt: true,
-          service: { select: { name: true, slug: true } },
+          occurredAt: true,
+          incidentId: true,
+          service: { select: { name: true, slug: true, imageUrl: true } },
           reportedBy: { select: { name: true } },
-          _count: { select: { evidence: true } },
+          _count: { select: { evidence: true, updates: true, participants: true } },
         },
       }),
-    [],
+    [[], 0] as const,
   ],
+  ['Failed to count cases', () => prisma.case.groupBy({ by: ['status'], _count: { _all: true } }), []],
   [
-    'Failed to count cases',
-    () => prisma.case.groupBy({ by: ['status'], _count: { _all: true } }),
-    [],
+    'Failed to load services',
+    () =>
+      prisma.service.findMany({
+        where: { cases: { some: {} } },
+        select: { name: true, slug: true, _count: { select: { cases: true } } },
+        orderBy: { name: 'asc' },
+      }),
+    [] as [],
   ],
 ])
 
 const countByStatus = new Map(statusCounts.map((row) => [row.status, row._count._all]))
 const totalCount = statusCounts.reduce((sum, row) => sum + row._count._all, 0)
+const totalPages = Math.max(1, Math.ceil(totalCases / PAGE_SIZE))
+
+const fieldClass =
+  'w-full rounded-md border border-night-500 bg-night-900 px-2.5 py-1.5 text-sm text-day-100 transition-colors [color-scheme:dark] focus:border-green-500/60 focus:outline-none'
+
+const statusTabs = [
+  { value: undefined, label: 'All', icon: 'ri:stack-line', count: totalCount },
+  ...caseStatuses.map((status) => ({
+    value: status.value,
+    label: status.label,
+    icon: status.icon,
+    count: countByStatus.get(status.value) ?? 0,
+  })),
+]
 ---
 
-<BaseLayout pageTitle="Cases" description="Manage service cases" widthClassName="max-w-7xl" noindex>
-  <div class="mt-10 mb-6 flex flex-wrap items-center justify-between gap-3">
-    <h1 class="font-title text-3xl font-bold">Cases</h1>
+<BaseLayout pageTitle="Cases" description="Manage service cases" widthClassName="max-w-6xl" noindex>
+  <div class="mt-10 mb-5 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="font-title text-3xl font-bold">Cases</h1>
+      <p class="mt-1 text-sm text-day-400">
+        User reports against services. Link a report to an incident once it substantiates one.
+      </p>
+    </div>
     <Button as="a" href="/admin/cases/new" color="success" icon="ri:add-line" label="New case" />
   </div>
 
-  <div class="mb-5 flex flex-wrap gap-1.5">
-    <a
-      href={urlWithParams(Astro.url, { status: undefined })}
-      class={cn(
-        'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
-        !filters.status ? 'border-day-400/40 bg-day-500/10 text-day-100' : 'border-night-500 text-day-300'
-      )}
-    >
-      <span>All</span>
-      <span class="rounded-sm bg-night-700 px-1.5 py-0.5 text-[10px]">{totalCount.toLocaleString()}</span>
-    </a>
+  <div class="mb-4 flex flex-wrap gap-1.5">
     {
-      caseStatuses.map((status) => (
+      statusTabs.map((tab) => (
         <a
-          href={urlWithParams(Astro.url, { status: status.value })}
+          href={urlWithParams(Astro.url, { status: tab.value, page: undefined })}
           class={cn(
             'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
-            filters.status === status.value
+            filters.status === tab.value
               ? 'border-day-400/40 bg-day-500/10 text-day-100'
-              : 'border-night-500 text-day-300'
+              : 'border-night-500 text-day-300 hover:border-night-400'
           )}
         >
-          <Icon name={status.icon} class="size-3.5" />
-          <span>{status.label}</span>
-          <span class="rounded-sm bg-night-700 px-1.5 py-0.5 text-[10px]">
-            {(countByStatus.get(status.value) ?? 0).toLocaleString()}
-          </span>
+          <Icon name={tab.icon} class="size-3.5" />
+          <span>{tab.label}</span>
+          <span class="rounded-sm bg-night-700 px-1.5 py-0.5 text-[10px]">{tab.count.toLocaleString()}</span>
         </a>
       ))
     }
   </div>
 
+  <form method="GET" class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+    {filters.status && <input type="hidden" name="status" value={filters.status} />}
+
+    <div class="sm:col-span-2 lg:col-span-1">
+      <label for="q" class="sr-only">Search cases</label>
+      <input
+        type="search"
+        id="q"
+        name="q"
+        value={filters.q}
+        placeholder="Search title or summary..."
+        class={fieldClass}
+      />
+    </div>
+
+    <div>
+      <label for="issueType" class="sr-only">Issue type</label>
+      <select id="issueType" name="issueType" class={fieldClass}>
+        <option value="">Any issue type</option>
+        {
+          caseIssueTypes.map((issue) => (
+            <option value={issue.value} selected={filters.issueType === issue.value}>
+              {issue.label}
+            </option>
+          ))
+        }
+      </select>
+    </div>
+
+    <div>
+      <label for="service" class="sr-only">Service</label>
+      <select id="service" name="service" class={fieldClass}>
+        <option value="">All services</option>
+        {
+          services.map((service) => (
+            <option value={service.slug} selected={filters.service === service.slug}>
+              {service.name} ({service._count.cases})
+            </option>
+          ))
+        }
+      </select>
+    </div>
+
+    <div>
+      <label for="linked" class="sr-only">Incident link</label>
+      <select id="linked" name="linked" class={fieldClass}>
+        <option value="any" selected={filters.linked === 'any'}>Linked or not</option>
+        <option value="yes" selected={filters.linked === 'yes'}>Linked to an incident</option>
+        <option value="no" selected={filters.linked === 'no'}>Not linked</option>
+      </select>
+    </div>
+
+    <div class="flex gap-2 sm:col-span-2 lg:col-span-4">
+      <Button type="submit" label="Apply filters" icon="ri:filter-3-line" size="sm" color="success" />
+      {
+        !hasDefaultData && (
+          <Button as="a" href="/admin/cases" label="Reset" icon="ri:close-line" size="sm" variant="faded" />
+        )
+      }
+    </div>
+  </form>
+
   {
     cases.length === 0 ? (
       <p class="rounded-xl border border-night-600 bg-night-800 p-10 text-center text-day-300">
-        No cases{filters.status ? ` with status ${getCaseStatusInfo(filters.status).label}` : ''} yet.
+        No cases{filters.status ? ` with status ${getCaseStatusInfo(filters.status).label}` : ''} match these
+        filters.
       </p>
     ) : (
-      <div class="space-y-2">
-        {cases.map((caseRow) => {
-          const statusInfo = getCaseStatusInfo(caseRow.status)
-          const issueInfo = getCaseIssueTypeInfo(caseRow.issueType)
-          return (
-            <a
-              href={`/admin/cases/${caseRow.id.toString()}`}
-              class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-night-600 bg-night-800 p-3 transition-colors hover:border-night-400"
-            >
-              <BadgeSmall text={statusInfo.label} variant="faded" color={statusInfo.color} icon={statusInfo.icon} />
-              <div class="min-w-0 grow">
-                <p class="truncate font-semibold text-day-100">{caseRow.title}</p>
-                <p class="truncate text-xs text-day-400">{caseRow.service.name}</p>
-              </div>
-              <BadgeSmall text={issueInfo.label} variant="faded" color="gray" icon={issueInfo.icon} />
-              {caseRow.amountText && <span class="text-xs text-day-400">{caseRow.amountText}</span>}
-              <span class="flex items-center gap-1 text-xs text-day-500">
-                <Icon name="ri:attachment-2" class="size-3.5" />
-                {caseRow._count.evidence}
-              </span>
-              <TimeFormatted date={caseRow.createdAt} class="text-xs text-day-500" />
-            </a>
-          )
-        })}
-      </div>
+      <ul class="space-y-2">
+        {cases.map((caseRow) => (
+          <li>
+            <AdminCaseRow caseRow={caseRow} />
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  {
+    totalPages > 1 && (
+      <nav class="mt-5 flex items-center justify-between gap-3" aria-label="Pagination">
+        {filters.page > 1 ? (
+          <Button
+            as="a"
+            href={urlWithParams(Astro.url, { page: filters.page - 1 })}
+            label="Previous"
+            icon="ri:arrow-left-line"
+            size="sm"
+            variant="faded"
+          />
+        ) : (
+          <span />
+        )}
+        <span class="text-xs text-day-500">
+          Page {filters.page} of {totalPages}
+        </span>
+        {filters.page < totalPages ? (
+          <Button
+            as="a"
+            href={urlWithParams(Astro.url, { page: filters.page + 1 })}
+            label="Next"
+            icon="ri:arrow-right-line"
+            size="sm"
+            variant="faded"
+          />
+        ) : (
+          <span />
+        )}
+      </nav>
     )
   }
 </BaseLayout>

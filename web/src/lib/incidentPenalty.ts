@@ -3,7 +3,9 @@ import type { Incident } from '@prisma/client'
 // Mirrors calculate_trust_score() in prisma/triggers/02_service_score.sql. Keep
 // these constants in sync with that function: the displayed penalty must equal
 // the one baked into the stored trustScore.
-const FULL_PENALTY = { LOW: -5, MEDIUM: -12, HIGH: -22, CRITICAL: -35 } as const
+/// Penalty applied while an incident is ongoing, before any decay. Exported so
+/// the admin form quotes the real numbers instead of a copy that can drift.
+export const FULL_PENALTY = { LOW: -5, MEDIUM: -12, HIGH: -22, CRITICAL: -35 } as const
 const DECAY_WINDOW_DAYS = { LOW: 90, MEDIUM: 180, HIGH: 365, CRITICAL: 540 } as const
 const RESOLUTION_STEP = {
   FUNDS_RECOVERED: 0.2,

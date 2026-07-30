@@ -1,0 +1,172 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import { getIncidentSeverityInfo } from '../../../constants/incidentSeverities'
+import { cn } from '../../../lib/cn'
+import { getEventDisplay } from '../../../lib/eventKind'
+import { stripMarkdown } from '../../../lib/strings'
+import BadgeSmall from '../../BadgeSmall.astro'
+import Button from '../../Button.astro'
+import FormatTimeInterval from '../../FormatTimeInterval.astro'
+import MyPicture from '../../MyPicture.astro'
+import Tooltip from '../../Tooltip.astro'
+
+import type { DisplayableEvent } from '../../../lib/eventKind'
+import type { IncidentSeverity, IncidentState } from '@prisma/client'
+
+type Props = {
+  event: Omit<DisplayableEvent, 'incident'> & {
+    id: number
+    title: string
+    content: string
+    visible: boolean
+    deletedAt: Date | null
+    incident: { state: IncidentState; severity: IncidentSeverity } | null
+    service: { name: string; slug: string; imageUrl: string | null }
+  }
+  now?: Date
+}
+
+const { event, now = new Date() } = Astro.props
+
+const display = getEventDisplay(event, now)
+const severityInfo = event.incident ? getIncidentSeverityInfo(event.incident.severity) : null
+const editHref = `/admin/events/${encodeURIComponent(event.service.slug)}#event-${event.id.toString()}`
+const isDeleted = event.deletedAt !== null
+---
+
+<article
+  class={cn(
+    'relative rounded-lg border pl-3 transition-colors',
+    isDeleted ? 'border-day-800 bg-night-900 opacity-70' : display.classNames.card
+  )}
+>
+  <span
+    class={cn(
+      'absolute inset-y-0 left-0 w-1 rounded-l-lg',
+      isDeleted ? 'bg-day-800' : display.classNames.rail
+    )}
+    aria-hidden="true"></span>
+
+  <div class="flex flex-wrap items-start gap-x-3 gap-y-2 px-3 py-2.5">
+    <div class="min-w-0 flex-1">
+      <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <BadgeSmall text={display.label} icon={display.icon} color={display.color} variant="faded" />
+
+        {
+          severityInfo && (
+            <BadgeSmall
+              text={severityInfo.label}
+              icon={severityInfo.icon}
+              color={severityInfo.color}
+              variant="faded"
+            />
+          )
+        }
+
+        {isDeleted && <BadgeSmall text="Deleted" icon="ri:delete-bin-line" color="red" variant="faded" />}
+        {
+          !isDeleted && !event.visible && (
+            <BadgeSmall text="Hidden" icon="ri:eye-off-line" color="gray" variant="faded" />
+          )
+        }
+
+        <FormatTimeInterval
+          as="span"
+          start={event.startedAt}
+          end={event.endedAt}
+          now={now}
+          class="text-xs text-day-400"
+        />
+      </div>
+
+      <a
+        href={editHref}
+        class="mt-1 block font-medium text-pretty wrap-anywhere text-day-100 hover:underline"
+      >
+        {event.title}
+      </a>
+
+      <p class="mt-0.5 line-clamp-1 text-xs text-day-500">{stripMarkdown(event.content)}</p>
+
+      <a
+        href={`/admin/events/${encodeURIComponent(event.service.slug)}`}
+        class="mt-1 inline-flex items-center gap-1.5 text-xs text-day-400 transition-colors hover:text-day-200"
+      >
+        <MyPicture
+          src={event.service.imageUrl}
+          fallback="service"
+          alt=""
+          class="size-4 shrink-0 rounded-xs object-contain"
+          width={16}
+          height={16}
+        />
+        {event.service.name}
+      </a>
+    </div>
+
+    <div class="flex shrink-0 items-center gap-1">
+      {
+        !isDeleted && (
+          <Tooltip text={event.visible ? 'Hide from the public site' : 'Show on the public site'}>
+            <form method="POST" action={actions.admin.event.toggle} class="contents">
+              <input type="hidden" name="eventId" value={event.id} />
+              <Button
+                type="submit"
+                variant="faded"
+                size="sm"
+                icon={event.visible ? 'ri:eye-off-line' : 'ri:eye-line'}
+                iconOnly
+                label={event.visible ? 'Hide' : 'Show'}
+              />
+            </form>
+          </Tooltip>
+        )
+      }
+
+      {
+        event.incident && event.incident.state !== 'RESOLVED' && !isDeleted && (
+          <Tooltip text="Mark this incident resolved as of now">
+            <form method="POST" action={actions.admin.event.resolve} class="contents">
+              <input type="hidden" name="eventId" value={event.id} />
+              <Button
+                type="submit"
+                variant="faded"
+                size="sm"
+                color="success"
+                icon="ri:check-double-line"
+                iconOnly
+                label="Resolve incident"
+              />
+            </form>
+          </Tooltip>
+        )
+      }
+
+      <Tooltip text="Open in the service timeline">
+        <Button
+          as="a"
+          href={editHref}
+          variant="faded"
+          size="sm"
+          icon="ri:edit-line"
+          iconOnly
+          label="Edit event"
+        />
+      </Tooltip>
+
+      <Tooltip text="View on the public site">
+        <a
+          href={`/service/${encodeURIComponent(event.service.slug)}#event-${event.id.toString()}`}
+          target="_blank"
+          rel="noopener"
+          aria-label="View on the public site"
+          class="flex size-7 items-center justify-center rounded-md text-day-400 transition-colors hover:bg-night-700 hover:text-day-100"
+        >
+          <Icon name="ri:external-link-line" class="size-4" />
+        </a>
+      </Tooltip>
+    </div>
+  </div>
+</article>

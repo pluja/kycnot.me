@@ -490,35 +490,6 @@ const navItems = [
 
   <script>
     ////////////////////////////////////////////////////////////
-    // Optional script for the "Clear" buttons next to        //
-    // datetime-local inputs.                                 //
-    //                                                        //
-    // HTML5 datetime-local inputs can get stuck in a         //
-    // "badInput" state when the user partially deletes the   //
-    // value, blocking form submission even when the field is //
-    // not required. Clicking Clear resets the value and      //
-    // dispatches input/change events so any listeners and    //
-    // the browser's validation state see a clean reset.      //
-    ////////////////////////////////////////////////////////////
-    document.addEventListener('astro:page-load', () => {
-      document.querySelectorAll<HTMLButtonElement>('[data-clear-datetime]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const targetName = btn.dataset.clearDatetime
-          if (!targetName) return
-          const form = btn.closest('form')
-          if (!form) return
-          const input = form.querySelector<HTMLInputElement>(`input[name="${targetName}"]`)
-          if (!input) return
-          input.value = ''
-          input.dispatchEvent(new Event('input', { bubbles: true }))
-          input.dispatchEvent(new Event('change', { bubbles: true }))
-        })
-      })
-    })
-  </script>
-
-  <script>
-    ////////////////////////////////////////////////////////////
     // Optional script for the evidence image lightbox.       //
     ////////////////////////////////////////////////////////////
     document.addEventListener('astro:page-load', () => {

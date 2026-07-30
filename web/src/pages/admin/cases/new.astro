@@ -1,4 +1,5 @@
 ---
+import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 
 import ReporterField from '../../../components/admin/cases/ReporterField.astro'
@@ -19,33 +20,54 @@ if (result && !result.error) {
 }
 const inputErrors = isInputError(result?.error) ? result.error.fields : {}
 
+// A slug in the query pre-selects the service, so "report a case" links from a
+// service page land on a form that is already scoped.
+const presetSlug = Astro.url.searchParams.get('service')
+
 const services = await Astro.locals.banners.try(
   'Failed to load services',
-  () => prisma.service.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+  () => prisma.service.findMany({ select: { id: true, name: true, slug: true }, orderBy: { name: 'asc' } }),
   []
 )
+
+const presetService = services.find((service) => service.slug === presetSlug)
 ---
 
 <BaseLayout pageTitle="New case" description="Create a service case" widthClassName="max-w-3xl" htmx noindex>
-  <h1 class="mt-10 mb-6 font-title text-3xl font-bold">New case</h1>
+  <div class="mt-10 mb-6">
+    <a
+      href="/admin/cases"
+      class="inline-flex items-center gap-1 text-sm text-day-400 transition-colors hover:text-day-200"
+    >
+      <Icon name="ri:arrow-left-line" class="size-4" />
+      All cases
+    </a>
+    <h1 class="mt-2 font-title text-3xl font-bold">New case</h1>
+    <p class="mt-1 text-sm text-day-400">
+      Cases stay private until you move them out of Draft. Publish only what you can evidence.
+    </p>
+  </div>
 
   <form method="POST" action={actions.admin.case.create} class="space-y-6">
-    <InputSelect
-      name="serviceId"
-      label="Service"
-      options={services.map((service) => ({ label: service.name, value: service.id.toString() }))}
-      selectProps={{ required: true }}
-      error={inputErrors.serviceId}
-    />
+    <fieldset class="space-y-4 rounded-lg border border-night-600 p-4">
+      <legend class="px-1 text-xs font-semibold tracking-wider text-day-400 uppercase">The report</legend>
 
-    <InputText
-      label="Title"
-      name="title"
-      inputProps={{ required: true, maxlength: 200 }}
-      error={inputErrors.title}
-    />
+      <InputSelect
+        name="serviceId"
+        label="Service"
+        options={services.map((service) => ({ label: service.name, value: service.id.toString() }))}
+        selectedValue={presetService?.id.toString()}
+        selectProps={{ required: true }}
+        error={inputErrors.serviceId}
+      />
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <InputText
+        label="Title"
+        name="title"
+        inputProps={{ required: true, maxlength: 200, placeholder: 'What happened, in one line' }}
+        error={inputErrors.title}
+      />
+
       <InputSelect
         name="issueType"
         label="Issue type"
@@ -54,45 +76,68 @@ const services = await Astro.locals.banners.try(
         error={inputErrors.issueType}
       />
 
-      <InputSelect
-        name="status"
-        label="Status"
-        options={caseStatuses.map((status) => ({ label: status.label, value: status.value }))}
-        selectedValue="DRAFT"
-        error={inputErrors.status}
+      <InputTextArea
+        label="Summary"
+        name="summaryMd"
+        inputProps={{ required: true, rows: 8 }}
+        error={inputErrors.summaryMd}
+        description="Markdown supported. State the facts and what the reporter can evidence, not conclusions."
       />
-    </div>
+    </fieldset>
 
-    <InputTextArea
-      label="Summary"
-      name="summaryMd"
-      inputProps={{ required: true, rows: 8 }}
-      error={inputErrors.summaryMd}
-      description="Markdown supported. Describe the case factually."
-    />
+    <fieldset class="space-y-4 rounded-lg border border-night-600 p-4">
+      <legend class="px-1 text-xs font-semibold tracking-wider text-day-400 uppercase">Details</legend>
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <InputText
-        label="Amount"
-        name="amountText"
-        error={inputErrors.amountText}
-        description="Optional, e.g. 0.5 BTC"
-      />
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <InputText
+          label="Amount"
+          name="amountText"
+          error={inputErrors.amountText}
+          inputProps={{ placeholder: 'e.g. 0.5 BTC' }}
+          description="Optional. Funds at stake, as the reporter states them."
+        />
+        <InputText
+          label="Occurred on"
+          name="occurredAt"
+          inputProps={{ type: 'date' }}
+          error={inputErrors.occurredAt}
+          description="Optional. When the problem happened, not when it was reported."
+        />
+      </div>
+
       <InputText
         label="External source"
         name="externalSource"
-        inputProps={{ type: 'url' }}
+        inputProps={{ type: 'url', placeholder: 'https://...' }}
         error={inputErrors.externalSource}
-        description="Optional link, e.g. a Bitcointalk thread"
+        description="Optional link, e.g. a forum thread where this was reported."
       />
-    </div>
 
-    <div>
-      <span class="mb-1 block text-sm font-medium text-day-200">Reporter user</span>
-      <p class="mb-2 text-xs text-day-400">Optional. The user who reported this case.</p>
-      <ReporterField />
-      {inputErrors.reportedById && <p class="mt-1 text-sm text-red-400">{inputErrors.reportedById}</p>}
-    </div>
+      <div>
+        <span class="mb-1 block text-sm font-medium text-day-200">Reporter</span>
+        <p class="mb-2 text-xs text-day-400">
+          Optional. Attaching the reporter lets them read private details and post in the conversation.
+        </p>
+        <ReporterField />
+        {inputErrors.reportedById && <p class="mt-1 text-sm text-red-400">{inputErrors.reportedById}</p>}
+      </div>
+    </fieldset>
+
+    <fieldset class="space-y-4 rounded-lg border border-night-600 p-4">
+      <legend class="px-1 text-xs font-semibold tracking-wider text-day-400 uppercase">Publishing</legend>
+
+      <InputSelect
+        name="status"
+        label="Status"
+        options={caseStatuses.map((status) => ({
+          label: status.public ? `${status.label} (public)` : `${status.label} (staff only)`,
+          value: status.value,
+        }))}
+        selectedValue="DRAFT"
+        error={inputErrors.status}
+        description="Draft and Rejected stay staff-only. Anything else is reachable by URL from the service page."
+      />
+    </fieldset>
 
     <InputSubmitButton label="Create case" icon="ri:add-line" hideCancel />
   </form>

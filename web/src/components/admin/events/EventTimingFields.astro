@@ -1,0 +1,75 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import InputText from '../../InputText.astro'
+
+type Props = {
+  /// Pre-formatted for a datetime-local input.
+  startedAt?: string
+  endedAt?: string
+  errors: Record<string, string[] | undefined>
+}
+
+const { startedAt = '', endedAt = '', errors } = Astro.props
+---
+
+<fieldset class="space-y-2 rounded-lg border border-night-600 p-3">
+  <legend class="px-1 text-xs font-semibold tracking-wider text-day-400 uppercase">Timing</legend>
+
+  <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+    <InputText
+      label="Started"
+      name="startedAt"
+      inputProps={{ type: 'datetime-local', required: true, value: startedAt }}
+      error={errors.startedAt}
+      description="When it began. A future date marks it as upcoming."
+    />
+
+    <div>
+      <InputText
+        label="Ended"
+        name="endedAt"
+        inputProps={{ type: 'datetime-local', value: endedAt }}
+        error={errors.endedAt}
+        description="Leave empty while it is still going. Set it to the same moment as the start for a one-off announcement."
+      />
+      <button
+        type="button"
+        data-clear-datetime="endedAt"
+        class="mt-1 inline-flex items-center gap-1 text-xs text-day-500 transition-colors hover:text-day-200"
+      >
+        <Icon name="ri:close-circle-line" class="size-3.5" />
+        Clear (still ongoing)
+      </button>
+    </div>
+  </div>
+</fieldset>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Optional script for the "Clear" buttons next to        //
+  // datetime-local inputs.                                 //
+  //                                                        //
+  // HTML5 datetime-local inputs can get stuck in a         //
+  // "badInput" state when the user partially deletes the   //
+  // value, blocking form submission even when the field is //
+  // not required. Clicking Clear resets the value and      //
+  // dispatches input/change events so any listeners and    //
+  // the browser's validation state see a clean reset.      //
+  ////////////////////////////////////////////////////////////
+  document.addEventListener('astro:page-load', () => {
+    document.querySelectorAll<HTMLButtonElement>('[data-clear-datetime]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const targetName = btn.dataset.clearDatetime
+        if (!targetName) return
+        const form = btn.closest('form')
+        if (!form) return
+        const input = form.querySelector<HTMLInputElement>(`input[name="${targetName}"]`)
+        if (!input) return
+        input.value = ''
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+        input.dispatchEvent(new Event('change', { bubbles: true }))
+      })
+    })
+  })
+</script>

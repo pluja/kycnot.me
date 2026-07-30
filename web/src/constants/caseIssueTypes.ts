@@ -16,6 +16,7 @@ export const {
   dataArray: caseIssueTypes,
   dataObject: caseIssueTypesByValue,
   getFn: getCaseIssueTypeInfo,
+  zodEnumById: caseIssueTypesZodEnum,
 } = makeHelpersForOptions(
   'value',
   (value): CaseIssueTypeInfo<typeof value> => ({
