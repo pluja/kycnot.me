@@ -633,7 +633,7 @@ const generateFakeCase = (serviceId: number, userIds: number[]) => {
     ]),
     issueType: faker.helpers.arrayElement(Object.values(CaseIssueType)),
     status,
-    summaryMd: faker.lorem.paragraphs(2),
+    summaryMd: faker.lorem.paragraphs(2, '\n\n'),
     amountText: faker.helpers.maybe(
       () => `${faker.number.float({ min: 0.01, max: 5, fractionDigits: 4 }).toFixed(4)} BTC`,
       { probability: 0.6 }
@@ -721,7 +721,7 @@ const generateFakeEvent = (serviceId: number) => {
 
   return {
     title: faker.helpers.arrayElement(kind === 'INCIDENT' ? incidentTitles : eventTitles),
-    content: faker.lorem.paragraphs({ min: 1, max: 3 }),
+    content: faker.lorem.paragraphs({ min: 1, max: 3 }, '\n\n'),
     source: faker.helpers.maybe(() => faker.internet.url(), { probability: 0.7 }),
     ...fields,
     origin,

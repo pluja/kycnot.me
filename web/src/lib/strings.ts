@@ -30,6 +30,37 @@ export const stripMarkdown = (markdown: string): string => {
 }
 
 /**
+ * Take the opening paragraph of a markdown body as its summary, flattened to
+ * plain text. Banners and list rows show this instead of the whole body, so the
+ * lead a moderator writes is what readers see first.
+ *
+ * Blocks that carry no prose of their own, a lone heading or an image, are
+ * skipped rather than surfaced as the summary.
+ *
+ * @example
+ * firstParagraph('## Outage\n\nWithdrawals paused.\n\nMore soon.') // 'Withdrawals paused.'
+ */
+export const firstParagraph = (markdown: string): string => {
+  return proseBlocks(markdown)[0] ?? stripMarkdown(markdown)
+}
+
+/**
+ * Split a markdown body into its paragraphs of plain prose. Blocks that carry no
+ * prose of their own, a lone heading or an image, are dropped, so the length of
+ * the result answers "is there anything to read past the lead?".
+ *
+ * @example
+ * proseBlocks('## Outage\n\nPaused.\n\nMore soon.') // ['Paused.', 'More soon.']
+ */
+export const proseBlocks = (markdown: string): string[] => {
+  return markdown
+    .split(/\n\s*\n/)
+    .filter((block) => !/^\s*#{1,6}\s/.test(block))
+    .map(stripMarkdown)
+    .filter(Boolean)
+}
+
+/**
  * Compare two strings after normalizing them.
  */
 export const areSameNormalized = (str1: string, str2: string): boolean => {
