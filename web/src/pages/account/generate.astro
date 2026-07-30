@@ -83,7 +83,9 @@ const prettyToken = preGeneratedToken ? prettifyUserSecretToken(preGeneratedToke
       />
     </div>
 
-    <input type="hidden" name="secret-token" value={preGeneratedToken} autocomplete="off" />
+    {/* Name must match the account.generate schema key, or the account is built
+        from a fresh token and the one saved above belongs to nobody. */}
+    <input type="hidden" name="token" value={preGeneratedToken} autocomplete="off" />
 
     <Captcha action={actions.account.generate} autofocus />
 

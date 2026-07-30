@@ -103,6 +103,10 @@ export const accountActions = {
       if (input.token) {
         const redisPreGeneratedSecretTokens = await getRedisPreGeneratedSecretTokens()
         isValidToken = await redisPreGeneratedSecretTokens.validateAndConsumePreGeneratedToken(input.token)
+      } else {
+        // The form always submits one, so a miss means the password manager
+        // saved a token this account will not use.
+        console.error('[account.generate] no pre-generated token submitted, creating account from a fresh one')
       }
       if (!isValidToken) {
         throw new ActionError({
