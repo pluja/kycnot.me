@@ -4,13 +4,19 @@ import { Icon } from 'astro-icon/components'
 import InputText from '../../InputText.astro'
 
 type Props = {
-  /// Pre-formatted for a datetime-local input.
-  startedAt?: string
-  endedAt?: string
+  /// Omitted on a new event, which prefills the start with now.
+  startedAt?: Date | null
+  endedAt?: Date | null
   errors: Record<string, string[] | undefined>
 }
 
-const { startedAt = '', endedAt = '', errors } = Astro.props
+const { startedAt, endedAt, errors } = Astro.props
+
+const toInputValue = (date: Date) =>
+  new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+
+const startedAtValue = toInputValue(startedAt ?? new Date())
+const endedAtValue = endedAt ? toInputValue(endedAt) : ''
 ---
 
 <fieldset class="space-y-2 rounded-lg border border-night-600 p-3">
@@ -20,7 +26,7 @@ const { startedAt = '', endedAt = '', errors } = Astro.props
     <InputText
       label="Started"
       name="startedAt"
-      inputProps={{ type: 'datetime-local', required: true, value: startedAt }}
+      inputProps={{ type: 'datetime-local', required: true, value: startedAtValue }}
       error={errors.startedAt}
       description="When it began. A future date marks it as upcoming."
     />
@@ -29,7 +35,7 @@ const { startedAt = '', endedAt = '', errors } = Astro.props
       <InputText
         label="Ended"
         name="endedAt"
-        inputProps={{ type: 'datetime-local', value: endedAt }}
+        inputProps={{ type: 'datetime-local', value: endedAtValue }}
         error={errors.endedAt}
         description="Leave empty while it is still going. Set it to the same moment as the start for a one-off announcement."
       />

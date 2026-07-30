@@ -5,7 +5,8 @@ import type { AstroChildren } from '../lib/astro'
 import type { HTMLAttributes } from 'astro/types'
 
 type Props = HTMLAttributes<'section'> & {
-  title: string
+  /// Omit on a page whose own heading already names the section.
+  title?: string
   subtitle?: string
   heading?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
   children: AstroChildren
@@ -17,7 +18,7 @@ const HeadingTag = heading
 ---
 
 <section class={cn('mt-24 space-y-2 first:mt-0', className)} {...props}>
-  <HeadingTag class="text-center font-title text-3xl leading-none font-bold">{title}</HeadingTag>
+  {title && <HeadingTag class="text-center font-title text-3xl leading-none font-bold">{title}</HeadingTag>}
   {subtitle && <p class="text-center text-day-400">{subtitle}</p>}
 
   <slot />

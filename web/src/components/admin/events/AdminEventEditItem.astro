@@ -1,18 +1,18 @@
 ---
-import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
-import { eventToKind, getEventDisplay } from '../../../lib/eventKind'
+import { eventToKind } from '../../../lib/eventKind'
 import BadgeSmall from '../../BadgeSmall.astro'
 import Button from '../../Button.astro'
+import EventCard from '../../events/EventCard.astro'
 import InputSubmitButton from '../../InputSubmitButton.astro'
 import InputText from '../../InputText.astro'
 import InputTextArea from '../../InputTextArea.astro'
 import Tooltip from '../../Tooltip.astro'
 import DeleteConfirmButton from '../DeleteConfirmButton.astro'
-import EditableListItem from '../EditableListItem.astro'
 import EditToggleButton from '../EditToggleButton.astro'
 import IncidentFields from '../services/edit/IncidentFields.astro'
+
 import EventTimingFields from './EventTimingFields.astro'
 
 import type { Prisma } from '@prisma/client'
@@ -34,59 +34,27 @@ type Props = {
 
 const { event, updateInputErrors, sectionHash, isAdmin } = Astro.props
 
-const display = getEventDisplay(event)
 const itemId = `event-${event.id.toString()}`
-
-const toLocalDateTime = (date: Date) =>
-  new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+const editedBy = event.updatedBy ?? event.createdBy
 ---
 
-<EditableListItem id={itemId}>
-  <Fragment slot="header">
-    <div class="flex flex-wrap items-center gap-2">
-      <span class="font-semibold text-day-100">{event.title}</span>
-      <BadgeSmall text={display.label} variant="faded" color={display.color} icon={display.icon} />
-      {
-        event.incident && (
-          <BadgeSmall
-            text={`${event.incident.state === 'RESOLVED' ? 'Resolved' : 'Active'} incident`}
-            variant="faded"
-            color={event.incident.state === 'RESOLVED' ? 'green' : 'red'}
-            icon="ri:alarm-warning-line"
-          />
-        )
-      }
-      {
-        event.deletedAt ? (
-          <BadgeSmall text="Deleted" variant="faded" color="red" icon="ri:delete-bin-line" />
-        ) : (
-          !event.visible && <BadgeSmall text="Hidden" variant="faded" color="gray" icon="ri:eye-off-line" />
-        )
-      }
-    </div>
-    <p class="text-sm text-pretty text-day-400">{event.content}</p>
-    <div class="flex flex-wrap items-center gap-3 text-xs text-day-500">
-      <span>Started: {new Date(event.startedAt).toLocaleDateString()}</span>
-      <span>
-        Ended:
-        {
-          event.endedAt
-            ? event.endedAt === event.startedAt
-              ? '1-time event'
-              : new Date(event.endedAt).toLocaleDateString()
-            : 'Ongoing'
-        }
-      </span>
-      {event.source && <span>Source: {event.source}</span>}
-    </div>
+<EventCard event={event} faded={event.deletedAt !== null}>
+  <Fragment slot="badges">
     {
-      (event.createdBy ?? event.updatedBy) && (
-        <div class="flex flex-wrap items-center gap-3 text-xs text-day-600">
-          {event.createdBy && <span>Created by {event.createdBy.displayName ?? event.createdBy.name}</span>}
-          {event.updatedBy && (
-            <span>Last edited by {event.updatedBy.displayName ?? event.updatedBy.name}</span>
-          )}
-        </div>
+      event.incident && (
+        <BadgeSmall
+          text={`${event.incident.state === 'RESOLVED' ? 'Resolved' : 'Active'} incident`}
+          variant="faded"
+          color={event.incident.state === 'RESOLVED' ? 'green' : 'red'}
+          icon="ri:alarm-warning-line"
+        />
+      )
+    }
+    {
+      event.deletedAt ? (
+        <BadgeSmall text="Deleted" variant="faded" color="red" icon="ri:delete-bin-line" />
+      ) : (
+        !event.visible && <BadgeSmall text="Hidden" variant="faded" color="gray" icon="ri:eye-off-line" />
       )
     }
   </Fragment>
@@ -159,45 +127,61 @@ const toLocalDateTime = (date: Date) =>
     }
   </Fragment>
 
-  <Fragment slot="edit">
-    <form method="POST" action={`${actions.admin.event.update}${sectionHash}`} class="space-y-3">
-      <input type="hidden" name="eventId" value={event.id} />
-
-      <InputText
-        label="Title"
-        name="title"
-        inputProps={{ required: true, value: event.title }}
-        error={updateInputErrors.title}
-      />
-
-      <InputTextArea
-        label="Content"
-        name="content"
-        inputProps={{ required: true, rows: 3 }}
-        value={event.content}
-        error={updateInputErrors.content}
-      />
-
-      <EventTimingFields
-        startedAt={toLocalDateTime(new Date(event.startedAt))}
-        endedAt={event.endedAt ? toLocalDateTime(new Date(event.endedAt)) : ''}
-        errors={updateInputErrors}
-      />
-
-      <InputText
-        label="Source URL"
-        name="source"
-        inputProps={{ type: 'url', value: event.source }}
-        error={updateInputErrors.source}
-      />
-
-      <IncidentFields
-        kind={eventToKind(event.class, event.sentiment)}
-        incident={event.incident}
-        errors={updateInputErrors}
-      />
-
-      <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
-    </form>
+  <Fragment slot="meta">
+    {
+      editedBy && (
+        <p class="mt-1.5 text-2xs text-day-600">
+          {event.updatedBy ? 'Last edited by' : 'Created by'} {editedBy.displayName ?? editedBy.name}
+        </p>
+      )
+    }
   </Fragment>
-</EditableListItem>
+
+  <Fragment slot="footer">
+    <input type="checkbox" id={`edit-${itemId}`} class="peer/edit sr-only" />
+    <div
+      class="mt-3 hidden space-y-3 rounded-md border border-night-500 bg-night-700 p-3 peer-checked/edit:block"
+    >
+      <form method="POST" action={`${actions.admin.event.update}${sectionHash}`} class="space-y-3">
+        <input type="hidden" name="eventId" value={event.id} />
+
+        <InputText
+          label="Title"
+          name="title"
+          inputProps={{ required: true, value: event.title }}
+          error={updateInputErrors.title}
+        />
+
+        <InputTextArea
+          label="Content"
+          name="content"
+          inputProps={{ required: true, rows: 3 }}
+          value={event.content}
+          error={updateInputErrors.content}
+          description="Markdown supported. The first paragraph is used as the summary in banners and lists, so lead with the point."
+        />
+
+        <EventTimingFields
+          startedAt={event.startedAt}
+          endedAt={event.endedAt}
+          errors={updateInputErrors}
+        />
+
+        <InputText
+          label="Source URL"
+          name="source"
+          inputProps={{ type: 'url', value: event.source }}
+          error={updateInputErrors.source}
+        />
+
+        <IncidentFields
+          kind={eventToKind(event.class, event.sentiment)}
+          incident={event.incident}
+          errors={updateInputErrors}
+        />
+
+        <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
+      </form>
+    </div>
+  </Fragment>
+</EventCard>

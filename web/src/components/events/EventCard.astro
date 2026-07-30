@@ -5,7 +5,7 @@ import { getEventOriginInfo } from '../../constants/eventOrigins'
 import { cn } from '../../lib/cn'
 import { getEventDisplay } from '../../lib/eventKind'
 import { safeHttpUrl } from '../../lib/exchange/safeUrl'
-import { stripMarkdown } from '../../lib/strings'
+import { proseBlocks, stripMarkdown } from '../../lib/strings'
 import BadgeSmall from '../BadgeSmall.astro'
 import FormatTimeInterval from '../FormatTimeInterval.astro'
 import Markdown from '../Markdown.astro'
@@ -27,13 +27,11 @@ type Props = {
   /// the owning service page.
   titleHref?: string
   headingLevel?: 'h2' | 'h3'
+  /// Muted shell for entries that are no longer live, such as deleted rows.
+  faded?: boolean
 }
 
-// Above this many characters the body collapses behind a no-JS disclosure, so a
-// long incident write-up cannot push the rest of the timeline off the screen.
-const INLINE_BODY_LIMIT = 220
-
-const { event, now = new Date(), titleHref, headingLevel: Heading = 'h3' } = Astro.props
+const { event, now = new Date(), titleHref, headingLevel: Heading = 'h3', faded = false } = Astro.props
 
 const display = getEventDisplay(event, now)
 const originInfo = getEventOriginInfo(event.origin)
@@ -41,71 +39,85 @@ const originInfo = getEventOriginInfo(event.origin)
 // repeat the badge next to it.
 const showOrigin = originInfo.showOnPublicEntries && display.kind !== 'CHANGE'
 const sourceUrl = safeHttpUrl(event.source)
-const excerpt = stripMarkdown(event.content)
-const isCollapsible = excerpt.length > INLINE_BODY_LIMIT
+
+// The lead shows in full; the disclosure exists only when something follows it.
+const blocks = proseBlocks(event.content)
+const lead = blocks[0] ?? stripMarkdown(event.content)
+const hasMore = blocks.length > 1
 
 const proseClass =
   'prose prose-sm max-w-none text-pretty wrap-anywhere text-day-400 prose-invert prose-a:text-current prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0'
+const headingClass = 'font-title text-base/snug font-semibold text-pretty wrap-anywhere text-white'
 ---
 
 <article
   id={`event-${event.id.toString()}`}
-  class={cn('relative scroll-mt-24 rounded-lg border pl-3', display.classNames.card)}
+  class={cn(
+    'relative scroll-mt-24 rounded-lg border pl-3',
+    faded ? 'border-day-800 bg-night-900 opacity-70' : display.classNames.card
+  )}
 >
-  <span class={cn('absolute inset-y-0 left-0 w-1 rounded-l-lg', display.classNames.rail)} aria-hidden="true"
-  ></span>
+  <span
+    class={cn('absolute inset-y-0 left-0 w-1 rounded-l-lg', faded ? 'bg-day-800' : display.classNames.rail)}
+    aria-hidden="true"></span>
 
   <div class="px-3 pt-2.5 pb-3">
-    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <Tooltip text={display.description} position="top">
-        <BadgeSmall text={display.label} icon={display.icon} color={display.color} variant="faded" />
-      </Tooltip>
+    <div class="flex flex-wrap items-start gap-x-2 gap-y-1">
+      <div class="flex min-w-0 grow flex-wrap items-center gap-x-2 gap-y-1">
+        <Tooltip text={display.description} position="top">
+          <BadgeSmall text={display.label} icon={display.icon} color={display.color} variant="faded" />
+        </Tooltip>
 
-      <FormatTimeInterval
-        as="span"
-        start={event.startedAt}
-        end={event.endedAt}
-        now={now}
-        class="text-xs text-day-400"
-      />
+        <slot name="badges" />
+
+        <FormatTimeInterval
+          as="span"
+          start={event.startedAt}
+          end={event.endedAt}
+          now={now}
+          class="text-xs text-day-400"
+        />
+
+        {
+          showOrigin && (
+            <Tooltip text={originInfo.description} position="top">
+              <span class="inline-flex items-center gap-1 text-2xs tracking-wide text-day-500 uppercase">
+                <Icon name={originInfo.icon} class="size-3.5" />
+                {originInfo.label}
+              </span>
+            </Tooltip>
+          )
+        }
+      </div>
 
       {
-        showOrigin && (
-          <Tooltip text={originInfo.description} position="top">
-            <span class="inline-flex items-center gap-1 text-2xs tracking-wide text-day-500 uppercase">
-              <Icon name={originInfo.icon} class="size-3.5" />
-              {originInfo.label}
-            </span>
-          </Tooltip>
+        Astro.slots.has('actions') && (
+          <div class="-my-0.5 flex shrink-0 items-center gap-0.5 rounded-md bg-night-900/50 p-0.5">
+            <slot name="actions" />
+          </div>
         )
       }
     </div>
 
-    <Heading class="mt-1 font-title text-base/snug font-semibold text-pretty wrap-anywhere text-white">
-      {
-        titleHref ? (
-          <a href={titleHref} class="transition-colors hover:text-day-200 hover:underline">
-            {event.title}
-          </a>
-        ) : (
-          event.title
-        )
-      }
-    </Heading>
-
-    <slot name="meta" />
-
     {
-      isCollapsible ? (
-        <details class="group/event mt-1.5">
-          <summary class="flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
-            <span
-              class="min-w-0 flex-1 truncate text-sm text-day-400 group-open/event:hidden"
-              aria-hidden="true"
-            >
-              {excerpt}
-            </span>
-            <span class="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-day-400 transition-colors group-hover:text-day-200">
+      hasMore ? (
+        <details class="group/event">
+          {/* Title and lead both sit in the summary, padded out so the whole
+              block is one easy tap target. */}
+          <summary class="-mx-2 mt-0.5 cursor-pointer list-none rounded-md px-2 py-1.5 transition-colors hover:bg-day-500/5 [&::-webkit-details-marker]:hidden">
+            <Heading class={headingClass}>
+              {titleHref ? (
+                <a href={titleHref} class="transition-colors hover:text-day-200 hover:underline">
+                  {event.title}
+                </a>
+              ) : (
+                event.title
+              )}
+            </Heading>
+
+            <p class="mt-1 text-sm text-pretty wrap-anywhere text-day-400 group-open/event:hidden">{lead}</p>
+
+            <span class="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-day-400 transition-colors group-hover/event:text-day-200">
               <span class="group-open/event:hidden">Read more</span>
               <span class="hidden group-open/event:inline">Show less</span>
               <Icon
@@ -115,16 +127,30 @@ const proseClass =
             </span>
           </summary>
 
-          <div class={cn('mt-1.5', proseClass)}>
+          <div class={cn('mt-1', proseClass)}>
             <Markdown content={event.content} linkRel={['nofollow', 'noopener']} />
           </div>
         </details>
       ) : (
-        <div class={cn('mt-1', proseClass)}>
-          <Markdown content={event.content} linkRel={['nofollow', 'noopener']} />
-        </div>
+        <>
+          <Heading class={cn('mt-1', headingClass)}>
+            {titleHref ? (
+              <a href={titleHref} class="transition-colors hover:text-day-200 hover:underline">
+                {event.title}
+              </a>
+            ) : (
+              event.title
+            )}
+          </Heading>
+
+          <div class={cn('mt-1', proseClass)}>
+            <Markdown content={event.content} linkRel={['nofollow', 'noopener']} />
+          </div>
+        </>
       )
     }
+
+    <slot name="meta" />
 
     {
       sourceUrl && (
@@ -139,5 +165,7 @@ const proseClass =
         </a>
       )
     }
+
+    <slot name="footer" />
   </div>
 </article>

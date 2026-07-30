@@ -1,16 +1,11 @@
 ---
+import { z } from 'astro/zod'
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
-import { z } from 'astro/zod'
 
 import AdminEventRow from '../../../components/admin/events/AdminEventRow.astro'
-import EventTimingFields from '../../../components/admin/events/EventTimingFields.astro'
-import IncidentFields from '../../../components/admin/services/edit/IncidentFields.astro'
+import EventCreateForm from '../../../components/admin/events/EventCreateForm.astro'
 import Button from '../../../components/Button.astro'
-import InputSelect from '../../../components/InputSelect.astro'
-import InputSubmitButton from '../../../components/InputSubmitButton.astro'
-import InputText from '../../../components/InputText.astro'
-import InputTextArea from '../../../components/InputTextArea.astro'
 import { eventClassFilterFor, eventViews, eventViewsZodEnum } from '../../../constants/eventViews'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { cn } from '../../../lib/cn'
@@ -95,6 +90,7 @@ const [events, totalEvents] = await Astro.locals.banners.try(
         id: true,
         title: true,
         content: true,
+        source: true,
         type: true,
         class: true,
         sentiment: true,
@@ -197,9 +193,6 @@ const shortcuts = [
 const fieldClass =
   'w-full rounded-md border border-night-500 bg-night-900 px-2.5 py-1.5 text-sm text-day-100 transition-colors [color-scheme:dark] focus:border-green-500/60 focus:outline-none'
 
-const toLocalDateTime = (date: Date) =>
-  new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-
 // Reopen the form when a submission bounced, so the errors are not hidden.
 const hasCreateErrors = Object.keys(createInputErrors).length > 0
 ---
@@ -227,65 +220,14 @@ const hasCreateErrors = Object.keys(createInputErrors).length > 0
     }
   </header>
 
-  <details
-    id="new-event"
-    class="group/add mb-5 rounded-xl border border-night-600 bg-night-800/60 p-3"
+  <EventCreateForm
+    services={services}
+    selectedServiceId={selectedService?.id.toString()}
+    inputErrors={createInputErrors}
+    sectionHash="#new-event"
     open={hasCreateErrors}
-  >
-    <summary
-      class="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-day-100 [&::-webkit-details-marker]:hidden"
-    >
-      <Icon name="ri:add-circle-line" class="size-5 shrink-0 text-green-400" />
-      <span class="grow">New event</span>
-      <Icon
-        name="ri:arrow-down-s-line"
-        class="size-5 shrink-0 text-day-400 transition-transform group-open/add:rotate-180"
-      />
-    </summary>
-
-    <form method="POST" action={`${actions.admin.event.create}#new-event`} class="mt-4 max-w-3xl space-y-3">
-      <InputSelect
-        name="serviceId"
-        label="Service"
-        options={services.map((service) => ({
-          label: `${service.name} (${service._count.events.toString()})`,
-          value: service.id.toString(),
-        }))}
-        selectedValue={selectedService?.id.toString()}
-        selectProps={{ required: true }}
-        error={createInputErrors.serviceId}
-      />
-
-      <InputText
-        label="Title"
-        name="title"
-        inputProps={{ required: true, placeholder: 'Short, factual headline' }}
-        error={createInputErrors.title}
-      />
-
-      <InputTextArea
-        label="Content"
-        name="content"
-        inputProps={{ required: true, rows: 3 }}
-        error={createInputErrors.content}
-        description="Markdown supported. Say what happened and what it means for users."
-      />
-
-      <EventTimingFields startedAt={toLocalDateTime(new Date())} errors={createInputErrors} />
-
-      <InputText
-        label="Source URL"
-        name="source"
-        inputProps={{ type: 'url', placeholder: 'https://...' }}
-        error={createInputErrors.source}
-        description="Optional. Where this was reported, so readers can check it."
-      />
-
-      <IncidentFields errors={createInputErrors} />
-
-      <InputSubmitButton label="Create event" icon="ri:add-line" hideCancel />
-    </form>
-  </details>
+    class="mb-5"
+  />
 
   <div class="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
     {

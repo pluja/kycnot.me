@@ -1,20 +1,17 @@
 ---
 import { Icon } from 'astro-icon/components'
-import { actions } from 'astro:actions'
 
+import { cn } from '../../../../lib/cn'
 import FormSection from '../../../FormSection.astro'
-import FormSubSection from '../../../FormSubSection.astro'
-import InputSubmitButton from '../../../InputSubmitButton.astro'
-import InputText from '../../../InputText.astro'
-import InputTextArea from '../../../InputTextArea.astro'
 import AdminEventEditItem from '../../events/AdminEventEditItem.astro'
-import EventTimingFields from '../../events/EventTimingFields.astro'
-import IncidentFields from './IncidentFields.astro'
+import EventCreateForm from '../../events/EventCreateForm.astro'
 
 import type { Prisma } from '@prisma/client'
 
 type Props = {
   serviceId: number
+  /// Null on a page whose own heading already says "events".
+  title?: string | null
   events: Prisma.EventGetPayload<{
     include: {
       createdBy: { select: { name: true; displayName: true } }
@@ -27,12 +24,16 @@ type Props = {
   id?: string
 }
 
-const { serviceId, events, createInputErrors, updateInputErrors, id = 'events' } = Astro.props
+const {
+  serviceId,
+  events,
+  createInputErrors,
+  updateInputErrors,
+  id = 'events',
+  title = 'Events',
+} = Astro.props
 
 const isAdmin = Astro.locals.user?.admin ?? false
-
-const toLocalDateTime = (date: Date) =>
-  new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 const sectionHash = `#${id}`
 
 const sortedEvents = [...events].sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
@@ -42,67 +43,47 @@ const curatedEvents = sortedEvents.filter((event) => event.class !== 'CHANGE')
 const changeEvents = sortedEvents.filter((event) => event.class === 'CHANGE')
 ---
 
-<FormSection title="Events" id={id}>
-  <FormSubSection title="Add an event">
-    <details class="group/add" open={events.length === 0}>
-      <summary
-        class="mb-3 flex w-fit cursor-pointer list-none items-center gap-2 rounded-md border border-night-500 px-3 py-1.5 text-sm text-day-200 transition-colors hover:border-green-500/50 hover:text-white [&::-webkit-details-marker]:hidden"
-      >
-        <Icon name="ri:add-line" class="size-4 shrink-0" />
-        <span class="group-open/add:hidden">New event</span>
-        <span class="hidden group-open/add:inline">Close</span>
-        <Icon
-          name="ri:arrow-down-s-line"
-          class="size-4 shrink-0 transition-transform group-open/add:rotate-180"
-        />
-      </summary>
+<FormSection title={title ?? undefined} id={id} class={cn('scroll-mt-24', title === null && 'mt-0')}>
+  <EventCreateForm
+    serviceId={serviceId}
+    inputErrors={createInputErrors}
+    sectionHash={sectionHash}
+    open={events.length === 0}
+    id={`${id}-new`}
+  />
 
-      <form method="POST" action={`${actions.admin.event.create}${sectionHash}`} class="space-y-3">
-        <input type="hidden" name="serviceId" value={serviceId} />
+  {
+    events.length === 0 ? (
+      <p class="mt-3 rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
+        No events yet.
+      </p>
+    ) : (
+      <>
+        {curatedEvents.length > 0 && (
+          <div class="mt-3 space-y-2">
+            {curatedEvents.map((event) => (
+              <AdminEventEditItem
+                event={event}
+                updateInputErrors={updateInputErrors}
+                sectionHash={sectionHash}
+                isAdmin={isAdmin}
+              />
+            ))}
+          </div>
+        )}
 
-        <InputText
-          label="Title"
-          name="title"
-          inputProps={{ required: true, placeholder: 'Short, factual headline' }}
-          error={createInputErrors.title}
-        />
-
-        <InputTextArea
-          label="Content"
-          name="content"
-          inputProps={{ required: true, rows: 3 }}
-          error={createInputErrors.content}
-          description="Markdown supported. Say what happened and what it means for users."
-        />
-
-        <EventTimingFields startedAt={toLocalDateTime(new Date())} errors={createInputErrors} />
-
-        <InputText
-          label="Source URL"
-          name="source"
-          inputProps={{ type: 'url', placeholder: 'https://...' }}
-          error={createInputErrors.source}
-          description="Optional. Where this was reported, so readers can check it."
-        />
-
-        <IncidentFields errors={createInputErrors} />
-
-        <InputSubmitButton label="Add event" icon="ri:add-line" hideCancel />
-      </form>
-    </details>
-  </FormSubSection>
-
-  <FormSubSection title="Timeline">
-    {
-      events.length === 0 ? (
-        <p class="rounded-xl border border-night-600 bg-night-800 p-6 text-center text-day-300">
-          No events yet.
-        </p>
-      ) : (
-        <>
-          {curatedEvents.length > 0 && (
-            <div class="space-y-2">
-              {curatedEvents.map((event) => (
+        {changeEvents.length > 0 && (
+          <details class="group/changes mt-3">
+            <summary class="flex w-fit cursor-pointer list-none items-center gap-2 py-1 text-sm text-day-500 transition-colors hover:text-day-300 [&::-webkit-details-marker]:hidden">
+              <Icon name="ri:pencil-line" class="size-4 shrink-0" />
+              Listing edits ({changeEvents.length})
+              <Icon
+                name="ri:arrow-down-s-line"
+                class="size-4 shrink-0 transition-transform group-open/changes:rotate-180"
+              />
+            </summary>
+            <div class="mt-2 space-y-2">
+              {changeEvents.map((event) => (
                 <AdminEventEditItem
                   event={event}
                   updateInputErrors={updateInputErrors}
@@ -111,32 +92,9 @@ const changeEvents = sortedEvents.filter((event) => event.class === 'CHANGE')
                 />
               ))}
             </div>
-          )}
-
-          {changeEvents.length > 0 && (
-            <details class="group/changes mt-3">
-              <summary class="flex w-fit cursor-pointer list-none items-center gap-2 py-1 text-sm text-day-500 transition-colors hover:text-day-300 [&::-webkit-details-marker]:hidden">
-                <Icon name="ri:pencil-line" class="size-4 shrink-0" />
-                Listing edits ({changeEvents.length})
-                <Icon
-                  name="ri:arrow-down-s-line"
-                  class="size-4 shrink-0 transition-transform group-open/changes:rotate-180"
-                />
-              </summary>
-              <div class="mt-2 space-y-2">
-                {changeEvents.map((event) => (
-                  <AdminEventEditItem
-                    event={event}
-                    updateInputErrors={updateInputErrors}
-                    sectionHash={sectionHash}
-                    isAdmin={isAdmin}
-                  />
-                ))}
-              </div>
-            </details>
-          )}
-        </>
-      )
-    }
-  </FormSubSection>
+          </details>
+        )}
+      </>
+    )
+  }
 </FormSection>

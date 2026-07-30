@@ -57,7 +57,7 @@ import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
 import { isEmbeddableBadgeStatus } from '../../lib/serviceBadges'
 import { serviceDetailSelect } from '../../lib/serviceDetail'
 import { getServiceVerificationOverview } from '../../lib/serviceVerification'
-import { stripMarkdown, transformCase } from '../../lib/strings'
+import { firstParagraph, transformCase } from '../../lib/strings'
 import { formatDateShort } from '../../lib/timeAgo'
 import { absoluteSiteUrl, siteOrigin, urlDomain, urlWithParams } from '../../lib/urls'
 
@@ -588,7 +588,7 @@ const verificationStatusDate =
           <span class="min-w-0">
             <span class="block font-bold wrap-anywhere">{activeEventToShow.title}</span>
             <span class="line-clamp-2 wrap-anywhere text-current/80">
-              {stripMarkdown(activeEventToShow.content)}
+              {firstParagraph(activeEventToShow.content)}
             </span>
           </span>
         </span>

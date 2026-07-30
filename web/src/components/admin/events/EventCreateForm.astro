@@ -1,0 +1,111 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import { cn } from '../../../lib/cn'
+import InputSelect from '../../InputSelect.astro'
+import InputSubmitButton from '../../InputSubmitButton.astro'
+import InputText from '../../InputText.astro'
+import InputTextArea from '../../InputTextArea.astro'
+import IncidentFields from '../services/edit/IncidentFields.astro'
+
+import EventTimingFields from './EventTimingFields.astro'
+
+type Props = {
+  /// Fixed service, for a page already scoped to one. Ignored when `services`
+  /// is passed, which renders a picker instead.
+  serviceId?: number
+  services?: { id: number; name: string; _count: { events: number } }[]
+  selectedServiceId?: string
+  inputErrors: Record<string, string[] | undefined>
+  /// Appended to the action so the page returns to this form after a POST.
+  sectionHash: string
+  open?: boolean
+  id?: string
+  class?: string
+}
+
+const {
+  serviceId,
+  services,
+  selectedServiceId,
+  inputErrors,
+  sectionHash,
+  open = false,
+  id = 'new-event',
+  class: className,
+} = Astro.props
+
+const contentHint =
+  'Markdown supported. The first paragraph is used as the summary in banners and lists, so lead with the point.'
+---
+
+<details
+  {id}
+  class={cn('group/add scroll-mt-24 rounded-xl border border-night-600 bg-night-800/60', className)}
+  {open}
+>
+  <summary
+    class="flex cursor-pointer list-none items-center gap-2 rounded-xl p-3 text-sm font-medium text-day-100 transition-colors hover:bg-night-700/40 [&::-webkit-details-marker]:hidden"
+  >
+    <Icon name="ri:add-circle-line" class="size-5 shrink-0 text-green-400" />
+    <span class="grow">New event</span>
+    <Icon
+      name="ri:arrow-down-s-line"
+      class="size-5 shrink-0 text-day-400 transition-transform group-open/add:rotate-180"
+    />
+  </summary>
+
+  <form
+    method="POST"
+    action={`${actions.admin.event.create}${sectionHash}`}
+    class="space-y-3 border-t border-night-600 p-3"
+  >
+    {
+      services ? (
+        <InputSelect
+          name="serviceId"
+          label="Service"
+          options={services.map((service) => ({
+            label: `${service.name} (${service._count.events.toString()})`,
+            value: service.id.toString(),
+          }))}
+          selectedValue={selectedServiceId}
+          selectProps={{ required: true }}
+          error={inputErrors.serviceId}
+        />
+      ) : (
+        <input type="hidden" name="serviceId" value={serviceId} />
+      )
+    }
+
+    <InputText
+      label="Title"
+      name="title"
+      inputProps={{ required: true, placeholder: 'Short, factual headline' }}
+      error={inputErrors.title}
+    />
+
+    <InputTextArea
+      label="Content"
+      name="content"
+      inputProps={{ required: true, rows: 3 }}
+      error={inputErrors.content}
+      description={contentHint}
+    />
+
+    <EventTimingFields errors={inputErrors} />
+
+    <InputText
+      label="Source URL"
+      name="source"
+      inputProps={{ type: 'url', placeholder: 'https://...' }}
+      error={inputErrors.source}
+      description="Optional. Where this was reported, so readers can check it."
+    />
+
+    <IncidentFields errors={inputErrors} />
+
+    <InputSubmitButton label="Create event" icon="ri:add-line" hideCancel />
+  </form>
+</details>

@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 import { getIncidentSeverityInfo } from '../constants/incidentSeverities'
 import { cn } from '../lib/cn'
 import { computeIncidentTrustPenalty } from '../lib/incidentPenalty'
-import { stripMarkdown } from '../lib/strings'
+import { firstParagraph } from '../lib/strings'
 
 import CaseReportsStrip from './cases/CaseReportsStrip.astro'
 import IncidentMeta from './IncidentMeta.astro'
@@ -60,7 +60,7 @@ const dateLabel = resolvedAt
   ? `${format(occurredAt, 'MMM d')} → ${format(resolvedAt, 'MMM d, yyyy')}`
   : `Started ${format(occurredAt, 'MMM d, yyyy')}`
 
-const excerpt = stripMarkdown(content)
+const excerpt = firstParagraph(content)
 
 const railClass = faded ? 'bg-day-700' : sev.classNames.rail
 const borderClass = faded ? 'border-day-800' : sev.classNames.border

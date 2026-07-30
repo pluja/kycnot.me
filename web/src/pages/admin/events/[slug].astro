@@ -56,22 +56,59 @@ if (!service) return Astro.rewrite('/404')
 
 <BaseLayout pageTitle={`Events: ${service.name}`} widthClassName="max-w-3xl" htmx>
   <div class="mt-8 mb-4">
-    <Button as="a" href="/admin/events" label="All services" icon="ri:arrow-left-line" size="sm" variant="faded" />
+    <Button
+      as="a"
+      href="/admin/events"
+      label="All events"
+      icon="ri:arrow-left-line"
+      size="sm"
+      variant="faded"
+    />
   </div>
 
-  <header class="mb-6 flex items-center gap-3">
-    <MyPicture
-      src={service.imageUrl}
-      fallback="service"
-      alt={`${service.name} logo`}
-      class="size-10 shrink-0 rounded-sm object-contain"
-      width={40}
-      height={40}
-    />
-    <h1 class="font-title text-2xl font-bold text-white">{service.name} events</h1>
+  <header class="mb-6 border-b border-night-600 pb-4">
+    <div class="flex min-w-0 items-center gap-3">
+      <MyPicture
+        src={service.imageUrl}
+        fallback="service"
+        alt={`${service.name} logo`}
+        class="size-10 shrink-0 rounded-sm object-contain"
+        width={40}
+        height={40}
+      />
+      <div class="min-w-0">
+        <h1 class="font-title text-2xl leading-tight font-bold wrap-anywhere text-white">
+          {service.name}
+        </h1>
+        <p class="text-sm text-day-400">Events timeline</p>
+      </div>
+    </div>
+
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      <Button
+        as="a"
+        href={`/service/${encodeURIComponent(service.slug)}#events`}
+        target="_blank"
+        rel="noopener"
+        label="View public timeline"
+        icon="ri:external-link-line"
+        size="sm"
+        variant="faded"
+        color="success"
+      />
+      <Button
+        as="a"
+        href={`/admin/services/${encodeURIComponent(service.slug)}/edit`}
+        label="Edit service"
+        icon="ri:settings-3-line"
+        size="sm"
+        variant="faded"
+      />
+    </div>
   </header>
 
   <EventsSection
+    title={null}
     serviceId={service.id}
     events={service.events}
     createInputErrors={errorsOf(eventCreateResult)}
