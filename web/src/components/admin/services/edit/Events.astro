@@ -44,16 +44,16 @@ const changeEvents = sortedEvents.filter((event) => event.class === 'CHANGE')
 
 <FormSection title="Events" id={id}>
   <FormSubSection title="Add an event">
-    <details class="group" open={events.length === 0}>
+    <details class="group/add" open={events.length === 0}>
       <summary
         class="mb-3 flex w-fit cursor-pointer list-none items-center gap-2 rounded-md border border-night-500 px-3 py-1.5 text-sm text-day-200 transition-colors hover:border-green-500/50 hover:text-white [&::-webkit-details-marker]:hidden"
       >
         <Icon name="ri:add-line" class="size-4 shrink-0" />
-        <span class="group-open:hidden">New event</span>
-        <span class="hidden group-open:inline">Close</span>
+        <span class="group-open/add:hidden">New event</span>
+        <span class="hidden group-open/add:inline">Close</span>
         <Icon
           name="ri:arrow-down-s-line"
-          class="size-4 shrink-0 transition-transform group-open:rotate-180"
+          class="size-4 shrink-0 transition-transform group-open/add:rotate-180"
         />
       </summary>
 
@@ -114,13 +114,13 @@ const changeEvents = sortedEvents.filter((event) => event.class === 'CHANGE')
           )}
 
           {changeEvents.length > 0 && (
-            <details class="group mt-3">
+            <details class="group/changes mt-3">
               <summary class="flex w-fit cursor-pointer list-none items-center gap-2 py-1 text-sm text-day-500 transition-colors hover:text-day-300 [&::-webkit-details-marker]:hidden">
                 <Icon name="ri:pencil-line" class="size-4 shrink-0" />
                 Listing edits ({changeEvents.length})
                 <Icon
                   name="ri:arrow-down-s-line"
-                  class="size-4 shrink-0 transition-transform group-open:rotate-180"
+                  class="size-4 shrink-0 transition-transform group-open/changes:rotate-180"
                 />
               </summary>
               <div class="mt-2 space-y-2">

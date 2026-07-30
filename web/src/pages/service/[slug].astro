@@ -1408,7 +1408,7 @@ const verificationStatusDate =
         )}
 
         {pastIncidents.length > 0 && (
-          <details class="group mb-2">
+          <details class="group/past mb-2">
             <summary class="flex w-fit cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 py-1 text-sm text-day-500 transition-colors hover:text-day-300 [&::-webkit-details-marker]:hidden">
               <span class="inline-flex items-center gap-1.5">
                 <Icon name="ri:history-line" class="size-4 shrink-0" />
@@ -1430,7 +1430,7 @@ const verificationStatusDate =
               </span>
               <Icon
                 name="ri:arrow-down-s-line"
-                class="size-4 shrink-0 transition-transform group-open:rotate-180"
+                class="size-4 shrink-0 transition-transform group-open/past:rotate-180"
               />
             </summary>
             <ul class="mt-2 space-y-2">

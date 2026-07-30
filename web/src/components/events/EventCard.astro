@@ -97,15 +97,21 @@ const proseClass =
 
     {
       isCollapsible ? (
-        <details class="group mt-1.5">
+        <details class="group/event mt-1.5">
           <summary class="flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
-            <span class="min-w-0 flex-1 truncate text-sm text-day-400 group-open:hidden" aria-hidden="true">
+            <span
+              class="min-w-0 flex-1 truncate text-sm text-day-400 group-open/event:hidden"
+              aria-hidden="true"
+            >
               {excerpt}
             </span>
             <span class="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-day-400 transition-colors group-hover:text-day-200">
-              <span class="group-open:hidden">Read more</span>
-              <span class="hidden group-open:inline">Show less</span>
-              <Icon name="ri:arrow-down-s-line" class="size-4 transition-transform group-open:rotate-180" />
+              <span class="group-open/event:hidden">Read more</span>
+              <span class="hidden group-open/event:inline">Show less</span>
+              <Icon
+                name="ri:arrow-down-s-line"
+                class="size-4 transition-transform group-open/event:rotate-180"
+              />
             </span>
           </summary>
 
