@@ -66,7 +66,7 @@ dump-db:  ## DB backup including _prisma_migrations (recommended)
 	echo "Creating complete database backup (including _prisma_migrations table)..."
 	docker compose exec -T database pg_dump -U $${POSTGRES_USER:-kycnot} -d $${POSTGRES_DATABASE:-kycnot} -c -F c > "$$OUT"
 	echo "Verifying dump integrity..."
-	cat "$$OUT" | docker compose exec -T database pg_restore --list >/dev/null
+	docker compose exec -T database pg_restore --list < "$$OUT" >/dev/null
 	echo "Backup saved: $$OUT ($$(du -h "$$OUT" | cut -f1))"
 
 dump-db-no-migrations:  ## DB backup excluding _prisma_migrations (legacy)
@@ -76,7 +76,7 @@ dump-db-no-migrations:  ## DB backup excluding _prisma_migrations (legacy)
 	echo "Creating database backup (excluding _prisma_migrations table)..."
 	docker compose exec -T database pg_dump -U $${POSTGRES_USER:-kycnot} -d $${POSTGRES_DATABASE:-kycnot} -c -F c -T _prisma_migrations > "$$OUT"
 	echo "Verifying dump integrity..."
-	cat "$$OUT" | docker compose exec -T database pg_restore --list >/dev/null
+	docker compose exec -T database pg_restore --list < "$$OUT" >/dev/null
 	echo "Backup saved: $$OUT ($$(du -h "$$OUT" | cut -f1))"
 
 prune-backups:  ## Keep newest N backups (default 10). Usage: make prune-backups N=30
@@ -121,7 +121,7 @@ import-db:  ## Restore a backup. Usage: make import-db [FILE=backups/x.dump]
 	docker compose exec -T database psql -U $${POSTGRES_USER:-kycnot} -c "CREATE DATABASE $${POSTGRES_DATABASE:-kycnot};" postgres
 
 	echo "=== STEP 2: RESTORING DUMP ==="
-	cat "$$BACKUP_FILE" | docker compose exec -T database pg_restore -U $${POSTGRES_USER:-kycnot} -d $${POSTGRES_DATABASE:-kycnot} --no-owner
+	docker compose exec -T database pg_restore -U $${POSTGRES_USER:-kycnot} -d $${POSTGRES_DATABASE:-kycnot} --no-owner < "$$BACKUP_FILE"
 	echo "Database data restored."
 
 	echo "=== STEP 3: APPLYING PENDING MIGRATIONS ==="
