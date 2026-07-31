@@ -21,7 +21,7 @@ DEFAULT_KEEP ?= 10
 .SILENT:
 
 .PHONY: help import-triggers migrate-deploy migrate-status dump-db dump-db-no-migrations \
-        prune-backups import-db db-shell logs
+        prune-backups import-db db-shell logs sync-prod scrub-credentials _assert-preprod
 
 help:  ## List targets
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z0-9_-]+:.*##/ {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -131,6 +131,56 @@ import-db:  ## Restore a backup. Usage: make import-db [FILE=backups/x.dump]
 	$(MAKE) migrate-status || true
 
 	echo "Database import completed successfully!"
+
+# === Preprod refresh ===
+
+PREPROD_ADMIN_TOKEN ?= admin
+
+_assert-preprod:
+	IMAGE=$$(docker compose config --images | grep -m1 '/kycnot/astro:' || true)
+	case "$$IMAGE" in
+		*:pre-*) ;;
+		*) echo "Refusing: this does not look like preprod (astro image: $${IMAGE:-none})"; exit 1 ;;
+	esac
+
+scrub-credentials:  ## Void every real login, install a dev admin token (preprod only)
+	$(MAKE) _assert-preprod
+	echo "Scrubbing credentials..."
+	docker compose exec -T database psql -U $${POSTGRES_USER:-kycnot} -d $${POSTGRES_DATABASE:-kycnot} \
+		-v ON_ERROR_STOP=1 -v tok=$(PREPROD_ADMIN_TOKEN) <<-'SQL'
+		UPDATE "User" SET
+			"secretTokenHash" = encode(sha512(convert_to(random()::text || '-' || id::text, 'UTF8')), 'hex'),
+			"feedId" = encode(sha256(convert_to(random()::text || '-' || id::text, 'UTF8')), 'hex');
+
+		DELETE FROM "ApiKey";
+
+		UPDATE "User"
+		SET "secretTokenHash" = encode(sha512(convert_to(:'tok', 'UTF8')), 'hex')
+		WHERE id = (SELECT id FROM "User" WHERE admin ORDER BY id LIMIT 1);
+
+		SELECT CASE
+			WHEN count(*) = 0 THEN 'WARNING: no admin user found, nobody can log in'
+			ELSE 'Log in as ' || max(name) || ' with token: ' || :'tok'
+		END AS result
+		FROM "User" WHERE admin;
+		SQL
+
+sync-prod:  ## Restore newest prod dump, then scrub credentials (preprod only)
+	$(MAKE) _assert-preprod
+	mkdir -p backups
+	OUT="backups/presync_preprod_$$(date +%Y%m%d_%H%M%S).dump"
+	echo "Saving a rollback copy of this database to $$OUT..."
+	docker compose exec -T database pg_dump -U $${POSTGRES_USER:-kycnot} -d $${POSTGRES_DATABASE:-kycnot} -c -F c > "$$OUT"
+	docker compose exec -T database pg_restore --list < "$$OUT" >/dev/null
+	SRC=$$(ls -1t backups/db_backup_*.dump 2>/dev/null | head -1)
+	if [ -z "$$SRC" ]; then
+		echo "No production dump found (backups/db_backup_*.dump). Run sync-all.sh first." >&2
+		exit 1
+	fi
+	echo "Restoring production dump: $$SRC"
+	$(MAKE) import-db FILE="$$SRC"
+	$(MAKE) scrub-credentials
+	echo "Preprod is now a scrubbed copy of production. Rollback: make import-db FILE=$$OUT"
 
 # === Utility ===
 
