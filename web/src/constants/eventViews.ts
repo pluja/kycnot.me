@@ -6,6 +6,7 @@ import type { Prisma } from '@prisma/client'
 /// volume rows by far, so they stay out until asked for by name.
 export const eventViews = [
   { value: 'curated', label: 'Events & incidents' },
+  { value: 'events', label: 'Events only' },
   { value: 'incidents', label: 'Incidents' },
   { value: 'changes', label: 'Listing edits' },
   { value: 'all', label: 'Everything' },
@@ -17,6 +18,8 @@ export const eventViewsZodEnum = z.enum(eventViews.map((view) => view.value) as 
 
 export function eventClassFilterFor(view: EventView): Prisma.EventWhereInput['class'] {
   switch (view) {
+    case 'events':
+      return 'EVENT'
     case 'incidents':
       return 'INCIDENT'
     case 'changes':

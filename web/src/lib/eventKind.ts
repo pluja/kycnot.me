@@ -114,6 +114,15 @@ export function getEventDisplay(event: DisplayableEvent, now = new Date()) {
   }
 }
 
+// eventStatusLabel describes an entry's standing for feeds and categories.
+// "Resolved" is reserved for the kinds that can actually be fixed; an entry that
+// simply stopped being current is "Ended", which is why a past announcement no
+// longer reads as though someone resolved it.
+export function eventStatusLabel(event: DisplayableEvent, now = new Date()): string {
+  if (getEventDisplay(event, now).isResolved) return 'Resolved'
+  return isEventOpen(event, now) ? 'Ongoing' : 'Ended'
+}
+
 // pickPrimaryEvent picks the entry that represents a whole list in one badge:
 // the most severe unresolved one, falling back to the most severe overall.
 export function pickPrimaryEvent<T extends DisplayableEvent>(

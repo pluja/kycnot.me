@@ -1,7 +1,7 @@
 import rss from '@astrojs/rss'
 
 import { getIncidentSeverityInfo } from '../../constants/incidentSeverities'
-import { getEventDisplay, isEventOpen } from '../../lib/eventKind'
+import { getEventDisplay, eventStatusLabel } from '../../lib/eventKind'
 import { getEvents, isEventFeedView, type EventFeedView } from '../../lib/feeds'
 import { absoluteSiteUrl, siteOrigin } from '../../lib/urls'
 
@@ -49,7 +49,7 @@ export const GET: APIRoute = async (context) => {
       xmlns: { atom: 'http://www.w3.org/2005/Atom' },
       items: events.map((event) => {
         const display = getEventDisplay(event)
-        const statusText = isEventOpen(event) ? 'Ongoing' : 'Resolved'
+        const statusText = eventStatusLabel(event)
 
         const categories = [display.label, event.service.name, statusText]
         let description = event.content
