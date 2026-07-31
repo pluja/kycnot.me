@@ -1,4 +1,5 @@
 import { getEventDisplay, pickPrimaryEvent } from '../../lib/eventKind'
+
 import type { DisplayableEvent, EventDisplay } from '../../lib/eventKind'
 
 export type SwapAmountSide = 'receive' | 'send'

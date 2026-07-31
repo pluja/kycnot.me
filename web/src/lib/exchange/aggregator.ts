@@ -109,6 +109,7 @@ const displayServiceSelect = {
       visible: true,
       type: { in: [EventType.WARNING, EventType.ALERT] },
       OR: [{ endedAt: null }, { endedAt: { gte: new Date() } }],
+      NOT: { incident: { state: 'RESOLVED' } },
     },
     orderBy: [{ startedAt: 'desc' }],
     select: {

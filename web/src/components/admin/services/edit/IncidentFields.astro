@@ -2,6 +2,7 @@
 import { IncidentOutcome, IncidentType } from '@prisma/client'
 
 import { incidentSeverities } from '../../../../constants/incidentSeverities'
+import { toDatetimeLocalValue } from '../../../../lib/dates'
 import { EVENT_KINDS, type EventKind } from '../../../../lib/eventKind'
 import { FULL_PENALTY } from '../../../../lib/incidentPenalty'
 import { transformCase } from '../../../../lib/strings'
@@ -27,8 +28,6 @@ type Props = {
 
 const { errors, kind = 'INFO', incident = null } = Astro.props
 
-const toLocalDateTime = (date: Date) =>
-  new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 const labelFor = (value: string) => transformCase(value.replaceAll('_', ' '), 'title')
 
 // Moderator-facing wording: it explains which one to pick, where the public
@@ -140,7 +139,7 @@ const outcomeOptions = [
         name="resolvedAt"
         inputProps={{
           type: 'datetime-local',
-          value: incident?.resolvedAt ? toLocalDateTime(new Date(incident.resolvedAt)) : '',
+          value: incident?.resolvedAt ? toDatetimeLocalValue(new Date(incident.resolvedAt)) : '',
         }}
         description="The trust penalty starts fading from here."
         error={errors.resolvedAt}

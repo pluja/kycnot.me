@@ -1,3 +1,8 @@
+BEGIN;
+
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '60s';
+
 -- CreateEnum
 CREATE TYPE "EventOrigin" AS ENUM ('STAFF', 'USER', 'AI', 'MONITOR');
 
@@ -29,3 +34,5 @@ UPDATE "Event" SET "origin" = 'MONITOR' WHERE "type" = 'UPDATE';
 
 -- CreateIndex
 CREATE INDEX "Case_publishedAt_idx" ON "Case"("publishedAt");
+
+COMMIT;

@@ -26,11 +26,11 @@ const { event, now = new Date() } = Astro.props
 
 const severityInfo = event.incident ? getIncidentSeverityInfo(event.incident.severity) : null
 const timelineHref = `/admin/events/${encodeURIComponent(event.service.slug)}`
-const editHref = `${timelineHref}#event-${event.id.toString()}`
+const editHref = event.class === 'CHANGE' ? timelineHref : `${timelineHref}#event-${event.id.toString()}`
 const isDeleted = event.deletedAt !== null
 ---
 
-<EventCard event={event} now={now} titleHref={editHref} faded={isDeleted}>
+<EventCard event={event} now={now} titleHref={editHref} faded={isDeleted} headingLevel="h2">
   <Fragment slot="badges">
     {
       severityInfo && (

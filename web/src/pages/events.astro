@@ -9,12 +9,12 @@ import EventCard from '../components/events/EventCard.astro'
 import EventServiceLink from '../components/events/EventServiceLink.astro'
 import MyPicture from '../components/MyPicture.astro'
 import TimeFormatted from '../components/TimeFormatted.astro'
-import { getIncidentSeverityInfo } from '../constants/incidentSeverities'
 import { eventClassFilterFor, eventViews, eventViewsZodEnum } from '../constants/eventViews'
+import { getIncidentSeverityInfo } from '../constants/incidentSeverities'
 import { getVerificationStatusInfo } from '../constants/verificationStatus'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { cn } from '../lib/cn'
-import { getEventDisplay } from '../lib/eventKind'
+import { getEventDisplay, isEventOpen } from '../lib/eventKind'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { formatDateShort } from '../lib/timeAgo'
@@ -69,6 +69,7 @@ const [services, [dbEvents, totalEvents]] = await Astro.locals.banners.tryMany([
       prisma.event.findManyAndCount({
         where: {
           visible: true,
+          deletedAt: null,
           createdAt: {
             lte: params.now,
           },
@@ -144,9 +145,7 @@ const groupMeta = {
 
 const events = orderBy(
   dbEvents.map((event) => {
-    // Grouping and the card badge read the same predicate, so a row cannot sit
-    // under "Ongoing" while its badge says resolved.
-    const isOngoing = !getEventDisplay(event, params.now).isResolved
+    const isOngoing = isEventOpen(event, params.now)
     const group: keyof typeof GROUP_ORDER =
       event.class === 'INCIDENT' && isOngoing ? 'incident' : isOngoing ? 'ongoing' : 'past'
     return {
@@ -415,7 +414,11 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
                   <EventCard
                     event={event}
                     now={params.now}
-                    titleHref={`/service/${event.service.slug}#event-${event.id.toString()}`}
+                    titleHref={
+                      event.class === 'CHANGE'
+                        ? `/service/${event.service.slug}#events`
+                        : `/service/${event.service.slug}#event-${event.id.toString()}`
+                    }
                   >
                     <Fragment slot="meta">
                       <span class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -451,13 +454,17 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
             </li>
           )}
 
-          <li class="hidden pt-3 htmx-request:block no-js:hidden" id="infinite-scroll-indicator">
-            <p class="animate-pulse text-center text-xs text-day-500 italic">Loading more events...</p>
-          </li>
+          {hasMorePages && (
+            <>
+              <li class="hidden pt-3 htmx-request:block no-js:hidden" id="infinite-scroll-indicator">
+                <p class="animate-pulse text-center text-xs text-day-500 italic">Loading more events...</p>
+              </li>
 
-          <li class="hidden pt-3 no-js:block">
-            <p class="text-center text-xs text-day-500 italic">Enable JavaScript to load more events</p>
-          </li>
+              <li class="hidden pt-3 no-js:block">
+                <p class="text-center text-xs text-day-500 italic">Enable JavaScript to load more events</p>
+              </li>
+            </>
+          )}
         </ol>
       ) : (
         <p class="my-12 text-center text-day-400">No events reported</p>

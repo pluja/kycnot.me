@@ -32,6 +32,10 @@ export function eventToKind(eventClass: EventClass, sentiment: EventSentiment): 
   return 'INFO'
 }
 
+/// Shown under the event body field in every admin form.
+export const EVENT_CONTENT_HINT =
+  'Markdown supported. The first paragraph is used as the summary in banners and lists, so lead with the point.'
+
 export type DisplayableEvent = {
   class: EventClass
   sentiment: EventSentiment
@@ -75,6 +79,16 @@ function isEventResolved(event: DisplayableEvent, now: Date): boolean {
   return event.endedAt.getTime() > event.startedAt.getTime() && event.endedAt.getTime() <= now.getTime()
 }
 
+// isEventOpen answers whether an entry is still running, which is a different
+// question from isResolved: a listing edit or an announcement never "resolves",
+// but it does stop being current once its end date passes.
+export function isEventOpen(event: DisplayableEvent, now = new Date()): boolean {
+  if (event.incident) return event.incident.state !== 'RESOLVED'
+  if (event.type && LEGACY_RESOLVED_TYPES.includes(event.type)) return false
+  if (!event.endedAt) return true
+  return event.endedAt.getTime() > now.getTime()
+}
+
 export type EventDisplay = ReturnType<typeof getEventDisplay>
 
 // getEventDisplay resolves an event to its looks. A resolved entry overrides the
@@ -93,6 +107,7 @@ export function getEventDisplay(event: DisplayableEvent, now = new Date()) {
     kind,
     isResolved: true,
     label: `${info.label} resolved`,
+    description: `${info.description} No longer active.`,
     color: 'green' as const,
     showBanner: false,
     classNames: resolvedEventClassNames,

@@ -1,12 +1,12 @@
 import { accountStatusChangesById } from '../constants/accountStatusChange'
 import { commentStatusChangesById } from '../constants/commentStatusChange'
-import { getEventDisplay } from './eventKind'
 import { getKarmaTransactionActionInfo } from '../constants/karmaTransactionActions'
 import { serviceVerificationStatusChangesById } from '../constants/serviceStatusChange'
 import { getServiceSuggestionTypeInfo } from '../constants/serviceSuggestionType'
 import { serviceSuggestionStatusChangesById } from '../constants/suggestionStatusChange'
 
 import { makeCommentUrl } from './commentsWithReplies'
+import { getEventDisplay } from './eventKind'
 
 import type { NotificationAction } from './serverEventsTypes'
 import type { Prisma } from '@prisma/client'

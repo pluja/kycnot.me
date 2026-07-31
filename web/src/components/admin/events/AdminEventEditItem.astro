@@ -1,7 +1,7 @@
 ---
 import { actions } from 'astro:actions'
 
-import { eventToKind } from '../../../lib/eventKind'
+import { EVENT_CONTENT_HINT, eventToKind } from '../../../lib/eventKind'
 import BadgeSmall from '../../BadgeSmall.astro'
 import Button from '../../Button.astro'
 import EventCard from '../../events/EventCard.astro'
@@ -38,7 +38,7 @@ const itemId = `event-${event.id.toString()}`
 const editedBy = event.updatedBy ?? event.createdBy
 ---
 
-<EventCard event={event} faded={event.deletedAt !== null}>
+<EventCard event={event} faded={event.deletedAt !== null} headingLevel="h2">
   <Fragment slot="badges">
     {
       event.incident && (
@@ -158,14 +158,10 @@ const editedBy = event.updatedBy ?? event.createdBy
           inputProps={{ required: true, rows: 3 }}
           value={event.content}
           error={updateInputErrors.content}
-          description="Markdown supported. The first paragraph is used as the summary in banners and lists, so lead with the point."
+          description={EVENT_CONTENT_HINT}
         />
 
-        <EventTimingFields
-          startedAt={event.startedAt}
-          endedAt={event.endedAt}
-          errors={updateInputErrors}
-        />
+        <EventTimingFields startedAt={event.startedAt} endedAt={event.endedAt} errors={updateInputErrors} />
 
         <InputText
           label="Source URL"

@@ -91,6 +91,7 @@ export async function sendNotification(
           sentiment: true,
           startedAt: true,
           endedAt: true,
+          incident: { select: { state: true } },
           service: {
             select: {
               slug: true,

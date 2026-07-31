@@ -1,6 +1,7 @@
 ---
 import { Icon } from 'astro-icon/components'
 
+import { toDatetimeLocalValue } from '../../../lib/dates'
 import InputText from '../../InputText.astro'
 
 type Props = {
@@ -12,11 +13,8 @@ type Props = {
 
 const { startedAt, endedAt, errors } = Astro.props
 
-const toInputValue = (date: Date) =>
-  new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-
-const startedAtValue = toInputValue(startedAt ?? new Date())
-const endedAtValue = endedAt ? toInputValue(endedAt) : ''
+const startedAtValue = toDatetimeLocalValue(startedAt ?? new Date())
+const endedAtValue = endedAt ? toDatetimeLocalValue(endedAt) : ''
 ---
 
 <fieldset class="space-y-2 rounded-lg border border-night-600 p-3">

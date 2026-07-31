@@ -3,9 +3,9 @@ import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 import { format } from 'date-fns'
 
+import AdminPageNav from '../../../components/admin/AdminPageNav.astro'
 import CaseEvidenceGallery from '../../../components/admin/cases/CaseEvidenceGallery.astro'
 import CaseUpdatesTimeline from '../../../components/admin/cases/CaseUpdatesTimeline.astro'
-import AdminPageNav from '../../../components/admin/AdminPageNav.astro'
 import ReporterField from '../../../components/admin/cases/ReporterField.astro'
 import DeleteConfirmButton from '../../../components/admin/DeleteConfirmButton.astro'
 import BadgeSmall from '../../../components/BadgeSmall.astro'
@@ -24,8 +24,8 @@ import { getIncidentSeverityInfo } from '../../../constants/incidentSeverities'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { prisma } from '../../../lib/prisma'
 
-import type { ComponentProps } from 'astro/types'
 import type { CaseStatus, Prisma } from '@prisma/client'
+import type { ComponentProps } from 'astro/types'
 
 if (!Astro.locals.userCan('cases:manage')) return Astro.rewrite('/404')
 

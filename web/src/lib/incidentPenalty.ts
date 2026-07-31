@@ -17,7 +17,7 @@ const RESOLUTION_STEP = {
 
 const MS_PER_DAY = 86_400_000
 
-type PenaltyInput = Pick<Incident, 'severity' | 'state' | 'resolvedAt' | 'outcome' | 'trustOverride'>
+type PenaltyInput = Pick<Incident, 'outcome' | 'resolvedAt' | 'severity' | 'state' | 'trustOverride'>
 
 export type IncidentTrustPenalty = {
   /// Current penalty in trust points (negative). Rounded for display.

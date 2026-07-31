@@ -139,6 +139,14 @@ export const adminEventActions = {
           message: 'Event not found',
         })
       }
+      // Showing a soft-deleted event would republish it on the feeds while the
+      // service page keeps filtering it out. Restore it first.
+      if (existingEvent.deletedAt) {
+        throw new ActionError({
+          code: 'BAD_REQUEST',
+          message: 'Restore the event before changing its visibility',
+        })
+      }
 
       const event = await prisma.event.update({
         where: { id: input.eventId },
@@ -167,6 +175,10 @@ export const adminEventActions = {
         })
       }
 
+      // A listing edit has no authorable kind, so the form falls back to INFO.
+      // Writing that back would promote an auto-recorded row into the curated
+      // timeline and the feeds, so its taxonomy and incident state are left alone.
+      const isListingEdit = existingEvent.class === 'CHANGE'
       const { class: eventClass, sentiment, type } = eventKindToFields(input.kind)
       await prisma.event.update({
         where: { id: input.eventId },
@@ -174,16 +186,16 @@ export const adminEventActions = {
           title: input.title,
           content: input.content,
           source: input.source,
-          type,
-          class: eventClass,
-          sentiment,
+          ...(isListingEdit ? {} : { type, class: eventClass, sentiment }),
           startedAt: input.startedAt,
           endedAt: input.endedAt,
           updatedById: context.locals.user.id,
         },
       })
 
-      if (input.kind === 'INCIDENT' && input.severity) {
+      if (isListingEdit) {
+        // Nothing else to reconcile: a listing edit never carries an incident.
+      } else if (input.kind === 'INCIDENT' && input.severity) {
         const incidentData = incidentDataFrom(input, input.severity)
         await prisma.incident.upsert({
           where: { eventId: input.eventId },

@@ -115,7 +115,12 @@ const headingClass = 'font-title text-base/snug font-semibold text-pretty wrap-a
               )}
             </Heading>
 
-            <p class="mt-1 text-sm text-pretty wrap-anywhere text-day-400 group-open/event:hidden">{lead}</p>
+            <span
+              class="mt-1 block text-sm text-pretty wrap-anywhere text-day-400 group-open/event:hidden"
+              aria-hidden="true"
+            >
+              {lead}
+            </span>
 
             <span class="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-day-400 transition-colors group-hover/event:text-day-200">
               <span class="group-open/event:hidden">Read more</span>

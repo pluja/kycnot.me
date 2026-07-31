@@ -14,7 +14,6 @@ import CommentSummary from '../../components/CommentSummary.astro'
 import DropdownButton from '../../components/DropdownButton.astro'
 import DropdownButtonItemForm from '../../components/DropdownButtonItemForm.astro'
 import DropdownButtonItemLink from '../../components/DropdownButtonItemLink.astro'
-import FormatTimeInterval from '../../components/FormatTimeInterval.astro'
 import EventTimeline from '../../components/events/EventTimeline.astro'
 import IncidentCard from '../../components/IncidentCard.astro'
 import InputSubmitButton from '../../components/InputSubmitButton.astro'
@@ -577,7 +576,7 @@ const verificationStatusDate =
     !!activeEventToShow && (
       <a
         href={`#event-${activeEventToShow.id.toString()}`}
-        aria-label={`${activeEventToShow.display.label}: ${activeEventToShow.title}. Jump to this entry.`}
+        aria-label={`${activeEventToShow.display.label}: ${activeEventToShow.title}. Read this entry.`}
         class={cn(
           'mb-3 block rounded-lg border border-day-500/10 px-3 py-2 text-sm transition-colors',
           activeEventToShow.display.classNames.banner

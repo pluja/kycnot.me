@@ -85,7 +85,7 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
               <Icon
                 name={option.icon}
                 class={cn(
-                  'size-8 text-day-200 group-peer-checked/card:text-day-300',
+                  'size-8 text-day-200 group-has-checked/card:text-day-300',
                   {
                     'size-4': iconSize === 'sm',
                     'size-8': iconSize === 'md',
@@ -94,7 +94,7 @@ const hasError = !!wrapperProps.error && wrapperProps.error.length > 0
                 )}
               />
             )}
-            <p class="flex-1 text-sm leading-none font-medium text-pretty text-day-200 group-peer-checked/card:text-day-300">
+            <p class="flex-1 text-sm leading-none font-medium text-pretty text-day-200 group-has-checked/card:text-day-300">
               {option.label}
             </p>
             <div class="self-stretch">

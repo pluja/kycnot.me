@@ -3,6 +3,7 @@ import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
 import { cn } from '../../../lib/cn'
+import { EVENT_CONTENT_HINT } from '../../../lib/eventKind'
 import InputSelect from '../../InputSelect.astro'
 import InputSubmitButton from '../../InputSubmitButton.astro'
 import InputText from '../../InputText.astro'
@@ -35,9 +36,6 @@ const {
   id = 'new-event',
   class: className,
 } = Astro.props
-
-const contentHint =
-  'Markdown supported. The first paragraph is used as the summary in banners and lists, so lead with the point.'
 ---
 
 <details
@@ -91,7 +89,7 @@ const contentHint =
       name="content"
       inputProps={{ required: true, rows: 3 }}
       error={inputErrors.content}
-      description={contentHint}
+      description={EVENT_CONTENT_HINT}
     />
 
     <EventTimingFields errors={inputErrors} />

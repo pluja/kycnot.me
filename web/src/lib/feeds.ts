@@ -165,6 +165,8 @@ export async function getEventsForService(slug: string | undefined): Promise<
     where: {
       serviceId: service.id,
       visible: true,
+      deletedAt: null,
+      class: { in: ['EVENT', 'INCIDENT'] },
     },
     select: serviceEventSelect,
     orderBy: {
@@ -206,6 +208,7 @@ export async function getEvents(view: EventFeedView = 'curated'): Promise<
   const events = await prisma.event.findMany({
     where: {
       visible: true,
+      deletedAt: null,
       service: {
         serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
       },
@@ -273,6 +276,7 @@ const notificationSelect = {
       sentiment: true,
       startedAt: true,
       endedAt: true,
+      incident: { select: { state: true } },
       service: {
         select: {
           slug: true,

@@ -82,13 +82,13 @@ dump-db-no-migrations:  ## DB backup excluding _prisma_migrations (legacy)
 prune-backups:  ## Keep newest N backups (default 10). Usage: make prune-backups N=30
 	N=$${N:-$(DEFAULT_KEEP)}
 	cd backups 2>/dev/null || { echo "No backups directory."; exit 0; }
-	TOTAL=$$(ls -1 db_backup_*.dump 2>/dev/null | wc -l)
+	TOTAL=$$(ls -1 db_backup_*.dump presync_preprod_*.dump predeploy_*.dump 2>/dev/null | wc -l)
 	if [ "$$TOTAL" -le "$$N" ]; then
 		echo "Have $$TOTAL backups, keep threshold is $$N. Nothing to prune."
 		exit 0
 	fi
 	echo "Pruning to newest $$N of $$TOTAL backups..."
-	ls -t db_backup_*.dump | tail -n +$$(($$N + 1)) | xargs -r rm -v
+	ls -t db_backup_*.dump presync_preprod_*.dump predeploy_*.dump 2>/dev/null | tail -n +$$(($$N + 1)) | xargs -r rm -v
 
 # Import a database backup. Without FILE=..., uses the newest backup. Always
 # runs migrate-deploy after restore so any migrations baked into the current
@@ -117,11 +117,11 @@ import-db:  ## Restore a backup. Usage: make import-db [FILE=backups/x.dump]
 	echo "=== STEP 1: PREPARING DATABASE ==="
 	docker compose exec -T database psql -U $${POSTGRES_USER:-kycnot} -c "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = '$${POSTGRES_DATABASE:-kycnot}' AND pid <> pg_backend_pid();" postgres
 	echo "Dropping and recreating the database..."
-	docker compose exec -T database psql -U $${POSTGRES_USER:-kycnot} -c "DROP DATABASE IF EXISTS $${POSTGRES_DATABASE:-kycnot};" postgres
+	docker compose exec -T database psql -U $${POSTGRES_USER:-kycnot} -c "DROP DATABASE IF EXISTS $${POSTGRES_DATABASE:-kycnot} WITH (FORCE);" postgres
 	docker compose exec -T database psql -U $${POSTGRES_USER:-kycnot} -c "CREATE DATABASE $${POSTGRES_DATABASE:-kycnot};" postgres
 
 	echo "=== STEP 2: RESTORING DUMP ==="
-	docker compose exec -T database pg_restore -U $${POSTGRES_USER:-kycnot} -d $${POSTGRES_DATABASE:-kycnot} --no-owner < "$$BACKUP_FILE"
+	docker compose exec -T database pg_restore -U $${POSTGRES_USER:-kycnot} -d $${POSTGRES_DATABASE:-kycnot} --no-owner --exit-on-error < "$$BACKUP_FILE"
 	echo "Database data restored."
 
 	echo "=== STEP 3: APPLYING PENDING MIGRATIONS ==="
@@ -136,43 +136,52 @@ import-db:  ## Restore a backup. Usage: make import-db [FILE=backups/x.dump]
 
 PREPROD_ADMIN_TOKEN ?= admin
 
+# Inlined by the destructive recipes rather than called through $(MAKE): a
+# recursive guard is skipped by `make -i`, which would let it fall through to
+# dropping the database.
+define ASSERT_PREPROD
+IMAGES=$$(docker compose config --images) || { echo "Refusing: cannot read the compose config"; exit 1; }
+IMAGE=$$(printf '%s\n' "$$IMAGES" | grep -m1 '/kycnot/astro:') || IMAGE=""
+STACK=$$(basename "$$PWD")
+case "$$IMAGE" in
+	*:pre-*) ;;
+	*) echo "Refusing: astro image is not a preprod build ($${IMAGE:-none})"; exit 1 ;;
+esac
+case "$$STACK" in
+	pre.*) ;;
+	*) echo "Refusing: stack directory is not a preprod one ($$STACK)"; exit 1 ;;
+esac
+endef
+
 _assert-preprod:
-	IMAGE=$$(docker compose config --images | grep -m1 '/kycnot/astro:' || true)
-	case "$$IMAGE" in
-		*:pre-*) ;;
-		*) echo "Refusing: this does not look like preprod (astro image: $${IMAGE:-none})"; exit 1 ;;
-	esac
+	$(ASSERT_PREPROD)
 
 scrub-credentials:  ## Void every real login, install a dev admin token (preprod only)
-	$(MAKE) _assert-preprod
+	$(ASSERT_PREPROD)
 	echo "Scrubbing credentials..."
 	docker compose exec -T database psql -U $${POSTGRES_USER:-kycnot} -d $${POSTGRES_DATABASE:-kycnot} \
-		-v ON_ERROR_STOP=1 -v tok=$(PREPROD_ADMIN_TOKEN) <<-'SQL'
+		-v ON_ERROR_STOP=1 -v tok="$(PREPROD_ADMIN_TOKEN)" <<-'SQL'
 		UPDATE "User" SET
 			"secretTokenHash" = encode(sha512(convert_to(random()::text || '-' || id::text, 'UTF8')), 'hex'),
 			"feedId" = encode(sha256(convert_to(random()::text || '-' || id::text, 'UTF8')), 'hex');
 
 		DELETE FROM "ApiKey";
+		DELETE FROM "PushSubscription";
 
 		UPDATE "User"
 		SET "secretTokenHash" = encode(sha512(convert_to(:'tok', 'UTF8')), 'hex')
-		WHERE id = (SELECT id FROM "User" WHERE admin ORDER BY id LIMIT 1);
-
-		SELECT CASE
-			WHEN count(*) = 0 THEN 'WARNING: no admin user found, nobody can log in'
-			ELSE 'Log in as ' || max(name) || ' with token: ' || :'tok'
-		END AS result
-		FROM "User" WHERE admin;
+		WHERE id = (SELECT id FROM "User" WHERE admin ORDER BY id LIMIT 1)
+		RETURNING 'Log in as ' || name || ' with token: ' || :'tok' AS result;
 		SQL
 
 sync-prod:  ## Restore newest prod dump, then scrub credentials (preprod only)
-	$(MAKE) _assert-preprod
+	$(ASSERT_PREPROD)
 	mkdir -p backups
 	OUT="backups/presync_preprod_$$(date +%Y%m%d_%H%M%S).dump"
 	echo "Saving a rollback copy of this database to $$OUT..."
 	docker compose exec -T database pg_dump -U $${POSTGRES_USER:-kycnot} -d $${POSTGRES_DATABASE:-kycnot} -c -F c > "$$OUT"
 	docker compose exec -T database pg_restore --list < "$$OUT" >/dev/null
-	SRC=$$(ls -1t backups/db_backup_*.dump 2>/dev/null | head -1)
+	SRC=$$(ls -1t backups/db_backup_*.dump 2>/dev/null | head -1 || true)
 	if [ -z "$$SRC" ]; then
 		echo "No production dump found (backups/db_backup_*.dump). Run sync-all.sh first." >&2
 		exit 1

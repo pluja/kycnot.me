@@ -3,10 +3,16 @@ import { test } from 'node:test'
 
 import { EVENT_DISPLAY_KINDS } from '../constants/eventKinds'
 
-import { eventKindToFields, eventToDisplayKind, getEventDisplay, pickPrimaryEvent } from './eventKind'
+import {
+  eventKindToFields,
+  eventToDisplayKind,
+  getEventDisplay,
+  isEventOpen,
+  pickPrimaryEvent,
+} from './eventKind'
 
-import type { EventDisplayKind } from '../constants/eventKinds'
 import type { DisplayableEvent, EventKind } from './eventKind'
+import type { EventDisplayKind } from '../constants/eventKinds'
 import type { EventSentiment, EventType, IncidentState } from '@prisma/client'
 
 const DAY = 24 * 60 * 60 * 1000
@@ -146,4 +152,47 @@ void test('pickPrimaryEvent ranks by severity among unresolved entries', () => {
 
 void test('pickPrimaryEvent returns null for an empty list', () => {
   assert.equal(pickPrimaryEvent([]), null)
+})
+
+void test('every kind stops being open once its end date passes', () => {
+  // Regression: grouping once derived "ongoing" from isResolved, which is
+  // permanently false for the kinds that never resolve, so listing edits and
+  // announcements stayed under "Ongoing" forever.
+  const ended = { endedAt: later }
+  for (const kind of EVENT_DISPLAY_KINDS) {
+    assert.equal(isEventOpen(event({ ...sampleByKind[kind], ...ended }), now), false, kind)
+  }
+})
+
+void test('an entry with no end date, or one still ahead, is open', () => {
+  assert.equal(isEventOpen(event({ class: 'CHANGE', endedAt: null }), now), true)
+  assert.equal(isEventOpen(event({ sentiment: 'NEGATIVE', endedAt: null }), now), true)
+  assert.equal(
+    isEventOpen(event({ sentiment: 'NEGATIVE', endedAt: new Date(now.getTime() + DAY) }), now),
+    true
+  )
+})
+
+void test('incident state decides openness regardless of the end date', () => {
+  const resolvedNoEnd = event({
+    class: 'INCIDENT',
+    sentiment: 'NEGATIVE',
+    endedAt: null,
+    incident: { state: 'RESOLVED' },
+  })
+  assert.equal(isEventOpen(resolvedNoEnd, now), false)
+
+  const ongoingPastEnd = event({
+    class: 'INCIDENT',
+    sentiment: 'NEGATIVE',
+    endedAt: later,
+    incident: { state: 'ONGOING' },
+  })
+  assert.equal(isEventOpen(ongoingPastEnd, now), true)
+})
+
+void test('legacy solved entries are closed even without a later end date', () => {
+  for (const type of ['WARNING_SOLVED', 'ALERT_SOLVED'] satisfies EventType[]) {
+    assert.equal(isEventOpen(event({ sentiment: 'NEGATIVE', endedAt: start, type }), now), false, type)
+  }
 })
