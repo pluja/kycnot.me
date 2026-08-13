@@ -1,5 +1,6 @@
 import { ImageResponse } from '@vercel/og'
-import sharp from 'sharp'
+
+import { readLocalImageAsDataUri } from '../lib/localImageDataUri'
 
 import type { APIContext } from 'astro'
 
@@ -9,13 +10,11 @@ type OgImageTemplate<TProps> = (
 ) => ImageResponse | Promise<ImageResponse | null> | null
 
 type BlogOgImageTemplateOptions = {
-  absoluteUrl: (url: string) => string
   defaultBackgroundSrc: string
   defaultOptions: ConstructorParameters<typeof ImageResponse>[1]
 }
 
 export function makeBlogOgImageTemplate({
-  absoluteUrl,
   defaultBackgroundSrc,
   defaultOptions,
 }: BlogOgImageTemplateOptions) {
@@ -40,32 +39,15 @@ export function makeBlogOgImageTemplate({
   ) => {
     const padding = 80
 
-    let resolvedCoverSrc: string | null = null
-    if (coverImage) {
-      try {
-        const coverUrl = absoluteUrl(coverImage)
-        const ext = coverImage.split('.').pop()?.toLowerCase()
-        if (ext === 'webp' || ext === 'avif') {
-          const res = await fetch(coverUrl)
-          if (res.ok) {
-            const buf = await res.arrayBuffer()
-            const pngBuf = await sharp(buf)
-              .png()
-              .resize(1200, 630, { fit: 'cover', position: 'center' })
-              .toBuffer()
-            resolvedCoverSrc = `data:image/png;base64,${pngBuf.toString('base64')}`
-          }
-        } else {
-          resolvedCoverSrc = coverUrl
-        }
-      } catch {
-        // OG image will fall back to the default background.
-      }
-    }
+    // Null when the cover is missing or unreadable; the OG image then falls
+    // back to the default background rather than failing the whole render.
+    const resolvedCoverSrc = coverImage
+      ? await readLocalImageAsDataUri(coverImage, {
+          convert: { width: 1200, height: 630, fit: 'cover' },
+        })
+      : null
 
-    const backgroundImage = resolvedCoverSrc
-      ? `url(${resolvedCoverSrc})`
-      : `url(${absoluteUrl(defaultBackgroundSrc)})`
+    const backgroundImage = resolvedCoverSrc ? `url(${resolvedCoverSrc})` : `url(${defaultBackgroundSrc})`
     const formattedDate = publishedAt
       ? new Date(publishedAt).toLocaleDateString('en-US', {
           year: 'numeric',

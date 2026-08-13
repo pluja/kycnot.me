@@ -19,7 +19,6 @@ type OgImageTemplate<TProps> = (
 
 type ExtraOgImageTemplateOptions = {
   defaultOptions: ConstructorParameters<typeof ImageResponse>[1]
-  absoluteUrl: (url: string) => string
   defaultBackgroundSrc: string
 }
 
@@ -161,12 +160,10 @@ async function getLogoSmallPng(height = 60): Promise<string> {
 
 export function makeExtraOgImageTemplates({
   defaultOptions,
-  absoluteUrl,
   defaultBackgroundSrc,
 }: ExtraOgImageTemplateOptions) {
   const blogOgImageTemplates = makeBlogOgImageTemplate({
     defaultOptions,
-    absoluteUrl,
     defaultBackgroundSrc,
   })
 
@@ -227,7 +224,16 @@ export function makeExtraOgImageTemplates({
             <img src={textLogoPng} height={36} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, overflow: 'hidden', marginRight: 12 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flex: 1,
+                overflow: 'hidden',
+                marginRight: 12,
+              }}
+            >
               {verificationStatus === 'VERIFICATION_SUCCESS' && <BadgeVerifiedIcon size={26} />}
               {verificationStatus === 'APPROVED' && (
                 <BadgeCheckIcon color={theme === 'light' ? '#1f2937' : '#ffffff'} size={20} />

@@ -1,10 +1,9 @@
 import fs from 'node:fs/promises'
-import path from 'node:path'
 
-import { UPLOAD_DIR } from 'astro:env/server'
 import { lookup } from 'mime-types'
 
 import { isPublicUploadSubpath } from '../../lib/uploadAccess'
+import { resolveUploadPath } from '../../lib/uploadPaths'
 
 import type { APIRoute } from 'astro'
 
@@ -29,11 +28,8 @@ export const GET: APIRoute = async ({ params }) => {
     return new Response('File not found', { status: 404 })
   }
 
-  const uploadPath = path.isAbsolute(UPLOAD_DIR) ? UPLOAD_DIR : path.join(process.cwd(), UPLOAD_DIR)
-  const fullPath = path.normalize(path.join(uploadPath, filePath))
-
-  // Prevent path traversal — resolved path must stay within the upload directory
-  if (!fullPath.startsWith(uploadPath + path.sep) && fullPath !== uploadPath) {
+  const fullPath = resolveUploadPath(filePath)
+  if (!fullPath) {
     return new Response('File not found', { status: 404 })
   }
 

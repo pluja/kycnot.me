@@ -4,10 +4,11 @@ import path from 'node:path'
 import { ImageResponse } from '@vercel/og'
 import sharp from 'sharp'
 
-import defaultOGImageBg from '../assets/ogimage-bg.png'
-import defaultOGImage from '../assets/ogimage.png'
+import defaultOGImageBg from '../assets/ogimage-bg.png?inline'
+import defaultOGImage from '../assets/ogimage.png?inline'
+import { readLocalImageAsDataUri } from '../lib/localImageDataUri'
 import { makeOverallScoreInfo } from '../lib/overallScore'
-import { siteOrigin, urlWithParams } from '../lib/urls'
+import { urlWithParams } from '../lib/urls'
 
 import { makeExtraOgImageTemplates } from './OgImageExtraTemplates'
 
@@ -90,15 +91,14 @@ const defaultOptions = {
 
 const extraOgImageTemplates = makeExtraOgImageTemplates({
   defaultOptions,
-  absoluteUrl,
-  defaultBackgroundSrc: defaultOGImageBg.src,
+  defaultBackgroundSrc: defaultOGImageBg,
 })
 
 export const ogImageTemplates = {
   default: (_props: Record<never, never> = {}, _context) => {
     return new ImageResponse(
       <img
-        src={absoluteUrl(defaultOGImage.src)}
+        src={defaultOGImage}
         style={{
           width: '100%',
           height: '100%',
@@ -142,35 +142,17 @@ export const ogImageTemplates = {
 
     const PADING = 80
 
-    // satori only supports PNG/JPEG/SVG, so convert webp/avif via sharp
-    let resolvedImageSrc: string | null = null
-    if (imageUrl) {
-      try {
-        const imgUrl = absoluteUrl(imageUrl)
-        const ext = imageUrl.split('.').pop()?.toLowerCase()
-        if (ext === 'webp' || ext === 'avif') {
-          const res = await fetch(imgUrl)
-          if (res.ok) {
-            const buf = await res.arrayBuffer()
-            const pngBuf = await sharp(buf)
-              .png()
-              .resize(140, 140, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-              .toBuffer()
-            resolvedImageSrc = `data:image/png;base64,${pngBuf.toString('base64')}`
-          }
-        } else {
-          resolvedImageSrc = imgUrl
-        }
-      } catch {
-        // OG image will render without the service icon
-      }
-    }
+    // Null when the upload is missing or unreadable; the OG image then renders
+    // without the service icon rather than failing the whole render.
+    const resolvedImageSrc = imageUrl
+      ? await readLocalImageAsDataUri(imageUrl, { convert: { width: 140, height: 140, fit: 'contain' } })
+      : null
 
     return new ImageResponse(
       <div
         style={{
           color: 'white',
-          backgroundImage: `url(${absoluteUrl(defaultOGImageBg.src)})`,
+          backgroundImage: `url(${defaultOGImageBg})`,
           width: '100%',
           height: '100%',
           padding: PADING,
@@ -357,7 +339,7 @@ export const ogImageTemplates = {
       <div
         style={{
           color: 'white',
-          backgroundImage: `url(${absoluteUrl(defaultOGImageBg.src)})`,
+          backgroundImage: `url(${defaultOGImageBg})`,
           width: '100%',
           height: '100%',
           padding: PADING,
@@ -453,10 +435,6 @@ export function makeOgImageUrl(
 }
 
 // Utilities ------------------------------------------------------------
-
-function absoluteUrl(url: string) {
-  return new URL(url, siteOrigin).href
-}
 
 async function svgUrlToBase64Png(svgUrl: string, width?: number, height?: number): Promise<string> {
   // 1. Fetch the SVG file

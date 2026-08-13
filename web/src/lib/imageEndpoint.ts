@@ -6,21 +6,18 @@
 // https://docs.astro.build/en/reference/image-service-reference/#custom-image-api-endpoint
 
 import fs from 'node:fs/promises'
-import path from 'node:path'
 
 import { GET as nodeImageEndpoint } from 'astro/assets/endpoint/node'
 import { getConfiguredImageService, imageConfig } from 'astro:assets'
-import { UPLOAD_DIR } from 'astro:env/server'
 import * as mime from 'mrmime'
 
 import { validateImageParams } from './imageRequestValidation'
 import { LruByteCache } from './lruByteCache'
 import { Semaphore } from './semaphore'
 import { isPublicUploadSubpath } from './uploadAccess'
+import { extractFilesSubpath, resolveUploadPath } from './uploadPaths'
 
 import type { APIContext, APIRoute } from 'astro'
-
-const FILES_PREFIX = '/files/'
 
 // Transforms are CPU-heavy (sharp/libvips) and allocate native memory, so
 // bursts must queue behind a small concurrency cap and shed beyond a
@@ -126,9 +123,7 @@ export const GET: APIRoute = async (context) => {
     }
 
     const inputBuffer = await fs.readFile(uploadPath)
-    const pending = transformSemaphore.run(() =>
-      imageService.transform(inputBuffer, transform, imageConfig)
-    )
+    const pending = transformSemaphore.run(() => imageService.transform(inputBuffer, transform, imageConfig))
     if (!pending) {
       return busyResponse()
     }
@@ -169,32 +164,4 @@ function imageResponse(data: Uint8Array<ArrayBuffer>, format: string): Response 
       'Cache-Control': 'public, max-age=31536000, immutable',
     },
   })
-}
-
-function extractFilesSubpath(src: string): string | null {
-  if (src.startsWith(FILES_PREFIX)) {
-    return src.slice(FILES_PREFIX.length)
-  }
-  try {
-    const parsed = new URL(src)
-    if (parsed.pathname.startsWith(FILES_PREFIX)) {
-      return parsed.pathname.slice(FILES_PREFIX.length)
-    }
-  } catch {
-    // not a parseable URL, ignore
-  }
-  return null
-}
-
-function resolveUploadPath(subpath: string): string | undefined {
-  const uploadPath = path.isAbsolute(UPLOAD_DIR)
-    ? UPLOAD_DIR
-    : path.join(process.cwd(), UPLOAD_DIR)
-  const fullPath = path.normalize(path.join(uploadPath, subpath))
-
-  // path-traversal guard: resolved path must stay inside upload root
-  if (!fullPath.startsWith(uploadPath + path.sep) && fullPath !== uploadPath) {
-    return undefined
-  }
-  return fullPath
 }
