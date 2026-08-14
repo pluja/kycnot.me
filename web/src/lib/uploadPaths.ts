@@ -2,6 +2,8 @@ import path from 'node:path'
 
 import { UPLOAD_DIR } from 'astro:env/server'
 
+import { confineToRoot } from './confinePath'
+
 const FILES_PREFIX = '/files/'
 
 // extractFilesSubpath pulls the upload subpath out of either a bare `/files/x`
@@ -23,12 +25,6 @@ export function extractFilesSubpath(src: string): string | null {
 }
 
 export function resolveUploadPath(subpath: string): string | undefined {
-  const uploadPath = path.isAbsolute(UPLOAD_DIR) ? UPLOAD_DIR : path.join(process.cwd(), UPLOAD_DIR)
-  const fullPath = path.normalize(path.join(uploadPath, subpath))
-
-  // path-traversal guard: resolved path must stay inside upload root
-  if (!fullPath.startsWith(uploadPath + path.sep) && fullPath !== uploadPath) {
-    return undefined
-  }
-  return fullPath
+  const uploadRoot = path.isAbsolute(UPLOAD_DIR) ? UPLOAD_DIR : path.join(process.cwd(), UPLOAD_DIR)
+  return confineToRoot(uploadRoot, subpath) ?? undefined
 }

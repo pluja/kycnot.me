@@ -1,18 +1,17 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-import { lookup } from 'mime-types'
 import sharp from 'sharp'
 
+import { confineToRoot } from './confinePath'
 import { isPublicUploadSubpath } from './uploadAccess'
 import { extractFilesSubpath, resolveUploadPath } from './uploadPaths'
-import { siteOrigin } from './urls'
-
-// SATORI_MIME_TYPES are the formats satori decodes natively; anything else has
-// to be re-encoded before it can be embedded.
-const SATORI_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/svg+xml'])
 
 const BUILD_ASSET_PREFIX = '/_astro/'
+
+// DEV_FS_PREFIX is how the Vite dev server addresses a source file that has no
+// build output yet. It never appears in a production build.
+const DEV_FS_PREFIX = '/@fs'
 
 type ConvertOptions = {
   width: number
@@ -21,31 +20,28 @@ type ConvertOptions = {
 }
 
 type ReadOptions = {
-  // convert bounds images that have to be re-encoded for satori. Formats
-  // satori reads natively are returned untouched.
   convert?: ConvertOptions
 }
 
-// readLocalImageAsDataUri resolves a same-origin image to a data URI by reading
-// it off local disk, covering both `/files/*` uploads and `/_astro/*` build
-// output. Rendering happens inside the server, so resolving these over the
-// public URL would route the request back through the front end, which is not
-// guaranteed to serve the app's own asset fetches.
+// readLocalImageAsDataUri resolves a same-origin image to a PNG data URI by
+// reading it off local disk, covering both `/files/*` uploads and `/_astro/*`
+// build output. Rendering happens inside the server, so resolving these over
+// the public URL would route the request back through the front end, which is
+// not guaranteed to serve the app's own asset fetches. Returns null when the image is missing, private or unreadable, leaving
+// the caller to render without it.
 export async function readLocalImageAsDataUri(
   src: string,
   { convert }: ReadOptions = {}
 ): Promise<string | null> {
-  const buffer = await readLocalBytes(src)
-  if (!buffer) {
-    return null
-  }
-
   try {
-    const contentType = lookup(stripQuery(src)) || ''
-    if (SATORI_MIME_TYPES.has(contentType) && !convert) {
-      return `data:${contentType};base64,${buffer.toString('base64')}`
+    const buffer = await readLocalBytes(src)
+    if (!buffer) {
+      return null
     }
 
+    // Always re-encoded rather than trusted by extension: upload filenames come
+    // from the client, so the extension does not prove the format. sharp sniffs
+    // the real one and satori only ever sees PNG.
     let image = sharp(buffer).png()
     if (convert) {
       image = image.resize(convert.width, convert.height, {
@@ -54,14 +50,18 @@ export async function readLocalImageAsDataUri(
         background: { r: 0, g: 0, b: 0, alpha: 0 },
       })
     }
-    const converted = await image.toBuffer()
-    return `data:image/png;base64,${converted.toString('base64')}`
+    const png = await image.toBuffer()
+    return `data:image/png;base64,${png.toString('base64')}`
   } catch {
     return null
   }
 }
 
 async function readLocalBytes(src: string): Promise<Buffer | null> {
+  if (typeof src !== 'string' || src.length === 0) {
+    return null
+  }
+
   const uploadSubpath = extractFilesSubpath(src)
   if (uploadSubpath !== null) {
     if (!isPublicUploadSubpath(uploadSubpath)) {
@@ -72,27 +72,31 @@ async function readLocalBytes(src: string): Promise<Buffer | null> {
   }
 
   const pathname = toPathname(src)
-
-  // Under `astro dev` there is no build output to read; the Vite dev server
-  // holds the asset and no proxy sits in front of it, so fetching is safe.
-  if (import.meta.env.DEV) {
-    return await fetchOrNull(new URL(src, siteOrigin).href)
-  }
-
-  if (!pathname?.startsWith(BUILD_ASSET_PREFIX)) {
+  if (!pathname) {
     return null
   }
+
+  if (import.meta.env.DEV && pathname.startsWith(DEV_FS_PREFIX + '/')) {
+    // Confined to the project root: `src` reaches here straight from the
+    // `?data=` query param, so an unconfined read would be arbitrary.
+    const fullPath = confineToRoot(process.cwd(), pathname.slice(DEV_FS_PREFIX.length))
+    return fullPath ? await readFileOrNull(fullPath) : null
+  }
+
+  if (!pathname.startsWith(BUILD_ASSET_PREFIX)) {
+    console.warn(`[ogImage] Not a local image, rendering without it: ${pathname.slice(0, 100)}`)
+    return null
+  }
+
   const clientRoot = path.join(process.cwd(), 'dist', 'client')
-  const fullPath = path.normalize(path.join(clientRoot, pathname))
-  if (!fullPath.startsWith(clientRoot + path.sep)) {
-    return null
-  }
-  return await readFileOrNull(fullPath)
+  const fullPath = confineToRoot(clientRoot, pathname.slice(1))
+  return fullPath ? await readFileOrNull(fullPath) : null
 }
 
 function toPathname(src: string): string | null {
   if (src.startsWith('/')) {
-    return stripQuery(src)
+    const queryStart = src.indexOf('?')
+    return queryStart === -1 ? src : src.slice(0, queryStart)
   }
   try {
     return new URL(src).pathname
@@ -101,26 +105,9 @@ function toPathname(src: string): string | null {
   }
 }
 
-function stripQuery(src: string): string {
-  const queryStart = src.indexOf('?')
-  return queryStart === -1 ? src : src.slice(0, queryStart)
-}
-
 async function readFileOrNull(fullPath: string): Promise<Buffer | null> {
   try {
     return await fs.readFile(fullPath)
-  } catch {
-    return null
-  }
-}
-
-async function fetchOrNull(url: string): Promise<Buffer | null> {
-  try {
-    const response = await fetch(url)
-    if (!response.ok) {
-      return null
-    }
-    return Buffer.from(await response.arrayBuffer())
   } catch {
     return null
   }
