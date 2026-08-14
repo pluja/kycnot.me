@@ -24,7 +24,7 @@ export function extractFilesSubpath(src: string): string | null {
   return null
 }
 
-export function resolveUploadPath(subpath: string): string | undefined {
+export function resolveUploadPath(subpath: string): string | null {
   const uploadRoot = path.isAbsolute(UPLOAD_DIR) ? UPLOAD_DIR : path.join(process.cwd(), UPLOAD_DIR)
-  return confineToRoot(uploadRoot, subpath) ?? undefined
+  return confineToRoot(uploadRoot, subpath)
 }

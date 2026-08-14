@@ -1,25 +1,53 @@
-import { ogImageTemplates, type OgImageAllTemplatesWithProps } from '../components/OgImage'
+import { createHash } from 'node:crypto'
+
+import {
+  ogImageTemplates,
+  renderOgImageTemplate,
+  type OgImageAllTemplatesWithProps,
+} from '../components/OgImage'
 import { LruByteCache } from '../lib/lruByteCache'
+import { memoizeAsync } from '../lib/memoizeAsync'
+import { trackMissingAssets } from '../lib/missingAssets'
+import {
+  ogImagePropsSchemas,
+  summarizeIssues,
+  type OgImageProps,
+  type OgImageTemplateName,
+} from '../lib/ogImageProps'
 import { Semaphore } from '../lib/semaphore'
 
+import type { ImageResponse } from '@vercel/og'
 import type { APIContext, APIRoute } from 'astro'
 import type { Misc } from 'ts-toolbelt'
 
-// Preserves what @vercel/og set on the streamed response. The URL is
-// content-addressed: every field that changes the picture is inside `?data=`,
-// and upload filenames are content hashes, so a service turning into a scam
-// produces a different URL rather than a stale hit.
-const SUCCESS_CACHE_CONTROL = 'public, immutable, no-transform, max-age=31536000'
+// IMMUTABLE_CACHE_CONTROL preserves what @vercel/og set on the streamed
+// response. The URL is content-addressed: every field that changes the picture
+// is inside `?data=`, and local image names are content hashes, so a service
+// turning into a scam produces a different URL rather than a stale hit.
+const IMMUTABLE_CACHE_CONTROL = 'public, immutable, no-transform, max-age=31536000'
 
-// satori + resvg are CPU-heavy and `?data=` is attacker-controlled, so renders
-// queue behind a small cap and shed beyond a bounded backlog rather than
-// saturating the box.
+// DEGRADED_CACHE_CONTROL covers a card that rendered without an asset it wanted.
+// The immutable TTL would freeze it in every social and browser cache for a
+// year, so a service whose upload was unreadable for one minute would keep its
+// logo-less card for good. Short rather than no-store so a permanently missing
+// asset still costs one render per window instead of one per request.
+const DEGRADED_CACHE_CONTROL = 'public, no-transform, max-age=300'
+
+// renderSemaphore bounds concurrent renders because satori and resvg are
+// CPU-heavy and `?data=` is unauthenticated, so work sheds beyond a bounded
+// backlog rather than saturating the box.
 const renderSemaphore = new Semaphore(2, 50)
 
-// Every social platform keeps its own unfurl cache, so the same card is
-// rendered once per platform and again after each deploy. Keyed on the raw
-// `data` param, which fully determines the image.
-const renderCache = new LruByteCache<Uint8Array<ArrayBuffer>>(32 * 1024 * 1024, 1024 * 1024)
+// renderCache exists because every social platform keeps its own unfurl cache,
+// so the same card is otherwise rendered once per platform and again after each
+// deploy.
+const renderCache = new LruByteCache<Uint8Array<ArrayBuffer>>(32 * 1024 * 1024, 2 * 1024 * 1024)
+
+// renderDefaultCard is memoized because the fallback runs after the semaphore
+// has released its slot, so without it every request carrying props that make a
+// template throw would buy an uncapped render. The card takes no props and no
+// request state, which is why one render can answer them all.
+const renderDefaultCard = memoizeAsync(() => toPngBytes(ogImageTemplates.default()))
 
 function toJSON<T extends Misc.JSON.Value>(data: string | null | undefined): T | undefined {
   if (!data) return undefined
@@ -30,38 +58,80 @@ function toJSON<T extends Misc.JSON.Value>(data: string | null | undefined): T |
   }
 }
 
+// cacheKey hashes the query param so an attacker cannot pad the key itself,
+// which the cache's byte budget does not account for.
+function cacheKey(rawData: string): string {
+  return createHash('sha1').update(rawData).digest('base64url')
+}
+
+function isPng(bytes: Uint8Array): boolean {
+  return (
+    bytes.byteLength > 0 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
+  )
+}
+
 export const GET: APIRoute = async (context) => {
   const rawData = context.url.searchParams.get('data') ?? ''
-  const { template, ...props } = toJSON<OgImageAllTemplatesWithProps>(rawData) ?? { template: 'default' }
 
-  const cached = renderCache.get(rawData)
+  const key = cacheKey(rawData)
+  const cached = renderCache.get(key)
   if (cached) {
-    return imageResponse(cached)
+    return imageResponse(cached, IMMUTABLE_CACHE_CONTROL)
   }
 
-  const templateName = template in ogImageTemplates ? template : 'default'
-  const templateProps = templateName === template ? props : {}
+  const { template, ...props } = toJSON<OgImageAllTemplatesWithProps>(rawData) ?? { template: 'default' }
+  // hasOwn, not `in`: `in` also matches Object.prototype keys, so a template of
+  // "constructor" would dispatch to it. An unrecognised template is not an
+  // error: makeOgImageUrl serialises `{}` for any page that sets no card.
+  const isKnownTemplate = typeof template === 'string' && Object.hasOwn(ogImagePropsSchemas, template)
+  const templateName: OgImageTemplateName = isKnownTemplate ? template : 'default'
+
+  const parsedProps = ogImagePropsSchemas[templateName].safeParse(isKnownTemplate ? props : {})
+  if (!parsedProps.success) {
+    // Rejected before a render slot is taken. Our own pages cannot land here:
+    // they build `?data=` from the same schemas, checked at compile time.
+    console.warn(`[ogimage] Rejected props for "${templateName}":`, summarizeIssues(parsedProps.error))
+    return new Response('Invalid image parameters', {
+      status: 400,
+      headers: { 'Cache-Control': 'no-store' },
+    })
+  }
+
+  const pending = renderSemaphore.run(() =>
+    trackMissingAssets(() => renderToBytes(templateName, parsedProps.data, context))
+  )
+  if (!pending) {
+    return new Response('Image service busy', {
+      status: 429,
+      headers: { 'Retry-After': '5', 'Cache-Control': 'no-store' },
+    })
+  }
 
   try {
-    const pending = renderSemaphore.run(() => renderToBytes(templateName, templateProps, context))
-    if (!pending) {
-      return new Response('Image service busy', {
-        status: 429,
-        headers: { 'Retry-After': '5', 'Cache-Control': 'no-store' },
-      })
+    const { result: bytes, missingAssets } = await pending
+    if (missingAssets) {
+      console.warn(`[ogimage] Rendered "${templateName}" without every asset, holding it out of the cache`)
+      return imageResponse(bytes, DEGRADED_CACHE_CONTROL)
     }
-
-    const bytes = await pending
-    renderCache.set(rawData, bytes, bytes.byteLength)
-    return imageResponse(bytes)
+    renderCache.set(key, bytes, bytes.byteLength)
+    return imageResponse(bytes, IMMUTABLE_CACHE_CONTROL)
   } catch (error) {
-    // Buffering the render is what makes this reachable: the stream @vercel/og
-    // returns sends its headers before satori runs, so a failure used to escape
-    // as a 200 image/png with a truncated body.
+    // Props come from an unauthenticated query param, so a render that throws is
+    // usually bad input rather than a server fault: answer with the default card
+    // so unfurls still get a picture, and never cache the degraded result.
     console.error(
       `[ogimage] Failed to render template "${templateName}":`,
       error instanceof Error ? error.message : error
     )
+    return await fallbackResponse()
+  }
+}
+
+async function fallbackResponse(): Promise<Response> {
+  try {
+    return imageResponse(await renderDefaultCard(), 'no-store')
+  } catch (error) {
+    console.error('[ogimage] Default template failed:', error instanceof Error ? error.message : error)
     return new Response('Could not render image', {
       status: 500,
       headers: { 'Cache-Control': 'no-store' },
@@ -70,26 +140,37 @@ export const GET: APIRoute = async (context) => {
 }
 
 async function renderToBytes(
-  templateName: keyof typeof ogImageTemplates,
-  props: Record<string, unknown>,
+  templateName: OgImageTemplateName,
+  props: OgImageProps<OgImageTemplateName>,
   context: APIContext
 ): Promise<Uint8Array<ArrayBuffer>> {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-  const response = await ogImageTemplates[templateName](props as any, context)
-  if (!response) {
-    throw new Error('template returned no response')
-  }
-  // Draining the stream here is what surfaces a satori failure as a throw.
-  return new Uint8Array(await response.arrayBuffer())
+  return await toPngBytes(renderOgImageTemplate(templateName, props, context))
 }
 
-function imageResponse(bytes: Uint8Array<ArrayBuffer>): Response {
+// toPngBytes drains a render into memory. @vercel/og returns a stream that has
+// already sent its headers by the time satori runs, so buffering here is what
+// turns a satori failure into a throw rather than a 200 with a truncated body.
+async function toPngBytes(
+  rendered: ImageResponse | Promise<ImageResponse | null> | null
+): Promise<Uint8Array<ArrayBuffer>> {
+  const response = await rendered
+  if (!response?.ok) {
+    throw new Error('template returned no usable response')
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  if (!isPng(bytes)) {
+    throw new Error('template produced a non-PNG body')
+  }
+  return bytes
+}
+
+function imageResponse(bytes: Uint8Array<ArrayBuffer>, cacheControl: string): Response {
   return new Response(bytes, {
     status: 200,
     headers: {
       'Content-Type': 'image/png',
       'Content-Length': String(bytes.byteLength),
-      'Cache-Control': SUCCESS_CACHE_CONTROL,
+      'Cache-Control': cacheControl,
     },
   })
 }

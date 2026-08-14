@@ -7,14 +7,20 @@ import sharp from 'sharp'
 import defaultOGImageBg from '../assets/ogimage-bg.png?inline'
 import defaultOGImage from '../assets/ogimage.png?inline'
 import { readLocalImageAsDataUri } from '../lib/localImageDataUri'
+import { reportMissingAsset } from '../lib/missingAssets'
+import {
+  type OgImageAllTemplatesWithProps,
+  type OgImageProps,
+  type OgImageTemplateName,
+} from '../lib/ogImageProps'
 import { makeOverallScoreInfo } from '../lib/overallScore'
 import { urlWithParams } from '../lib/urls'
 
 import { makeExtraOgImageTemplates } from './OgImageExtraTemplates'
 
-import type { VerificationStatus } from '@prisma/client'
 import type { APIContext } from 'astro'
-import type { Prettify } from 'ts-essentials'
+
+export type { OgImageAllTemplatesWithProps }
 
 //////////////////////////////////////////////////////
 //                    NOTE                          //
@@ -94,8 +100,17 @@ const extraOgImageTemplates = makeExtraOgImageTemplates({
   defaultBackgroundSrc: defaultOGImageBg,
 })
 
+type OgImageRender = ImageResponse | Promise<ImageResponse | null> | null
+
+// OgImageTemplateRegistry pins every template to the output of the schema
+// registered under the same name, so a template cannot drift from the shape its
+// props are parsed into, and neither can gain an entry without the other.
+type OgImageTemplateRegistry = {
+  [K in OgImageTemplateName]: (props: OgImageProps<K>, context: APIContext) => OgImageRender
+}
+
 export const ogImageTemplates = {
-  default: (_props: Record<never, never> = {}, _context) => {
+  default: (_props?: OgImageProps<'default'>, _context?: APIContext) => {
     return new ImageResponse(
       <img
         src={defaultOGImage}
@@ -108,24 +123,7 @@ export const ogImageTemplates = {
     )
   },
   service: async (
-    {
-      title,
-      description,
-      categories,
-      score,
-      imageUrl,
-      verificationStatus,
-    }: {
-      title: string
-      description: string
-      categories: {
-        name: string
-        icon: string
-      }[]
-      score: number
-      imageUrl: string | null
-      verificationStatus: VerificationStatus | null
-    },
+    { title, description, categories, score, imageUrl, verificationStatus }: OgImageProps<'service'>,
     _context
   ) => {
     const scoreInfo = makeOverallScoreInfo(score, 10)
@@ -142,10 +140,8 @@ export const ogImageTemplates = {
 
     const PADING = 80
 
-    // Null when the upload is missing or unreadable; the OG image then renders
-    // without the service icon rather than failing the whole render.
     const resolvedImageSrc = imageUrl
-      ? await readLocalImageAsDataUri(imageUrl, { convert: { width: 140, height: 140, fit: 'contain' } })
+      ? await readLocalImageAsDataUri(imageUrl, { resize: { width: 140, height: 140, fit: 'contain' } })
       : null
 
     return new ImageResponse(
@@ -244,17 +240,17 @@ export const ogImageTemplates = {
               }}
             >
               {await Promise.all(
-                categories.map(async (category) => (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap' }}>
-                    <img
-                      src={await iconUrl(category.icon, 50)}
-                      width={50}
-                      height={50}
-                      style={{ width: 50, height: 50 }}
-                    />
-                    {category.name}
-                  </span>
-                ))
+                categories.map(async (category) => {
+                  const resolvedIconSrc = await iconUrl(category.icon, 50)
+                  return (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap' }}>
+                      {!!resolvedIconSrc && (
+                        <img src={resolvedIconSrc} width={50} height={50} style={{ width: 50, height: 50 }} />
+                      )}
+                      {category.name}
+                    </span>
+                  )
+                })
               )}
             </div>
           </div>
@@ -321,19 +317,10 @@ export const ogImageTemplates = {
       defaultOptions
     )
   },
-  generic: async (
-    {
-      title,
-      description,
-      icon,
-    }: {
-      title: string
-      description?: string | null
-      icon?: string | null
-    },
-    _context
-  ) => {
+  generic: async ({ title, description, icon }: OgImageProps<'generic'>, _context) => {
     const PADING = 80
+
+    const resolvedIconSrc = icon ? await iconUrl(icon, 200) : null
 
     return new ImageResponse(
       <div
@@ -390,9 +377,9 @@ export const ogImageTemplates = {
           {description}
         </span>
 
-        {!!icon && (
+        {!!resolvedIconSrc && (
           <img
-            src={await iconUrl(icon, 200)}
+            src={resolvedIconSrc}
             width={200}
             height={200}
             style={{
@@ -407,21 +394,23 @@ export const ogImageTemplates = {
     )
   },
   ...extraOgImageTemplates,
-} as const satisfies Record<
-  string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (props: any, context: APIContext) => ImageResponse | Promise<ImageResponse | null> | null
->
+} as const satisfies OgImageTemplateRegistry
 
-type OgImageTemplate = keyof typeof ogImageTemplates
-type OgImageProps<T extends OgImageTemplate> = Parameters<(typeof ogImageTemplates)[T]>[0]
-
-export type OgImageAllTemplatesWithProps = Prettify<
-  {
-    // eslint-disable-next-line @typescript-eslint/sort-type-constituents
-    [K in OgImageTemplate]: { template: K } & Omit<OgImageProps<K>, 'template'>
-  }[OgImageTemplate]
->
+// renderOgImageTemplate dispatches on a name whose props the caller has already
+// parsed. Indexing the registry with a runtime union yields a union of functions
+// taking different props, which TypeScript cannot narrow from the name alone;
+// the registry's `satisfies` above is what makes the cast sound.
+export function renderOgImageTemplate(
+  templateName: OgImageTemplateName,
+  props: OgImageProps<OgImageTemplateName>,
+  context: APIContext
+): OgImageRender {
+  const render = ogImageTemplates[templateName] as (
+    props: OgImageProps<OgImageTemplateName>,
+    context: APIContext
+  ) => OgImageRender
+  return render(props, context)
+}
 
 export function makeOgImageUrl(
   ogImage: OgImageAllTemplatesWithProps | string | undefined,
@@ -436,9 +425,13 @@ export function makeOgImageUrl(
 
 // Utilities ------------------------------------------------------------
 
+const ICON_FETCH_TIMEOUT_MS = 3000
+
 async function svgUrlToBase64Png(svgUrl: string, width?: number, height?: number): Promise<string> {
-  // 1. Fetch the SVG file
-  const response = await fetch(svgUrl)
+  // Renders hold a concurrency slot for their whole duration, so an unbounded
+  // fetch here would let a slow third party stall every queued render. undici
+  // would otherwise wait out its 300s default.
+  const response = await fetch(svgUrl, { signal: AbortSignal.timeout(ICON_FETCH_TIMEOUT_MS) })
   if (!response.ok) {
     throw new Error(`Failed to fetch SVG: ${response.statusText}`)
   }
@@ -461,10 +454,22 @@ async function svgUrlToBase64Png(svgUrl: string, width?: number, height?: number
   return `data:image/png;base64,${base64}`
 }
 
-async function iconUrl(icon: string, size = 30) {
+// iconUrl resolves a `prefix:name` icon to a PNG data URI, or null when it
+// cannot be fetched. Null rather than undefined so that a caller who forgets to
+// check fails to compile: satori rejects a falsy `src` with "Image source is not
+// provided." and takes the whole card down with it.
+async function iconUrl(icon: string, size = 30): Promise<string | null> {
   const [, prefix, name] = /^([^:]+):(.*)$/.exec(icon) ?? []
-  if (!prefix || !name) return undefined
+  if (!prefix || !name) return null
   const url = `https://api.iconify.design/${prefix}/${name}.svg`
-  const result = await svgUrlToBase64Png(url, size, size)
-  return result
+  try {
+    return await svgUrlToBase64Png(url, size, size)
+  } catch (error) {
+    // A third party being slow, rate-limiting or down must cost the icon, not
+    // the whole card. Reported so the iconless card is not cached as if it were
+    // the finished picture, unlike the malformed name rejected above.
+    reportMissingAsset()
+    console.warn(`[ogimage] Could not load icon "${icon}":`, error instanceof Error ? error.message : error)
+    return null
+  }
 }

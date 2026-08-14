@@ -2,6 +2,7 @@ import { ImageResponse } from '@vercel/og'
 
 import { readLocalImageAsDataUri } from '../lib/localImageDataUri'
 
+import type { OgImageProps } from '../lib/ogImageProps'
 import type { APIContext } from 'astro'
 
 type OgImageTemplate<TProps> = (
@@ -18,32 +19,15 @@ export function makeBlogOgImageTemplate({
   defaultBackgroundSrc,
   defaultOptions,
 }: BlogOgImageTemplateOptions) {
-  const blog: OgImageTemplate<{
-    title: string
-    coverImage?: string | null
-    author?: string | null
-    publishedAt?: string | null
-  }> = async (
-    {
-      title,
-      coverImage,
-      author,
-      publishedAt,
-    }: {
-      title: string
-      coverImage?: string | null
-      author?: string | null
-      publishedAt?: string | null
-    },
+  const blog: OgImageTemplate<OgImageProps<'blog'>> = async (
+    { title, coverImage, author, publishedAt }: OgImageProps<'blog'>,
     _context
   ) => {
     const padding = 80
 
-    // Null when the cover is missing or unreadable; the OG image then falls
-    // back to the default background rather than failing the whole render.
     const resolvedCoverSrc = coverImage
       ? await readLocalImageAsDataUri(coverImage, {
-          convert: { width: 1200, height: 630, fit: 'cover' },
+          resize: { width: 1200, height: 630, fit: 'cover' },
         })
       : null
 

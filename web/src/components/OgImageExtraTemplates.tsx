@@ -9,6 +9,7 @@ import { getBadgeSize, type BadgeTheme } from '../lib/serviceBadges'
 
 import { makeBlogOgImageTemplate } from './OgImageBlogTemplate'
 
+import type { OgImageProps } from '../lib/ogImageProps'
 import type { VerificationStatus } from '@prisma/client'
 import type { APIContext } from 'astro'
 
@@ -22,16 +23,7 @@ type ExtraOgImageTemplateOptions = {
   defaultBackgroundSrc: string
 }
 
-type BadgeProps = {
-  verificationStatus: VerificationStatus | null
-  overallScore: number | null
-  averageUserRating: number | null
-  kycLevel: number | null
-  showScore: boolean
-  showRating: boolean
-  showKycLevel: boolean
-  theme: BadgeTheme
-}
+type BadgeProps = OgImageProps<'badge-sm'>
 
 const badgeStatusMap: Record<VerificationStatus, { label: string; color: string }> = {
   VERIFICATION_SUCCESS: { label: 'Verified', color: '#40e6c2' },
@@ -167,7 +159,7 @@ export function makeExtraOgImageTemplates({
     defaultBackgroundSrc,
   })
 
-  const badgeLg: OgImageTemplate<BadgeProps & { name: string }> = async (
+  const badgeLg: OgImageTemplate<OgImageProps<'badge-lg'>> = async (
     {
       name,
       verificationStatus,
@@ -178,7 +170,7 @@ export function makeExtraOgImageTemplates({
       showRating,
       showKycLevel,
       theme,
-    }: BadgeProps & { name: string },
+    }: OgImageProps<'badge-lg'>,
     _context
   ) => {
     const status = badgeStatusInfo(verificationStatus, theme)
@@ -423,8 +415,8 @@ export function makeExtraOgImageTemplates({
     )
   }
 
-  const badgeXs: OgImageTemplate<Pick<BadgeProps, 'theme' | 'verificationStatus'>> = async (
-    { verificationStatus, theme }: Pick<BadgeProps, 'theme' | 'verificationStatus'>,
+  const badgeXs: OgImageTemplate<OgImageProps<'badge-xs'>> = async (
+    { verificationStatus, theme }: OgImageProps<'badge-xs'>,
     _context
   ) => {
     const status = badgeStatusInfo(verificationStatus, theme)

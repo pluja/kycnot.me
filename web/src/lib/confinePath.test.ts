@@ -35,3 +35,14 @@ void test('does not treat a sibling with a shared prefix as inside', () => {
   assert.equal(confineToRoot('/app/uploads', '../uploads-backup/x.png'), null)
   assert.equal(confineToRoot('/app/up', '/app/uploads/x.png'), null)
 })
+
+void test('normalizes the root so an unusual one does not fail every input closed', () => {
+  assert.equal(confineToRoot('/app/uploads/', 'services/x.png'), '/app/uploads/services/x.png')
+  assert.equal(confineToRoot('/app/./uploads', 'services/x.png'), '/app/uploads/services/x.png')
+  assert.equal(confineToRoot('/app/media/../uploads', 'services/x.png'), '/app/uploads/services/x.png')
+})
+
+void test('still confines when the root is unusual', () => {
+  assert.equal(confineToRoot('/app/uploads/', '../cases/x.png'), null)
+  assert.equal(confineToRoot('/app/./uploads', '/etc/passwd'), null)
+})
