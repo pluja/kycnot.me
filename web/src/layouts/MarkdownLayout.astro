@@ -1,12 +1,13 @@
 ---
-import { makeOgImageUrl, type OgImageAllTemplatesWithProps } from '../components/OgImage'
 import TimeFormatted from '../components/TimeFormatted.astro'
+import { makeOgImageUrl } from '../lib/ogImageUrl'
 import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
 import { absoluteSiteUrl, siteOrigin } from '../lib/urls'
 
 import BaseLayout from './BaseLayout.astro'
 
 import type { AstroChildren } from '../lib/astro'
+import type { OgImagePublicTemplateWithProps } from '../lib/ogImageProps'
 import type { MarkdownLayoutProps } from 'astro'
 import type { ComponentProps } from 'astro/types'
 import type { Article, WithContext } from 'schema-dts'
@@ -28,7 +29,7 @@ const ogImageTemplateData = {
   title: frontmatter.title,
   description: frontmatter.description,
   icon: frontmatter.icon,
-} satisfies OgImageAllTemplatesWithProps
+} satisfies OgImagePublicTemplateWithProps
 ---
 
 <BaseLayout

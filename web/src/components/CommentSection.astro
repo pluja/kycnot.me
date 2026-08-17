@@ -17,12 +17,11 @@ import {
   type CommentWithRepliesPopulated,
 } from '../lib/commentsWithReplies'
 import { getOrCreateNotificationPreferences } from '../lib/notificationPreferences'
+import { makeOgImageUrl } from '../lib/ogImageUrl'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
 import { absoluteSiteUrl, siteOrigin } from '../lib/urls'
-
-import { makeOgImageUrl } from './OgImage'
 
 import type { Prisma } from '@prisma/client'
 import type { Comment, DiscussionForumPosting, WithContext } from 'schema-dts'

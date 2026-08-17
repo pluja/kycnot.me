@@ -1,4 +1,4 @@
-import { ogImageTemplates } from '../../components/OgImage'
+import { badgeOgImageTemplates } from '../../components/OgImage'
 import { prisma } from '../../lib/prisma'
 import { isBadgeSize, isBadgeTheme, isEmbeddableBadgeStatus } from '../../lib/serviceBadges'
 
@@ -159,7 +159,7 @@ export const GET: APIRoute = async (context) => {
   try {
     const response =
       size === 'lg'
-        ? await ogImageTemplates['badge-lg'](
+        ? await badgeOgImageTemplates['badge-lg'](
             {
               ...baseProps,
               name: service.name,
@@ -173,7 +173,7 @@ export const GET: APIRoute = async (context) => {
             context
           )
         : size === 'sm'
-          ? await ogImageTemplates['badge-sm'](
+          ? await badgeOgImageTemplates['badge-sm'](
               {
                 ...baseProps,
                 overallScore: service.overallScore,
@@ -185,7 +185,7 @@ export const GET: APIRoute = async (context) => {
               },
               context
             )
-          : await ogImageTemplates['badge-xs'](baseProps, context)
+          : await badgeOgImageTemplates['badge-xs'](baseProps, context)
 
     if (response === null) {
       return new Response('Render failed', { status: 500 })

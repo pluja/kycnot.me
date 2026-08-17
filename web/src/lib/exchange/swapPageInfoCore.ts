@@ -4,6 +4,8 @@
 import { currencyDisplayMetadata, FALLBACK_ICON } from './currencyMapping'
 import { buildSwapUrl } from './swapUrls'
 
+import type { OgImagePublicTemplateWithProps } from '../ogImageProps'
+
 export type SwapPair = { from: string; to: string }
 export type FaqItem = { id?: string; q: string; a: string }
 export const SWAP_FAQ_GUARANTEE_ID = 'swap-faq-guarantee'
@@ -127,17 +129,17 @@ export function buildDescription(pair: SwapPair | null): string {
 export function buildOgImageProps(pair: SwapPair | null) {
   if (!pair) {
     return {
-      template: 'generic' as const,
+      template: 'generic',
       title: 'Compare Swap Rates',
       description: 'KYC-free exchange rate comparison across every major provider.',
-    }
+    } satisfies OgImagePublicTemplateWithProps
   }
   return {
-    template: 'generic' as const,
+    template: 'generic',
     title: `${formatCurrencyLabel(pair.from)} → ${formatCurrencyLabel(pair.to)}`,
     description: `Compare ${formatCurrencyHumanName(pair.from)} → ${formatCurrencyHumanName(pair.to)} rates from KYC-free exchanges.`,
     icon: lookupLabel(pair.from).icon,
-  }
+  } satisfies OgImagePublicTemplateWithProps
 }
 
 // Shared by the visible accordion and the FAQPage JSON-LD.

@@ -1,24 +1,15 @@
 import { createHash } from 'node:crypto'
 
-import {
-  ogImageTemplates,
-  renderOgImageTemplate,
-  type OgImageAllTemplatesWithProps,
-} from '../components/OgImage'
+import { publicOgImageTemplates, renderPublicOgImageTemplate } from '../components/OgImage'
 import { LruByteCache } from '../lib/lruByteCache'
 import { memoizeAsync } from '../lib/memoizeAsync'
 import { trackMissingAssets } from '../lib/missingAssets'
-import {
-  ogImagePropsSchemas,
-  summarizeIssues,
-  type OgImageProps,
-  type OgImageTemplateName,
-} from '../lib/ogImageProps'
+import { type OgImageProps, type OgImagePublicTemplateName } from '../lib/ogImageProps'
+import { parsePublicOgImageRequest } from '../lib/ogImageRequest'
 import { Semaphore } from '../lib/semaphore'
 
 import type { ImageResponse } from '@vercel/og'
 import type { APIContext, APIRoute } from 'astro'
-import type { Misc } from 'ts-toolbelt'
 
 // IMMUTABLE_CACHE_CONTROL preserves what @vercel/og set on the streamed
 // response. The URL is content-addressed: every field that changes the picture
@@ -47,16 +38,7 @@ const renderCache = new LruByteCache<Uint8Array<ArrayBuffer>>(32 * 1024 * 1024, 
 // has released its slot, so without it every request carrying props that make a
 // template throw would buy an uncapped render. The card takes no props and no
 // request state, which is why one render can answer them all.
-const renderDefaultCard = memoizeAsync(() => toPngBytes(ogImageTemplates.default()))
-
-function toJSON<T extends Misc.JSON.Value>(data: string | null | undefined): T | undefined {
-  if (!data) return undefined
-  try {
-    return JSON.parse(data) as T
-  } catch (_error) {
-    return undefined
-  }
-}
+const renderDefaultCard = memoizeAsync(() => toPngBytes(publicOgImageTemplates.default()))
 
 // cacheKey hashes the query param so an attacker cannot pad the key itself,
 // which the cache's byte budget does not account for.
@@ -71,34 +53,24 @@ function isPng(bytes: Uint8Array): boolean {
 }
 
 export const GET: APIRoute = async (context) => {
-  const rawData = context.url.searchParams.get('data') ?? ''
+  const rawData = context.url.searchParams.get('data')
+  const parsedRequest = parsePublicOgImageRequest(rawData)
+  if (!parsedRequest.success) {
+    const outcome = parsedRequest.response === 'reject' ? 'Rejected request' : 'Using default card'
+    console.warn(`[ogimage] ${outcome}: ${parsedRequest.reason}`)
+    return parsedRequest.response === 'reject' ? invalidParametersResponse() : await fallbackResponse()
+  }
 
-  const key = cacheKey(rawData)
+  const key = cacheKey(rawData ?? '')
   const cached = renderCache.get(key)
   if (cached) {
     return imageResponse(cached, IMMUTABLE_CACHE_CONTROL)
   }
 
-  const { template, ...props } = toJSON<OgImageAllTemplatesWithProps>(rawData) ?? { template: 'default' }
-  // hasOwn, not `in`: `in` also matches Object.prototype keys, so a template of
-  // "constructor" would dispatch to it. An unrecognised template is not an
-  // error: makeOgImageUrl serialises `{}` for any page that sets no card.
-  const isKnownTemplate = typeof template === 'string' && Object.hasOwn(ogImagePropsSchemas, template)
-  const templateName: OgImageTemplateName = isKnownTemplate ? template : 'default'
-
-  const parsedProps = ogImagePropsSchemas[templateName].safeParse(isKnownTemplate ? props : {})
-  if (!parsedProps.success) {
-    // Rejected before a render slot is taken. Our own pages cannot land here:
-    // they build `?data=` from the same schemas, checked at compile time.
-    console.warn(`[ogimage] Rejected props for "${templateName}":`, summarizeIssues(parsedProps.error))
-    return new Response('Invalid image parameters', {
-      status: 400,
-      headers: { 'Cache-Control': 'no-store' },
-    })
-  }
+  const { templateName, props } = parsedRequest
 
   const pending = renderSemaphore.run(() =>
-    trackMissingAssets(() => renderToBytes(templateName, parsedProps.data, context))
+    trackMissingAssets(() => renderToBytes(templateName, props, context))
   )
   if (!pending) {
     return new Response('Image service busy', {
@@ -140,11 +112,11 @@ async function fallbackResponse(): Promise<Response> {
 }
 
 async function renderToBytes(
-  templateName: OgImageTemplateName,
-  props: OgImageProps<OgImageTemplateName>,
+  templateName: OgImagePublicTemplateName,
+  props: OgImageProps<OgImagePublicTemplateName>,
   context: APIContext
 ): Promise<Uint8Array<ArrayBuffer>> {
-  return await toPngBytes(renderOgImageTemplate(templateName, props, context))
+  return await toPngBytes(renderPublicOgImageTemplate(templateName, props, context))
 }
 
 // toPngBytes drains a render into memory. @vercel/og returns a stream that has
@@ -162,6 +134,13 @@ async function toPngBytes(
     throw new Error('template produced a non-PNG body')
   }
   return bytes
+}
+
+function invalidParametersResponse(): Response {
+  return new Response('Invalid image parameters', {
+    status: 400,
+    headers: { 'Cache-Control': 'no-store' },
+  })
 }
 
 function imageResponse(bytes: Uint8Array<ArrayBuffer>, cacheControl: string): Response {

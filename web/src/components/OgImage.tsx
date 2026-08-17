@@ -9,18 +9,16 @@ import defaultOGImage from '../assets/ogimage.png?inline'
 import { readLocalImageAsDataUri } from '../lib/localImageDataUri'
 import { reportMissingAsset } from '../lib/missingAssets'
 import {
-  type OgImageAllTemplatesWithProps,
+  type OgImageBadgeTemplateName,
   type OgImageProps,
+  type OgImagePublicTemplateName,
   type OgImageTemplateName,
 } from '../lib/ogImageProps'
 import { makeOverallScoreInfo } from '../lib/overallScore'
-import { urlWithParams } from '../lib/urls'
 
 import { makeExtraOgImageTemplates } from './OgImageExtraTemplates'
 
 import type { APIContext } from 'astro'
-
-export type { OgImageAllTemplatesWithProps }
 
 //////////////////////////////////////////////////////
 //                    NOTE                          //
@@ -105,11 +103,11 @@ type OgImageRender = ImageResponse | Promise<ImageResponse | null> | null
 // OgImageTemplateRegistry pins every template to the output of the schema
 // registered under the same name, so a template cannot drift from the shape its
 // props are parsed into, and neither can gain an entry without the other.
-type OgImageTemplateRegistry = {
-  [K in OgImageTemplateName]: (props: OgImageProps<K>, context: APIContext) => OgImageRender
+type OgImageTemplateRegistry<KTemplateName extends OgImageTemplateName> = {
+  [K in KTemplateName]: (props: OgImageProps<K>, context: APIContext) => OgImageRender
 }
 
-export const ogImageTemplates = {
+const ogImageTemplates = {
   default: (_props?: OgImageProps<'default'>, _context?: APIContext) => {
     return new ImageResponse(
       <img
@@ -394,33 +392,35 @@ export const ogImageTemplates = {
     )
   },
   ...extraOgImageTemplates,
-} as const satisfies OgImageTemplateRegistry
+} as const satisfies OgImageTemplateRegistry<OgImageTemplateName>
 
-// renderOgImageTemplate dispatches on a name whose props the caller has already
-// parsed. Indexing the registry with a runtime union yields a union of functions
-// taking different props, which TypeScript cannot narrow from the name alone;
-// the registry's `satisfies` above is what makes the cast sound.
-export function renderOgImageTemplate(
-  templateName: OgImageTemplateName,
-  props: OgImageProps<OgImageTemplateName>,
+export const publicOgImageTemplates = {
+  default: ogImageTemplates.default,
+  service: ogImageTemplates.service,
+  generic: ogImageTemplates.generic,
+  blog: ogImageTemplates.blog,
+} as const satisfies OgImageTemplateRegistry<OgImagePublicTemplateName>
+
+export const badgeOgImageTemplates = {
+  'badge-lg': ogImageTemplates['badge-lg'],
+  'badge-sm': ogImageTemplates['badge-sm'],
+  'badge-xs': ogImageTemplates['badge-xs'],
+} as const satisfies OgImageTemplateRegistry<OgImageBadgeTemplateName>
+
+// renderPublicOgImageTemplate dispatches validated public props. Indexing the
+// registry with a runtime union yields a union of functions taking different
+// props, which TypeScript cannot narrow from the name alone. The registry's
+// `satisfies` check above makes the cast sound.
+export function renderPublicOgImageTemplate(
+  templateName: OgImagePublicTemplateName,
+  props: OgImageProps<OgImagePublicTemplateName>,
   context: APIContext
 ): OgImageRender {
-  const render = ogImageTemplates[templateName] as (
-    props: OgImageProps<OgImageTemplateName>,
+  const render = publicOgImageTemplates[templateName] as (
+    props: OgImageProps<OgImagePublicTemplateName>,
     context: APIContext
   ) => OgImageRender
   return render(props, context)
-}
-
-export function makeOgImageUrl(
-  ogImage: OgImageAllTemplatesWithProps | string | undefined,
-  baseUrl: URL | string
-) {
-  if (typeof ogImage === 'string') {
-    return new URL(ogImage, baseUrl).href
-  }
-  const ogPath = urlWithParams(new URL('/ogimage.png', baseUrl), { data: JSON.stringify(ogImage ?? {}) })
-  return new URL(ogPath, baseUrl).href
 }
 
 // Utilities ------------------------------------------------------------

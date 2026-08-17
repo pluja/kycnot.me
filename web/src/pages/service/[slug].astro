@@ -20,7 +20,6 @@ import InputSubmitButton from '../../components/InputSubmitButton.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
 import Markdown from '../../components/Markdown.astro'
 import MyPicture from '../../components/MyPicture.astro'
-import { makeOgImageUrl, type OgImageAllTemplatesWithProps } from '../../components/OgImage'
 import ScoreGauge from '../../components/ScoreGauge.astro'
 import ScoreSquare from '../../components/ScoreSquare.astro'
 import ServiceLinkButton from '../../components/ServiceLinkButton.astro'
@@ -49,6 +48,7 @@ import { getEventDisplay, pickPrimaryEvent } from '../../lib/eventKind'
 import { getSupportedProviderSlugs } from '../../lib/exchange/supportedProviders'
 import { computeIncidentTrustPenalty, totalIncidentTrustPenalty } from '../../lib/incidentPenalty'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
+import { makeOgImageUrl } from '../../lib/ogImageUrl'
 import { pluralize } from '../../lib/pluralize'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
@@ -61,6 +61,7 @@ import { formatDateShort } from '../../lib/timeAgo'
 import { absoluteSiteUrl, siteOrigin, urlDomain, urlWithParams } from '../../lib/urls'
 
 import type { BreadcrumArray } from '../../components/BaseHead.astro'
+import type { OgImagePublicTemplateWithProps } from '../../lib/ogImageProps'
 import type { Prisma, ServiceVisibility } from '@prisma/client'
 import type { ContactPoint, ListItem, Organization, Review, WebPage, WithContext } from 'schema-dts'
 
@@ -345,7 +346,7 @@ const ogImageTemplateData = {
   score: service.overallScore,
   imageUrl: service.imageUrl,
   verificationStatus: service.verificationStatus,
-} satisfies OgImageAllTemplatesWithProps
+} satisfies OgImagePublicTemplateWithProps
 
 const serviceVisibilityInfo = getServiceVisibilityInfo(service.serviceVisibility)
 
