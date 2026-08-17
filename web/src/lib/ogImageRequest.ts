@@ -1,3 +1,4 @@
+import { OG_IMAGE_LIMITS } from './ogImageInput'
 import { badgeOgImagePropsSchemas, publicOgImagePropsSchemas, summarizeIssues } from './ogImageProps'
 
 import type { OgImageBadgeTemplateName, OgImageProps, OgImagePublicTemplateName } from './ogImageProps'
@@ -17,6 +18,10 @@ type RejectedPublicOgImageRequest = {
 export type PublicOgImageRequestResult = ParsedPublicOgImageRequest | RejectedPublicOgImageRequest
 
 export function parsePublicOgImageRequest(rawData: string | null): PublicOgImageRequestResult {
+  if (rawData && rawData.length > OG_IMAGE_LIMITS.rawData) {
+    return rejectWithDefault('Image data exceeds the length limit')
+  }
+
   const data = parseJson(rawData)
   if (data === undefined) return rejectWithDefault('Malformed JSON')
   if (!isRecord(data)) return rejectWithDefault('Image data must be a JSON object')

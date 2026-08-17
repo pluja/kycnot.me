@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
+import { OG_IMAGE_LIMITS } from './ogImageInput'
 import { parsePublicOgImageRequest } from './ogImageRequest'
 
 void test('uses the default card when data or its template is absent', () => {
@@ -84,5 +85,13 @@ void test('falls back with schema diagnostics for invalid props and unknown fiel
     success: false,
     response: 'default',
     reason: 'Invalid props for "default": (root): unrecognized_keys',
+  })
+})
+
+void test('falls back before parsing oversized image data', () => {
+  assert.deepEqual(parsePublicOgImageRequest('x'.repeat(OG_IMAGE_LIMITS.rawData + 1)), {
+    success: false,
+    response: 'default',
+    reason: 'Image data exceeds the length limit',
   })
 })

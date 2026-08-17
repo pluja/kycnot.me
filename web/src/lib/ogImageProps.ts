@@ -1,24 +1,33 @@
 import { VerificationStatus } from '@prisma/client'
 import { z } from 'zod'
 
+import {
+  countOgImageEmoji,
+  isAllowedOgImageSource,
+  isWithinOgImageTextBudget,
+  OG_IMAGE_ICON_PATTERN,
+  OG_IMAGE_LIMITS,
+} from './ogImageInput'
 import { badgeThemes } from './serviceBadges'
 
 import type { Prettify } from 'ts-essentials'
 
-// MAX_RENDERED_CATEGORIES bounds the icon fan-out: each entry costs a
-// third-party fetch and a rasterization while holding a render slot. Extra
-// entries are dropped rather than rejected, so a service that gains a category
-// keeps its card.
-const MAX_RENDERED_CATEGORIES = 8
+const MAX_SUMMARIZED_ISSUES = 8
 
 const verificationStatusSchema = z.nativeEnum(VerificationStatus).nullable()
+const scoreSchema = z.number().finite().int().min(0).max(10)
+const ratingSchema = z.number().finite().min(0).max(5)
+const kycLevelSchema = z.number().finite().int().min(0).max(4)
+const iconSchema = z.string().max(OG_IMAGE_LIMITS.icon).regex(OG_IMAGE_ICON_PATTERN)
+const imageSourceSchema = z.string().max(OG_IMAGE_LIMITS.imageSource).refine(isAllowedOgImageSource)
+const requiredTextSchema = (maxLength: number) => z.string().trim().min(1).max(maxLength)
 
 const badgePropsSchema = z
   .object({
     verificationStatus: verificationStatusSchema,
-    overallScore: z.number().nullable(),
-    averageUserRating: z.number().nullable(),
-    kycLevel: z.number().nullable(),
+    overallScore: scoreSchema.nullable(),
+    averageUserRating: ratingSchema.nullable(),
+    kycLevel: kycLevelSchema.nullable(),
     showScore: z.boolean(),
     showRating: z.boolean(),
     showKycLevel: z.boolean(),
@@ -33,35 +42,77 @@ export const publicOgImagePropsSchemas = {
   default: z.object({}).strict(),
   service: z
     .object({
-      title: z.string(),
-      description: z.string(),
+      title: requiredTextSchema(OG_IMAGE_LIMITS.service.title),
+      description: z.string().max(OG_IMAGE_LIMITS.service.description),
       categories: z
-        .array(z.object({ name: z.string(), icon: z.string() }).strict())
-        .transform((categories) => categories.slice(0, MAX_RENDERED_CATEGORIES)),
-      score: z.number(),
-      imageUrl: z.string().nullish(),
+        .array(
+          z
+            .object({
+              name: requiredTextSchema(OG_IMAGE_LIMITS.service.categoryName),
+              icon: iconSchema,
+            })
+            .strict()
+        )
+        .max(OG_IMAGE_LIMITS.maxCategories),
+      score: scoreSchema,
+      imageUrl: imageSourceSchema.nullish(),
       verificationStatus: verificationStatusSchema,
     })
-    .strict(),
+    .strict()
+    .refine(
+      ({ categories, description, title }) =>
+        isWithinOgImageTextBudget(
+          [title, description, ...categories.map(({ name }) => name)],
+          OG_IMAGE_LIMITS.service.totalText
+        ),
+      { path: ['renderedText'] }
+    )
+    .refine(
+      ({ categories, description, title }) =>
+        countOgImageEmoji([title, description, ...categories.map(({ name }) => name)]) <=
+        OG_IMAGE_LIMITS.maxEmoji,
+      { path: ['emoji'] }
+    ),
   generic: z
     .object({
-      title: z.string(),
-      description: z.string().nullish(),
-      icon: z.string().nullish(),
+      title: requiredTextSchema(OG_IMAGE_LIMITS.generic.title),
+      description: z.string().max(OG_IMAGE_LIMITS.generic.description).nullish(),
+      icon: iconSchema.nullish(),
     })
-    .strict(),
+    .strict()
+    .refine(
+      ({ description, title }) =>
+        isWithinOgImageTextBudget([title, description ?? ''], OG_IMAGE_LIMITS.generic.totalText),
+      { path: ['renderedText'] }
+    )
+    .refine(
+      ({ description, title }) => countOgImageEmoji([title, description ?? '']) <= OG_IMAGE_LIMITS.maxEmoji,
+      { path: ['emoji'] }
+    ),
   blog: z
     .object({
-      title: z.string(),
-      coverImage: z.string().nullish(),
-      author: z.string().nullish(),
-      publishedAt: z.string().nullish(),
+      title: requiredTextSchema(OG_IMAGE_LIMITS.blog.title),
+      coverImage: imageSourceSchema.nullish(),
+      author: z.string().max(OG_IMAGE_LIMITS.blog.author).nullish(),
+      publishedAt: z.string().max(40).datetime({ offset: true }).nullish(),
     })
-    .strict(),
+    .strict()
+    .refine(
+      ({ author, title }) => isWithinOgImageTextBudget([title, author ?? ''], OG_IMAGE_LIMITS.blog.totalText),
+      { path: ['renderedText'] }
+    )
+    .refine(({ author, title }) => countOgImageEmoji([title, author ?? '']) <= OG_IMAGE_LIMITS.maxEmoji, {
+      path: ['emoji'],
+    }),
 } as const satisfies Record<string, z.ZodType>
 
 export const badgeOgImagePropsSchemas = {
-  'badge-lg': badgePropsSchema.extend({ name: z.string() }).strict(),
+  'badge-lg': badgePropsSchema
+    .extend({ name: requiredTextSchema(OG_IMAGE_LIMITS.badge.name) })
+    .strict()
+    .refine(({ name }) => countOgImageEmoji([name]) <= OG_IMAGE_LIMITS.maxEmoji, {
+      path: ['emoji'],
+    }),
   'badge-sm': badgePropsSchema,
   'badge-xs': badgePropsSchema.pick({ theme: true, verificationStatus: true }).strict(),
 } as const satisfies Record<string, z.ZodType>
@@ -85,5 +136,10 @@ export type OgImagePublicTemplateWithProps = Prettify<
 // summarizeIssues keeps the rejected values out of the log and reports only
 // which fields failed and how.
 export function summarizeIssues(error: z.ZodError): string {
-  return error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.code}`).join(', ')
+  const issues = error.issues
+    .slice(0, MAX_SUMMARIZED_ISSUES)
+    .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.code}`)
+  const omittedCount = error.issues.length - issues.length
+  if (omittedCount > 0) issues.push(`${String(omittedCount)} more`)
+  return issues.join(', ')
 }

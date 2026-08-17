@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
+import { OG_IMAGE_LIMITS } from './ogImageInput'
 import { badgeOgImagePropsSchemas, publicOgImagePropsSchemas, summarizeIssues } from './ogImageProps'
 
 import type { z } from 'zod'
@@ -96,16 +97,16 @@ void test('rejects a rating that cannot be formatted', () => {
   )
 })
 
-void test('caps categories instead of rejecting a service that has many', () => {
+void test('accepts the maximum rendered category count', () => {
   const props = accepted(publicOgImagePropsSchemas.service, {
     ...serviceProps,
-    categories: Array.from({ length: 30 }, (_, index) => ({
+    categories: Array.from({ length: OG_IMAGE_LIMITS.maxCategories }, (_, index) => ({
       name: `Category ${String(index)}`,
       icon: 'ri:exchange-line',
     })),
   })
 
-  assert.equal(props.categories.length, 8)
+  assert.equal(props.categories.length, OG_IMAGE_LIMITS.maxCategories)
 })
 
 void test('rejects unknown keys instead of hiding input mistakes', () => {
@@ -135,4 +136,92 @@ void test('keeps badge schemas out of the public registry', () => {
   assert.equal(Object.hasOwn(publicOgImagePropsSchemas, 'badge-lg'), false)
   assert.equal(Object.hasOwn(publicOgImagePropsSchemas, 'badge-sm'), false)
   assert.equal(Object.hasOwn(publicOgImagePropsSchemas, 'badge-xs'), false)
+})
+
+void test('rejects oversized rendered text and emoji fan-out', () => {
+  assert.equal(
+    rejected(publicOgImagePropsSchemas.generic, {
+      title: 'x'.repeat(OG_IMAGE_LIMITS.generic.title + 1),
+    }),
+    'title: too_big'
+  )
+  assert.equal(
+    rejected(publicOgImagePropsSchemas.generic, {
+      title: '😀'.repeat(OG_IMAGE_LIMITS.maxEmoji + 1),
+    }),
+    'emoji: custom'
+  )
+  assert.equal(
+    rejected(publicOgImagePropsSchemas.generic, {
+      title: 'x'.repeat(OG_IMAGE_LIMITS.generic.title),
+      description: 'y'.repeat(OG_IMAGE_LIMITS.generic.description),
+    }),
+    'renderedText: custom'
+  )
+})
+
+void test('rejects excess categories and invalid category fields', () => {
+  assert.equal(
+    rejected(publicOgImagePropsSchemas.service, {
+      ...serviceProps,
+      categories: Array.from({ length: OG_IMAGE_LIMITS.maxCategories + 1 }, () => ({
+        name: 'Exchange',
+        icon: 'ri:exchange-line',
+      })),
+    }),
+    'categories: too_big'
+  )
+  assert.equal(
+    rejected(publicOgImagePropsSchemas.service, {
+      ...serviceProps,
+      categories: [{ name: 'Exchange', icon: 'not-an-icon' }],
+    }),
+    'categories.0.icon: invalid_string'
+  )
+})
+
+void test('rejects non-finite and out-of-range scores', () => {
+  assert.match(
+    rejected(publicOgImagePropsSchemas.service, { ...serviceProps, score: JSON.parse('1e400') }),
+    /score: not_finite/
+  )
+  assert.equal(
+    rejected(publicOgImagePropsSchemas.service, { ...serviceProps, score: -1 }),
+    'score: too_small'
+  )
+  assert.equal(rejected(publicOgImagePropsSchemas.service, { ...serviceProps, score: 11 }), 'score: too_big')
+})
+
+void test('rejects invalid image sources and publication dates', () => {
+  assert.equal(
+    rejected(publicOgImagePropsSchemas.service, {
+      ...serviceProps,
+      imageUrl: 'https://example.com/files/services/x.png',
+    }),
+    'imageUrl: custom'
+  )
+  assert.equal(
+    rejected(publicOgImagePropsSchemas.blog, {
+      title: 'A post',
+      coverImage: '/private/cover.png',
+    }),
+    'coverImage: custom'
+  )
+  assert.equal(
+    rejected(publicOgImagePropsSchemas.blog, {
+      title: 'A post',
+      publishedAt: 'garbage',
+    }),
+    'publishedAt: invalid_string'
+  )
+})
+
+void test('bounds validation diagnostics', () => {
+  const summary = rejected(publicOgImagePropsSchemas.service, {
+    ...serviceProps,
+    categories: Array.from({ length: 20 }, () => null),
+  })
+
+  assert.match(summary, /more$/)
+  assert.ok(summary.length < 300)
 })

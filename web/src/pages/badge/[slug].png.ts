@@ -1,4 +1,6 @@
 import { badgeOgImageTemplates } from '../../components/OgImage'
+import { createOgImageTextNormalizer, OG_IMAGE_LIMITS } from '../../lib/ogImageInput'
+import { badgeOgImagePropsSchemas } from '../../lib/ogImageProps'
 import { prisma } from '../../lib/prisma'
 import { isBadgeSize, isBadgeTheme, isEmbeddableBadgeStatus } from '../../lib/serviceBadges'
 
@@ -157,24 +159,25 @@ export const GET: APIRoute = async (context) => {
   const baseProps = { verificationStatus: service.verificationStatus, theme }
 
   try {
+    const normalizeBadgeText = createOgImageTextNormalizer(OG_IMAGE_LIMITS.badge.name)
     const response =
       size === 'lg'
         ? await badgeOgImageTemplates['badge-lg'](
-            {
+            badgeOgImagePropsSchemas['badge-lg'].parse({
               ...baseProps,
-              name: service.name,
+              name: normalizeBadgeText(service.name, OG_IMAGE_LIMITS.badge.name),
               overallScore: service.overallScore,
               averageUserRating: service.trustWeightedUserRating,
               kycLevel: service.kycLevel,
               showScore,
               showRating,
               showKycLevel,
-            },
+            }),
             context
           )
         : size === 'sm'
           ? await badgeOgImageTemplates['badge-sm'](
-              {
+              badgeOgImagePropsSchemas['badge-sm'].parse({
                 ...baseProps,
                 overallScore: service.overallScore,
                 averageUserRating: service.trustWeightedUserRating,
@@ -182,10 +185,13 @@ export const GET: APIRoute = async (context) => {
                 showScore,
                 showRating,
                 showKycLevel,
-              },
+              }),
               context
             )
-          : await badgeOgImageTemplates['badge-xs'](baseProps, context)
+          : await badgeOgImageTemplates['badge-xs'](
+              badgeOgImagePropsSchemas['badge-xs'].parse(baseProps),
+              context
+            )
 
     if (response === null) {
       return new Response('Render failed', { status: 500 })
