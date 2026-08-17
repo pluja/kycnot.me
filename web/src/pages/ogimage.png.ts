@@ -5,6 +5,7 @@ import { LruByteCache } from '../lib/lruByteCache'
 import { memoizeAsync } from '../lib/memoizeAsync'
 import { trackMissingAssets } from '../lib/missingAssets'
 import { type OgImageProps, type OgImagePublicTemplateName } from '../lib/ogImageProps'
+import { logOgImageRejection } from '../lib/ogImageRejectionLog'
 import { parsePublicOgImageRequest } from '../lib/ogImageRequest'
 import { Semaphore } from '../lib/semaphore'
 
@@ -57,7 +58,7 @@ export const GET: APIRoute = async (context) => {
   const parsedRequest = parsePublicOgImageRequest(rawData)
   if (!parsedRequest.success) {
     const outcome = parsedRequest.response === 'reject' ? 'Rejected request' : 'Using default card'
-    console.warn(`[ogimage] ${outcome}: ${parsedRequest.reason}`)
+    logOgImageRejection(outcome, parsedRequest.reason)
     return parsedRequest.response === 'reject' ? invalidParametersResponse() : await fallbackResponse()
   }
 
