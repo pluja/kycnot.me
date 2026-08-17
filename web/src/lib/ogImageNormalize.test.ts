@@ -2,8 +2,15 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { countOgImageEmoji, OG_IMAGE_LIMITS } from './ogImageInput'
-import { normalizePublicOgImageProps } from './ogImageNormalize'
-import { publicOgImagePropsSchemas } from './ogImageProps'
+import {
+  normalizeOgImageKycLevel,
+  normalizeOgImageRating,
+  normalizeOgImageScore,
+  normalizePublicOgImageProps,
+} from './ogImageNormalize'
+import { badgeOgImagePropsSchemas, publicOgImagePropsSchemas, summarizeIssues } from './ogImageProps'
+
+import type { OgImagePublicTemplateName, OgImagePublicTemplateWithProps } from './ogImageProps'
 
 void test('normalizes generic text and icons', () => {
   const data = normalizePublicOgImageProps({
@@ -63,4 +70,64 @@ void test('drops invalid optional blog fields', () => {
 
   const { template: _template, ...props } = data
   assert.equal(publicOgImagePropsSchemas.blog.safeParse(props).success, true)
+})
+
+void test('clamps badge numbers before schema validation', () => {
+  const props = {
+    theme: 'dark',
+    verificationStatus: 'APPROVED',
+    overallScore: normalizeOgImageScore(10),
+    averageUserRating: normalizeOgImageRating(5.0000000000000036),
+    kycLevel: normalizeOgImageKycLevel(4),
+    showScore: true,
+    showRating: true,
+    showKycLevel: true,
+  }
+
+  assert.equal(props.averageUserRating, 5)
+  assert.equal(badgeOgImagePropsSchemas['badge-sm'].safeParse(props).success, true)
+  assert.equal(normalizeOgImageRating(Infinity), null)
+  assert.equal(normalizeOgImageKycLevel(-1), 0)
+})
+
+void test('every public normalizer output satisfies its schema', () => {
+  const hostileText = `${'😀'.repeat(OG_IMAGE_LIMITS.maxEmoji + 20)}${'x'.repeat(1000)}`
+  const inputs: OgImagePublicTemplateWithProps[] = [
+    { template: 'default' },
+    {
+      template: 'service',
+      title: hostileText,
+      description: hostileText,
+      categories: Array.from({ length: 30 }, () => ({ name: hostileText, icon: 'bad icon' })),
+      score: Infinity,
+      imageUrl: 'https://example.com/private.png',
+      verificationStatus: null,
+    },
+    {
+      template: 'generic',
+      title: hostileText,
+      description: hostileText,
+      icon: 'bad icon',
+    },
+    {
+      template: 'blog',
+      title: hostileText,
+      author: hostileText,
+      coverImage: 'https://example.com/private.png',
+      publishedAt: 'garbage',
+    },
+  ]
+  const inputsByTemplate = new Map(inputs.map((input) => [input.template, input] as const))
+  const templateNames = Object.keys(publicOgImagePropsSchemas) as OgImagePublicTemplateName[]
+
+  assert.deepEqual([...inputsByTemplate.keys()].sort(), [...templateNames].sort())
+  for (const templateName of templateNames) {
+    const input = inputsByTemplate.get(templateName)
+    assert.ok(input)
+    const normalized = normalizePublicOgImageProps(input)
+    assert.equal(normalized.template, templateName)
+    const { template: _template, ...props } = normalized
+    const parsed = publicOgImagePropsSchemas[templateName].safeParse(props)
+    assert.equal(parsed.success, true, parsed.success ? undefined : summarizeIssues(parsed.error))
+  }
 })

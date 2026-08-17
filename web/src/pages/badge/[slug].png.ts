@@ -1,5 +1,10 @@
 import { badgeOgImageTemplates } from '../../components/OgImage'
 import { createOgImageTextNormalizer, OG_IMAGE_LIMITS } from '../../lib/ogImageInput'
+import {
+  normalizeOgImageKycLevel,
+  normalizeOgImageRating,
+  normalizeOgImageScore,
+} from '../../lib/ogImageNormalize'
 import { badgeOgImagePropsSchemas } from '../../lib/ogImageProps'
 import { prisma } from '../../lib/prisma'
 import { isBadgeSize, isBadgeTheme, isEmbeddableBadgeStatus } from '../../lib/serviceBadges'
@@ -160,15 +165,18 @@ export const GET: APIRoute = async (context) => {
 
   try {
     const normalizeBadgeText = createOgImageTextNormalizer(OG_IMAGE_LIMITS.badge.name)
+    const metricProps = {
+      overallScore: normalizeOgImageScore(service.overallScore),
+      averageUserRating: normalizeOgImageRating(service.trustWeightedUserRating),
+      kycLevel: normalizeOgImageKycLevel(service.kycLevel),
+    }
     const response =
       size === 'lg'
         ? await badgeOgImageTemplates['badge-lg'](
             badgeOgImagePropsSchemas['badge-lg'].parse({
               ...baseProps,
+              ...metricProps,
               name: normalizeBadgeText(service.name, OG_IMAGE_LIMITS.badge.name),
-              overallScore: service.overallScore,
-              averageUserRating: service.trustWeightedUserRating,
-              kycLevel: service.kycLevel,
               showScore,
               showRating,
               showKycLevel,
@@ -179,9 +187,7 @@ export const GET: APIRoute = async (context) => {
           ? await badgeOgImageTemplates['badge-sm'](
               badgeOgImagePropsSchemas['badge-sm'].parse({
                 ...baseProps,
-                overallScore: service.overallScore,
-                averageUserRating: service.trustWeightedUserRating,
-                kycLevel: service.kycLevel,
+                ...metricProps,
                 showScore,
                 showRating,
                 showKycLevel,

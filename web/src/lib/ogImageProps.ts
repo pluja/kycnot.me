@@ -15,9 +15,14 @@ import type { Prettify } from 'ts-essentials'
 const MAX_SUMMARIZED_ISSUES = 8
 
 const verificationStatusSchema = z.nativeEnum(VerificationStatus).nullable()
-const scoreSchema = z.number().finite().int().min(0).max(10)
-const ratingSchema = z.number().finite().min(0).max(5)
-const kycLevelSchema = z.number().finite().int().min(0).max(4)
+const scoreSchema = z.number().finite().int().min(OG_IMAGE_LIMITS.score.min).max(OG_IMAGE_LIMITS.score.max)
+const ratingSchema = z.number().finite().min(OG_IMAGE_LIMITS.rating.min).max(OG_IMAGE_LIMITS.rating.max)
+const kycLevelSchema = z
+  .number()
+  .finite()
+  .int()
+  .min(OG_IMAGE_LIMITS.kycLevel.min)
+  .max(OG_IMAGE_LIMITS.kycLevel.max)
 const iconSchema = z.string().max(OG_IMAGE_LIMITS.icon).regex(OG_IMAGE_ICON_PATTERN)
 const imageSourceSchema = z.string().max(OG_IMAGE_LIMITS.imageSource).refine(isAllowedOgImageSource)
 const requiredTextSchema = (maxLength: number) => z.string().trim().min(1).max(maxLength)

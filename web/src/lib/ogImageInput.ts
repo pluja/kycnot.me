@@ -23,6 +23,18 @@ export const OG_IMAGE_LIMITS = {
   badge: {
     name: 120,
   },
+  score: {
+    min: 0,
+    max: 10,
+  },
+  rating: {
+    min: 0,
+    max: 5,
+  },
+  kycLevel: {
+    min: 0,
+    max: 4,
+  },
 } as const
 
 export const OG_IMAGE_ICON_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*:[a-z0-9]+(?:-[a-z0-9]+)*$/

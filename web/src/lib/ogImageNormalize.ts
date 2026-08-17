@@ -37,7 +37,7 @@ export function normalizePublicOgImageProps(
         title,
         description,
         categories,
-        score: normalizeScore(ogImage.score),
+        score: normalizeOgImageScore(ogImage.score),
         imageUrl: normalizeImageSource(ogImage.imageUrl),
         verificationStatus: ogImage.verificationStatus,
       }
@@ -100,6 +100,18 @@ function normalizePublishedAt(value: string | null | undefined): string | null |
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
 }
 
-function normalizeScore(value: number): number {
-  return Number.isFinite(value) ? Math.min(10, Math.max(0, Math.round(value))) : 0
+export function normalizeOgImageScore(value: number): number {
+  return Number.isFinite(value)
+    ? Math.min(OG_IMAGE_LIMITS.score.max, Math.max(OG_IMAGE_LIMITS.score.min, Math.round(value)))
+    : OG_IMAGE_LIMITS.score.min
+}
+
+export function normalizeOgImageRating(value: number | null): number | null {
+  if (value === null || !Number.isFinite(value)) return null
+  return Math.min(OG_IMAGE_LIMITS.rating.max, Math.max(OG_IMAGE_LIMITS.rating.min, value))
+}
+
+export function normalizeOgImageKycLevel(value: number | null): number | null {
+  if (value === null || !Number.isFinite(value)) return null
+  return Math.min(OG_IMAGE_LIMITS.kycLevel.max, Math.max(OG_IMAGE_LIMITS.kycLevel.min, Math.round(value)))
 }
