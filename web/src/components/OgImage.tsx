@@ -1,7 +1,3 @@
-import fs from 'node:fs'
-import path from 'node:path'
-
-import { ImageResponse } from '@vercel/og'
 import sharp from 'sharp'
 
 import defaultOGImageBg from '../assets/ogimage-bg.png?inline'
@@ -14,6 +10,7 @@ import {
   type OgImagePublicTemplateName,
   type OgImageTemplateName,
 } from '../lib/ogImageProps'
+import { defaultOgImageRenderOptions, renderOgImage, type OgImageRender } from '../lib/ogImageRenderer'
 import { makeOverallScoreInfo } from '../lib/overallScore'
 
 import { makeExtraOgImageTemplates } from './OgImageExtraTemplates'
@@ -26,79 +23,12 @@ import type { APIContext } from 'astro'
 //         https://og-playground.vercel.app/        //
 //////////////////////////////////////////////////////
 
-const defaultOptions = {
-  width: 1200,
-  height: 630,
-  fonts: [
-    {
-      name: 'Inter',
-      weight: 400,
-      style: 'normal',
-      data: fs.readFileSync(
-        path.resolve(
-          process.cwd(),
-          'node_modules',
-          '@fontsource',
-          'inter',
-          'files',
-          'inter-latin-400-normal.woff'
-        )
-      ),
-    },
-    {
-      name: 'Inter',
-      weight: 700,
-      style: 'normal',
-      data: fs.readFileSync(
-        path.resolve(
-          process.cwd(),
-          'node_modules',
-          '@fontsource',
-          'inter',
-          'files',
-          'inter-latin-700-normal.woff'
-        )
-      ),
-    },
-    {
-      name: 'Space Grotesk',
-      weight: 400,
-      style: 'normal',
-      data: fs.readFileSync(
-        path.resolve(
-          process.cwd(),
-          'node_modules',
-          '@fontsource',
-          'space-grotesk',
-          'files',
-          'space-grotesk-latin-400-normal.woff'
-        )
-      ),
-    },
-    {
-      name: 'Space Grotesk',
-      weight: 700,
-      style: 'normal',
-      data: fs.readFileSync(
-        path.resolve(
-          process.cwd(),
-          'node_modules',
-          '@fontsource',
-          'space-grotesk',
-          'files',
-          'space-grotesk-latin-700-normal.woff'
-        )
-      ),
-    },
-  ],
-} as const satisfies ConstructorParameters<typeof ImageResponse>[1]
+const defaultOptions = defaultOgImageRenderOptions
 
 const extraOgImageTemplates = makeExtraOgImageTemplates({
   defaultOptions,
   defaultBackgroundSrc: defaultOGImageBg,
 })
-
-type OgImageRender = ImageResponse | Promise<ImageResponse | null> | null
 
 // OgImageTemplateRegistry pins every template to the output of the schema
 // registered under the same name, so a template cannot drift from the shape its
@@ -109,7 +39,7 @@ type OgImageTemplateRegistry<KTemplateName extends OgImageTemplateName> = {
 
 const ogImageTemplates = {
   default: (_props?: OgImageProps<'default'>, _context?: APIContext) => {
-    return new ImageResponse(
+    return renderOgImage(
       <img
         src={defaultOGImage}
         style={{
@@ -142,7 +72,7 @@ const ogImageTemplates = {
       ? await readLocalImageAsDataUri(imageUrl, { resize: { width: 140, height: 140, fit: 'contain' } })
       : null
 
-    return new ImageResponse(
+    return renderOgImage(
       <div
         style={{
           color: 'white',
@@ -320,7 +250,7 @@ const ogImageTemplates = {
 
     const resolvedIconSrc = icon ? await iconUrl(icon, 200) : null
 
-    return new ImageResponse(
+    return renderOgImage(
       <div
         style={{
           color: 'white',

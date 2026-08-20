@@ -1,25 +1,20 @@
-import { ImageResponse } from '@vercel/og'
 import sharp from 'sharp'
 
 import faviconSvg from '../../public/favicon.svg?raw'
 import logoNormalSvg from '../assets/logo/logo-normal.svg?raw'
 import logoSmallSvg from '../assets/logo/logo-small.svg?raw'
+import { renderOgImage } from '../lib/ogImageRenderer'
 import { makeOverallScoreInfo } from '../lib/overallScore'
 import { getBadgeSize, type BadgeTheme } from '../lib/serviceBadges'
 
 import { makeBlogOgImageTemplate } from './OgImageBlogTemplate'
 
 import type { OgImageProps } from '../lib/ogImageProps'
+import type { OgImageRenderOptions, OgImageTemplate } from '../lib/ogImageRenderer'
 import type { VerificationStatus } from '@prisma/client'
-import type { APIContext } from 'astro'
-
-type OgImageTemplate<TProps> = (
-  props: TProps,
-  context: APIContext
-) => ImageResponse | Promise<ImageResponse | null> | null
 
 type ExtraOgImageTemplateOptions = {
-  defaultOptions: ConstructorParameters<typeof ImageResponse>[1]
+  defaultOptions: OgImageRenderOptions
   defaultBackgroundSrc: string
 }
 
@@ -184,7 +179,7 @@ export function makeExtraOgImageTemplates({
     const kycLevelColor = badgeKycLevelColor(kycLevel)
     const size = getBadgeSize('lg')
 
-    return new ImageResponse(
+    return renderOgImage(
       <div
         style={{
           display: 'flex',
@@ -331,7 +326,7 @@ export function makeExtraOgImageTemplates({
     const kycLevelColor = badgeKycLevelColor(kycLevel)
     const size = getBadgeSize('sm')
 
-    return new ImageResponse(
+    return renderOgImage(
       <div
         style={{
           display: 'flex',
@@ -424,7 +419,7 @@ export function makeExtraOgImageTemplates({
     const logoTextPng = await getLogoTextPng(22)
     const size = getBadgeSize('xs')
 
-    return new ImageResponse(
+    return renderOgImage(
       <div
         style={{
           display: 'flex',

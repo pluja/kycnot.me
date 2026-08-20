@@ -6,16 +6,14 @@ import { memoizeAsync } from '../lib/memoizeAsync'
 import { trackMissingAssets } from '../lib/missingAssets'
 import { type OgImageProps, type OgImagePublicTemplateName } from '../lib/ogImageProps'
 import { logOgImageRejection } from '../lib/ogImageRejectionLog'
+import { type OgImageRender } from '../lib/ogImageRenderer'
 import { parsePublicOgImageRequest } from '../lib/ogImageRequest'
 import { Semaphore } from '../lib/semaphore'
 
-import type { ImageResponse } from '@vercel/og'
 import type { APIContext, APIRoute } from 'astro'
 
-// IMMUTABLE_CACHE_CONTROL preserves what @vercel/og set on the streamed
-// response. The URL is content-addressed: every field that changes the picture
-// is inside `?data=`, and local image names are content hashes, so a service
-// turning into a scam produces a different URL rather than a stale hit.
+// IMMUTABLE_CACHE_CONTROL keeps successful OG responses on the existing
+// long-lived cache policy.
 const IMMUTABLE_CACHE_CONTROL = 'public, immutable, no-transform, max-age=31536000'
 
 // DEGRADED_CACHE_CONTROL covers a card that rendered without an asset it wanted.
@@ -120,12 +118,8 @@ async function renderToBytes(
   return await toPngBytes(renderPublicOgImageTemplate(templateName, props, context))
 }
 
-// toPngBytes drains a render into memory. @vercel/og returns a stream that has
-// already sent its headers by the time satori runs, so buffering here is what
-// turns a satori failure into a throw rather than a 200 with a truncated body.
-async function toPngBytes(
-  rendered: ImageResponse | Promise<ImageResponse | null> | null
-): Promise<Uint8Array<ArrayBuffer>> {
+// toPngBytes validates the completed renderer response before it enters a cache.
+async function toPngBytes(rendered: OgImageRender): Promise<Uint8Array<ArrayBuffer>> {
   const response = await rendered
   if (!response?.ok) {
     throw new Error('template returned no usable response')

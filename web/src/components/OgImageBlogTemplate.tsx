@@ -1,18 +1,12 @@
-import { ImageResponse } from '@vercel/og'
-
 import { readLocalImageAsDataUri } from '../lib/localImageDataUri'
+import { renderOgImage } from '../lib/ogImageRenderer'
 
 import type { OgImageProps } from '../lib/ogImageProps'
-import type { APIContext } from 'astro'
-
-type OgImageTemplate<TProps> = (
-  props: TProps,
-  context: APIContext
-) => ImageResponse | Promise<ImageResponse | null> | null
+import type { OgImageRenderOptions, OgImageTemplate } from '../lib/ogImageRenderer'
 
 type BlogOgImageTemplateOptions = {
   defaultBackgroundSrc: string
-  defaultOptions: ConstructorParameters<typeof ImageResponse>[1]
+  defaultOptions: OgImageRenderOptions
 }
 
 export function makeBlogOgImageTemplate({
@@ -40,7 +34,7 @@ export function makeBlogOgImageTemplate({
         })
       : null
 
-    return new ImageResponse(
+    return renderOgImage(
       <div
         style={{
           width: '100%',
