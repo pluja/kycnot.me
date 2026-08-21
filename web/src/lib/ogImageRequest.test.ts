@@ -72,6 +72,7 @@ void test('falls back with schema diagnostics for invalid props and unknown fiel
     success: false,
     response: 'default',
     reason: 'Invalid props for "generic": title: invalid_type',
+    reasonKey: 'Invalid props for "generic"',
   })
   assert.deepEqual(
     parsePublicOgImageRequest(JSON.stringify({ template: 'generic', title: 'Events', extra: true })),
@@ -79,12 +80,14 @@ void test('falls back with schema diagnostics for invalid props and unknown fiel
       success: false,
       response: 'default',
       reason: 'Invalid props for "generic": (root): unrecognized_keys',
+      reasonKey: 'Invalid props for "generic"',
     }
   )
   assert.deepEqual(parsePublicOgImageRequest(JSON.stringify({ extra: true })), {
     success: false,
     response: 'default',
     reason: 'Invalid props for "default": (root): unrecognized_keys',
+    reasonKey: 'Invalid props for "default"',
   })
 })
 
@@ -94,4 +97,21 @@ void test('falls back before parsing oversized image data', () => {
     response: 'default',
     reason: 'Image data exceeds the length limit',
   })
+})
+
+void test('keeps the rejection key bounded while the reason keeps its detail', () => {
+  const reject = (categories: unknown) =>
+    parsePublicOgImageRequest(JSON.stringify({ template: 'service', categories }))
+
+  const first = reject([{ name: '', icon: 1 }])
+  const second = reject([
+    { name: 'ok', icon: 'ri:x-line' },
+    { name: '', icon: 2 },
+  ])
+
+  assert.equal(first.success, false)
+  assert.equal(second.success, false)
+  assert.notEqual(first.reason, second.reason)
+  assert.equal(first.reasonKey, 'Invalid props for "service"')
+  assert.equal(second.reasonKey, first.reasonKey)
 })

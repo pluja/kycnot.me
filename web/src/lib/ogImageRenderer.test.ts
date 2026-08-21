@@ -27,7 +27,24 @@ void test('renders a PNG without loading Greek or Cyrillic fonts from the networ
   const metadata = await sharp(bytes).metadata()
 
   assert.equal(response.headers.get('Content-Type'), 'image/png')
+  assert.equal(response.headers.get('Cache-Control'), null)
   assert.equal(metadata.width, 1200)
   assert.equal(metadata.height, 630)
   assert.equal(fetchRequests, 0)
+})
+
+void test('pins the compound language code Satori emits for Han text', async () => {
+  const detectedLanguageCodes: string[] = []
+  await renderOgImage(
+    createElement('div', { style: { display: 'flex', fontFamily: 'Space Grotesk' } }, '漢'),
+    {
+      ...defaultOgImageRenderOptions,
+      loadAdditionalAsset: (languageCode) => {
+        detectedLanguageCodes.push(languageCode)
+        return Promise.resolve([])
+      },
+    }
+  )
+
+  assert.deepEqual(detectedLanguageCodes, ['ja-JP|zh-CN|zh-TW|zh-HK'])
 })

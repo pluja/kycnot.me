@@ -12,8 +12,8 @@ import { Semaphore } from '../lib/semaphore'
 
 import type { APIContext, APIRoute } from 'astro'
 
-// IMMUTABLE_CACHE_CONTROL keeps successful OG responses on the existing
-// long-lived cache policy.
+// IMMUTABLE_CACHE_CONTROL is safe because every field that changes the picture
+// is inside `?data=`, and local image names are content hashes.
 const IMMUTABLE_CACHE_CONTROL = 'public, immutable, no-transform, max-age=31536000'
 
 // DEGRADED_CACHE_CONTROL covers a card that rendered without an asset it wanted.
@@ -23,7 +23,7 @@ const IMMUTABLE_CACHE_CONTROL = 'public, immutable, no-transform, max-age=315360
 // asset still costs one render per window instead of one per request.
 const DEGRADED_CACHE_CONTROL = 'public, no-transform, max-age=300'
 
-// renderSemaphore bounds concurrent renders because satori and resvg are
+// renderSemaphore bounds concurrent renders because satori and sharp are
 // CPU-heavy and `?data=` is unauthenticated, so work sheds beyond a bounded
 // backlog rather than saturating the box.
 const renderSemaphore = new Semaphore(2, 50)
@@ -56,7 +56,7 @@ export const GET: APIRoute = async (context) => {
   const parsedRequest = parsePublicOgImageRequest(rawData)
   if (!parsedRequest.success) {
     const outcome = parsedRequest.response === 'reject' ? 'Rejected request' : 'Using default card'
-    logOgImageRejection(outcome, parsedRequest.reason)
+    logOgImageRejection(outcome, parsedRequest.reason, parsedRequest.reasonKey)
     return parsedRequest.response === 'reject' ? invalidParametersResponse() : await fallbackResponse()
   }
 

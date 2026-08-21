@@ -13,6 +13,8 @@ type RejectedPublicOgImageRequest = {
   success: false
   response: 'default' | 'reject'
   reason: string
+  // reasonKey groups the log rate limit when reason carries `?data=` detail.
+  reasonKey?: string
 }
 
 export type PublicOgImageRequestResult = ParsedPublicOgImageRequest | RejectedPublicOgImageRequest
@@ -40,7 +42,12 @@ export function parsePublicOgImageRequest(rawData: string | null): PublicOgImage
   const { template: _template, ...props } = data
   const parsedProps = publicOgImagePropsSchemas[templateName].safeParse(props)
   if (!parsedProps.success) {
-    return rejectWithDefault(`Invalid props for "${templateName}": ${summarizeIssues(parsedProps.error)}`)
+    return {
+      success: false,
+      response: 'default',
+      reason: `Invalid props for "${templateName}": ${summarizeIssues(parsedProps.error)}`,
+      reasonKey: `Invalid props for "${templateName}"`,
+    }
   }
 
   return {

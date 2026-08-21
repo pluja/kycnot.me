@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { LruByteCache } from './lruByteCache'
 import { reportMissingAsset } from './missingAssets'
 
-import type { Font, SatoriOptions } from 'satori'
+import type { Font, Locale, SatoriOptions } from 'satori'
 
 export const OG_IMAGE_ASSET_LIMITS = {
   timeoutMs: 3000,
@@ -14,7 +14,9 @@ export const OG_IMAGE_ASSET_LIMITS = {
 } as const
 
 const TWEMOJI_BASE_URL = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/'
-const FONT_FAMILIES: Record<string, string[]> = {
+type SatoriFontCode = Locale | 'math' | 'symbol'
+
+const FONT_FAMILIES = {
   'ja-JP': ['Noto+Sans+JP'],
   'ko-KR': ['Noto+Sans+KR'],
   'zh-CN': ['Noto+Sans+SC'],
@@ -31,10 +33,12 @@ const FONT_FAMILIES: Record<string, string[]> = {
   kannada: ['Noto+Sans+Kannada'],
   symbol: ['Noto+Sans+Symbols', 'Noto+Sans+Symbols+2'],
   math: ['Noto+Sans+Math'],
-}
+} satisfies Record<SatoriFontCode, string[]>
 
 type OgImageAsset = Font[] | string
 type FetchAsset = (input: URL | string, init?: RequestInit) => Promise<Response>
+type FontRequest = { code: SatoriFontCode; family: string }
+type OgImageAssetRequest = { type: 'emoji' } | { type: 'fonts'; fontRequests: FontRequest[] }
 
 type OgImageAssetLoaderOptions = {
   fetchAsset?: FetchAsset
@@ -60,6 +64,15 @@ export function createOgImageAssetLoader({
   const pending = new Map<string, Promise<OgImageAsset>>()
 
   return async (languageCode, segment) => {
+    const assetRequest: OgImageAssetRequest =
+      languageCode === 'emoji'
+        ? { type: 'emoji' }
+        : { type: 'fonts', fontRequests: getFontRequests(languageCode) }
+    // A script with no mapped family renders as tofu no matter how often it is
+    // retried, so it must not reach reportMissingAsset: that would hold every
+    // card carrying it out of the render cache forever.
+    if (assetRequest.type === 'fonts' && assetRequest.fontRequests.length === 0) return []
+
     const key = assetKey(languageCode, segment)
     const cached = assetCache.get(key)
     if (cached !== undefined) return cached
@@ -72,7 +85,7 @@ export function createOgImageAssetLoader({
 
     let task = pending.get(key)
     if (!task) {
-      task = loadAndCacheAsset(languageCode, segment, key)
+      task = loadAndCacheAsset(segment, key, assetRequest)
       pending.set(key, task)
     }
 
@@ -81,12 +94,12 @@ export function createOgImageAssetLoader({
     return asset
   }
 
-  async function loadAndCacheAsset(languageCode: string, segment: string, key: string) {
+  async function loadAndCacheAsset(segment: string, key: string, assetRequest: OgImageAssetRequest) {
     try {
       const asset =
-        languageCode === 'emoji'
+        assetRequest.type === 'emoji'
           ? await loadEmoji(segment, fetchAsset, timeoutMs)
-          : await loadFonts(languageCode, segment, fetchAsset, timeoutMs)
+          : await loadFonts(assetRequest.fontRequests, segment, fetchAsset, timeoutMs)
       if (isEmptyAsset(asset)) {
         failureCache.set(key, now() + OG_IMAGE_ASSET_LIMITS.failureCacheMs, 1)
       } else {
@@ -116,14 +129,11 @@ async function loadEmoji(segment: string, fetchAsset: FetchAsset, timeoutMs: num
 }
 
 async function loadFonts(
-  languageCode: string,
+  requests: FontRequest[],
   segment: string,
   fetchAsset: FetchAsset,
   timeoutMs: number
 ): Promise<Font[]> {
-  const requests = languageCode
-    .split('|')
-    .flatMap((code) => (FONT_FAMILIES[code] ?? []).map((family) => ({ code, family })))
   const fonts = await Promise.all(
     requests.map(async ({ code, family }) => {
       try {
@@ -134,6 +144,18 @@ async function loadFonts(
     })
   )
   return fonts.filter((font): font is Font => font !== null)
+}
+
+function getFontRequests(languageCode: string): FontRequest[] {
+  return languageCode
+    .split('|')
+    .flatMap((code) =>
+      isSatoriFontCode(code) ? FONT_FAMILIES[code].map((family) => ({ code, family })) : []
+    )
+}
+
+function isSatoriFontCode(code: string): code is SatoriFontCode {
+  return Object.hasOwn(FONT_FAMILIES, code)
 }
 
 async function loadGoogleFont(

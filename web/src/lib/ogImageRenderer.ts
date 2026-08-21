@@ -33,7 +33,7 @@ export async function renderOgImage(element: ReactNode, options: OgImageRenderOp
     debug: options.debug,
     loadAdditionalAsset: options.loadAdditionalAsset ?? loadOgImageAsset,
   })
-  const png = await sharp(Buffer.from(svg)).resize(options.width).png().toBuffer()
+  const png = await sharp(Buffer.from(svg)).png().toBuffer()
   const pngBytes = new Uint8Array(png)
 
   return new Response(pngBytes, {
@@ -41,10 +41,6 @@ export async function renderOgImage(element: ReactNode, options: OgImageRenderOp
     headers: {
       'Content-Type': 'image/png',
       'Content-Length': String(png.byteLength),
-      'Cache-Control':
-        process.env.NODE_ENV === 'development'
-          ? 'no-cache, no-store'
-          : 'public, immutable, no-transform, max-age=31536000',
     },
   })
 }
