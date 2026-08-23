@@ -7,8 +7,8 @@ import { trackMissingAssets } from '../lib/missingAssets'
 import { type OgImageProps, type OgImagePublicTemplateName } from '../lib/ogImageProps'
 import { logOgImageRejection } from '../lib/ogImageRejectionLog'
 import { type OgImageRender } from '../lib/ogImageRenderer'
+import { ogRenderSemaphore } from '../lib/ogImageRenderQueue'
 import { parsePublicOgImageRequest } from '../lib/ogImageRequest'
-import { Semaphore } from '../lib/semaphore'
 
 import type { APIContext, APIRoute } from 'astro'
 
@@ -22,11 +22,6 @@ const IMMUTABLE_CACHE_CONTROL = 'public, immutable, no-transform, max-age=315360
 // logo-less card for good. Short rather than no-store so a permanently missing
 // asset still costs one render per window instead of one per request.
 const DEGRADED_CACHE_CONTROL = 'public, no-transform, max-age=300'
-
-// renderSemaphore bounds concurrent renders because satori and sharp are
-// CPU-heavy and `?data=` is unauthenticated, so work sheds beyond a bounded
-// backlog rather than saturating the box.
-const renderSemaphore = new Semaphore(2, 50)
 
 // renderCache exists because every social platform keeps its own unfurl cache,
 // so the same card is otherwise rendered once per platform and again after each
@@ -68,7 +63,7 @@ export const GET: APIRoute = async (context) => {
 
   const { templateName, props } = parsedRequest
 
-  const pending = renderSemaphore.run(() =>
+  const pending = ogRenderSemaphore.run(() =>
     trackMissingAssets(() => renderToBytes(templateName, props, context))
   )
   if (!pending) {

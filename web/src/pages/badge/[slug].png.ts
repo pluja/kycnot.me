@@ -6,11 +6,12 @@ import {
   normalizeOgImageScore,
 } from '../../lib/ogImageNormalize'
 import { badgeOgImagePropsSchemas } from '../../lib/ogImageProps'
+import { ogRenderSemaphore } from '../../lib/ogImageRenderQueue'
 import { prisma } from '../../lib/prisma'
 import { isBadgeSize, isBadgeTheme, isEmbeddableBadgeStatus } from '../../lib/serviceBadges'
 
 import type { BadgeSize, BadgeTheme } from '../../lib/serviceBadges'
-import type { APIRoute } from 'astro'
+import type { APIContext, APIRoute } from 'astro'
 
 export const prerender = false
 
@@ -37,6 +38,24 @@ type CachedBadgeResponse = {
 }
 
 const badgeResponseCache = new Map<string, CachedBadgeResponse>()
+
+// pendingBadgeRenders collapses concurrent requests for one badge onto a single
+// render. The cache is only written after a render finishes, so without this a
+// burst on one URL misses on every connection and each miss buys its own
+// satori pass.
+const pendingBadgeRenders = new Map<string, Promise<BadgeRenderOutcome>>()
+
+type BadgeRenderOutcome =
+  | { body: Uint8Array; headers: [string, string][]; status: 'ok' }
+  | { status: 'busy' }
+  | { status: 'notFound' }
+
+function busyBadgeResponse() {
+  return new Response('Badge service busy', {
+    status: 429,
+    headers: { 'Retry-After': '5', 'Cache-Control': 'no-store' },
+  })
+}
 
 function notFoundBadgeResponse() {
   return new Response(null, {
@@ -105,13 +124,7 @@ async function readResponseBody(body: ReadableStream<Uint8Array> | null) {
   return result
 }
 
-async function cacheBadgeResponse(
-  cacheKey: string,
-  bodyStream: ReadableStream<Uint8Array> | null,
-  headers: Headers
-) {
-  const body = await readResponseBody(bodyStream)
-
+function cacheBadgeResponse(cacheKey: string, body: Uint8Array, headers: Headers): BadgeRenderOutcome {
   badgeResponseCache.set(cacheKey, {
     body,
     expiresAt: Date.now() + BADGE_CACHE_SECONDS * 1000,
@@ -123,10 +136,7 @@ async function cacheBadgeResponse(
     if (oldestCacheKey) badgeResponseCache.delete(oldestCacheKey)
   }
 
-  return new Response(body.slice(0), {
-    status: 200,
-    headers,
-  })
+  return { body, headers: [...headers.entries()], status: 'ok' }
 }
 
 export const GET: APIRoute = async (context) => {
@@ -141,9 +151,42 @@ export const GET: APIRoute = async (context) => {
   const showRating = context.url.searchParams.get('rating') === '1'
   const showKycLevel = context.url.searchParams.get('kyc') === '1'
   const cacheKey = makeBadgeCacheKey({ slug, size, theme, showScore, showRating, showKycLevel })
+
   const cachedResponse = getCachedBadgeResponse(cacheKey)
   if (cachedResponse) return cachedResponse
 
+  const options = { showKycLevel, showRating, showScore, size, slug, theme }
+  let pending = pendingBadgeRenders.get(cacheKey)
+  if (!pending) {
+    pending = renderBadge(cacheKey, options, context).finally(() => pendingBadgeRenders.delete(cacheKey))
+    pendingBadgeRenders.set(cacheKey, pending)
+  }
+
+  try {
+    const outcome = await pending
+    if (outcome.status === 'notFound') return notFoundBadgeResponse()
+    if (outcome.status === 'busy') return busyBadgeResponse()
+    return new Response(outcome.body.slice(0), { status: 200, headers: outcome.headers })
+  } catch (error) {
+    console.error(`[badge] Failed to render badge-${size} for ${slug}:`, error)
+    return new Response('Render failed', { status: 500, headers: { 'Cache-Control': 'no-store' } })
+  }
+}
+
+type BadgeRenderOptions = {
+  showKycLevel: boolean
+  showRating: boolean
+  showScore: boolean
+  size: BadgeSize
+  slug: string
+  theme: BadgeTheme
+}
+
+async function renderBadge(
+  cacheKey: string,
+  { showKycLevel, showRating, showScore, size, slug, theme }: BadgeRenderOptions,
+  context: APIContext
+): Promise<BadgeRenderOutcome> {
   const service = await prisma.service.findUnique({
     where: { slug, serviceVisibility: 'PUBLIC' },
     select: {
@@ -155,60 +198,57 @@ export const GET: APIRoute = async (context) => {
     },
   })
 
-  if (!service) return notFoundBadgeResponse()
-  if (!isEmbeddableBadgeStatus(service.verificationStatus)) {
-    return notFoundBadgeResponse()
-  }
+  if (!service || !isEmbeddableBadgeStatus(service.verificationStatus)) return { status: 'notFound' }
 
-  const templateKey = `badge-${size}` as const
   const baseProps = { verificationStatus: service.verificationStatus, theme }
-
-  try {
-    const normalizeBadgeText = createOgImageTextNormalizer(OG_IMAGE_LIMITS.badge.name)
-    const metricProps = {
-      overallScore: normalizeOgImageScore(service.overallScore),
-      averageUserRating: normalizeOgImageRating(service.trustWeightedUserRating),
-      kycLevel: normalizeOgImageKycLevel(service.kycLevel),
-    }
-    const response =
-      size === 'lg'
-        ? await badgeOgImageTemplates['badge-lg'](
-            badgeOgImagePropsSchemas['badge-lg'].parse({
-              ...baseProps,
-              ...metricProps,
-              name: normalizeBadgeText(service.name, OG_IMAGE_LIMITS.badge.name),
-              showScore,
-              showRating,
-              showKycLevel,
-            }),
-            context
-          )
-        : size === 'sm'
-          ? await badgeOgImageTemplates['badge-sm'](
-              badgeOgImagePropsSchemas['badge-sm'].parse({
-                ...baseProps,
-                ...metricProps,
-                showScore,
-                showRating,
-                showKycLevel,
-              }),
-              context
-            )
-          : await badgeOgImageTemplates['badge-xs'](
-              badgeOgImagePropsSchemas['badge-xs'].parse(baseProps),
-              context
-            )
-
-    if (response === null) {
-      return new Response('Render failed', { status: 500 })
-    }
-
-    const headers = new Headers(response.headers)
-    headers.set('Cache-Control', BADGE_CACHE_CONTROL)
-
-    return await cacheBadgeResponse(cacheKey, response.body, headers)
-  } catch (error) {
-    console.error(`[badge] Failed to render ${templateKey} for ${slug}:`, error)
-    return new Response('Render failed', { status: 500 })
+  const metricProps = {
+    overallScore: normalizeOgImageScore(service.overallScore),
+    averageUserRating: normalizeOgImageRating(service.trustWeightedUserRating),
+    kycLevel: normalizeOgImageKycLevel(service.kycLevel),
   }
+  const normalizeBadgeText = createOgImageTextNormalizer(OG_IMAGE_LIMITS.badge.name)
+
+  // The template call is the CPU-heavy part, so only it takes a render slot.
+  // The lookup above stays outside: holding a slot across database I/O would
+  // shed requests the box has the capacity to serve.
+  const pending = ogRenderSemaphore.run(async () => {
+    switch (size) {
+      case 'lg':
+        return await badgeOgImageTemplates['badge-lg'](
+          badgeOgImagePropsSchemas['badge-lg'].parse({
+            ...baseProps,
+            ...metricProps,
+            name: normalizeBadgeText(service.name, OG_IMAGE_LIMITS.badge.name),
+            showScore,
+            showRating,
+            showKycLevel,
+          }),
+          context
+        )
+      case 'sm':
+        return await badgeOgImageTemplates['badge-sm'](
+          badgeOgImagePropsSchemas['badge-sm'].parse({
+            ...baseProps,
+            ...metricProps,
+            showScore,
+            showRating,
+            showKycLevel,
+          }),
+          context
+        )
+      case 'xs':
+        return await badgeOgImageTemplates['badge-xs'](
+          badgeOgImagePropsSchemas['badge-xs'].parse(baseProps),
+          context
+        )
+    }
+  })
+  if (!pending) return { status: 'busy' }
+
+  const response = await pending
+  if (!response?.ok) throw new Error(`badge-${size} template returned no usable response`)
+
+  const headers = new Headers(response.headers)
+  headers.set('Cache-Control', BADGE_CACHE_CONTROL)
+  return cacheBadgeResponse(cacheKey, await readResponseBody(response.body), headers)
 }
