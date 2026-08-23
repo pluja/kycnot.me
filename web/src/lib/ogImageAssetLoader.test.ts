@@ -15,33 +15,28 @@ function mockGoogleFontResponse(input: URL | string): Response {
   })
 }
 
-void test('loads each emoji once with an abort signal and caches it', async () => {
+void test('loads each segment once with an abort signal and caches it', async () => {
   const signals: AbortSignal[] = []
   let requests = 0
   const loadAsset = createOgImageAssetLoader({
-    fetchAsset: (_input, init) => {
+    fetchAsset: (input, init) => {
       requests++
       assert.ok(init?.signal)
       signals.push(init.signal)
-      return Promise.resolve(
-        new Response('<svg xmlns="http://www.w3.org/2000/svg"/>', {
-          headers: { 'Content-Type': 'image/svg+xml' },
-        })
-      )
+      return Promise.resolve(mockGoogleFontResponse(input))
     },
   })
 
-  const first = await loadAsset('emoji', '😀')
-  const second = await loadAsset('emoji', '😀')
+  const first = await loadAsset('ar-AR', 'مرحبا')
+  const second = await loadAsset('ar-AR', 'مرحبا')
 
-  assert.equal(requests, 1)
-  assert.equal(signals.length, 1)
-  if (typeof first !== 'string') assert.fail('expected an emoji data URI')
+  assert.equal(requests, 2)
+  assert.equal(signals.length, 2)
   assert.equal(second, first)
-  assert.match(first, /^data:image\/svg\+xml;base64,/)
+  assert.equal(Array.isArray(first) ? first.length : 0, 1)
 })
 
-void test('shares one in-flight emoji request', async () => {
+void test('shares one in-flight request per segment', async () => {
   let requests = 0
   let resolveResponse: (response: Response) => void = () => undefined
   const loadAsset = createOgImageAssetLoader({
@@ -53,15 +48,11 @@ void test('shares one in-flight emoji request', async () => {
     },
   })
 
-  const first = loadAsset('emoji', '😀')
-  const second = loadAsset('emoji', '😀')
+  const first = loadAsset('ar-AR', 'مرحبا')
+  const second = loadAsset('ar-AR', 'مرحبا')
   assert.equal(requests, 1)
 
-  resolveResponse(
-    new Response('<svg xmlns="http://www.w3.org/2000/svg"/>', {
-      headers: { 'Content-Type': 'image/svg+xml' },
-    })
-  )
+  resolveResponse(new Response('no font-face here', { headers: { 'Content-Type': 'text/css' } }))
   const results = await Promise.all([first, second])
   assert.equal(results[0], results[1])
 })
@@ -84,8 +75,8 @@ void test('aborts a stalled asset request and negative-caches the failure', asyn
     },
   })
 
-  const first = await trackMissingAssets(() => loadAsset('emoji', '😀'))
-  const second = await trackMissingAssets(() => loadAsset('emoji', '😀'))
+  const first = await trackMissingAssets(() => loadAsset('ar-AR', 'مرحبا'))
+  const second = await trackMissingAssets(() => loadAsset('ar-AR', 'مرحبا'))
   assert.deepEqual(first, { result: [], missingAssets: true })
   assert.deepEqual(second, { result: [], missingAssets: true })
   assert.equal(requests, 1)
@@ -163,14 +154,27 @@ void test('rejects oversized asset responses', async () => {
   const loadAsset = createOgImageAssetLoader({
     fetchAsset: () =>
       Promise.resolve(
-        new Response('<svg/>', {
+        new Response('@font-face {}', {
           headers: {
             'Content-Length': '9999999',
-            'Content-Type': 'image/svg+xml',
+            'Content-Type': 'text/css',
           },
         })
       ),
   })
 
-  assert.deepEqual(await loadAsset('emoji', '😀'), [])
+  assert.deepEqual(await loadAsset('ar-AR', 'مرحبا'), [])
+})
+
+void test('rejects a font resource served from outside the allowlist', async () => {
+  const loadAsset = createOgImageAssetLoader({
+    fetchAsset: () =>
+      Promise.resolve(
+        new Response("@font-face { src: url(https://evil.tld/f.ttf) format('truetype'); }", {
+          headers: { 'Content-Type': 'text/css' },
+        })
+      ),
+  })
+
+  assert.deepEqual(await loadAsset('ar-AR', 'مرحبا'), [])
 })

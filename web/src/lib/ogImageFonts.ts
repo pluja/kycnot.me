@@ -14,7 +14,7 @@ function readLocalFont(fileName: string): Buffer {
   return fs.readFileSync(path.join(LOCAL_FONT_ROOT, fileName))
 }
 
-export const notoSansFonts = [
+const notoSansFonts = [
   {
     name: 'Noto Sans',
     weight: 400,

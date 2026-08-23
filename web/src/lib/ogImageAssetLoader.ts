@@ -5,15 +5,13 @@ import { reportMissingAsset } from './missingAssets'
 
 import type { Font, Locale, SatoriOptions } from 'satori'
 
-export const OG_IMAGE_ASSET_LIMITS = {
+const OG_IMAGE_ASSET_LIMITS = {
   timeoutMs: 3000,
-  emojiBytes: 256 * 1024,
   fontCssBytes: 64 * 1024,
   fontBytes: 2 * 1024 * 1024,
   failureCacheMs: 5 * 60 * 1000,
 } as const
 
-const TWEMOJI_BASE_URL = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/'
 type SatoriFontCode = Locale | 'math' | 'symbol'
 
 const FONT_FAMILIES = {
@@ -35,10 +33,8 @@ const FONT_FAMILIES = {
   math: ['Noto+Sans+Math'],
 } satisfies Record<SatoriFontCode, string[]>
 
-type OgImageAsset = Font[] | string
 type FetchAsset = (input: URL | string, init?: RequestInit) => Promise<Response>
 type FontRequest = { code: SatoriFontCode; family: string }
-type OgImageAssetRequest = { type: 'emoji' } | { type: 'fonts'; fontRequests: FontRequest[] }
 
 type OgImageAssetLoaderOptions = {
   fetchAsset?: FetchAsset
@@ -59,19 +55,17 @@ export function createOgImageAssetLoader({
   now = Date.now,
   timeoutMs = OG_IMAGE_ASSET_LIMITS.timeoutMs,
 }: OgImageAssetLoaderOptions = {}): NonNullable<SatoriOptions['loadAdditionalAsset']> {
-  const assetCache = new LruByteCache<OgImageAsset>(32 * 1024 * 1024, 4 * 1024 * 1024)
+  const assetCache = new LruByteCache<Font[]>(32 * 1024 * 1024, 4 * 1024 * 1024)
   const failureCache = new LruByteCache<number>(256, 1)
-  const pending = new Map<string, Promise<OgImageAsset>>()
+  const pending = new Map<string, Promise<Font[]>>()
 
   return async (languageCode, segment) => {
-    const assetRequest: OgImageAssetRequest =
-      languageCode === 'emoji'
-        ? { type: 'emoji' }
-        : { type: 'fonts', fontRequests: getFontRequests(languageCode) }
     // A script with no mapped family renders as tofu no matter how often it is
     // retried, so it must not reach reportMissingAsset: that would hold every
-    // card carrying it out of the render cache forever.
-    if (assetRequest.type === 'fonts' && assetRequest.fontRequests.length === 0) return []
+    // card carrying it out of the render cache forever. Emoji land here too,
+    // since card text is stripped of them before it reaches satori.
+    const fontRequests = getFontRequests(languageCode)
+    if (fontRequests.length === 0) return []
 
     const key = assetKey(languageCode, segment)
     const cached = assetCache.get(key)
@@ -85,27 +79,24 @@ export function createOgImageAssetLoader({
 
     let task = pending.get(key)
     if (!task) {
-      task = loadAndCacheAsset(segment, key, assetRequest)
+      task = loadAndCacheFonts(fontRequests, segment, key)
       pending.set(key, task)
     }
 
-    const asset = await task
-    if (isEmptyAsset(asset)) reportMissingAsset()
-    return asset
+    const fonts = await task
+    if (fonts.length === 0) reportMissingAsset()
+    return fonts
   }
 
-  async function loadAndCacheAsset(segment: string, key: string, assetRequest: OgImageAssetRequest) {
+  async function loadAndCacheFonts(requests: FontRequest[], segment: string, key: string) {
     try {
-      const asset =
-        assetRequest.type === 'emoji'
-          ? await loadEmoji(segment, fetchAsset, timeoutMs)
-          : await loadFonts(assetRequest.fontRequests, segment, fetchAsset, timeoutMs)
-      if (isEmptyAsset(asset)) {
+      const fonts = await loadFonts(requests, segment, fetchAsset, timeoutMs)
+      if (fonts.length === 0) {
         failureCache.set(key, now() + OG_IMAGE_ASSET_LIMITS.failureCacheMs, 1)
       } else {
-        assetCache.set(key, asset, assetBytes(asset))
+        assetCache.set(key, fonts, fontBytes(fonts))
       }
-      return asset
+      return fonts
     } catch {
       failureCache.set(key, now() + OG_IMAGE_ASSET_LIMITS.failureCacheMs, 1)
       return []
@@ -116,17 +107,6 @@ export function createOgImageAssetLoader({
 }
 
 export const loadOgImageAsset = createOgImageAssetLoader()
-
-async function loadEmoji(segment: string, fetchAsset: FetchAsset, timeoutMs: number): Promise<string> {
-  const signal = AbortSignal.timeout(timeoutMs)
-  const bytes = await fetchBytes(`${TWEMOJI_BASE_URL}${emojiCode(segment)}.svg`, fetchAsset, {
-    allowedHost: 'cdn.jsdelivr.net',
-    contentTypes: new Set(['image/svg+xml']),
-    maxBytes: OG_IMAGE_ASSET_LIMITS.emojiBytes,
-    signal,
-  })
-  return `data:image/svg+xml;base64,${Buffer.from(bytes).toString('base64')}`
-}
 
 async function loadFonts(
   requests: FontRequest[],
@@ -253,26 +233,10 @@ function assertAllowedUrl(value: string, allowedHost: string): void {
   }
 }
 
-function emojiCode(value: string): string {
-  const normalized = value.includes('\u200d') ? value : value.replaceAll('\ufe0f', '')
-  return Array.from(normalized, codePointHex).join('-')
-}
-
-function codePointHex(character: string): string {
-  const codePoint = character.codePointAt(0)
-  if (codePoint === undefined) throw new Error('Cannot encode an empty emoji segment')
-  return codePoint.toString(16)
-}
-
 function assetKey(languageCode: string, segment: string): string {
   return createHash('sha1').update(languageCode).update('\0').update(segment).digest('base64url')
 }
 
-function assetBytes(asset: OgImageAsset): number {
-  if (typeof asset === 'string') return Buffer.byteLength(asset)
-  return asset.reduce((total, font) => total + font.data.byteLength, 0)
-}
-
-function isEmptyAsset(asset: OgImageAsset): boolean {
-  return Array.isArray(asset) && asset.length === 0
+function fontBytes(fonts: Font[]): number {
+  return fonts.reduce((total, font) => total + font.data.byteLength, 0)
 }
