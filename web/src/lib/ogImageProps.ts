@@ -2,11 +2,11 @@ import { VerificationStatus } from '@prisma/client'
 import { z } from 'zod'
 
 import {
-  countOgImageEmoji,
   isAllowedOgImageSource,
   isWithinOgImageTextBudget,
   OG_IMAGE_ICON_PATTERN,
   OG_IMAGE_LIMITS,
+  stripOgImageEmoji,
 } from './ogImageInput'
 import { badgeThemes } from './serviceBadges'
 
@@ -25,7 +25,16 @@ const kycLevelSchema = z
   .max(OG_IMAGE_LIMITS.kycLevel.max)
 const iconSchema = z.string().max(OG_IMAGE_LIMITS.icon).regex(OG_IMAGE_ICON_PATTERN)
 const imageSourceSchema = z.string().max(OG_IMAGE_LIMITS.imageSource).refine(isAllowedOgImageSource)
-const requiredTextSchema = (maxLength: number) => z.string().trim().min(1).max(maxLength)
+// Text schemas strip emoji before length checks so `?data=` cannot put one in
+// front of satori. This is the only chokepoint both the public endpoint and the
+// badge route share, so it has to happen here rather than in the normalizer.
+const optionalTextSchema = (maxLength: number) =>
+  z
+    .string()
+    .trim()
+    .max(maxLength)
+    .transform((value) => stripOgImageEmoji(value).trim())
+const requiredTextSchema = (maxLength: number) => optionalTextSchema(maxLength).pipe(z.string().trim().min(1))
 
 const badgePropsSchema = z
   .object({
@@ -48,7 +57,7 @@ export const publicOgImagePropsSchemas = {
   service: z
     .object({
       title: requiredTextSchema(OG_IMAGE_LIMITS.service.title),
-      description: z.string().max(OG_IMAGE_LIMITS.service.description),
+      description: optionalTextSchema(OG_IMAGE_LIMITS.service.description),
       categories: z
         .array(
           z
@@ -71,17 +80,11 @@ export const publicOgImagePropsSchemas = {
           OG_IMAGE_LIMITS.service.totalText
         ),
       { path: ['renderedText'] }
-    )
-    .refine(
-      ({ categories, description, title }) =>
-        countOgImageEmoji([title, description, ...categories.map(({ name }) => name)]) <=
-        OG_IMAGE_LIMITS.maxEmoji,
-      { path: ['emoji'] }
     ),
   generic: z
     .object({
       title: requiredTextSchema(OG_IMAGE_LIMITS.generic.title),
-      description: z.string().max(OG_IMAGE_LIMITS.generic.description).nullish(),
+      description: optionalTextSchema(OG_IMAGE_LIMITS.generic.description).nullish(),
       icon: iconSchema.nullish(),
     })
     .strict()
@@ -89,35 +92,23 @@ export const publicOgImagePropsSchemas = {
       ({ description, title }) =>
         isWithinOgImageTextBudget([title, description ?? ''], OG_IMAGE_LIMITS.generic.totalText),
       { path: ['renderedText'] }
-    )
-    .refine(
-      ({ description, title }) => countOgImageEmoji([title, description ?? '']) <= OG_IMAGE_LIMITS.maxEmoji,
-      { path: ['emoji'] }
     ),
   blog: z
     .object({
       title: requiredTextSchema(OG_IMAGE_LIMITS.blog.title),
       coverImage: imageSourceSchema.nullish(),
-      author: z.string().max(OG_IMAGE_LIMITS.blog.author).nullish(),
+      author: optionalTextSchema(OG_IMAGE_LIMITS.blog.author).nullish(),
       publishedAt: z.string().max(40).datetime({ offset: true }).nullish(),
     })
     .strict()
     .refine(
       ({ author, title }) => isWithinOgImageTextBudget([title, author ?? ''], OG_IMAGE_LIMITS.blog.totalText),
       { path: ['renderedText'] }
-    )
-    .refine(({ author, title }) => countOgImageEmoji([title, author ?? '']) <= OG_IMAGE_LIMITS.maxEmoji, {
-      path: ['emoji'],
-    }),
+    ),
 } as const satisfies Record<string, z.ZodType>
 
 export const badgeOgImagePropsSchemas = {
-  'badge-lg': badgePropsSchema
-    .extend({ name: requiredTextSchema(OG_IMAGE_LIMITS.badge.name) })
-    .strict()
-    .refine(({ name }) => countOgImageEmoji([name]) <= OG_IMAGE_LIMITS.maxEmoji, {
-      path: ['emoji'],
-    }),
+  'badge-lg': badgePropsSchema.extend({ name: requiredTextSchema(OG_IMAGE_LIMITS.badge.name) }).strict(),
   'badge-sm': badgePropsSchema,
   'badge-xs': badgePropsSchema.pick({ theme: true, verificationStatus: true }).strict(),
 } as const satisfies Record<string, z.ZodType>

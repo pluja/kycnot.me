@@ -1,6 +1,5 @@
 export const OG_IMAGE_LIMITS = {
   rawData: 4096,
-  maxEmoji: 12,
   maxCategories: 8,
   icon: 100,
   imageSource: 512,
@@ -43,14 +42,17 @@ const LOCAL_IMAGE_PREFIXES = ['/files/', '/_astro/', '/@fs/'] as const
 const EMOJI_GRAPHEME_PATTERN = /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20e3|\ufe0f/u
 const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
-export function countOgImageEmoji(values: readonly string[]): number {
-  let count = 0
-  for (const value of values) {
-    for (const { segment } of graphemeSegmenter.segment(value)) {
-      if (isEmojiGrapheme(segment)) count++
-    }
+// stripOgImageEmoji removes emoji graphemes. Cards are rendered by satori,
+// which resolves every emoji through a remote sprite, so an emoji in card copy
+// is an outbound request per glyph on an unauthenticated endpoint. Site copy
+// carries none, so dropping them costs nothing and keeps the renderer offline.
+// Segmenting rather than replacing keeps ZWJ sequences and modifiers whole.
+export function stripOgImageEmoji(value: string): string {
+  let stripped = ''
+  for (const { segment } of graphemeSegmenter.segment(value)) {
+    if (!isEmojiGrapheme(segment)) stripped += segment
   }
-  return count
+  return stripped
 }
 
 export function isWithinOgImageTextBudget(values: readonly string[], budget: number): boolean {
@@ -61,7 +63,6 @@ export function createOgImageTextNormalizer(
   totalBudget: number
 ): (value: string, fieldLimit: number) => string {
   let remainingText = totalBudget
-  let remainingEmoji: number = OG_IMAGE_LIMITS.maxEmoji
 
   return (value: string, fieldLimit: number): string => {
     let normalized = ''
@@ -69,15 +70,12 @@ export function createOgImageTextNormalizer(
 
     for (const { segment } of graphemeSegmenter.segment(value)) {
       if (remainingText === 0 || remainingFieldText === 0) break
+      if (isEmojiGrapheme(segment)) continue
       if (segment.length > remainingText || segment.length > remainingFieldText) continue
-
-      const isEmoji = isEmojiGrapheme(segment)
-      if (isEmoji && remainingEmoji === 0) continue
 
       normalized += segment
       remainingText -= segment.length
       remainingFieldText -= segment.length
-      if (isEmoji) remainingEmoji--
     }
 
     return normalized

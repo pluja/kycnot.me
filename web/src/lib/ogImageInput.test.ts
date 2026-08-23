@@ -2,28 +2,26 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import {
-  countOgImageEmoji,
   createOgImageTextNormalizer,
   isAllowedOgImageSource,
   isValidOgImageIcon,
-  OG_IMAGE_LIMITS,
+  stripOgImageEmoji,
 } from './ogImageInput'
 
-void test('counts emoji graphemes instead of code points', () => {
-  assert.equal(countOgImageEmoji(['plain text']), 0)
-  assert.equal(countOgImageEmoji(['👨‍👩‍👧‍👦']), 1)
-  assert.equal(countOgImageEmoji(['🇬🇷']), 1)
-  assert.equal(countOgImageEmoji(['😀'.repeat(20)]), 20)
+void test('strips whole emoji graphemes and keeps surrounding text', () => {
+  assert.equal(stripOgImageEmoji('plain text'), 'plain text')
+  assert.equal(stripOgImageEmoji('Bisq 👨‍👩‍👧‍👦 exchange'), 'Bisq  exchange')
+  assert.equal(stripOgImageEmoji('🇬🇷'), '')
+  assert.equal(stripOgImageEmoji('⚠️ alert'), ' alert')
+  assert.equal(stripOgImageEmoji('a😀z'.repeat(20)), 'az'.repeat(20))
 })
 
-void test('normalizes text without splitting graphemes', () => {
+void test('normalizes text without splitting graphemes or keeping emoji', () => {
   const normalizeText = createOgImageTextNormalizer(20)
   const normalized = normalizeText(`a${'👨‍👩‍👧‍👦'.repeat(20)}z`, 20)
 
-  assert.equal(normalized.startsWith('a'), true)
-  assert.equal(normalized.endsWith('\u200d'), false)
-  assert.ok(normalized.length <= 20)
-  assert.ok(countOgImageEmoji([normalized]) <= OG_IMAGE_LIMITS.maxEmoji)
+  assert.equal(normalized, 'az')
+  assert.equal(normalized.includes('\u200d'), false)
 })
 
 void test('accepts confined local image sources', () => {

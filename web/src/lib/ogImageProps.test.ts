@@ -138,18 +138,12 @@ void test('keeps badge schemas out of the public registry', () => {
   assert.equal(Object.hasOwn(publicOgImagePropsSchemas, 'badge-xs'), false)
 })
 
-void test('rejects oversized rendered text and emoji fan-out', () => {
+void test('rejects oversized rendered text', () => {
   assert.equal(
     rejected(publicOgImagePropsSchemas.generic, {
       title: 'x'.repeat(OG_IMAGE_LIMITS.generic.title + 1),
     }),
     'title: too_big'
-  )
-  assert.equal(
-    rejected(publicOgImagePropsSchemas.generic, {
-      title: '😀'.repeat(OG_IMAGE_LIMITS.maxEmoji + 1),
-    }),
-    'emoji: custom'
   )
   assert.equal(
     rejected(publicOgImagePropsSchemas.generic, {

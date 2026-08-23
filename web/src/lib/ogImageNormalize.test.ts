@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { countOgImageEmoji, OG_IMAGE_LIMITS } from './ogImageInput'
+import { OG_IMAGE_LIMITS } from './ogImageInput'
 import {
   normalizeOgImageKycLevel,
   normalizeOgImageRating,
@@ -15,14 +15,14 @@ import type { OgImagePublicTemplateName, OgImagePublicTemplateWithProps } from '
 void test('normalizes generic text and icons', () => {
   const data = normalizePublicOgImageProps({
     template: 'generic',
-    title: `Events ${'😀'.repeat(OG_IMAGE_LIMITS.maxEmoji + 10)}`,
+    title: `Events ${'😀'.repeat(22)}`,
     description: 'x'.repeat(OG_IMAGE_LIMITS.generic.description + 100),
     icon: 'not-an-icon',
   })
 
   assert.equal(data.template, 'generic')
   assert.ok(data.title.length <= OG_IMAGE_LIMITS.generic.title)
-  assert.ok(countOgImageEmoji([data.title, data.description ?? '']) <= OG_IMAGE_LIMITS.maxEmoji)
+  assert.equal(data.title, 'Events ')
   assert.equal(data.icon, undefined)
 
   const { template: _template, ...props } = data
@@ -91,7 +91,7 @@ void test('clamps badge numbers before schema validation', () => {
 })
 
 void test('every public normalizer output satisfies its schema', () => {
-  const hostileText = `${'😀'.repeat(OG_IMAGE_LIMITS.maxEmoji + 20)}${'x'.repeat(1000)}`
+  const hostileText = `${'😀'.repeat(32)}${'x'.repeat(1000)}`
   const inputs: OgImagePublicTemplateWithProps[] = [
     { template: 'default' },
     {
