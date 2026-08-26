@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
 
+import { OG_IMAGE_SIGNING_SECRET } from 'astro:env/server'
+
 import { publicOgImageTemplates, renderPublicOgImageTemplate } from '../components/OgImage'
 import { LruByteCache } from '../lib/lruByteCache'
 import { memoizeAsync } from '../lib/memoizeAsync'
@@ -9,6 +11,7 @@ import { logOgImageRejection } from '../lib/ogImageRejectionLog'
 import { type OgImageRender } from '../lib/ogImageRenderer'
 import { ogRenderSemaphore } from '../lib/ogImageRenderQueue'
 import { parsePublicOgImageRequest } from '../lib/ogImageRequest'
+import { isValidOgImageSignature } from '../lib/ogImageSignature'
 
 import type { APIContext, APIRoute } from 'astro'
 
@@ -48,6 +51,17 @@ function isPng(bytes: Uint8Array): boolean {
 
 export const GET: APIRoute = async (context) => {
   const rawData = context.url.searchParams.get('data')
+  // Props decide what the card asserts, so they are only trusted with a
+  // signature this server issued. Checked before parsing so an unsigned payload
+  // never reaches JSON.parse. A bare /ogimage.png stays the plain default card.
+  if (
+    rawData !== null &&
+    !isValidOgImageSignature(OG_IMAGE_SIGNING_SECRET, rawData, context.url.searchParams.get('sig'))
+  ) {
+    logOgImageRejection('Using default card', 'Missing or invalid signature')
+    return await fallbackResponse()
+  }
+
   const parsedRequest = parsePublicOgImageRequest(rawData)
   if (!parsedRequest.success) {
     const outcome = parsedRequest.response === 'reject' ? 'Rejected request' : 'Using default card'

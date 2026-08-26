@@ -351,6 +351,15 @@ export default defineConfig({
         optional: false,
       }),
 
+      // Signs `?data=` on /ogimage.png. Any long random string; rotating it
+      // only invalidates OG URLs already published in social caches.
+      OG_IMAGE_SIGNING_SECRET: envField.string({
+        context: 'server',
+        access: 'secret',
+        min: 32,
+        optional: false,
+      }),
+
       AGGREGATOR_GRPC_URL: envField.string({
         context: 'server',
         access: 'public',

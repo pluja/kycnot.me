@@ -35,7 +35,9 @@ const message = Astro.url.searchParams.get('message')
   ogImage={{
     template: 'generic',
     title: 'Login',
-    description: message ?? 'Enter your login key',
+    // Not `message`: it comes from the query string, and OG props are signed,
+    // so echoing it here would mint attacker text onto a KYCnot.me card.
+    description: 'Enter your login key',
     icon: 'ri:login-box-line',
   }}
   layoutHeader={{
