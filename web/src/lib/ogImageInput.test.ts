@@ -8,6 +8,20 @@ import {
   stripOgImageEmoji,
 } from './ogImageInput'
 
+void test('keeps pictographs satori renders from the bundled fonts', () => {
+  assert.equal(stripOgImageEmoji('Bitcoin® Foo™ ©2026 ℹ ‼ ⁉'), 'Bitcoin® Foo™ ©2026 ℹ ‼ ⁉')
+  assert.equal(stripOgImageEmoji('★ → ✓ € · • ₿ ° ½ №'), '★ → ✓ € · • ₿ ° ½ №')
+  // A trailing U+FE0F requests the emoji form, which satori does classify as
+  // emoji, so it goes even though the bare character stays.
+  assert.equal(stripOgImageEmoji('a ©\ufe0f b'), 'a  b')
+})
+
+void test('strips a bare skin-tone modifier, which satori still calls emoji', () => {
+  // The modifier is Grapheme_Cluster_Break=Extend, so it clusters with the
+  // space before it and the whole cluster goes.
+  assert.equal(stripOgImageEmoji('Hi \u{1F3FB} there'), 'Hi there')
+})
+
 void test('strips whole emoji graphemes and keeps surrounding text', () => {
   assert.equal(stripOgImageEmoji('plain text'), 'plain text')
   assert.equal(stripOgImageEmoji('Bisq 👨‍👩‍👧‍👦 exchange'), 'Bisq  exchange')

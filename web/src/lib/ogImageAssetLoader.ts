@@ -62,8 +62,8 @@ export function createOgImageAssetLoader({
   return async (languageCode, segment) => {
     // A script with no mapped family renders as tofu no matter how often it is
     // retried, so it must not reach reportMissingAsset: that would hold every
-    // card carrying it out of the render cache forever. Emoji land here too,
-    // since card text is stripped of them before it reaches satori.
+    // card carrying it out of the render cache forever. Satori's `emoji` code
+    // lands here too, mapped to nothing on purpose: no emoji font is bundled.
     const fontRequests = getFontRequests(languageCode)
     if (fontRequests.length === 0) return []
 

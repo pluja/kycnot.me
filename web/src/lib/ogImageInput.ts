@@ -39,14 +39,19 @@ export const OG_IMAGE_LIMITS = {
 export const OG_IMAGE_ICON_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*:[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 const LOCAL_IMAGE_PREFIXES = ['/files/', '/_astro/', '/@fs/'] as const
-const EMOJI_GRAPHEME_PATTERN = /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20e3|\ufe0f/u
+const EMOJI_GRAPHEME_PATTERN =
+  /\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Regional_Indicator}|\u20e3|\ufe0f/u
+// Extended_Pictographic covers these, but satori does not treat them as emoji
+// and the bundled fonts draw them, so stripping would eat real copy: Bitcoin(R)
+// would render as Bitcoin. A trailing U+FE0F asks for the emoji form instead,
+// which satori does classify as emoji, so that case falls through to the strip.
+const TEXT_PRESENTATION_PICTOGRAPHS = /^[\u00a9\u00ae\u2122\u203c\u2049\u2139]$/
 const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
-// stripOgImageEmoji removes emoji graphemes. Cards are rendered by satori,
-// which resolves every emoji through a remote sprite, so an emoji in card copy
-// is an outbound request per glyph on an unauthenticated endpoint. Site copy
-// carries none, so dropping them costs nothing and keeps the renderer offline.
-// Segmenting rather than replacing keeps ZWJ sequences and modifiers whole.
+// stripOgImageEmoji removes emoji graphemes. No emoji font is bundled and the
+// renderer loads no remote sprites, so an emoji left in card copy draws as a
+// tofu box baked into a year-long immutable cache. Segmenting rather than
+// replacing keeps ZWJ sequences, modifiers and flags whole.
 export function stripOgImageEmoji(value: string): string {
   let stripped = ''
   for (const { segment } of graphemeSegmenter.segment(value)) {
@@ -107,5 +112,6 @@ export function isAllowedOgImageSource(value: string): boolean {
 }
 
 function isEmojiGrapheme(value: string): boolean {
+  if (TEXT_PRESENTATION_PICTOGRAPHS.test(value)) return false
   return EMOJI_GRAPHEME_PATTERN.test(value)
 }

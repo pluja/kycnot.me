@@ -207,6 +207,10 @@ async function renderBadge(
     kycLevel: normalizeOgImageKycLevel(service.kycLevel),
   }
   const normalizeBadgeText = createOgImageTextNormalizer(OG_IMAGE_LIMITS.badge.name)
+  // Normalising can empty a name made only of emoji, and the schema requires a
+  // non-empty one. This route has no default card to fall back to, so without
+  // the slug such a service would serve 500 for its badge forever.
+  const badgeName = normalizeBadgeText(service.name, OG_IMAGE_LIMITS.badge.name).trim() || slug
 
   // The template call is the CPU-heavy part, so only it takes a render slot.
   // The lookup above stays outside: holding a slot across database I/O would
@@ -218,7 +222,7 @@ async function renderBadge(
           badgeOgImagePropsSchemas['badge-lg'].parse({
             ...baseProps,
             ...metricProps,
-            name: normalizeBadgeText(service.name, OG_IMAGE_LIMITS.badge.name),
+            name: badgeName,
             showScore,
             showRating,
             showKycLevel,
