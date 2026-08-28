@@ -174,7 +174,8 @@ class TestFetchLegalCorpus(unittest.TestCase):
         ])
 
         from pyworker.utils.crawl import fetch_legal_corpus
-        combined, urls, _ = fetch_legal_corpus(["https://x.com/terms"])
+        corpus = fetch_legal_corpus(["https://x.com/terms"])
+        combined, urls = corpus.combined, corpus.urls
 
         self.assertEqual(len(urls), 1)
         self.assertNotIn("Different content", combined)
@@ -187,7 +188,8 @@ class TestFetchLegalCorpus(unittest.TestCase):
         ])
 
         from pyworker.utils.crawl import fetch_legal_corpus
-        combined, urls, _ = fetch_legal_corpus(["https://x.com/terms"])
+        corpus = fetch_legal_corpus(["https://x.com/terms"])
+        combined, urls = corpus.combined, corpus.urls
 
         self.assertEqual(len(urls), 1)
         self.assertEqual(combined.count("Identical body"), 1)
@@ -201,10 +203,10 @@ class TestFetchLegalCorpus(unittest.TestCase):
         mock_post.return_value = self._make_response(results)
 
         from pyworker.utils.crawl import fetch_legal_corpus
-        _, _, hash1 = fetch_legal_corpus(["https://x.com/terms"])
+        hash1 = fetch_legal_corpus(["https://x.com/terms"]).corpus_hash
 
         mock_post.return_value = self._make_response(results)
-        _, _, hash2 = fetch_legal_corpus(["https://x.com/terms"])
+        hash2 = fetch_legal_corpus(["https://x.com/terms"]).corpus_hash
 
         self.assertEqual(hash1, hash2)
         self.assertEqual(len(hash1), 64)
@@ -217,7 +219,7 @@ class TestFetchLegalCorpus(unittest.TestCase):
         ])
 
         from pyworker.utils.crawl import fetch_legal_corpus
-        _, urls, _ = fetch_legal_corpus(["https://x.com/terms"])
+        urls = fetch_legal_corpus(["https://x.com/terms"]).urls
 
         self.assertEqual(urls, ["https://x.com/terms"])
 
@@ -230,7 +232,8 @@ class TestFetchLegalCorpus(unittest.TestCase):
         mock_crawl4ai.return_value = "single page content"
 
         from pyworker.utils.crawl import fetch_legal_corpus
-        combined, urls, _ = fetch_legal_corpus(["https://x.com/terms"])
+        corpus = fetch_legal_corpus(["https://x.com/terms"])
+        combined, urls = corpus.combined, corpus.urls
 
         self.assertIn("single page content", combined)
         self.assertEqual(urls, ["https://x.com/terms"])
@@ -238,7 +241,8 @@ class TestFetchLegalCorpus(unittest.TestCase):
     @patch("pyworker.utils.crawl.requests.post")
     def test_empty_seeds_returns_empty(self, mock_post: MagicMock):
         from pyworker.utils.crawl import fetch_legal_corpus
-        combined, urls, corpus_hash = fetch_legal_corpus([])
+        corpus = fetch_legal_corpus([])
+        combined, urls, corpus_hash = corpus.combined, corpus.urls, corpus.corpus_hash
 
         self.assertEqual(combined, "")
         self.assertEqual(urls, [])

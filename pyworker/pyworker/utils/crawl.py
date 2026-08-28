@@ -5,14 +5,21 @@ Primary: crawl4ai Docker service with stealth mode and JS wait support.
 Fallback: Jina Reader (r.jina.ai) for simple pages or when crawl4ai is unavailable.
 """
 
-import hashlib
 import logging
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
 import requests
 
 from pyworker.config import config
+from pyworker.utils.legal_text import (
+    LegalDocumentKind,
+    classify_legal_document_kind,
+    combined_corpus_hash,
+    legal_content_hash,
+    normalize_legal_markdown,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +163,12 @@ def _normalize_url(url: str) -> str:
     return f"{parsed.scheme}://{host}{path}"
 
 
+def _document_key(url: str) -> str:
+    """Identity of a legal page across crawls, ignoring scheme and trailing slash."""
+    parsed = urlparse(_normalize_url(url))
+    return f"{parsed.netloc}{parsed.path}"
+
+
 def _deep_crawl_seed(seed_url: str) -> list[dict[str, Any]]:
     """Deep-crawl one seed URL with the legal-pages filter chain. Returns the
     list of result entries from crawl4ai (each with url + markdown).
@@ -202,21 +215,48 @@ def _deep_crawl_seed(seed_url: str) -> list[dict[str, Any]]:
     return data.get("results") or []
 
 
-def fetch_legal_corpus(seed_urls: list[str]) -> tuple[str, list[str], str]:
+@dataclass(frozen=True)
+class LegalPage:
+    """One crawled legal page, identified by its normalized content."""
+
+    # Identity for storage. The raw URL is not stable: a trailing slash or an
+    # http to https upgrade would read as a brand new document and silently
+    # reset change detection for that page.
+    url_key: str
+    url: str
+    kind: LegalDocumentKind
+    markdown: str
+    normalized_text: str
+    content_hash: str
+
+
+@dataclass(frozen=True)
+class LegalCorpus:
+    pages: list[LegalPage]
+    combined: str
+    corpus_hash: str
+
+    @property
+    def urls(self) -> list[str]:
+        return [page.url for page in self.pages]
+
+
+def fetch_legal_corpus(seed_urls: list[str]) -> LegalCorpus:
     """Fetch a deduplicated, labeled markdown corpus of legal pages.
 
     For each seed URL: deep-crawl one level deep, restricted to same-domain pages
     whose path matches a legal-keyword pattern. Pages are deduplicated by both
     normalized URL and markdown content hash.
 
-    Returns (combined_markdown, fetched_urls, corpus_hash).
+    Page hashes are taken over normalized text, so a page that only re-rendered
+    its "last updated" line or its tracking parameters keeps the same hash.
 
     The combined markdown wraps each page in delimited sections so the LLM can
     treat the union as one document but still attribute clauses to a source.
     """
     seen_urls: set[str] = set()
     seen_content_hashes: set[str] = set()
-    pages: list[tuple[str, str, str]] = []  # (url, content_hash, markdown)
+    pages: list[LegalPage] = []
 
     for seed in seed_urls:
         if not seed:
@@ -245,32 +285,35 @@ def fetch_legal_corpus(seed_urls: list[str]) -> tuple[str, list[str], str]:
             markdown = _extract_markdown(entry).strip()
             if not markdown:
                 continue
-            content_hash = hashlib.sha256(markdown.encode()).hexdigest()
+            content_hash = legal_content_hash(markdown)
             if content_hash in seen_content_hashes:
                 seen_urls.add(normalized)
                 continue
             seen_urls.add(normalized)
             seen_content_hashes.add(content_hash)
-            pages.append((url, content_hash, markdown))
+            pages.append(
+                LegalPage(
+                    url_key=_document_key(url),
+                    url=url,
+                    kind=classify_legal_document_kind(url),
+                    markdown=markdown,
+                    normalized_text=normalize_legal_markdown(markdown),
+                    content_hash=content_hash,
+                )
+            )
 
     if not pages:
-        return "", [], ""
+        return LegalCorpus(pages=[], combined="", corpus_hash="")
 
     combined = "\n\n".join(
-        f"===== PAGE: {url} =====\n{md}\n===== END PAGE ====="
-        for url, _, md in pages
+        f"===== PAGE: {page.url} =====\n{page.markdown}\n===== END PAGE ====="
+        for page in pages
     )
-    fetched_urls = [url for url, _, _ in pages]
-    # Sort hashes by normalized URL so the corpus hash is order-independent;
-    # BFS deep-crawl may visit pages in different order between runs.
-    sorted_hashes = sorted((_normalize_url(url), h) for url, h, _ in pages)
-    corpus_hash = hashlib.sha256(
-        "".join(h for _, h in sorted_hashes).encode()
-    ).hexdigest()
+    corpus_hash = combined_corpus_hash(page.content_hash for page in pages)
     logger.info(
         f"Legal corpus assembled: {len(pages)} pages, {len(combined)} chars, hash={corpus_hash[:12]}"
     )
-    return combined, fetched_urls, corpus_hash
+    return LegalCorpus(pages=pages, combined=combined, corpus_hash=corpus_hash)
 
 
 if __name__ == "__main__":

@@ -75,7 +75,8 @@ class DeepScanTask(Task):
             f"Deep-scanning service: {service_name} (ID: {service_id}); seeds={tos_urls}"
         )
 
-        combined, fetched_urls, corpus_hash = fetch_legal_corpus(tos_urls)
+        corpus = fetch_legal_corpus(tos_urls)
+        combined, fetched_urls, corpus_hash = corpus.combined, corpus.urls, corpus.corpus_hash
         if not combined:
             self.logger.warning(f"Empty legal corpus for seeds: {tos_urls}")
             return None

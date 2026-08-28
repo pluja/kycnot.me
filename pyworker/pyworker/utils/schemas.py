@@ -8,6 +8,40 @@ class PromptSchema:
     validate: Callable[[dict[str, Any]], None]
 
 
+# Mirrors the topic union in TOS_REVIEW.ts_type and the TosReview type in the web app.
+HIGHLIGHT_TOPICS = frozenset(
+    {
+        "custody",
+        "dataSharing",
+        "disputes",
+        "fundBlocking",
+        "jurisdiction",
+        "logging",
+        "other",
+        "refunds",
+        "verification",
+    }
+)
+
+
+def _validate_highlights(highlights: list[Any]) -> None:
+    for i, h in enumerate(highlights):
+        if not isinstance(h, dict):
+            raise ValueError(f"highlights[{i}] must be a dict")
+        for field in ("title", "content", "rating"):
+            if field not in h:
+                raise ValueError(f"highlights[{i}] missing field: {field}")
+        if h["rating"] not in ("negative", "neutral", "positive"):
+            raise ValueError(f"highlights[{i}].rating must be negative|neutral|positive, got {h['rating']!r}")
+        # A model that omits topic, evidence or sourceUrl costs that highlight
+        # its extra detail; rejecting here would cost the service its review.
+        if "topic" in h and h["topic"] not in HIGHLIGHT_TOPICS:
+            raise ValueError(f"highlights[{i}].topic must be one of {sorted(HIGHLIGHT_TOPICS)}, got {h['topic']!r}")
+        for field in ("evidence", "sourceUrl"):
+            if field in h and not isinstance(h[field], str):
+                raise ValueError(f"highlights[{i}].{field} must be a string")
+
+
 def _validate_tos_check(data: dict[str, Any]) -> None:
     if "isComplete" not in data:
         raise ValueError("Missing required field: isComplete")
@@ -34,14 +68,7 @@ def _validate_tos_review(data: dict[str, Any]) -> None:
     if not isinstance(data["highlights"], list):
         raise ValueError("highlights must be a list")
 
-    for i, h in enumerate(data["highlights"]):
-        if not isinstance(h, dict):
-            raise ValueError(f"highlights[{i}] must be a dict")
-        for field in ("title", "content", "rating"):
-            if field not in h:
-                raise ValueError(f"highlights[{i}] missing field: {field}")
-        if h["rating"] not in ("negative", "neutral", "positive"):
-            raise ValueError(f"highlights[{i}].rating must be negative|neutral|positive, got {h['rating']!r}")
+    _validate_highlights(data["highlights"])
 
 
 def _validate_deep_scan(data: dict[str, Any]) -> None:
@@ -73,14 +100,7 @@ def _validate_deep_scan(data: dict[str, Any]) -> None:
     if not isinstance(data["highlights"], list):
         raise ValueError("highlights must be a list")
 
-    for i, h in enumerate(data["highlights"]):
-        if not isinstance(h, dict):
-            raise ValueError(f"highlights[{i}] must be a dict")
-        for field in ("title", "content", "rating"):
-            if field not in h:
-                raise ValueError(f"highlights[{i}] missing field: {field}")
-        if h["rating"] not in ("negative", "neutral", "positive"):
-            raise ValueError(f"highlights[{i}].rating must be negative|neutral|positive, got {h['rating']!r}")
+    _validate_highlights(data["highlights"])
 
     for str_field in ("kycPolicyNotesMd", "kycLevelRationale"):
         if not isinstance(data[str_field], str):
@@ -173,6 +193,21 @@ TOS_CHECK = PromptSchema(
     validate=_validate_tos_check,
 )
 
+def _validate_legal_change_summary(data: dict[str, Any]) -> None:
+    if "summary" not in data:
+        raise ValueError("Missing required field: summary")
+    if not isinstance(data["summary"], str) or not data["summary"].strip():
+        raise ValueError("summary must be a non-empty string")
+
+
+LEGAL_CHANGE_SUMMARY = PromptSchema(
+    ts_type="""type LegalChangeSummary = {
+    /** Less than 240 characters. Plain English description of what the edit changes for the reader. */
+    summary: MarkdownString
+}""",
+    validate=_validate_legal_change_summary,
+)
+
 TOS_REVIEW = PromptSchema(
     ts_type="""type TosReview = {
     kycLevel: 0 | 1 | 2 | 3 | 4
@@ -187,6 +222,12 @@ TOS_REVIEW = PromptSchema(
         /** In regards to KYC, Privacy, Anonymity, Self-Sovereignity, etc. */
         /** anything that could harm the user's privacy, identity, self-sovereignity or anonymity is negative, anything that otherwise helps is positive. else it is neutral. */
         rating: 'negative' | 'neutral' | 'positive'
+        /** Which aspect of the service this concerns. */
+        topic: 'custody' | 'dataSharing' | 'disputes' | 'fundBlocking' | 'jurisdiction' | 'logging' | 'other' | 'refunds' | 'verification'
+        /** The clause this is based on, quoted from the corpus verbatim. Max 300 characters. */
+        evidence: string
+        /** The `===== PAGE: <url>` the quoted clause came from. */
+        sourceUrl: string
     }[] // max 10 highlights, but typically 3-6. Quality over quantity, do not pad. May be empty.
 }""",
     validate=_validate_tos_review,

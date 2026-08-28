@@ -46,6 +46,9 @@ def _today() -> str:
 
 PROMPT_CHECK_TOS_REVIEW = _load_prompt("tos_check.md", schema=schemas.TOS_CHECK.ts_type)
 _PROMPT_TOS_REVIEW = _load_prompt("tos_review.md", schema=schemas.TOS_REVIEW.ts_type)
+_PROMPT_LEGAL_CHANGE_SUMMARY = _load_prompt(
+    "legal_change_summary.md", schema=schemas.LEGAL_CHANGE_SUMMARY.ts_type
+)
 _PROMPT_DEEP_SCAN = _load_prompt("deep_scan.md", schema=schemas.DEEP_SCAN.ts_type)
 PROMPT_COMMENT_SENTIMENT_SUMMARY = _load_prompt(
     "comment_sentiment.md", schema=schemas.COMMENT_SEN.ts_type
@@ -164,6 +167,28 @@ def prompt_tos_review(content: str, service_name: str) -> TosReviewType:
 
     schemas.TOS_REVIEW.validate(result_dict)
     return cast(TosReviewType, result_dict)
+
+
+def prompt_legal_change_summary(diff: str, service_name: str, document_kind: str) -> str:
+    """Describe one legal document edit in plain English.
+
+    The model only describes the diff. Whether the change counted as a change at
+    all was already decided deterministically, so a document cannot argue its
+    way out of being flagged.
+    """
+    scope = (
+        f"The document is the {document_kind.lower()} document of the service "
+        f"named exactly '{service_name}'.\n\n"
+    )
+    messages: List[ChatCompletionMessageParam] = [
+        {"role": "system", "content": _today() + scope + _PROMPT_LEGAL_CHANGE_SUMMARY},
+        {"role": "user", "content": diff},
+    ]
+
+    result_dict = query_openai_json(messages)
+
+    schemas.LEGAL_CHANGE_SUMMARY.validate(result_dict)
+    return cast(str, result_dict["summary"])
 
 
 def prompt_deep_scan(

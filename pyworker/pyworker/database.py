@@ -736,6 +736,110 @@ def save_tos_review(service_id: int, review: Optional[TosReviewType]):
         logger.error(f"Error saving TOS review for service {service_id}: {e}")
 
 
+class LegalDocumentRow(TypedDict):
+    """Stored state of one legal page, as needed to diff the next crawl."""
+
+    id: int
+    urlKey: str
+    normalizedText: str
+
+
+def get_legal_documents(service_id: int) -> Dict[str, LegalDocumentRow]:
+    """Return the stored legal documents for a service, keyed by urlKey."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    'SELECT id, "urlKey", "normalizedText" '
+                    'FROM "ServiceLegalDocument" WHERE "serviceId" = %s',
+                    (service_id,),
+                )
+                return {row["urlKey"]: row for row in cursor.fetchall()}
+    except Exception as e:
+        logger.error(f"Error loading legal documents for service {service_id}: {e}")
+        return {}
+
+
+def upsert_legal_document(
+    service_id: int,
+    url_key: str,
+    url: str,
+    kind: str,
+    content_hash: str,
+    normalized_text: str,
+    changed: bool,
+) -> Optional[int]:
+    """Store the latest crawl of one legal page.
+
+    ``checkedAt`` moves on every crawl; ``changedAt`` only when the normalized
+    text actually moved.
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO "ServiceLegalDocument"
+                        ("serviceId", "urlKey", url, kind, "contentHash", "normalizedText", "checkedAt", "changedAt")
+                    VALUES (%s, %s, %s, %s::"LegalDocumentKind", %s, %s, NOW(), CASE WHEN %s THEN NOW() END)
+                    ON CONFLICT ("serviceId", "urlKey") DO UPDATE SET
+                        url = EXCLUDED.url,
+                        kind = EXCLUDED.kind,
+                        "contentHash" = EXCLUDED."contentHash",
+                        "normalizedText" = EXCLUDED."normalizedText",
+                        "checkedAt" = NOW(),
+                        "changedAt" = CASE
+                            WHEN %s THEN NOW()
+                            ELSE "ServiceLegalDocument"."changedAt"
+                        END
+                    RETURNING id
+                    """,
+                    (service_id, url_key, url, kind, content_hash, normalized_text, changed, changed),
+                )
+                row = cursor.fetchone()
+                conn.commit()
+                return int(row["id"]) if row else None
+    except Exception as e:
+        logger.error(f"Error saving legal document {url_key} for service {service_id}: {e}")
+        return None
+
+
+def create_legal_revision(
+    service_id: int,
+    document_id: int,
+    change_level: str,
+    changed_words: int,
+    summary: Optional[str],
+    diff: Optional[str],
+) -> Optional[int]:
+    """Append one recorded change, and stamp the service as having changed.
+
+    The service-level timestamp is written here so a revision and the stamp
+    that advertises it cannot disagree.
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO "ServiceLegalRevision"
+                        ("serviceId", "documentId", "changeLevel", "changedWords", summary, diff)
+                    VALUES (%s, %s, %s::"LegalChangeLevel", %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (service_id, document_id, change_level, changed_words, summary, diff),
+                )
+                row = cursor.fetchone()
+                cursor.execute(
+                    'UPDATE "Service" SET "tosChangedAt" = NOW() WHERE id = %s', (service_id,)
+                )
+                conn.commit()
+                return int(row["id"]) if row else None
+    except Exception as e:
+        logger.error(f"Error saving legal revision for service {service_id}: {e}")
+        return None
+
+
 def get_comments(service_id: int, status: str = "APPROVED") -> List[Dict[str, Any]]:
     """
     Get all comments for a specific service with the specified status.

@@ -33,6 +33,9 @@ Extract the following:
    - **No filler.** Skip clauses that are universal across services (standard liability disclaimers, generic copyright notices, "we may update these terms") unless they materially differ from the norm.
    - **Skip implications already encoded.** If `kycLevel` already conveys the KYC posture, do not add a highlight that just repeats it.
    - **Neutral phrasing.** Describe what the document says, not what it promises in spirit.
+   - **Quote the clause.** `evidence` must be the sentence or clause from the corpus that the highlight rests on, copied verbatim and trimmed to at most 300 characters. Do not paraphrase it, do not stitch together fragments from different places. If you cannot quote a clause, drop the highlight.
+   - **Attribute the source.** `sourceUrl` is the `===== PAGE: <url>` header the quoted clause appeared under.
+   - **Pick one topic.** `verification` for identity checks and KYC, `fundBlocking` for freezing or rejecting transactions, `dataSharing` for disclosure to third parties or authorities, `logging` for what is recorded and for how long, `custody` for who holds funds or keys, `jurisdiction` for governing law and venue, `refunds` for refund and cancellation terms, `disputes` for arbitration and claim limits, `other` when none fit.
    - **Scope to the service under review.** A single operator may publish shared legal terms covering multiple distinct products. Exclude any clause whose text scopes it to a sibling product (a different product name, app, or domain than the service being reviewed). Include only clauses that apply to the service being reviewed or to the operator/account level (which transitively applies to the service). When in doubt, prefer exclusion over speculation. The `summary` must describe the service being reviewed, not the whole product family.
 
 Format the response as a valid JSON object matching this type:

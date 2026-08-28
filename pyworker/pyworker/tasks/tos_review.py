@@ -7,10 +7,26 @@ from typing import Any, Dict, Optional
 
 import requests
 
-from pyworker.database import TosReviewType, create_kyc_edit_suggestion, save_tos_review
+from pyworker.database import (
+    TosReviewType,
+    create_kyc_edit_suggestion,
+    create_legal_revision,
+    get_legal_documents,
+    save_tos_review,
+    upsert_legal_document,
+)
 from pyworker.tasks.base import Task
-from pyworker.utils.ai import prompt_check_tos_review, prompt_tos_review
-from pyworker.utils.crawl import fetch_legal_corpus
+from pyworker.utils.ai import (
+    prompt_check_tos_review,
+    prompt_legal_change_summary,
+    prompt_tos_review,
+)
+from pyworker.utils.crawl import LegalCorpus, fetch_legal_corpus
+from pyworker.utils.legal_text import (
+    LegalChangeLevel,
+    diff_legal_text,
+    is_usable_legal_page,
+)
 
 
 class TosReviewTask(Task):
@@ -60,7 +76,10 @@ class TosReviewTask(Task):
         )
         self.logger.info(f"TOS URLs: {tos_urls}")
 
-        review = self.get_tos_review(tos_urls, service.get("tosReview"), service_name)
+        corpus = fetch_legal_corpus(tos_urls)
+        self.record_document_changes(service_id, corpus, service_name)
+
+        review = self.get_tos_review(corpus, service.get("tosReview"), service_name)
 
         # Always update the processed timestamp, even if review is None
         save_tos_review(service_id, review)
@@ -107,21 +126,119 @@ class TosReviewTask(Task):
 
         return review
 
+    def record_document_changes(
+        self, service_id: int, corpus: LegalCorpus, service_name: str = ""
+    ) -> None:
+        """Store each crawled page and log the ones whose text actually moved.
+
+        Detection is deterministic: normalization has already removed the
+        republish noise, so a surviving difference is a real edit. Nothing here
+        calls a model, which keeps a service unable to talk the detector out of
+        noticing a change to its own terms.
+        """
+        stored = get_legal_documents(service_id)
+        self.record_removed_documents(service_id, corpus, stored)
+
+        for page in corpus.pages:
+            if not is_usable_legal_page(page.normalized_text):
+                self.logger.info(
+                    f"Skipping unusable legal page for service {service_id}: {page.url} "
+                    f"({len(page.normalized_text)} chars)"
+                )
+                continue
+
+            previous = stored.get(page.url_key)
+            diff = (
+                diff_legal_text(previous["normalizedText"], page.normalized_text)
+                if previous
+                else None
+            )
+            changed = previous is not None and diff is not None and diff.level is not LegalChangeLevel.NONE
+
+            document_id = upsert_legal_document(
+                service_id=service_id,
+                url_key=page.url_key,
+                url=page.url,
+                kind=page.kind.value,
+                content_hash=page.content_hash,
+                normalized_text=page.normalized_text,
+                changed=changed,
+            )
+
+            if not changed or document_id is None or diff is None:
+                continue
+
+            create_legal_revision(
+                service_id=service_id,
+                document_id=document_id,
+                change_level=diff.level.value,
+                changed_words=diff.changed_words,
+                summary=self.summarize_change(diff.level, diff.hunks, service_name, page.kind.value),
+                diff=diff.hunks,
+            )
+            self.logger.info(
+                f"Legal change recorded for service {service_id}: {page.url} "
+                f"({diff.level.value}, {diff.changed_words} words)"
+            )
+
+    def record_removed_documents(
+        self,
+        service_id: int,
+        corpus: LegalCorpus,
+        stored: Dict[str, Any],
+    ) -> None:
+        """Log documents that were stored before but are absent from this crawl.
+
+        Deleting a page is an edit like any other, and without this a service
+        could drop a clause by dropping the page that carried it. Skipped when
+        the crawl returned nothing at all, since that is far more likely to be
+        an outage than every document being withdrawn at once.
+        """
+        if not corpus.pages:
+            return
+
+        crawled = {page.url_key for page in corpus.pages}
+        for url_key, document in stored.items():
+            if url_key in crawled or not document.get("normalizedText"):
+                continue
+            create_legal_revision(
+                service_id=service_id,
+                document_id=document["id"],
+                change_level=LegalChangeLevel.MATERIAL.value,
+                changed_words=0,
+                summary="The document is no longer published at this address.",
+                diff=None,
+            )
+            self.logger.info(f"Legal document removed for service {service_id}: {url_key}")
+
+    def summarize_change(
+        self, level: LegalChangeLevel, hunks: str, service_name: str, document_kind: str
+    ) -> Optional[str]:
+        """Describe a material change in plain English, or return None.
+
+        Minor edits are recorded without a summary: a reworded sentence does not
+        warrant a model call, and an empty summary reads better than one
+        explaining that nothing meaningful happened.
+        """
+        if level is not LegalChangeLevel.MATERIAL or not hunks:
+            return None
+        try:
+            return prompt_legal_change_summary(hunks, service_name, document_kind)
+        except Exception as exc:
+            self.logger.warning(f"Legal change summary failed: {exc}")
+            return None
+
     def get_tos_review(
         self,
-        tos_urls: list[str],
+        corpus: LegalCorpus,
         current_review: Optional[TosReviewType],
         service_name: str,
     ) -> Optional[TosReviewType]:
-        """
-        Build a legal corpus from all seed URLs (depth=1, legal-keyword filter)
-        and run a single review pass over the combined content.
-        """
-        self.logger.info(f"Building legal corpus from seed URLs: {tos_urls}")
-        combined, fetched_urls, corpus_hash = fetch_legal_corpus(tos_urls)
+        """Run a single review pass over the combined legal corpus."""
+        combined, fetched_urls, corpus_hash = corpus.combined, corpus.urls, corpus.corpus_hash
 
         if not combined:
-            self.logger.warning(f"Empty legal corpus for seeds: {tos_urls}")
+            self.logger.warning("Empty legal corpus")
             return None
 
         self.logger.info(

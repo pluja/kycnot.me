@@ -6,6 +6,8 @@ from unittest.mock import MagicMock, patch
 
 from pyworker.database import save_deep_scan_proposed_edits
 from pyworker.tasks.deep_scan import DeepScanTask, _format_attribute_catalog
+from pyworker.utils.crawl import LegalCorpus, LegalPage
+from pyworker.utils.legal_text import LegalDocumentKind
 
 
 SAMPLE_LLM_RESULT: Dict[str, Any] = {
@@ -232,10 +234,19 @@ class TestDeepScanTaskRun(unittest.TestCase):
             "kycLevel": 1,
             "tosUrls": ["https://example.com/tos"],
         }
-        mock_corpus.return_value = (
-            "===== PAGE: a =====\nbody\n===== END PAGE =====",
-            ["a"],
-            "hash",
+        mock_corpus.return_value = LegalCorpus(
+            pages=[
+                LegalPage(
+                    url_key="a",
+                    url="https://a",
+                    kind=LegalDocumentKind.TERMS,
+                    markdown="body",
+                    normalized_text="body",
+                    content_hash="hash",
+                )
+            ],
+            combined="===== PAGE: a =====\nbody\n===== END PAGE =====",
+            corpus_hash="hash",
         )
         mock_catalog.return_value = make_catalog(7, 12)
         mock_attrs.return_value = [{"id": 7}]
