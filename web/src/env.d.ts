@@ -41,8 +41,25 @@ declare global {
         /** Short */
         content: MarkdownString
         rating: 'negative' | 'neutral' | 'positive'
+        /** Absent on reviews generated before topics were introduced. */
+        topic?: TosHighlightTopic
+        /** The clause the highlight rests on, quoted from the source document. */
+        evidence?: string
+        /** The legal page the quoted clause came from. */
+        sourceUrl?: string
       }[]
     }
+
+    type TosHighlightTopic =
+      | 'custody'
+      | 'dataSharing'
+      | 'disputes'
+      | 'fundBlocking'
+      | 'jurisdiction'
+      | 'logging'
+      | 'other'
+      | 'refunds'
+      | 'verification'
 
     type ProposedEdits = {
       /** sha256 hash of the legal corpus used to generate these edits. */

@@ -64,10 +64,10 @@ enum CommentIssueType {
 }
 
 model Comment {
-  id      Int           @id @default(autoincrement())
+  id              Int                    @id @default(autoincrement())
   /// Computed via trigger. Do not update through prisma.
-  upvotes Int           @default(0)
-  status  CommentStatus @default(PENDING)
+  upvotes         Int                    @default(0)
+  status          CommentStatus          @default(PENDING)
   /// Computed via trigger. Do not update through prisma.
   moderationState CommentModerationState @default(AWAITING_AI)
 
@@ -581,7 +581,12 @@ model Service {
   registeredCompanyName   String?
   /// [TosReview]
   tosReview               Json?
+  /// Set on every crawl, whether or not anything changed.
   tosReviewAt             DateTime?
+  /// Set only when a legal document changed in a way that survived normalization.
+  tosChangedAt            DateTime?
+  legalDocuments          ServiceLegalDocument[]
+  legalRevisions          ServiceLegalRevision[]
   createdAt               DateTime                     @default(now())
   updatedAt               DateTime                     @default(now()) @updatedAt
   /// Computed via trigger when the visibility is PUBLIC or (ARCHIVED and listedAt was null). Do not update through prisma.
@@ -807,21 +812,21 @@ enum ContactStatus {
 }
 
 model ContactThread {
-  id            Int             @id @default(autoincrement())
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @default(now()) @updatedAt
+  id            Int              @id @default(autoincrement())
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @default(now()) @updatedAt
   category      ContactCategory
   /// Affiliation role the author claims on ACCOUNT_VERIFICATION requests. Null
   /// for other categories. A claim until the TXT record is verified.
   requestedRole ServiceUserRole?
-  status        ContactStatus   @default(AWAITING_STAFF)
+  status        ContactStatus    @default(AWAITING_STAFF)
   readAt        DateTime?
   repliedAt     DateTime?
   /// Set when a thread is resolved. Resolved threads are auto-deleted 30 days
   /// after this timestamp; deletion is the privacy mechanism, not encryption.
   resolvedAt    DateTime?
   adminNote     String?
-  lastMessageAt DateTime        @default(now())
+  lastMessageAt DateTime         @default(now())
 
   author   User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
   authorId Int?
@@ -1166,4 +1171,61 @@ model PushSubscription {
 
   @@index([userId])
   @@index([endpoint])
+}
+
+enum LegalDocumentKind {
+  TERMS
+  PRIVACY
+  AML
+  REFUND
+  OTHER
+}
+
+enum LegalChangeLevel {
+  MINOR
+  MATERIAL
+}
+
+/// Latest crawled state of one legal page. Rows are the pages the deep crawl
+/// actually reached from the Service.tosUrls seeds, not the seeds themselves.
+model ServiceLegalDocument {
+  id             Int                    @id @default(autoincrement())
+  service        Service                @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId      Int
+  /// Host and path, without scheme or trailing slash. Identity across crawls.
+  urlKey         String
+  /// The URL as last crawled, for linking.
+  url            String
+  kind           LegalDocumentKind      @default(OTHER)
+  /// sha256 of the normalized text. Cosmetic republishes do not move it.
+  contentHash    String
+  /// Normalized text of the latest crawl, retained only so the next crawl can diff against it.
+  normalizedText String
+  checkedAt      DateTime               @default(now())
+  changedAt      DateTime?
+  revisions      ServiceLegalRevision[]
+  createdAt      DateTime               @default(now())
+
+  @@unique([serviceId, urlKey])
+  @@index([serviceId])
+}
+
+/// One recorded change to a legal document. Written only when the normalized
+/// text moved, so this stays a change log rather than a crawl log.
+model ServiceLegalRevision {
+  id           Int                  @id @default(autoincrement())
+  document     ServiceLegalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId   Int
+  service      Service              @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId    Int
+  changeLevel  LegalChangeLevel
+  changedWords Int                  @default(0)
+  /// Plain English description of the change. Null when summarization was skipped or failed.
+  summary      String?
+  /// Unified diff of the normalized text, bounded at write time.
+  diff         String?
+  createdAt    DateTime             @default(now())
+
+  @@index([serviceId, createdAt])
+  @@index([documentId, createdAt])
 }
