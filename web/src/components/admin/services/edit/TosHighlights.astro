@@ -15,19 +15,9 @@ import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
 import EditableListItem from '../../EditableListItem.astro'
 import EditToggleButton from '../../EditToggleButton.astro'
 
-import type { MarkdownString } from '../../../../lib/markdown'
-
-type TosReview = {
-  highlights: {
-    title: string
-    content: MarkdownString
-    rating: 'negative' | 'neutral' | 'positive'
-  }[]
-}
-
 type Props = {
   serviceId: number
-  tosReview: TosReview | null
+  tosReview: Pick<PrismaJson.TosReview, 'highlights'> | null
   addInputErrors: Record<string, string[] | undefined>
   updateInputErrors: Record<string, string[] | undefined>
   id?: string

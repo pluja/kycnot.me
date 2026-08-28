@@ -82,9 +82,13 @@ export const tosHighlightActions = {
         })
       }
 
+      // Spread the stored highlight: the form carries title, content and rating
+      // only, so rebuilding it would drop the topic and the quoted clause, and
+      // an unchanged corpus hash means the review is never regenerated to
+      // restore them.
       const highlights = service.tosReview.highlights.map((highlight, index) =>
         index === input.index
-          ? { title: input.title, content: input.content, rating: input.rating }
+          ? { ...highlight, title: input.title, content: input.content, rating: input.rating }
           : highlight
       )
       const tosReview = { ...service.tosReview, highlights }
