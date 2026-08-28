@@ -36,7 +36,10 @@ import { currencies, getCurrencyInfo } from '../../constants/currencies'
 import { incidentSeverities } from '../../constants/incidentSeverities'
 import { getKycLevelInfo, kycLevels } from '../../constants/kycLevels'
 import { getServiceVisibilityInfo } from '../../constants/serviceVisibility'
+import { safeHttpUrl } from '../../lib/exchange/safeUrl'
+import { getLegalDocumentKindInfo } from '../../constants/legalDocumentKind'
 import { getTosHighlightRatingInfo } from '../../constants/tosHighlightRating'
+import { getTosHighlightTopicInfo } from '../../constants/tosHighlightTopic'
 import { getUserSentimentInfo } from '../../constants/userSentiment'
 import { getServiceStatusIcon, getVerificationStatusInfo } from '../../constants/verificationStatus'
 import { getVerificationStepStatusInfo } from '../../constants/verificationStepStatus'
@@ -1264,6 +1267,10 @@ const verificationStatusDate =
                   return {
                     ...highlight,
                     ratingInfo: getTosHighlightRatingInfo(rating),
+                    topicInfo: highlight.topic ? getTosHighlightTopicInfo(highlight.topic) : null,
+                    // Model-authored, and the model reads text the service
+                    // publishes, so the scheme is not ours to trust.
+                    safeSourceUrl: safeHttpUrl(highlight.sourceUrl),
                   }
                 }),
                 'ratingInfo.order'
@@ -1284,17 +1291,82 @@ const verificationStatusDate =
                     />
                     <span>{highlight.title}</span>
                   </h3>
+                  {highlight.topicInfo && (
+                    <p class="mt-0.5 text-xs text-day-400">
+                      <Icon
+                        name={highlight.topicInfo.icon}
+                        class="me-0.5 inline-block size-3 align-[-0.1em]"
+                      />
+                      {highlight.topicInfo.name}
+                    </p>
+                  )}
                   {!!highlight.content && (
                     <div class="prose prose-sm prose-invert">
                       <Markdown content={highlight.content} />
                     </div>
                   )}
+                  {!!highlight.evidence && (
+                    <details class="mt-1 text-xs text-day-400">
+                      <summary class="cursor-pointer select-none hover:text-day-200">Quoted clause</summary>
+                      <blockquote class="mt-1 border-l-2 border-l-night-600 ps-2 text-pretty italic">
+                        {highlight.evidence}
+                      </blockquote>
+                      {!!highlight.safeSourceUrl && (
+                        <a
+                          href={highlight.safeSourceUrl}
+                          rel="nofollow noopener noreferrer"
+                          class="mt-1 inline-block break-all hover:underline"
+                        >
+                          {highlight.safeSourceUrl}
+                        </a>
+                      )}
+                    </details>
+                  )}
                 </div>
               ))}
             </div>
 
+            {service.legalRevisions.length > 0 && (
+              <details class="mt-6 rounded-lg bg-night-800 px-4 py-2 sm:px-6 sm:py-4">
+                <summary class="cursor-pointer font-title font-bold select-none">
+                  <Icon name="ri:history-line" class="me-1 inline-block size-4 align-[-0.1em]" />
+                  Recent changes to the legal documents
+                </summary>
+                <ul class="mt-3 flex flex-col gap-3">
+                  {service.legalRevisions.map((revision) => (
+                    <li class="border-l-2 border-l-night-600 ps-3 text-pretty">
+                      <p class="text-xs text-day-400">
+                        <TimeFormatted date={revision.createdAt} />
+                        <span> in the </span>
+                        <a
+                          href={safeHttpUrl(revision.document.url) ?? undefined}
+                          rel="nofollow noopener noreferrer"
+                          class="hover:underline"
+                        >
+                          {getLegalDocumentKindInfo(revision.document.kind).name}
+                        </a>
+                      </p>
+                      {revision.summary ? (
+                        <div class="prose prose-sm prose-invert">
+                          <Markdown content={revision.summary} />
+                        </div>
+                      ) : (
+                        <p class="text-sm text-day-400">Change recorded without a summary.</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+
             <p class="mt-4 text-center text-xs text-day-400">
               Reviewed <TimeFormatted date={service.tosReviewAt} hourPrecision />
+              {service.tosChangedAt !== null && (
+                <span>
+                  {' '}
+                  &middot; documents last changed <TimeFormatted date={service.tosChangedAt} hourPrecision />
+                </span>
+              )}
               {service.tosUrls.length > 0 && <span> from </span>}
               {service.tosUrls.map((url) => (
                 <a href={url} class="break-all hover:underline">

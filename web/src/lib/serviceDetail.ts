@@ -37,6 +37,21 @@ export function serviceDetailSelect(viewerId: number) {
     registeredCompanyName: true,
     tosReview: true,
     tosReviewAt: true,
+    tosChangedAt: true,
+    legalRevisions: {
+      select: {
+        id: true,
+        changeLevel: true,
+        summary: true,
+        createdAt: true,
+        document: { select: { kind: true, url: true } },
+      },
+      // Only changes worth reading: minor edits are recorded for the audit
+      // trail but carry no summary, so they would render as empty rows.
+      where: { changeLevel: 'MATERIAL' },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    },
     userSentiment: true,
     userSentimentAt: true,
     averageUserRating: true,

@@ -24,6 +24,8 @@ import {
   IncidentSeverity,
   IncidentState,
   IncidentType,
+  LegalChangeLevel,
+  LegalDocumentKind,
   PrismaClient,
   RatingMuteReason,
   ServiceSuggestionStatus,
@@ -318,6 +320,41 @@ const serviceDescriptions = [
   'P2P marketplace that accepts Monero. It is similar to MoneroMarket and Facebook Marketplace. Messenger for buyer/seller is included with PGP encryption.',
 ]
 
+// One entry per legal document a service publishes, with the changes recorded
+// against it. Mirrors what the crawler produces so the UI can be checked locally.
+const legalDocumentSeeds = [
+  {
+    kind: LegalDocumentKind.TERMS,
+    url: '/terms',
+    revisions: [
+      {
+        changeLevel: LegalChangeLevel.MATERIAL,
+        summary: 'Adds a requirement to verify identity before withdrawals above a threshold.',
+      },
+      // Material but unsummarized: the summary model call can fail in production,
+      // and the UI has a branch for it that would otherwise never be exercised.
+      { changeLevel: LegalChangeLevel.MATERIAL, summary: null },
+    ],
+  },
+  {
+    kind: LegalDocumentKind.PRIVACY,
+    url: '/privacy',
+    revisions: [
+      {
+        changeLevel: LegalChangeLevel.MATERIAL,
+        summary: 'Extends connection log retention from 7 to 90 days.',
+      },
+      // Minor changes are recorded but filtered out of the public list.
+      { changeLevel: LegalChangeLevel.MINOR, summary: null },
+    ],
+  },
+  { kind: LegalDocumentKind.AML, url: '/aml-policy', revisions: [] },
+] as const satisfies {
+  kind: LegalDocumentKind
+  revisions: { changeLevel: LegalChangeLevel; summary: string | null }[]
+  url: string
+}[]
+
 const tosReviewExamples: PrismaJson.TosReview[] = [
   {
     kycLevel: 1,
@@ -329,11 +366,19 @@ const tosReviewExamples: PrismaJson.TosReview[] = [
         title: 'No KYC Required',
         content: 'No KYC or Source of Funds verification required for transactions.',
         rating: 'positive',
+        topic: 'verification',
+        evidence:
+          'We do not require users to submit identity documents in order to create or complete an order.',
+        sourceUrl: 'https://example.com/terms',
       },
       {
         title: 'Privacy Protection',
         content: 'No metadata collection (IP addresses, browser information, etc.).',
         rating: 'positive',
+        topic: 'logging',
+        evidence:
+          'We do not retain IP addresses, browser fingerprints or other connection metadata after an order completes.',
+        sourceUrl: 'https://example.com/privacy',
       },
       {
         title: 'Tor Support',
@@ -1583,6 +1628,56 @@ async function main() {
           },
         },
       })
+
+      // Legal documents and their change history, so the terms section renders
+      // with something to show without waiting for a crawl.
+      if (serviceData.tosReview) {
+        const changePromises = legalDocumentSeeds.map(async ({ kind, url, revisions }) => {
+          // Paired up front so a revision and its date cannot drift apart, and
+          // oldest first so changedAt can take the last one.
+          const datedRevisions = revisions
+            .map((revision) => ({ ...revision, createdAt: faker.date.recent({ days: 40 }) }))
+            .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+          const document = await prisma.serviceLegalDocument.create({
+            data: {
+              serviceId: service.id,
+              urlKey: `${service.slug}.example${url}`,
+              url: `https://${service.slug}.example${url}`,
+              kind,
+              contentHash: crypto.createHash('sha256').update(faker.lorem.text()).digest('hex'),
+              // Normalization collapses blank lines, so seeded text has none.
+              normalizedText: faker.lorem.sentences(6).replaceAll('. ', '.\n'),
+              changedAt: datedRevisions.at(-1)?.createdAt ?? null,
+            },
+          })
+          await Promise.all(
+            datedRevisions.map(({ changeLevel, summary, createdAt }) =>
+              prisma.serviceLegalRevision.create({
+                data: {
+                  serviceId: service.id,
+                  documentId: document.id,
+                  changeLevel,
+                  changedWords:
+                    changeLevel === LegalChangeLevel.MINOR
+                      ? faker.number.int({ min: 1, max: 7 })
+                      : faker.number.int({ min: 9, max: 120 }),
+                  summary,
+                  diff: '--- \n+++ \n@@ -1,2 +1,2 @@\n-old clause\n+new clause',
+                  createdAt,
+                },
+              })
+            )
+          )
+          return datedRevisions.at(-1)?.createdAt ?? null
+        })
+        const changedAts = (await Promise.all(changePromises)).filter((d) => d !== null)
+        if (changedAts.length > 0) {
+          await prisma.service.update({
+            where: { id: service.id },
+            data: { tosChangedAt: new Date(Math.max(...changedAts.map((d) => d.getTime()))) },
+          })
+        }
+      }
 
       // Create contact methods for each service
       await Promise.all(
