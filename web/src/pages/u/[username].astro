@@ -26,6 +26,7 @@ import { prisma } from '../../lib/prisma'
 import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
 import { formatDateShort } from '../../lib/timeAgo'
 import { absoluteSiteUrl, urlDomain } from '../../lib/urls'
+import { isUserProfileIndexable } from '../../lib/userProfileSeo'
 
 import type { ProfilePage, WithContext } from 'schema-dts'
 
@@ -44,6 +45,7 @@ const user = await Astro.locals.banners.try('user', async () => {
         picture: true,
         spammer: true,
         verified: true,
+        scheduledDeletionAt: true,
         admin: true,
         capabilities: true,
         verifiedLink: true,
@@ -205,6 +207,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
 <BaseLayout
   pageTitle={`${user.displayName ?? user.name} - User Profile`}
   description={`User profile page of ${user.displayName ?? user.name} in KYCnot.me`}
+  noindex={!isUserProfileIndexable(user)}
   ogImage={{
     template: 'generic',
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
@@ -714,7 +717,9 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                       >
                         {unlock.name}
                       </p>
-                      <p class="text-sm text-day-500">{unlock.karmaLabel ?? `${unlock.karma.toLocaleString()} karma`}</p>
+                      <p class="text-sm text-day-500">
+                        {unlock.karmaLabel ?? `${unlock.karma.toLocaleString()} karma`}
+                      </p>
                     </div>
                   </div>
                   <div>

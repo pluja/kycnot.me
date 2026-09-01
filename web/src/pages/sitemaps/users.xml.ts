@@ -1,6 +1,7 @@
 import he from 'he'
 
 import { prisma } from '../../lib/prisma'
+import { indexableUserProfileWhere } from '../../lib/userProfileSeo'
 
 import type { APIRoute } from 'astro'
 
@@ -9,10 +10,7 @@ export const GET: APIRoute = async ({ site }) => {
 
   try {
     const users = await prisma.user.findMany({
-      where: {
-        scheduledDeletionAt: null,
-        OR: [{ verified: true }, { serviceAffiliations: { some: {} } }],
-      },
+      where: indexableUserProfileWhere,
       select: { name: true, updatedAt: true },
       orderBy: { updatedAt: 'desc' },
     })
