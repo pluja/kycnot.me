@@ -22,9 +22,7 @@ export function calculateReadingTime(content: string): number {
 export async function getPublishedPosts({ includeDrafts = false } = {}): Promise<BlogPost[]> {
   const all = await getCollection('blog')
   const filtered = includeDrafts ? all : all.filter((post) => !post.data.draft)
-  return [...filtered].sort(
-    (a, b) => b.data.publishedAt.getTime() - a.data.publishedAt.getTime()
-  )
+  return [...filtered].sort((a, b) => b.data.publishedAt.getTime() - a.data.publishedAt.getTime())
 }
 
 export function getRelatedPosts(current: BlogPost, all: BlogPost[], limit = 3): BlogPost[] {
@@ -68,6 +66,34 @@ export function getAllTags(posts: BlogPost[]): string[] {
     }
   }
   return Array.from(tags).sort((a, b) => a.localeCompare(b))
+}
+
+/**
+ * Posts a tag needs before its page is worth indexing.
+ *
+ * Below this the page is a near-duplicate of the single post it links to, and
+ * the blog currently has more tags than posts. The page still renders and
+ * stays crawlable so tag navigation keeps working.
+ */
+export const MIN_POSTS_FOR_INDEXABLE_TAG = 3
+
+/**
+ * Tags with enough posts to stand as their own page.
+ *
+ * The sitemap and the page's `noindex` both read this, so a tag can never be
+ * submitted for indexing while the page itself asks to be left out.
+ */
+export function getIndexableTags(posts: BlogPost[]): string[] {
+  const postsPerTag = new Map<string, number>()
+  for (const post of posts) {
+    for (const tag of post.data.tags) {
+      postsPerTag.set(tag, (postsPerTag.get(tag) ?? 0) + 1)
+    }
+  }
+  return Array.from(postsPerTag)
+    .filter(([, count]) => count >= MIN_POSTS_FOR_INDEXABLE_TAG)
+    .map(([tag]) => tag)
+    .sort((a, b) => a.localeCompare(b))
 }
 
 export function tagToSlug(tag: string): string {

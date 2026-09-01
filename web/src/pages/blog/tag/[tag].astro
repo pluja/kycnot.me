@@ -4,7 +4,14 @@ import { Icon } from 'astro-icon/components'
 import BlogPostCard from '../../../components/BlogPostCard.astro'
 import Breadcrumbs from '../../../components/Breadcrumbs.astro'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
-import { getAllTags, getPublishedPosts, postUrl, slugToTag, tagToSlug } from '../../../lib/blog'
+import {
+  getAllTags,
+  getPublishedPosts,
+  MIN_POSTS_FOR_INDEXABLE_TAG,
+  postUrl,
+  slugToTag,
+  tagToSlug,
+} from '../../../lib/blog'
 import { setPublicPageCacheHeaders } from '../../../lib/pageCacheHeaders'
 import { absoluteSiteUrl } from '../../../lib/urls'
 
@@ -72,6 +79,7 @@ const breadcrumbs: BreadcrumArray = [
   pageTitle={`Posts tagged: ${tag}`}
   description={`All KYCnot.me blog posts tagged "${tag}". ${posts.length} ${posts.length === 1 ? 'post' : 'posts'}.`}
   canonical={tagPath}
+  noindex={posts.length < MIN_POSTS_FOR_INDEXABLE_TAG}
   ogImage={{
     template: 'generic',
     title: `#${tag}`,
@@ -89,7 +97,8 @@ const breadcrumbs: BreadcrumArray = [
       <span class="text-day-500">#</span>{tag}
     </h1>
     <p class="mt-3 text-lg text-day-300">
-      {posts.length} {posts.length === 1 ? 'post' : 'posts'} tagged with{' '}
+      {posts.length}
+      {posts.length === 1 ? 'post' : 'posts'} tagged with{' '}
       <code class="rounded-sm bg-night-700 px-1.5 py-0.5 text-day-200">{tag}</code>
     </p>
   </header>

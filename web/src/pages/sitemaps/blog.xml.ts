@@ -1,6 +1,6 @@
 import he from 'he'
 
-import { getAllTags, getPublishedPosts, postUrl, tagUrl } from '../../lib/blog'
+import { getIndexableTags, getPublishedPosts, postUrl, tagUrl } from '../../lib/blog'
 
 import type { APIRoute } from 'astro'
 
@@ -9,16 +9,14 @@ export const GET: APIRoute = async ({ site }) => {
 
   try {
     const posts = await getPublishedPosts()
-    const tags = getAllTags(posts)
+    const tags = getIndexableTags(posts)
     const origin = site.origin
     const now = Date.now()
 
     const entries: string[] = []
 
     const indexLastmodDate =
-      posts.length > 0
-        ? (posts[0]?.data.updatedAt ?? posts[0]?.data.publishedAt ?? new Date())
-        : new Date()
+      posts.length > 0 ? (posts[0]?.data.updatedAt ?? posts[0]?.data.publishedAt ?? new Date()) : new Date()
     const indexLastmod = indexLastmodDate.toISOString().slice(0, 10)
     entries.push(
       `<url><loc>${he.encode(`${origin}/blog`)}</loc><lastmod>${indexLastmod}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>`
@@ -38,9 +36,7 @@ export const GET: APIRoute = async ({ site }) => {
 
     for (const tag of tags) {
       const loc = he.encode(`${origin}${tagUrl(tag)}`)
-      entries.push(
-        `<url><loc>${loc}</loc><changefreq>weekly</changefreq><priority>0.5</priority></url>`
-      )
+      entries.push(`<url><loc>${loc}</loc><changefreq>weekly</changefreq><priority>0.5</priority></url>`)
     }
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
