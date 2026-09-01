@@ -174,12 +174,17 @@ const nextPageUrl = (() => {
   }}
   htmx
 >
-  <div class="mb-5">
+  <div>
+    <h1 class="font-title text-2xl font-bold text-white first-letter:uppercase sm:text-3xl">{heading}</h1>
+    <p class="mt-1 mb-4 text-sm text-day-400">
+      What people are saying about KYC-free services right now.
+      {totalComments > 0 && ` ${totalComments.toLocaleString()} comments.`}
+    </p>
     {
       /* Scrolls sideways on a narrow screen rather than stacking into a wall of
         pills, and every pill is a link so none of this needs scripting. */
     }
-    <div class="-mx-1 flex items-center gap-1 overflow-x-auto px-1 pb-1">
+    <div class="-mx-1 mb-2 flex items-center gap-1 overflow-x-auto px-1 pb-1">
       <FilterPill
         href={filterUrl({ rated: undefined, issue: undefined })}
         label="All"
@@ -244,7 +249,7 @@ const nextPageUrl = (() => {
       />
     </div>
 
-    <div class="mt-2 flex flex-wrap items-center gap-2">
+    <div class="mb-5 flex flex-wrap items-center gap-2">
       <ServicePicker
         services={services}
         suggested={servicesByActivity}
@@ -264,13 +269,12 @@ const nextPageUrl = (() => {
         )
       }
     </div>
-  </div>
 
-  <div>
-    <h1 class="mb-1 font-title text-2xl font-bold text-white first-letter:uppercase">{heading}</h1>
-    <p class="mb-5 text-sm text-day-400">
-      What people are saying about KYC-free services right now.
-      {totalComments > 0 && ` ${totalComments.toLocaleString()} comments.`}
+    <p
+      class="mb-5 flex items-start gap-2 rounded-lg border border-day-500/10 bg-yellow-900/50 px-3 py-2 text-sm text-yellow-400"
+    >
+      <Icon name="ri:information-line" class="mt-0.5 size-4 shrink-0" />
+      <span>Comments are public once approved. Moderation is light. Do not trust, verify.</span>
     </p>
 
     {
