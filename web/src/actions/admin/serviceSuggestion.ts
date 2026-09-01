@@ -2,10 +2,12 @@ import { ServiceSuggestionStatus } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
+import { recordAuditLog } from '../../lib/auditLog'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { sendChatMessageEvents } from '../../lib/sendChatEvents'
+import { transformCase } from '../../lib/strings'
 
 export const adminServiceSuggestionActions = {
   update: defineProtectedAction({
@@ -15,7 +17,7 @@ export const adminServiceSuggestionActions = {
       suggestionId: z.coerce.number().int().positive(),
       status: z.nativeEnum(ServiceSuggestionStatus),
     }),
-    handler: async (input) => {
+    handler: async (input, { locals }) => {
       const suggestion = await prisma.serviceSuggestion.findUnique({
         select: {
           id: true,
@@ -32,11 +34,18 @@ export const adminServiceSuggestionActions = {
         })
       }
 
-      await prisma.serviceSuggestion.update({
-        where: { id: suggestion.id },
-        data: {
-          status: input.status,
-        },
+      await prisma.$transaction(async (tx) => {
+        await tx.serviceSuggestion.update({
+          where: { id: suggestion.id },
+          data: { status: input.status },
+        })
+        await recordAuditLog(tx, {
+          actorId: locals.user.id,
+          action: 'STATUS_CHANGED',
+          targetType: 'SERVICE_SUGGESTION',
+          targetId: suggestion.id,
+          summary: `Status set to ${transformCase(input.status.replace('_', ' '), 'lower')}, from ${transformCase(suggestion.status.replace('_', ' '), 'lower')}`,
+        })
       })
     },
   }),

@@ -2,6 +2,7 @@
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 
+import AuditLogTimeline from '../../../components/admin/AuditLogTimeline.astro'
 import ProposedEditsReview from '../../../components/admin/serviceSuggestions/ProposedEditsReview.astro'
 import BadgeSmall from '../../../components/BadgeSmall.astro'
 import Button from '../../../components/Button.astro'
@@ -15,6 +16,7 @@ import {
 } from '../../../constants/serviceSuggestionStatus'
 import { getServiceSuggestionTypeInfo } from '../../../constants/serviceSuggestionType'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { auditLogSelect } from '../../../lib/auditLog'
 import { parseIntWithFallback } from '../../../lib/numbers'
 import { prisma } from '../../../lib/prisma'
 import { makeLoginUrl } from '../../../lib/redirectUrls'
@@ -113,6 +115,18 @@ if (!serviceSuggestion) {
   return Astro.rewrite('/404')
 }
 
+const auditEntries = await Astro.locals.banners.try(
+  'Error fetching moderation history',
+  () =>
+    prisma.auditLog.findMany({
+      where: { targetType: 'SERVICE_SUGGESTION', targetId: serviceSuggestion.id },
+      select: auditLogSelect(),
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    }),
+  []
+)
+
 const attributes = serviceSuggestion.proposedEdits
   ? await Astro.locals.banners.try(
       'Error fetching attributes',
@@ -194,6 +208,10 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
           <div class="my-4 text-center text-sm text-day-400 italic">Empty</div>
         )
       }
+    </div>
+
+    <div class="mt-6">
+      <AuditLogTimeline entries={auditEntries} title="Moderation history" />
     </div>
 
     {

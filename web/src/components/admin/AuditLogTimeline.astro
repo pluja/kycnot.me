@@ -1,0 +1,48 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { getAuditActionInfo } from '../../constants/auditActions'
+import { cn } from '../../lib/cn'
+import TimeFormatted from '../TimeFormatted.astro'
+
+import type { auditLogSelect } from '../../lib/auditLog'
+import type { Prisma } from '@prisma/client'
+
+type Props = {
+  entries: Prisma.AuditLogGetPayload<{ select: ReturnType<typeof auditLogSelect> }>[]
+  title?: string
+}
+
+const { entries, title = 'History' } = Astro.props
+---
+
+{
+  entries.length > 0 && (
+    <details class="rounded-md border border-night-600 bg-night-900 p-3">
+      <summary class="cursor-pointer list-none select-none">
+        <div class="inline-flex items-center gap-2 font-title text-sm font-semibold text-day-100">
+          <Icon name="ri:history-line" class="size-4 text-day-400" />
+          {title} ({entries.length})
+        </div>
+      </summary>
+      <ul class="mt-3 space-y-2">
+        {entries.map((entry) => {
+          const actionInfo = getAuditActionInfo(entry.action)
+          return (
+            <li class="flex items-start gap-2 text-sm">
+              <Icon name={actionInfo.icon} class={cn('mt-0.5 size-4 shrink-0', actionInfo.classNames.icon)} />
+              <div class="min-w-0 flex-1">
+                <p class="text-pretty text-day-200">{entry.summary}</p>
+                <p class="text-xs text-day-500">
+                  {entry.actor?.displayName ?? entry.actor?.name ?? 'the platform'}
+                  {' · '}
+                  <TimeFormatted date={entry.createdAt} />
+                </p>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </details>
+  )
+}
