@@ -43,16 +43,27 @@ if (!isEmbeddableBadgeStatus(service.verificationStatus)) {
 const { name: serviceName, slug: serviceSlug } = service
 const serviceUrl = `${siteOrigin}/service/${serviceSlug}`
 
-function getBadgeImageUrl(sizeId: (typeof badgeSizes)[number]['id'], options: BadgeOptions = defaultBadgeOptions) {
+function getBadgeImageUrl(
+  sizeId: (typeof badgeSizes)[number]['id'],
+  options: BadgeOptions = defaultBadgeOptions
+) {
   return getServiceBadgeImageUrl(serviceSlug, siteOrigin, sizeId, options)
 }
 
-function getBadgeEmbedCode(sizeId: (typeof badgeSizes)[number]['id'], options: BadgeOptions = defaultBadgeOptions) {
+function getBadgeEmbedCode(
+  sizeId: (typeof badgeSizes)[number]['id'],
+  options: BadgeOptions = defaultBadgeOptions
+) {
   return getServiceBadgeEmbedCode(serviceName, serviceUrl, getBadgeImageUrl(sizeId, options))
 }
 ---
 
-<BaseLayout pageTitle={`Badge for ${service.name}`} widthClassName="max-w-6xl">
+<BaseLayout
+  pageTitle={`Badge for ${service.name}`}
+  description={`Copy the embeddable KYCnot.me verification badge for ${service.name}.`}
+  widthClassName="max-w-6xl"
+  noindex
+>
   <section class="mt-2">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-day-500/10 pb-3">
       <div>
