@@ -49,6 +49,7 @@ import { getSupportedProviderSlugs } from '../../lib/exchange/supportedProviders
 import { computeIncidentTrustPenalty, totalIncidentTrustPenalty } from '../../lib/incidentPenalty'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
 import { makeOgImageUrl } from '../../lib/ogImageUrl'
+import { setPublicPageCacheHeaders } from '../../lib/pageCacheHeaders'
 import { fitPageTitle } from '../../lib/pageTitle'
 import { pluralize } from '../../lib/pluralize'
 import { prisma } from '../../lib/prisma'
@@ -138,6 +139,17 @@ if (!service) {
 if (!visibleStatuses.includes(service.serviceVisibility)) {
   return Astro.rewrite('/404')
 }
+
+// Set after the 404/redirect returns above so only a real service page is
+// cached. Signed-in visitors get `no-store`, which is also what keeps a
+// HIDDEN service (visible only via `services:edit`) out of a shared cache.
+// The mirror-URL shuffle below is frozen for the edge TTL as a result; that
+// affects the 22 of 367 public services with more than one URL, and only
+// changes which mirror is listed first.
+setPublicPageCacheHeaders(Astro.response.headers, {
+  isAuthenticated: user !== null,
+  hasErrors: Astro.locals.banners.errors.length > 0,
+})
 
 const makeWatchingDetails = (
   dbNotificationPreferences: Prisma.NotificationPreferencesGetPayload<{
