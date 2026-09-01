@@ -11,6 +11,7 @@
     "astro": "astro",
     "db-admin": "prisma studio --browser=none",
     "db-gen": "prisma generate",
+    "db-drift": "sh scripts/db-drift.sh",
     "db-push": "prisma migrate dev",
     "db-triggers": "just import-triggers",
     "db-update": "prisma migrate dev && just import-triggers",
