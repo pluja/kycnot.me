@@ -39,6 +39,7 @@ import { makeSortSeed } from '../lib/sortSeed'
 import { siteOrigin } from '../lib/urls'
 
 import type { Prisma } from '@prisma/client'
+import type { WebSite, WithContext } from 'schema-dts'
 
 const PAGE_SIZE = 12
 
@@ -448,6 +449,23 @@ const searchPageDescription = makeSearchMetaDescription({
 
 const searchResultsId = 'search-results'
 const showFiltersId = 'show-filters'
+// query-input is required for Google's sitelinks search box, and schema-dts does
+// not carry it on SearchAction. The property is correct and the type is short,
+// so it is asserted here rather than dropped from the markup.
+const searchBoxSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'KYCnot.me',
+  url: siteOrigin,
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: {
+      '@type': 'EntryPoint',
+      urlTemplate: `${siteOrigin}/?q={search_term_string}`,
+    },
+    'query-input': 'required name=search_term_string',
+  },
+} as WithContext<WebSite>
 ---
 
 <BaseLayout
@@ -457,22 +475,7 @@ const showFiltersId = 'show-filters'
   widthClassName="max-w-none"
   htmx
   showSplashText
-  schemas={[
-    {
-      '@context': 'https://schema.org',
-      '@type': 'WebSite',
-      name: 'KYCnot.me',
-      url: siteOrigin,
-      potentialAction: {
-        '@type': 'SearchAction',
-        target: {
-          '@type': 'EntryPoint',
-          urlTemplate: `${siteOrigin}/?q={search_term_string}`,
-        },
-        'query-input': 'required name=search_term_string',
-      },
-    },
-  ]}
+  schemas={[searchBoxSchema]}
   breadcrumbs={[
     {
       name: 'Services',
@@ -559,7 +562,9 @@ const showFiltersId = 'show-filters'
     </div>
 
     <div class="min-w-0 flex-1">
-      <h1 class="mb-2 flex items-center gap-0.5 text-[11px] font-medium tracking-widest text-day-500 uppercase">
+      <h1
+        class="mb-2 flex items-center gap-0.5 text-[11px] font-medium tracking-widest text-day-500 uppercase"
+      >
         No-KYC crypto services directory
         <a
           href="/about"

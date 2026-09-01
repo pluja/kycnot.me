@@ -32,7 +32,7 @@ export type ServerEventsData = {
   }
 }
 
-export type ChatConversationType = 'suggestion' | 'contact'
+export type ChatConversationType = 'contact' | 'suggestion'
 
 export const allServerEventsData = [
   'new-notification',
@@ -56,12 +56,16 @@ export type SSEEventMap = {
 }
 
 declare global {
+  // Added to the event map rather than as an overload on Document. An overload
+  // constrained to these events wins when a type argument is given explicitly,
+  // which left addEventListener<'astro:page-load'> unable to name an event it
+  // handles perfectly well.
+  // Empty on purpose: extending is what merges these events into the map.
+  // eslint-disable-next-line @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type
+  interface DocumentEventMap extends SSEEventMap {}
+
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface Document {
-    addEventListener<K extends keyof SSEEventMap>(
-      type: K,
-      listener: (this: Document, ev: SSEEventMap[K]) => void
-    ): void
     dispatchEvent<K extends keyof SSEEventMap>(ev: SSEEventMap[K]): void
   }
 }

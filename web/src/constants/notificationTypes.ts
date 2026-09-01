@@ -53,6 +53,26 @@ export const {
       icon: 'ri:mail-line',
     },
     {
+      id: 'COMMUNITY_NOTE_ADDED',
+      label: 'Community note added',
+      icon: 'ri:sticky-note-line',
+    },
+    {
+      id: 'CONTACT_MESSAGE',
+      label: 'New message in contact thread',
+      icon: 'ri:customer-service-2-line',
+    },
+    {
+      id: 'CONTACT_SEEN',
+      label: 'Contact thread seen',
+      icon: 'ri:eye-line',
+    },
+    {
+      id: 'CONTACT_RESOLVED',
+      label: 'Contact thread resolved',
+      icon: 'ri:check-double-line',
+    },
+    {
       id: 'SUGGESTION_STATUS_CHANGE',
       label: 'Suggestion status changed',
       icon: 'ri:lightbulb-line',
