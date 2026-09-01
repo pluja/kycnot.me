@@ -256,6 +256,7 @@ function makeReplySchema(comment: CommentWithRepliesPopulated): Comment {
           <div class="flex items-center">
             <a
               href={toggleUrl.toString()}
+              rel={params.showPending ? undefined : 'nofollow'}
               class={cn([
                 'flex items-center gap-2 text-sm',
                 params.showPending ? 'text-yellow-500' : 'text-zinc-400 hover:text-zinc-300',

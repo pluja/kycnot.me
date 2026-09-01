@@ -7,10 +7,10 @@ import { isStaff } from '../lib/permissions'
 import BadgeSmall from './BadgeSmall.astro'
 import Tooltip from './Tooltip.astro'
 
-import type { CommentWithRepliesPopulated } from '../lib/commentsWithReplies'
+import type { CommentBadgeFields } from '../lib/commentsWithReplies'
 
 type Props = {
-  comment: CommentWithRepliesPopulated
+  comment: CommentBadgeFields
   serviceSlug: string
 }
 

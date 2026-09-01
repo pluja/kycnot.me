@@ -172,3 +172,22 @@ export function separateServiceUrlsByType(allServiceUrls: string[]) {
 
   return result
 }
+
+/**
+ * The current address with some filters changed, for a feed whose filters are
+ * plain links.
+ *
+ * Drops the parameters that describe where a reader is in the feed rather than
+ * what they are looking at: the page, the day the last page ended on, and the
+ * text typed into a service picker. Carrying those into a filter link pins the
+ * picker open over the page and hides the heading the feed opens with.
+ */
+export function makeFilterUrl(currentUrl: URL, changes: Record<string, string | undefined>) {
+  const url = new URL(currentUrl)
+  for (const key of ['page', 'after', 'serviceQuery']) url.searchParams.delete(key)
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === undefined) url.searchParams.delete(key)
+    else url.searchParams.set(key, value)
+  }
+  return `${url.pathname}${url.search}`
+}

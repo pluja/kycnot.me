@@ -1,0 +1,53 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../lib/cn'
+
+type Props = {
+  href: string
+  label: string
+  icon?: string
+  active?: boolean
+  /** Announced instead of the label when the label alone is ambiguous. */
+  accessibleLabel?: string
+  count?: number
+  color?: 'blue' | 'green' | 'red' | 'yellow'
+  /** For a view worth offering a reader but not worth a crawler following. */
+  nofollow?: boolean
+}
+
+const {
+  href,
+  label,
+  icon,
+  active = false,
+  accessibleLabel,
+  count,
+  color = 'blue',
+  nofollow = false,
+} = Astro.props
+
+// A link rather than a control, so the bar works with scripting off and every
+// filtered view has an address a reader can share or a crawler can follow.
+const activeClasses = {
+  blue: 'bg-blue-500/20 text-blue-400',
+  green: 'bg-green-500/20 text-green-400',
+  red: 'bg-red-500/20 text-red-400',
+  yellow: 'bg-yellow-500/20 text-yellow-400',
+}[color]
+---
+
+<a
+  href={href}
+  rel={nofollow ? 'nofollow' : undefined}
+  aria-label={accessibleLabel}
+  aria-current={active ? 'page' : undefined}
+  class={cn(
+    'inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm whitespace-nowrap',
+    active ? activeClasses : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300'
+  )}
+>
+  {icon && <Icon name={icon} class="inline size-3.5" />}
+  {label}
+  {count !== undefined && <span class="text-xs opacity-70">{count.toLocaleString()}</span>}
+</a>

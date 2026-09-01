@@ -4,21 +4,19 @@ import { Icon } from 'astro-icon/components'
 import { orderBy } from 'lodash-es'
 
 import BadgeSmall from '../components/BadgeSmall.astro'
-import Button from '../components/Button.astro'
 import EventCard from '../components/events/EventCard.astro'
 import EventServiceLink from '../components/events/EventServiceLink.astro'
-import MyPicture from '../components/MyPicture.astro'
-import TimeFormatted from '../components/TimeFormatted.astro'
+import FilterPill from '../components/FilterPill.astro'
+import ServicePicker from '../components/ServicePicker.astro'
 import { eventClassFilterFor, eventViews, eventViewsZodEnum } from '../constants/eventViews'
 import { getIncidentSeverityInfo } from '../constants/incidentSeverities'
-import { getVerificationStatusInfo } from '../constants/verificationStatus'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { cn } from '../lib/cn'
 import { getEventDisplay, isEventOpen } from '../lib/eventKind'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { formatDateShort } from '../lib/timeAgo'
-import { createPageUrl } from '../lib/urls'
+import { createPageUrl, makeFilterUrl } from '../lib/urls'
 
 import type { Prisma } from '@prisma/client'
 
@@ -39,8 +37,18 @@ const { data: params, hasDefaultData: hasDefaultFilters } = zodParseQueryParamsS
 
 const classFilter = eventClassFilterFor(params.view)
 
-const fieldClass =
-  'w-full rounded-md border border-night-400 bg-night-900 px-3 py-2 text-sm text-day-100 transition-colors [color-scheme:dark] focus:border-green-500/60 focus:ring-1 focus:ring-green-500/30 focus:outline-none'
+const eventViewIcons: Record<string, string> = {
+  curated: 'ri:stack-line',
+  events: 'ri:calendar-event-line',
+  incidents: 'ri:alarm-warning-line',
+  changes: 'ri:edit-line',
+  all: 'ri:apps-line',
+}
+
+// now pins the clock for a single render, so it is this page's own equivalent of
+// a position in the feed and does not belong in a filter link either.
+const filterUrl = (changes: Record<string, string | undefined>) =>
+  makeFilterUrl(Astro.url, { now: undefined, ...changes })
 
 const [services, [dbEvents, totalEvents]] = await Astro.locals.banners.tryMany([
   [
@@ -56,6 +64,7 @@ const [services, [dbEvents, totalEvents]] = await Astro.locals.banners.tryMany([
           name: true,
           imageUrl: true,
           verificationStatus: true,
+          _count: { select: { events: true } },
         },
         orderBy: {
           name: 'asc',
@@ -74,7 +83,16 @@ const [services, [dbEvents, totalEvents]] = await Astro.locals.banners.tryMany([
             lte: params.now,
           },
           service: {
-            slug: params.service ?? undefined,
+            // A slug when it came from a link, or a name when the reader typed
+            // one into the picker, which is all a datalist can hand back.
+            ...(params.service
+              ? {
+                  OR: [
+                    { slug: params.service },
+                    { name: { equals: params.service, mode: 'insensitive' as const } },
+                  ],
+                }
+              : {}),
             serviceVisibility: {
               in: params.service ? ['PUBLIC', 'ARCHIVED', 'UNLISTED'] : ['PUBLIC', 'ARCHIVED'],
             },
@@ -143,6 +161,9 @@ const groupMeta = {
   past: { label: 'Earlier', icon: 'ri:history-line', class: 'text-day-500' },
 } satisfies Record<keyof typeof GROUP_ORDER, { label: string; icon: string; class: string }>
 
+// Most eventful first, so the picker opens on the services worth reading about.
+const servicesByActivity = [...services].sort((a, b) => b._count.events - a._count.events)
+
 const events = orderBy(
   dbEvents.map((event) => {
     const isOngoing = isEventOpen(event, params.now)
@@ -163,17 +184,6 @@ const events = orderBy(
 )
 const totalPages = Math.ceil(totalEvents / PAGE_SIZE) || 1
 const hasMorePages = params.page < totalPages
-
-const createUrlWithoutFilter = (paramName: keyof typeof params) => {
-  const url = new URL(Astro.url)
-  url.searchParams.delete(paramName)
-  url.searchParams.forEach((value, key) => {
-    if (value === '') {
-      url.searchParams.delete(key)
-    }
-  })
-  return url.pathname + url.search
-}
 ---
 
 <BaseLayout
@@ -189,195 +199,74 @@ const createUrlWithoutFilter = (paramName: keyof typeof params) => {
   }}
   htmx
 >
-  <p class="mb-6 block text-center font-title text-2xl font-bold text-white sm:hidden" aria-hidden="true">
-    Service Events Timeline
-  </p>
-  <form
-    method="GET"
-    class={cn(
-      'w-full rounded-xl border border-night-400 bg-night-800/40 p-4 sm:sticky sm:top-20 sm:w-64 sm:shrink-0',
-      '[&:has(~[data-has-default-filters="true"])_[data-clear-filters-button]]:hidden'
-    )}
-    hx-get={Astro.url.pathname}
-    hx-trigger="change, keyup[key=='Enter']"
-    hx-target="#events-list-container"
-    hx-select="#events-list-container"
-    hx-swap="outerHTML"
-    hx-push-url="true"
-    hx-indicator="#search-indicator"
-  >
-    <div class="mb-4 flex items-center justify-between">
-      <h2 class="flex items-center gap-1.5 text-sm font-semibold tracking-wider text-day-200 uppercase">
-        <Icon name="ri:filter-3-line" class="size-4 text-green-500" />
-        Filters
-        <Icon
-          id="search-indicator"
-          name="ri:loader-2-line"
-          class="hidden size-4 animate-spin text-green-500 htmx-request:inline-block"
-        />
-      </h2>
+  <div>
+    <h1 class="font-title text-2xl font-bold text-white sm:text-3xl">Events on KYCnot.me</h1>
+    <p class="mt-1 mb-4 text-sm text-day-400">
+      What has happened to KYC-free services, newest first.
+      {totalEvents > 0 && ` ${totalEvents.toLocaleString()} events.`}
+    </p>
 
-      <a
-        href="/events"
-        class="text-xs text-day-500 transition-colors hover:text-day-200 hover:underline"
-        data-clear-filters-button
-      >
-        Clear all
-      </a>
+    <div class="-mx-1 mb-2 flex items-center gap-1 overflow-x-auto px-1 pb-1">
+      {
+        eventViews.map((view) => (
+          <FilterPill
+            href={filterUrl({ view: view.value === 'curated' ? undefined : view.value })}
+            label={view.label}
+            icon={eventViewIcons[view.value]}
+            active={params.view === view.value}
+          />
+        ))
+      }
     </div>
 
-    <div class="grid grid-cols-2 gap-3 sm:grid-cols-1">
-      <div>
-        <label for="from" class="mb-1 block text-xs font-medium text-day-400">From</label>
+    <div class="mb-5 flex flex-wrap items-center gap-2">
+      <ServicePicker
+        services={services}
+        suggested={servicesByActivity}
+        selected={params.service}
+        keep={{
+          view: params.view === 'curated' ? undefined : params.view,
+          from: params.from?.toISOString().slice(0, 10),
+          to: params.to?.toISOString().slice(0, 10),
+        }}
+        clearHref={filterUrl({ service: undefined })}
+      />
+
+      <form method="GET" class="flex flex-wrap items-center gap-1">
+        {params.view !== 'curated' && <input type="hidden" name="view" value={params.view} />}
+        {params.service && <input type="hidden" name="service" value={params.service} />}
+        <label class="sr-only" for="from">From</label>
         <input
-          type="date"
           id="from"
-          name="from"
-          value={params.from?.toISOString().split('T')[0]}
-          class={fieldClass}
-        />
-      </div>
-
-      <div>
-        <label for="to" class="mb-1 block text-xs font-medium text-day-400">To</label>
-        <input
           type="date"
-          id="to"
-          name="to"
-          value={params.to?.toISOString().split('T')[0]}
-          class={fieldClass}
+          name="from"
+          value={params.from?.toISOString().slice(0, 10)}
+          class="rounded-md border border-night-400 bg-night-900 px-2 py-1 text-sm text-day-100 [color-scheme:dark]"
         />
-      </div>
+        <label class="sr-only" for="to">To</label>
+        <input
+          id="to"
+          type="date"
+          name="to"
+          value={params.to?.toISOString().slice(0, 10)}
+          class="rounded-md border border-night-400 bg-night-900 px-2 py-1 text-sm text-day-100 [color-scheme:dark]"
+        />
+        <button
+          type="submit"
+          class="rounded-md border border-night-400 px-2 py-1 text-sm text-day-200 hover:bg-night-700"
+        >
+          Apply dates
+        </button>
+      </form>
+
+      {
+        !hasDefaultFilters && (
+          <a href="/events" class="text-sm text-day-500 hover:text-day-200 hover:underline">
+            Clear all
+          </a>
+        )
+      }
     </div>
-
-    <label for="view" class="mt-3 mb-1 block text-xs font-medium text-day-400">Show</label>
-    <div class="relative">
-      <select id="view" name="view" class={cn(fieldClass, 'appearance-none pr-9')}>
-        {
-          eventViews.map((view) => (
-            <option value={view.value} selected={params.view === view.value}>
-              {view.label}
-            </option>
-          ))
-        }
-      </select>
-      <Icon
-        name="ri:arrow-down-s-line"
-        class="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-day-500"
-      />
-    </div>
-
-    <label for="service" class="mt-3 mb-1 block text-xs font-medium text-day-400">Service</label>
-    <div class="relative">
-      <select id="service" name="service" class={cn(fieldClass, 'appearance-none pr-9')}>
-        <option value="">All Services</option>
-        {
-          services.map((service) => (
-            <option value={service.slug} selected={params.service === service.slug}>
-              {service.name}
-            </option>
-          ))
-        }
-      </select>
-      <Icon
-        name="ri:arrow-down-s-line"
-        class="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-day-500"
-      />
-    </div>
-
-    <Button type="submit" label="Apply" size="lg" class="mt-5 w-full sm:js:hidden" color="success" shadow />
-  </form>
-
-  <div class="flex-1" id="events-list-container" data-has-default-filters={hasDefaultFilters}>
-    <h1 class="mb-3 hidden font-title text-2xl font-bold text-white sm:block">Service Events Timeline</h1>
-
-    <!-- Active filters -->
-    {
-      !hasDefaultFilters && (
-        <div class="mt-8 mb-6 flex flex-wrap justify-center gap-2 sm:mt-0 sm:justify-start">
-          {params.from && (
-            <a
-              href={createUrlWithoutFilter('from')}
-              class="group flex h-8 items-center gap-2 rounded-full border border-green-500/30 bg-black/40 px-3 text-sm text-white"
-            >
-              <span>
-                From <TimeFormatted date={params.from} prefix={false} />
-              </span>
-              <div class="text-gray-400 group-hover:text-white">
-                <Icon name="ri:close-large-line" class="size-4" />
-              </div>
-            </a>
-          )}
-
-          {params.to && (
-            <a
-              href={createUrlWithoutFilter('to')}
-              class="group flex h-8 items-center gap-2 rounded-full border border-green-500/30 bg-black/40 px-3 text-sm text-white"
-            >
-              <span>
-                To <TimeFormatted date={params.to} prefix={false} />
-              </span>
-              <div class="text-gray-400 group-hover:text-white">
-                <Icon name="ri:close-large-line" class="size-4" />
-              </div>
-            </a>
-          )}
-
-          {params.service &&
-            (() => {
-              const service = services.find((s) => s.slug === params.service)
-              const verificationStatusInfo = service
-                ? getVerificationStatusInfo(service.verificationStatus)
-                : null
-
-              return (
-                <a
-                  href={createUrlWithoutFilter('service')}
-                  class="group flex h-8 items-center gap-2 rounded-full border border-green-500/30 bg-black/40 px-3 text-sm text-white"
-                >
-                  {service?.imageUrl && (
-                    <MyPicture
-                      src={service.imageUrl}
-                      alt={service.name}
-                      width={16}
-                      height={16}
-                      class="size-4 shrink-0 rounded-xs object-contain"
-                    />
-                  )}
-                  <span>
-                    {service?.name ?? params.service}
-                    {service && service.verificationStatus !== 'APPROVED' && verificationStatusInfo && (
-                      <Icon
-                        name={verificationStatusInfo.icon}
-                        class={cn(
-                          'inline-block size-3 shrink-0 align-[-0.1em]',
-                          verificationStatusInfo.classNames.icon
-                        )}
-                      />
-                    )}
-                  </span>
-                  <div class="text-gray-400 group-hover:text-white">
-                    <Icon name="ri:close-large-line" class="size-4" />
-                  </div>
-                </a>
-              )
-            })()}
-
-          {params.view !== 'curated' && (
-            <a
-              href={createUrlWithoutFilter('view')}
-              class="group flex h-8 items-center gap-2 rounded-full border border-green-500/30 bg-black/40 px-3 text-sm text-white"
-            >
-              <Icon name="ri:filter-3-line" class="size-4" />
-              <span>{eventViews.find((view) => view.value === params.view)?.label}</span>
-              <div class="text-gray-400 group-hover:text-white">
-                <Icon name="ri:close-large-line" class="size-4" />
-              </div>
-            </a>
-          )}
-        </div>
-      )
-    }
 
     {
       events.length > 0 ? (

@@ -1,0 +1,85 @@
+---
+import { commentStatusById } from '../constants/commentStatus'
+
+import BadgeSmall from './BadgeSmall.astro'
+import Tooltip from './Tooltip.astro'
+
+import type { CommentBadgeFields } from '../lib/commentsWithReplies'
+
+type Props = {
+  comment: CommentBadgeFields
+}
+
+const { comment } = Astro.props
+
+// Only penalty-bearing mute reasons say anything to a reader. The others take
+// the rating out of the score while the comment still stands, so a badge would
+// read as an accusation the moderators did not make.
+const isPenaltyMute =
+  comment.ratingMuted &&
+  (comment.ratingMuteReason === 'SUSPICIOUS_PATTERN' || comment.ratingMuteReason === 'TEMPLATE_SPAM')
+
+const isUserRatingTrustLabel = ['Active user', 'Trusted user'].includes(comment.ratingTrustLabel ?? '')
+
+const shouldShowRatingTrustBadge =
+  comment.rating !== null &&
+  !comment.parentId &&
+  !!comment.ratingTrustLabel &&
+  !isUserRatingTrustLabel &&
+  comment.ratingTrustLabel !== 'Not counted' &&
+  comment.ratingTrustLabel !== 'Verified customer'
+---
+
+{isPenaltyMute && <BadgeSmall icon="ri:spam-2-fill" color="red" text="Potential SPAM" inlineIcon />}
+
+{
+  shouldShowRatingTrustBadge && (
+    <Tooltip
+      text={`${comment.ratingTrustReason ?? 'Review trust weight'}. Score influence: ${Math.round(comment.ratingWeight * 100).toLocaleString()}%.`}
+      position="right"
+    >
+      <BadgeSmall
+        icon={comment.ratingWeight >= 0.45 ? 'ri:shield-check-line' : 'ri:shield-flash-line'}
+        color={comment.ratingWeight >= 0.45 ? 'lime' : 'yellow'}
+        text={comment.ratingTrustLabel ?? ''}
+        inlineIcon
+      />
+    </Tooltip>
+  )
+}
+
+{
+  comment.status === 'VERIFIED' && (
+    <BadgeSmall
+      icon={commentStatusById.VERIFIED.icon}
+      color={commentStatusById.VERIFIED.color}
+      text={commentStatusById.VERIFIED.label}
+      inlineIcon
+    />
+  )
+}
+
+{/* Service usage verification indicators */}
+{
+  comment.privateProof && comment.privateProofStatus === 'APPROVED' && (
+    <Tooltip text="The submitted Order ID was checked by moderation. It does not verify the reviewer, the full review, or whether the review is unbiased.">
+      <BadgeSmall icon="ri:checkbox-circle-line" color="green" text="Order ID checked" inlineIcon />
+    </Tooltip>
+  )
+}
+{
+  comment.privateProof && comment.privateProofStatus === 'REJECTED' && (
+    <BadgeSmall icon="ri:close-circle-fill" color="red" text="Invalid order ID" inlineIcon />
+  )
+}
+
+{
+  comment.issues.includes('KYC_REQUESTED') && (
+    <BadgeSmall icon="ri:user-forbid-fill" color="red" text="KYC issue" inlineIcon />
+  )
+}
+{
+  comment.issues.includes('FUNDS_BLOCKED') && (
+    <BadgeSmall icon="ri:wallet-3-fill" color="orange" text="Funds blocked" inlineIcon />
+  )
+}

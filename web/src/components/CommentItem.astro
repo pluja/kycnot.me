@@ -15,6 +15,7 @@ import { absoluteSiteUrl, siteOrigin, urlDomain } from '../lib/urls'
 
 import BadgeSmall from './BadgeSmall.astro'
 import CommentAuthorBadges from './CommentAuthorBadges.astro'
+import CommentBadges from './CommentBadges.astro'
 import CommentModeration from './CommentModeration.astro'
 import CommentReply from './CommentReply.astro'
 import Markdown from './Markdown.astro'
@@ -68,7 +69,6 @@ const canSeeOrderId = canModerate || viewerIsAffiliated
 const isAuthorOrPrivileged = isAuthor || canModerate
 const ratingWeightPercent = `${Math.round(comment.ratingWeight * 100).toLocaleString()}%`
 
-const isUserRatingTrustLabel = ['Active user', 'Trusted user'].includes(comment.ratingTrustLabel ?? '')
 
 const isRatingActive =
   comment.rating !== null &&
@@ -85,14 +85,6 @@ const isRatingActive =
 const isPenaltyMute =
   comment.ratingMuted &&
   (comment.ratingMuteReason === 'SUSPICIOUS_PATTERN' || comment.ratingMuteReason === 'TEMPLATE_SPAM')
-
-const shouldShowRatingTrustBadge =
-  comment.rating !== null &&
-  !comment.parentId &&
-  !!comment.ratingTrustLabel &&
-  !isUserRatingTrustLabel &&
-  comment.ratingTrustLabel !== 'Not counted' &&
-  comment.ratingTrustLabel !== 'Verified customer'
 
 // Why this rating isn't counting toward the service score. Reaches the
 // user as a tooltip on the strikethrough score so they understand the
@@ -247,7 +239,7 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
       <TimeFormatted date={comment.createdAt} hourPrecision />
     </a>
 
-    {isPenaltyMute && <BadgeSmall icon="ri:spam-2-fill" color="red" text="Potential SPAM" inlineIcon />}
+    <CommentBadges comment={comment} />
 
     {
       comment.rating !== null && !comment.parentId && (
@@ -271,33 +263,6 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
             {ratingWeightPercent}
           </a>
         </Tooltip>
-      )
-    }
-
-    {
-      shouldShowRatingTrustBadge && (
-        <Tooltip
-          text={`${comment.ratingTrustReason ?? 'Review trust weight'}. Score influence: ${Math.round(comment.ratingWeight * 100).toLocaleString()}%.`}
-          position="right"
-        >
-          <BadgeSmall
-            icon={comment.ratingWeight >= 0.45 ? 'ri:shield-check-line' : 'ri:shield-flash-line'}
-            color={comment.ratingWeight >= 0.45 ? 'lime' : 'yellow'}
-            text={comment.ratingTrustLabel ?? ''}
-            inlineIcon
-          />
-        </Tooltip>
-      )
-    }
-
-    {
-      comment.status === 'VERIFIED' && (
-        <BadgeSmall
-          icon={commentStatusById.VERIFIED.icon}
-          color={commentStatusById.VERIFIED.color}
-          text={commentStatusById.VERIFIED.label}
-          inlineIcon
-        />
       )
     }
 
@@ -333,31 +298,6 @@ const commentUrl = makeCommentUrl({ serviceSlug, commentId: comment.id, origin: 
           inlineIcon
           endIcon="ri:lock-line"
         />
-      )
-    }
-
-    {/* Service usage verification indicators */}
-    {
-      comment.privateProof && comment.privateProofStatus === 'APPROVED' && (
-        <Tooltip text="The submitted Order ID was checked by moderation. It does not verify the reviewer, the full review, or whether the review is unbiased.">
-          <BadgeSmall icon="ri:checkbox-circle-line" color="green" text="Order ID checked" inlineIcon />
-        </Tooltip>
-      )
-    }
-    {
-      comment.privateProof && comment.privateProofStatus === 'REJECTED' && (
-        <BadgeSmall icon="ri:close-circle-fill" color="red" text="Invalid order ID" inlineIcon />
-      )
-    }
-
-    {
-      comment.issues.includes('KYC_REQUESTED') && (
-        <BadgeSmall icon="ri:user-forbid-fill" color="red" text="KYC issue" inlineIcon />
-      )
-    }
-    {
-      comment.issues.includes('FUNDS_BLOCKED') && (
-        <BadgeSmall icon="ri:wallet-3-fill" color="orange" text="Funds blocked" inlineIcon />
       )
     }
   </div>

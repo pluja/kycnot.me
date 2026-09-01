@@ -1,0 +1,254 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../lib/cn'
+
+import MyPicture from './MyPicture.astro'
+
+import type { Prisma } from '@prisma/client'
+
+type PickableService = Prisma.ServiceGetPayload<{
+  select: { name: true; slug: true; imageUrl: true }
+}>
+
+type Props = {
+  /** Every service that can be picked, offered to the browser's own typeahead. */
+  services: PickableService[]
+  /** Shown as icon links, in the order given. The list scrolls. */
+  suggested?: PickableService[]
+  selected?: string
+  /** Query parameter a pick writes, and the prefix of the one the search writes. */
+  name?: string
+  /** Filters to carry through the search, since a GET form replaces the query. */
+  keep?: Record<string, string | undefined>
+  clearHref: string
+  class?: string
+}
+
+const {
+  services,
+  suggested = [],
+  selected,
+  name = 'service',
+  keep = {},
+  clearHref,
+  class: className,
+} = Astro.props
+
+const selectedService = selected
+  ? services.find((service) => service.slug === selected || service.name === selected)
+  : undefined
+
+const keptParams = Object.entries(keep).filter((entry): entry is [string, string] => !!entry[1])
+
+function linkParams(slug: string) {
+  return new URLSearchParams([...keptParams, [name, slug]]).toString()
+}
+
+// Searching and picking are separate parameters: a search narrows the list, and
+// only a pick filters the page. So typing never has to guess whether half a name
+// meant a service, and the address a reader ends up sharing holds a slug.
+const queryParam = `${name}Query`
+const query = (Astro.url.searchParams.get(queryParam) ?? '').trim()
+const needle = query.toLowerCase()
+
+// Only the busiest services get a row. Listing all of them put several hundred
+// links between a keyboard reader and the rest of the page, and shipped an icon
+// each. The datalist below still holds every service, and a search reaches the
+// tail through the server, so nothing becomes unreachable.
+const SHOWN_WITHOUT_SEARCH = 25
+const matching = suggested
+  .map((service) => ({ service, key: service.name.toLowerCase() }))
+  .filter(({ key }) => !needle || key.includes(needle))
+const options = matching.slice(0, SHOWN_WITHOUT_SEARCH)
+const hiddenMatches = matching.length - options.length
+
+const listId = `service-picker-${name}`
+const panelId = `${listId}-panel`
+const datalistId = `${listId}-datalist`
+// A datalist is the only native type-to-filter there is, and it cannot carry an
+// icon, so the list below repeats the same services as links that can.
+// overscroll-contain keeps a flick inside the list from scrolling the page
+// underneath once it reaches the end.
+---
+
+<div class={cn('group/picker relative', className)} data-service-picker>
+  {
+    /* Focus rather than a details toggle, the same mechanism DropdownButton uses,
+      because focus leaves when a reader taps anything else and the panel closes
+      with it. A details element has no way to notice that without scripting. */
+  }
+  <button
+    type="button"
+    aria-haspopup="true"
+    aria-controls={panelId}
+    class="flex cursor-pointer items-center gap-2 rounded-md border border-night-400 px-2 py-1 text-sm text-day-200 group-focus-within/picker:bg-night-700 group-hover/picker:bg-night-700 hover:bg-night-700"
+  >
+    {
+      selectedService?.imageUrl && (
+        <MyPicture
+          src={selectedService.imageUrl}
+          alt=""
+          width={16}
+          height={16}
+          class="size-4 shrink-0 rounded-xs"
+        />
+      )
+    }
+    <span class="truncate">{selectedService?.name ?? 'All services'}</span>
+    <Icon
+      name="ri:arrow-down-s-line"
+      class="size-4 shrink-0 transition-transform group-focus-within/picker:rotate-180 group-hover/picker:rotate-180"
+    />
+  </button>
+
+  {
+    /* Held open by the query itself, so a search made without scripting lands on
+      the narrowed list rather than on a panel that shut during the reload. */
+  }
+  <div
+    id={panelId}
+    class={cn(
+      'absolute z-20 mt-1 w-72 max-w-[calc(100vw-2rem)] rounded-md border border-night-400 bg-night-900 p-2 shadow-lg group-focus-within/picker:block group-hover/picker:block',
+      query ? 'block' : 'hidden'
+    )}
+  >
+    <form method="GET" class="flex gap-1">
+      {Object.entries(keep).map(([key, value]) => value && <input type="hidden" name={key} value={value} />)}
+      {/* Or searching would clear the service the reader already picked. */}
+      {selected && <input type="hidden" name={name} value={selected} />}
+      <label class="sr-only" for={listId}>Search for a service</label>
+      <input
+        id={listId}
+        type="search"
+        name={queryParam}
+        list={datalistId}
+        placeholder="Search services"
+        autocomplete="off"
+        autocapitalize="off"
+        autocorrect="off"
+        spellcheck="false"
+        enterkeyhint="search"
+        value={query}
+        data-service-search
+        class="min-w-0 flex-1 rounded-md border border-night-400 bg-night-800 px-2 py-1 text-sm text-day-100 placeholder:text-day-500"
+      />
+      <datalist id={datalistId}>
+        {services.map((service) => <option value={service.name} />)}
+      </datalist>
+      {/* Only reaches a reader without scripting. Typing narrows the list otherwise. */}
+      <button
+        type="submit"
+        class="shrink-0 rounded-md border border-night-400 px-2 py-1 text-sm text-day-200 hover:bg-night-700 js:hidden"
+      >
+        Search
+      </button>
+    </form>
+
+    <ul class="mt-2 max-h-72 overflow-y-auto overscroll-contain">
+      {
+        options.map(({ service, key }) => (
+          <li data-service-option data-name={key}>
+            <a
+              href={`?${linkParams(service.slug)}`}
+              class={cn(
+                'flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-night-700',
+                selectedService?.slug === service.slug ? 'text-blue-400' : 'text-day-200'
+              )}
+            >
+              {service.imageUrl && (
+                <MyPicture
+                  src={service.imageUrl}
+                  alt=""
+                  width={16}
+                  height={16}
+                  class="size-4 shrink-0 rounded-xs"
+                />
+              )}
+              <span class="truncate">{service.name}</span>
+            </a>
+          </li>
+        ))
+      }
+      <li data-service-empty hidden={options.length > 0} class="px-2 py-1 text-sm text-day-500">
+        {needle ? 'No service matches that.' : 'No match in this list. Press Enter to search them all.'}
+      </li>
+      {
+        hiddenMatches > 0 && (
+          <li data-service-more class="px-2 py-1 text-xs text-day-500">
+            {hiddenMatches} more. Keep typing to narrow the list.
+          </li>
+        )
+      }
+    </ul>
+
+    {
+      selectedService && (
+        <a
+          href={clearHref}
+          class="mt-2 block rounded-md px-2 py-1 text-sm text-day-500 hover:bg-night-700 hover:text-day-200"
+        >
+          Clear service filter
+        </a>
+      )
+    }
+  </div>
+</div>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Optional script for the service picker.                //
+  // Narrows the list as the reader types. Every service is //
+  // already on the page, so this needs no request and the  //
+  // list can widen again when the field is cleared. With   //
+  // it off the form falls back to a plain search reload.   //
+  ////////////////////////////////////////////////////////////
+  document.addEventListener('astro:page-load', () => {
+    document.querySelectorAll<HTMLDivElement>('[data-service-picker]').forEach((picker) => {
+      const input = picker.querySelector<HTMLInputElement>('[data-service-search]')
+      const options = picker.querySelectorAll<HTMLLIElement>('[data-service-option]')
+      const empty = picker.querySelector<HTMLLIElement>('[data-service-empty]')
+      if (!input) return
+
+      // The list below holds the same services with icons and narrows as you
+      // type, so the browser's own dropdown would only sit on top of it. Taking
+      // it away here rather than never rendering it means it survives for
+      // readers without scripting, and for anyone this script fails to reach.
+      input.removeAttribute('list')
+
+      const narrow = () => {
+        const needle = input.value.trim().toLowerCase()
+        let matches = 0
+        options.forEach((option) => {
+          const shown = !needle || (option.dataset.name ?? '').includes(needle)
+          option.hidden = !shown
+          if (shown) matches += 1
+        })
+        if (empty) empty.hidden = matches > 0
+      }
+
+      input.addEventListener('input', narrow)
+
+      // Enter picks the first service still standing. When nothing is standing
+      // the form is left alone, so the reader reaches the services further down
+      // the list than this panel renders instead of pressing a dead key.
+      picker.querySelector('form')?.addEventListener('submit', (event) => {
+        const first = picker.querySelector<HTMLAnchorElement>('[data-service-option]:not([hidden]) a')
+        if (!first) return
+        event.preventDefault()
+        first.click()
+      })
+
+      // Focus is what holds the panel open, so letting go of it is what closes
+      // it. Focus cannot be handed back to the button that opens it, since the
+      // button sits inside the same group and would hold it open again.
+      picker.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return
+        event.preventDefault()
+        ;(document.activeElement as HTMLElement | null)?.blur()
+      })
+
+      narrow()
+    })
+  })
+</script>

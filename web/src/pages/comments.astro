@@ -1,0 +1,319 @@
+---
+import { z } from 'astro/zod'
+import { Icon } from 'astro-icon/components'
+
+import CommentFeedCard from '../components/CommentFeedCard.astro'
+import FilterPill from '../components/FilterPill.astro'
+import Pagination from '../components/Pagination.astro'
+import ServicePicker from '../components/ServicePicker.astro'
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { commentFeedSelect } from '../lib/commentsWithReplies'
+import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
+import { prisma } from '../lib/prisma'
+import { makeFilterUrl } from '../lib/urls'
+
+import type { CommentForFeed } from '../lib/commentsWithReplies'
+import type { Prisma } from '@prisma/client'
+
+const PAGE_SIZE = 30
+
+const { data: params, hasDefaultData: hasDefaultFilters } = zodParseQueryParamsStoringErrors(
+  {
+    page: z.coerce.number().int().min(1).default(1),
+    /** Service's slug */
+    service: z.string().optional(),
+    issue: z.enum(['KYC_REQUESTED', 'FUNDS_BLOCKED']).optional(),
+    rated: z.enum(['positive', 'neutral', 'negative']).optional(),
+    showPending: z.coerce.boolean().default(false),
+    /** Day the previous page ended on, so its heading is not repeated. */
+    after: z.string().optional(),
+  },
+  Astro
+)
+
+const where: Prisma.CommentWhereInput = {
+  // Same rule as a service's own thread: pending comments are shown only when
+  // asked for, and never anything a signed-out reader could not already reach.
+  status: params.showPending ? { in: ['APPROVED', 'VERIFIED', 'PENDING'] } : { in: ['APPROVED', 'VERIFIED'] },
+  service: {
+    serviceVisibility: 'PUBLIC',
+    // The picker always writes a slug. A name is accepted too, so an address
+    // written by hand or held over from an older link still resolves.
+    ...(params.service
+      ? { OR: [{ slug: params.service }, { name: { equals: params.service, mode: 'insensitive' } }] }
+      : {}),
+  },
+  ...(params.issue ? { issues: { has: params.issue } } : {}),
+  ...(params.rated === 'positive' ? { rating: { gte: 4 } } : {}),
+  ...(params.rated === 'neutral' ? { rating: 3 } : {}),
+  ...(params.rated === 'negative' ? { rating: { lte: 2 } } : {}),
+}
+
+const filterUrl = (changes: Record<string, string | undefined>) => makeFilterUrl(Astro.url, changes)
+
+const [services, [comments, totalComments]] = await Astro.locals.banners.tryMany([
+  [
+    'Error fetching services',
+    () =>
+      prisma.service.findMany({
+        select: {
+          name: true,
+          slug: true,
+          imageUrl: true,
+          _count: { select: { comments: true } },
+        },
+        where: {
+          serviceVisibility: 'PUBLIC',
+          comments: { some: { status: { in: ['APPROVED', 'VERIFIED'] } } },
+        },
+        orderBy: { name: 'asc' },
+      }),
+    [] as { name: string; slug: string; imageUrl: string | null; _count: { comments: number } }[],
+  ],
+  [
+    'Error fetching comments',
+    () =>
+      prisma.comment.findManyAndCount({
+        select: commentFeedSelect,
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (params.page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
+      }),
+    [[], 0] as [CommentForFeed[], number],
+  ],
+])
+
+const activeService = params.service
+  ? services.find(
+      (service) =>
+        service.slug === params.service || service.name.toLowerCase() === params.service?.toLowerCase()
+    )
+  : undefined
+
+// Most talked about first, so the panel opens on something worth reading rather
+// than on whatever is first alphabetically. All of them are listed; the panel
+// scrolls and the search field is there for reaching the tail quickly.
+const servicesByActivity = [...services].sort((a, b) => b._count.comments - a._count.comments)
+
+// Reads as a sentence whichever filters are on: "Latest negative comments about
+// ChangeNOW reporting blocked funds".
+const issuePhrase = {
+  KYC_REQUESTED: 'reporting requested KYC',
+  FUNDS_BLOCKED: 'reporting blocked funds',
+}
+const heading = [
+  'Latest',
+  params.rated,
+  params.showPending && !params.rated ? 'pending' : null,
+  'comments',
+  activeService ? `about ${activeService.name}` : null,
+  params.issue ? issuePhrase[params.issue] : null,
+]
+  .filter(Boolean)
+  .join(' ')
+
+const totalPages = Math.max(1, Math.ceil(totalComments / PAGE_SIZE))
+
+// Grouped by the day they were written, so a reader can see at a glance whether
+// a run of reports about one service happened together or over months.
+const dayFormatter = new Intl.DateTimeFormat('en-GB', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+})
+const today = dayFormatter.format(new Date())
+const yesterday = dayFormatter.format(new Date(Date.now() - 24 * 60 * 60 * 1000))
+
+function dayLabel(date: Date) {
+  const formatted = dayFormatter.format(date)
+  return formatted === today ? 'Today' : formatted === yesterday ? 'Yesterday' : formatted
+}
+
+// Flat rather than nested, because infinite scroll appends siblings: a heading
+// has to be able to arrive with the comments under it. The day the previous page
+// ended on rides along in the URL, so a day spanning a page boundary is not
+// announced twice.
+type FeedItem = { kind: 'comment'; comment: (typeof comments)[number] } | { kind: 'day'; label: string }
+
+// Only the pages that follow one can have had their day announced already. On a
+// first page the parameter is someone else's leftover, and honouring it drops
+// the heading the feed opens with.
+const carriedDay = params.page > 1 ? params.after : undefined
+
+const feedItems = comments.reduce<FeedItem[]>((acc, comment, index) => {
+  const label = dayLabel(comment.createdAt)
+  const previousLabel =
+    index === 0 ? carriedDay : dayLabel(comments[index - 1]?.createdAt ?? comment.createdAt)
+  if (label !== previousLabel) acc.push({ kind: 'day', label })
+  acc.push({ kind: 'comment', comment })
+  return acc
+}, [])
+
+const lastComment = comments.at(-1)
+const lastDayShown = lastComment ? dayLabel(lastComment.createdAt) : undefined
+const nextPageUrl = (() => {
+  const url = new URL(Astro.url)
+  url.searchParams.set('page', String(params.page + 1))
+  if (lastDayShown) url.searchParams.set('after', lastDayShown)
+  return `${url.pathname}${url.search}`
+})()
+---
+
+<BaseLayout
+  pageTitle="Latest comments on KYC-free services"
+  description="Read the newest user comments and ratings on no-KYC exchanges, VPNs and services, including reports of requested KYC and blocked funds."
+  widthClassName="max-w-5xl"
+  noindex={params.showPending}
+  ogImage={{
+    template: 'generic',
+    title: 'Latest comments',
+    description: 'The newest user comments and ratings across KYC-free services',
+    icon: 'ri:chat-3-line',
+  }}
+  htmx
+>
+  <div class="mb-5">
+    {
+      /* Scrolls sideways on a narrow screen rather than stacking into a wall of
+        pills, and every pill is a link so none of this needs scripting. */
+    }
+    <div class="-mx-1 flex items-center gap-1 overflow-x-auto px-1 pb-1">
+      <FilterPill
+        href={filterUrl({ rated: undefined, issue: undefined })}
+        label="All"
+        icon="ri:stack-line"
+        active={!params.rated && !params.issue}
+      />
+
+      <span class="mx-1 h-4 w-px shrink-0 bg-night-500" aria-hidden="true"></span>
+
+      <FilterPill
+        href={filterUrl({ rated: params.rated === 'positive' ? undefined : 'positive' })}
+        label="Positive"
+        accessibleLabel="Comments rated 4 or 5"
+        icon="ri:star-fill"
+        color="green"
+        active={params.rated === 'positive'}
+      />
+      <FilterPill
+        href={filterUrl({ rated: params.rated === 'neutral' ? undefined : 'neutral' })}
+        label="Neutral"
+        accessibleLabel="Comments rated 3"
+        icon="ri:star-half-line"
+        active={params.rated === 'neutral'}
+      />
+      <FilterPill
+        href={filterUrl({ rated: params.rated === 'negative' ? undefined : 'negative' })}
+        label="Negative"
+        accessibleLabel="Comments rated 1 or 2"
+        icon="ri:star-line"
+        color="red"
+        active={params.rated === 'negative'}
+      />
+
+      <span class="mx-1 h-4 w-px shrink-0 bg-night-500" aria-hidden="true"></span>
+
+      <FilterPill
+        href={filterUrl({ issue: params.issue === 'KYC_REQUESTED' ? undefined : 'KYC_REQUESTED' })}
+        label="KYC asked"
+        accessibleLabel="Comments reporting that KYC was requested"
+        icon="ri:user-forbid-fill"
+        color="red"
+        active={params.issue === 'KYC_REQUESTED'}
+      />
+      <FilterPill
+        href={filterUrl({ issue: params.issue === 'FUNDS_BLOCKED' ? undefined : 'FUNDS_BLOCKED' })}
+        label="Funds blocked"
+        icon="ri:wallet-3-fill"
+        color="red"
+        active={params.issue === 'FUNDS_BLOCKED'}
+      />
+
+      <span class="mx-1 h-4 w-px shrink-0 bg-night-500" aria-hidden="true"></span>
+
+      <FilterPill
+        href={filterUrl({ showPending: params.showPending ? undefined : 'true' })}
+        label="Pending"
+        accessibleLabel="Include comments awaiting moderation"
+        icon="ri:hourglass-line"
+        color="yellow"
+        active={params.showPending}
+        nofollow
+      />
+    </div>
+
+    <div class="mt-2 flex flex-wrap items-center gap-2">
+      <ServicePicker
+        services={services}
+        suggested={servicesByActivity}
+        selected={params.service}
+        keep={{
+          rated: params.rated,
+          issue: params.issue,
+          showPending: params.showPending ? 'true' : undefined,
+        }}
+        clearHref={filterUrl({ service: undefined })}
+      />
+      {
+        !hasDefaultFilters && (
+          <a href="/comments" class="text-sm text-day-500 hover:text-day-200 hover:underline">
+            Clear all
+          </a>
+        )
+      }
+    </div>
+  </div>
+
+  <div>
+    <h1 class="mb-1 font-title text-2xl font-bold text-white first-letter:uppercase">{heading}</h1>
+    <p class="mb-5 text-sm text-day-400">
+      What people are saying about KYC-free services right now.
+      {totalComments > 0 && ` ${totalComments.toLocaleString()} comments.`}
+    </p>
+
+    {
+      feedItems.length === 0 ? (
+        <p class="rounded-lg border border-night-600 bg-night-800/40 p-6 text-center text-day-400">
+          No comments match these filters.
+        </p>
+      ) : (
+        <ol class="flex flex-col gap-3">
+          {feedItems.map((item, i) => (
+            <li
+              data-hx-comment-item
+              class={item.kind === 'day' ? 'mt-3 first:mt-0' : ''}
+              {...(i === feedItems.length - 1 && params.page < totalPages
+                ? {
+                    'hx-get': nextPageUrl,
+                    'hx-trigger': 'revealed',
+                    'hx-swap': 'afterend',
+                    'hx-select': '[data-hx-comment-item]',
+                    'hx-indicator': '#infinite-scroll-indicator',
+                  }
+                : {})}
+            >
+              {item.kind === 'day' ? (
+                <h2 class="font-title text-sm font-bold tracking-wide text-day-400 uppercase">
+                  {item.label}
+                </h2>
+              ) : (
+                <CommentFeedCard comment={item.comment} />
+              )}
+            </li>
+          ))}
+        </ol>
+      )
+    }
+
+    <div class="mt-8 flex justify-center no-js:hidden" id="infinite-scroll-indicator">
+      <div class="flex items-center gap-2 opacity-0 transition-opacity duration-500 htmx-request:opacity-100">
+        <Icon name="ri:loader-4-line" class="size-6 animate-spin text-green-500" />
+        Loading more comments...
+      </div>
+    </div>
+
+    <Pagination currentPage={params.page} totalPages={totalPages} class="mt-6 js:hidden" />
+  </div>
+</BaseLayout>

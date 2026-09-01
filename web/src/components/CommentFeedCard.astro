@@ -1,0 +1,109 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { getVerificationStatusInfo } from '../constants/verificationStatus'
+import { cn } from '../lib/cn'
+
+import BadgeSmall from './BadgeSmall.astro'
+import CommentAuthorBadges from './CommentAuthorBadges.astro'
+import CommentBadges from './CommentBadges.astro'
+import Markdown from './Markdown.astro'
+import MyPicture from './MyPicture.astro'
+import TimeFormatted from './TimeFormatted.astro'
+import Tooltip from './Tooltip.astro'
+import UserBadge from './UserBadge.astro'
+
+import type { CommentForFeed } from '../lib/commentsWithReplies'
+
+type Props = {
+  comment: CommentForFeed
+}
+
+const { comment } = Astro.props
+const { service } = comment
+
+// Carries the id twice on purpose: the service page reads the query parameter to
+// expand the branch a reply sits in, and the fragment is what scrolls to it.
+const commentUrl = `/service/${service.slug}?comment=${String(comment.id)}#comment-${String(comment.id)}`
+
+const rating = comment.rating ?? null
+const statusInfo = getVerificationStatusInfo(service.verificationStatus)
+const replyCount = comment._count.replies
+const isPending = comment.status === 'PENDING'
+---
+
+<article
+  class={cn(
+    'rounded-lg border bg-night-800/40 p-3 sm:p-4',
+    isPending ? 'border-yellow-500/40' : 'border-night-600'
+  )}
+>
+  <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+    <Tooltip text={`Service status: ${statusInfo.label}. ${statusInfo.description}`} position="right">
+      <Icon
+        name={statusInfo.icon}
+        class={cn('size-4', statusInfo.classNames.icon)}
+        aria-label={`Service status: ${statusInfo.label}`}
+      />
+    </Tooltip>
+
+    <a
+      href={commentUrl}
+      class="inline-flex items-center gap-2 font-title font-bold text-day-100 hover:underline"
+    >
+      {
+        service.imageUrl && (
+          <MyPicture
+            src={service.imageUrl}
+            alt=""
+            width={20}
+            height={20}
+            class="size-5 shrink-0 rounded-xs"
+          />
+        )
+      }
+      {service.name}
+    </a>
+
+    {
+      rating !== null && (
+        <span class="inline-flex items-center" aria-label={`Rated ${String(rating)} out of 5`}>
+          {Array.from({ length: 5 }, (_, i) => (
+            <Icon
+              name={i < rating ? 'ri:star-fill' : 'ri:star-line'}
+              class={cn('size-3.5', i < rating ? 'text-yellow-400' : 'text-night-400')}
+            />
+          ))}
+        </span>
+      )
+    }
+
+    {isPending && <BadgeSmall icon="ri:hourglass-line" color="yellow" text="Pending review" inlineIcon />}
+
+    <a href={commentUrl} class="ms-auto shrink-0 text-xs text-day-500 hover:text-day-300 hover:underline">
+      <TimeFormatted date={comment.createdAt} hourPrecision />
+    </a>
+  </div>
+
+  <div class="prose prose-sm mt-2 max-w-none text-pretty prose-invert">
+    <Markdown content={comment.content} />
+  </div>
+
+  <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-day-500">
+    <UserBadge user={comment.author} />
+    <CommentAuthorBadges comment={comment} serviceSlug={service.slug} />
+    <span class="inline-flex items-center gap-0.5" title="Upvotes">
+      <Icon name="ri:arrow-up-line" class="size-3" />
+      {comment.upvotes}
+    </span>
+    {
+      replyCount > 0 && (
+        <a href={commentUrl} class="inline-flex items-center gap-0.5 hover:text-day-300">
+          <Icon name="ri:chat-1-line" class="size-3" />
+          {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+        </a>
+      )
+    }
+    <CommentBadges comment={comment} />
+  </div>
+</article>

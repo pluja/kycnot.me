@@ -33,7 +33,11 @@ export function sinkSpamToBottom<
   return [...kept, ...sunk]
 }
 
-const commentReplyQuery = {
+/**
+ * Fields every rendering of a comment needs. Exported so a listing outside a
+ * service thread can select the same shape and reuse the same components.
+ */
+export const commentReplyQuery = {
   select: {
     id: true,
     status: true,
@@ -117,6 +121,66 @@ const commentReplyQuery = {
   },
   orderBy: [{ createdAt: 'desc' }],
 } as const satisfies Prisma.CommentFindManyArgs
+
+/**
+ * A comment listed outside its service thread, which has to name the service it
+ * belongs to.
+ *
+ * Spelled out rather than spread from the thread query, which also carries the
+ * moderation record: notes written for moderators, the reasoning behind a
+ * verdict, the text of a private proof, and who voted which way. The thread is
+ * one service behind a moderator's screen; this feed is every service, public
+ * and crawled, so it loads what it draws and nothing else.
+ */
+export const commentFeedSelect = {
+  id: true,
+  content: true,
+  createdAt: true,
+  status: true,
+  rating: true,
+  upvotes: true,
+  issues: true,
+  parentId: true,
+  privateProofStatus: true,
+  ratingMuted: true,
+  ratingMuteReason: true,
+  ratingTrustLabel: true,
+  ratingTrustReason: true,
+  ratingWeight: true,
+  // Whether a proof exists, never the proof itself: it is an order id a reader
+  // handed us to show a moderator, and the badge only reflects its verdict.
+  privateProof: true,
+  author: {
+    select: {
+      name: true,
+      displayName: true,
+      picture: true,
+      totalKarma: true,
+      verified: true,
+      admin: true,
+      spammer: true,
+      createdAt: true,
+      // Read by userCan, which the badges call to mark a moderator. Public by
+      // design: the badge it draws is shown to everyone.
+      capabilities: true,
+      _count: { select: { comments: true } },
+      serviceAffiliations: {
+        select: { role: true, service: { select: { name: true, slug: true } } },
+      },
+    },
+  },
+  service: {
+    select: {
+      name: true,
+      slug: true,
+      imageUrl: true,
+      verificationStatus: true,
+    },
+  },
+  _count: { select: { replies: true } },
+} satisfies Prisma.CommentSelect
+
+export type CommentForFeed = Prisma.CommentGetPayload<{ select: typeof commentFeedSelect }>
 
 export type CommentWithReplies<T extends Record<string, unknown> = Record<never, never>> =
   Prisma.CommentGetPayload<typeof commentReplyQuery> &
@@ -295,3 +359,27 @@ export function makeCommentUrl({
 }) {
   return `${origin}/service/${serviceSlug}?comment=${commentId.toString()}#comment-${commentId.toString()}` as const
 }
+
+/**
+ * What the badge components read off a comment.
+ *
+ * Named rather than taken from either query, because the feed and a service's
+ * own thread select different shapes and both draw the same badges. Typing the
+ * badges by the fuller of the two would oblige the feed to load fields it never
+ * renders.
+ */
+export type CommentBadgeFields = Pick<
+  CommentForFeed,
+  | 'author'
+  | 'issues'
+  | 'parentId'
+  | 'privateProof'
+  | 'privateProofStatus'
+  | 'rating'
+  | 'ratingMuted'
+  | 'ratingMuteReason'
+  | 'ratingTrustLabel'
+  | 'ratingTrustReason'
+  | 'ratingWeight'
+  | 'status'
+>
