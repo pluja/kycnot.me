@@ -49,6 +49,7 @@ import { getSupportedProviderSlugs } from '../../lib/exchange/supportedProviders
 import { computeIncidentTrustPenalty, totalIncidentTrustPenalty } from '../../lib/incidentPenalty'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
 import { makeOgImageUrl } from '../../lib/ogImageUrl'
+import { fitPageTitle } from '../../lib/pageTitle'
 import { pluralize } from '../../lib/pluralize'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
@@ -265,13 +266,15 @@ const itemReviewedId = `${pageUrl}#service`
 const primaryCategoryName = service.categories[0]?.name
 const kycTitlePhrase = kycLevelInfo.value === 0 ? 'No-KYC' : `KYC Level ${kycLevelInfo.value}`
 const categoryTitlePhrase = primaryCategoryName ? ` ${primaryCategoryName}` : ''
-const pageTitle =
-  [
-    `${service.name} Review: ${kycTitlePhrase}${categoryTitlePhrase} & Privacy Score`,
-    `${service.name} Review: ${kycTitlePhrase}${categoryTitlePhrase}`,
-    `${service.name} Review: KYC Policy & Privacy Score`,
-    `${service.name} Review`,
-  ].find((title) => title.length <= 62) ?? `${service.name} Review`
+// Ordered most to least descriptive. The `${kycTitlePhrase}`-only rung matters
+// for long service names: without it the ladder jumps straight to a bare
+// "<name> Review" and drops every keyword.
+const pageTitle = fitPageTitle([
+  `${service.name} Review: ${kycTitlePhrase}${categoryTitlePhrase} & Privacy Score`,
+  `${service.name} Review: ${kycTitlePhrase}${categoryTitlePhrase}`,
+  `${service.name} Review: ${kycTitlePhrase}`,
+  `${service.name} Review`,
+])
 const sentenceListFormatter = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' })
 const formatRating = (rating: number) => {
   const rounded = Math.round(rating * 10) / 10

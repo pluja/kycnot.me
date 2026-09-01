@@ -4,6 +4,7 @@ import { getCurrencyInfo } from '../constants/currencies'
 import { getVerificationStatusInfo } from '../constants/verificationStatus'
 
 import { areEqualArraysWithoutOrder } from './arrays'
+import { MAX_PAGE_TITLE_LENGTH } from './pageTitle'
 import { transformCase } from './strings'
 
 type SearchFilters = {
@@ -146,7 +147,8 @@ export function makeSearchTitle({
     prefix = ''
   }
 
-  const buildTitle = (segments: string[]) => transformCase(`${prefix} ${base} ${segments.join('; ')}`.trim(), 'first-upper')
+  const buildTitle = (segments: string[]) =>
+    transformCase(`${prefix} ${base} ${segments.join('; ')}`.trim(), 'first-upper')
 
   const titleCandidates = [
     buildTitle([attributesPart, currencies, kycLevel, score].filter((value) => !!value)),
@@ -156,7 +158,10 @@ export function makeSearchTitle({
     buildTitle([]),
   ]
 
-  const bestTitle = titleCandidates.find((candidate) => candidate.length <= MAX_TITLE_LENGTH) ?? titleCandidates.at(-1) ?? 'Services'
+  const bestTitle =
+    titleCandidates.find((candidate) => candidate.length <= MAX_TITLE_LENGTH) ??
+    titleCandidates.at(-1) ??
+    'Services'
 
   if (!forPageTitle) return bestTitle
 
@@ -185,17 +190,16 @@ export function makeSearchTitle({
   const subjectParts = [baseLabel, currencies, kycLabelForTitle, attributesPart].filter(Boolean)
   const subject = `No-KYC ${subjectParts.join(' ')}`
 
-  // Try suffixes from most to least descriptive. Cap pageTitle at 55 chars so the full
-  // "<title> | KYCnot.me" stays within ~68 chars and avoids SERP truncation.
-  // With extra filter context in the subject, "Privacy Scores" may not fit — fall back to shorter forms.
+  // Try suffixes from most to least descriptive. With extra filter context in the
+  // subject, "Privacy Scores" may not fit; fall back to shorter forms.
   const hasExtraContext = !!(currencies || kycLabelForTitle || attributesPart)
   const suffixes = hasExtraContext
     ? [' - Reviews & Privacy Scores', ' - Reviews & Scores', ' - Reviews', '']
     : [' - Reviews & Privacy Scores', ' - Reviews & Scores', '']
   for (const suffix of suffixes) {
-    if ((subject + suffix).length <= 55) return subject + suffix
+    if ((subject + suffix).length <= MAX_PAGE_TITLE_LENGTH) return subject + suffix
   }
-  return subject.slice(0, 55)
+  return subject.slice(0, MAX_PAGE_TITLE_LENGTH)
 }
 
 export function makeSearchMetaDescription({
@@ -212,15 +216,18 @@ export function makeSearchMetaDescription({
 
   // Default: match "no KYC crypto" / "buy crypto without ID" intent
   if (hasDefaultFilters) {
-    return "Find no-KYC crypto exchanges, wallets, VPNs, and more - all verified and ranked by privacy score. Use crypto without identity verification or government-issued ID."
+    return 'Find no-KYC crypto exchanges, wallets, VPNs, and more - all verified and ranked by privacy score. Use crypto without identity verification or government-issued ID.'
   }
 
   // Filtered: describe what's on the page without a count (counts go stale in cached snippets)
   const shortTitle = makeSearchTitle({ filters, hasDefaultFilters, categories, attributes, attributeOptions })
   // Lowercase first char for prose, but preserve acronyms (VPNs, CEXs...)
-  const s0 = shortTitle[0] ?? '', s1 = shortTitle[1] ?? ''
+  const s0 = shortTitle[0] ?? '',
+    s1 = shortTitle[1] ?? ''
   const isAcronymShort = shortTitle.length >= 2 && s0 === s0.toUpperCase() && s1 === s1.toUpperCase()
-  const shortTitleProse = isAcronymShort ? shortTitle : shortTitle.charAt(0).toLowerCase() + shortTitle.slice(1)
+  const shortTitleProse = isAcronymShort
+    ? shortTitle
+    : shortTitle.charAt(0).toLowerCase() + shortTitle.slice(1)
 
   return `Browse no-KYC ${shortTitleProse} on KYCnot.me - all verified and ranked by privacy score, trust rating, and accepted currencies. Use crypto without identity verification.`
 }
