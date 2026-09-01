@@ -30,7 +30,7 @@ services:
       - .env
 
   crawl4ai:
-    image: unclecode/crawl4ai:0.8.6
+    image: unclecode/crawl4ai:0.9.2
     expose:
       - "11235"
     env_file:

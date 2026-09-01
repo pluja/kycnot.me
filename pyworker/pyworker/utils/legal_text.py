@@ -308,3 +308,52 @@ def _decisive_words_changed(added: Iterable[str], removed: Iterable[str]) -> boo
 
 def _word_counts(lines: Iterable[str]) -> "Counter[str]":
     return Counter(word.lower() for line in lines for word in _WORD_RE.findall(line))
+
+
+# Shortest quote worth trusting. Below this, a fragment matches somewhere in any
+# long document by chance, so the check would pass without meaning anything.
+_MIN_GROUNDED_QUOTE_CHARS = 20
+
+
+# Link and image syntax, kept for the words a reader sees and not the address.
+_MARKDOWN_LINK_RE = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
+# Emphasis, headings and quote markers, which decorate the words rather than
+# being part of them.
+_MARKDOWN_MARKS_RE = re.compile(r"[*_`~#>]")
+# Clause numbering of the multi-level kind legal documents run on, "3.8.1.".
+# Bare integers are left alone, so "within 30 days" keeps its 30.
+_CLAUSE_NUMBER_RE = re.compile(r"\b\d+(?:\.\d+)+\.?")
+
+
+def _normalized_for_grounding(text: str) -> str:
+    """Text as a reader sees it, so a quote can be matched against the page.
+
+    A model quotes the prose. The page is markdown, so the same sentence carries
+    emphasis and links through the middle of it: a page reading "does **not**
+    store your emails" holds no run of characters equal to the sentence anyone
+    would quote from it. Clause numbers sit between sentences the same way, and
+    a quote running from 3.8 into 3.8.1 reads as one passage to anyone checking
+    it. Comparing the decoration too rejects quotes that are accurate, which is
+    worse than useless when an unmatched quote costs the whole finding.
+
+    Only what surrounds the words is dropped. Two passages the document keeps
+    apart still cannot be joined, because everything between them would have to
+    be nothing but numbering.
+    """
+    text = (text or "").lower()
+    text = _MARKDOWN_LINK_RE.sub(r"\1", text)
+    text = _MARKDOWN_MARKS_RE.sub("", text)
+    text = _CLAUSE_NUMBER_RE.sub(" ", text)
+    return re.sub(r"\s+", " ", text)
+
+
+def is_grounded(quote: str, corpus: str) -> bool:
+    """Whether a quote is really in the corpus the model was given.
+
+    A claim a service cannot be shown to have written is not a finding, and
+    dropping it costs nothing next to publishing a quote it never wrote.
+    """
+    quote = _normalized_for_grounding(quote).strip()
+    return len(
+        quote
+    ) >= _MIN_GROUNDED_QUOTE_CHARS and quote in _normalized_for_grounding(corpus)

@@ -1,1 +1,1 @@
-"""Utility modules for the pyworker package.""" 
+"""Utility modules for the pyworker package."""

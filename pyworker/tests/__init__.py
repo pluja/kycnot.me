@@ -1,1 +1,1 @@
-"""Test package for the pyworker.""" 
+"""Test package for the pyworker."""

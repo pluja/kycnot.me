@@ -5,6 +5,7 @@ Tests for pyworker.utils.legal_text
 import unittest
 
 from pyworker.utils.legal_text import (
+    is_grounded,
     MATERIAL_WORD_THRESHOLD,
     LegalChangeLevel,
     LegalDocumentKind,
@@ -199,4 +200,67 @@ class TestIsUsableLegalPage(unittest.TestCase):
         self.assertFalse(is_usable_legal_page("We require KYC."))
 
     def test_accepts_a_real_document(self):
-        self.assertTrue(is_usable_legal_page("We require identity verification before withdrawal. " * 20))
+        self.assertTrue(
+            is_usable_legal_page(
+                "We require identity verification before withdrawal. " * 20
+            )
+        )
+
+
+class GroundingAgainstMarkdownTests(unittest.TestCase):
+    """A model quotes the prose; the page it came from is markdown."""
+
+    def test_emphasis_inside_a_sentence_does_not_hide_it(self):
+        # The page reads "does **not** store", and nobody quoting it would keep
+        # the asterisks. Rejecting that quote rejects an accurate one.
+        page = "Your emails: SimpleLogin does **not** store your emails at any point."
+
+        self.assertTrue(is_grounded("SimpleLogin does not store your emails", page))
+
+    def test_a_link_is_matched_by_the_words_it_shows(self):
+        page = "We rely on [Paddle](http://paddle.com) to process credit card payments."
+
+        self.assertTrue(
+            is_grounded("rely on Paddle to process credit card payments", page)
+        )
+
+    def test_a_quote_running_across_a_clause_number_is_matched(self):
+        # Legal documents number their clauses, so a passage a reader would
+        # quote as one sentence often has a "3.8.1." sitting in the middle.
+        page = (
+            "3.8. CCE Cash has partnered with a KYC provider named Sumsub. "
+            "3.8.1. If a transaction has been stopped for KYC checks, we proceed."
+        )
+
+        self.assertTrue(
+            is_grounded("named Sumsub. If a transaction has been stopped", page)
+        )
+
+    def test_passages_the_document_keeps_apart_cannot_be_joined(self):
+        # Only the numbering between them is dropped, so the words in between
+        # still have to be there.
+        page = (
+            "3.8. We partnered with a KYC provider named Sumsub. "
+            "3.8.1. Stopped transactions are reviewed by hand. "
+            "9.4. Users in restricted territories may not trade at all."
+        )
+
+        self.assertFalse(
+            is_grounded("named Sumsub. Users in restricted territories", page)
+        )
+
+    def test_words_dropped_from_the_middle_are_refused(self):
+        page = (
+            "Since its inception CCE Cash has partnered with a provider named Sumsub."
+        )
+
+        self.assertFalse(
+            is_grounded("Since its inception CCE Cash has partnered with Sumsub", page)
+        )
+
+    def test_a_sentence_the_page_never_had_is_still_refused(self):
+        page = "We may require identity verification at any time."
+
+        self.assertFalse(
+            is_grounded("we never ask anyone for identity documents", page)
+        )
