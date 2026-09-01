@@ -5,6 +5,7 @@ from pyworker.utils import schemas
 
 # --- TOS_CHECK ---
 
+
 def test_tos_check_valid():
     schemas.TOS_CHECK.validate({"isComplete": True})
     schemas.TOS_CHECK.validate({"isComplete": False})
@@ -59,7 +60,10 @@ def test_tos_review_complexity_invalid():
 
 
 def test_tos_review_highlights_bad_rating():
-    bad = {**VALID_TOS_REVIEW, "highlights": [{"title": "x", "content": "y", "rating": "bad"}]}
+    bad = {
+        **VALID_TOS_REVIEW,
+        "highlights": [{"title": "x", "content": "y", "rating": "bad"}],
+    }
     with pytest.raises(ValueError, match="rating"):
         schemas.TOS_REVIEW.validate(bad)
 
@@ -112,7 +116,9 @@ def test_comment_mod_bool_wrong_type():
 
 def test_comment_mod_invalid_recommended_action():
     with pytest.raises(ValueError, match="recommendedAction"):
-        schemas.COMMENT_MOD.validate({**VALID_COMMENT_MOD, "recommendedAction": "maybe"})
+        schemas.COMMENT_MOD.validate(
+            {**VALID_COMMENT_MOD, "recommendedAction": "maybe"}
+        )
 
 
 def test_comment_mod_brigade_confidence_out_of_range():
@@ -122,20 +128,24 @@ def test_comment_mod_brigade_confidence_out_of_range():
 
 def test_comment_mod_spam_with_approve_rejected():
     with pytest.raises(ValueError, match="isSpam"):
-        schemas.COMMENT_MOD.validate({
-            **VALID_COMMENT_MOD,
-            "isSpam": True,
-            "recommendedAction": "approve",
-        })
+        schemas.COMMENT_MOD.validate(
+            {
+                **VALID_COMMENT_MOD,
+                "isSpam": True,
+                "recommendedAction": "approve",
+            }
+        )
 
 
 def test_comment_mod_brigade_without_confidence_rejected():
     with pytest.raises(ValueError, match="brigadeConfidence"):
-        schemas.COMMENT_MOD.validate({
-            **VALID_COMMENT_MOD,
-            "isBrigade": True,
-            "brigadeConfidence": 0,
-        })
+        schemas.COMMENT_MOD.validate(
+            {
+                **VALID_COMMENT_MOD,
+                "isBrigade": True,
+                "brigadeConfidence": 0,
+            }
+        )
 
 
 # --- COMMENT_SEN ---

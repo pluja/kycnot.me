@@ -12,8 +12,8 @@ from pyworker.cli import (
     should_use_scheduler_task_instance,
 )
 from pyworker.tasks import TosReviewTask
-from pyworker.utils.crawl import LegalCorpus, LegalPage
-from pyworker.utils.legal_text import LegalChangeLevel, LegalDocumentKind
+from pyworker.utils.legal_crawl import LegalCorpus, LegalPage
+from pyworker.utils.legal_text import LegalDocumentKind
 
 
 class TestWorkerSchedules(unittest.TestCase):
@@ -67,16 +67,14 @@ class TestTosReviewTask(unittest.TestCase):
         result = self.task.run(service)
         self.assertIsNone(result)
 
-    @patch("pyworker.tasks.tos_review.upsert_legal_document", return_value=1)
-    @patch("pyworker.tasks.tos_review.get_legal_documents", return_value={})
+    @patch("pyworker.tasks.tos_review.record_document_changes")
     @patch("pyworker.tasks.tos_review.save_tos_review")
     @patch("pyworker.tasks.tos_review.fetch_legal_corpus")
     def test_run_skips_when_corpus_unchanged(
         self,
         mock_corpus: MagicMock,
         mock_save: MagicMock,
-        mock_docs: MagicMock,
-        mock_upsert: MagicMock,
+        mock_record: MagicMock,
     ):
         corpus_hash = "a" * 64
         mock_corpus.return_value = LegalCorpus(
@@ -104,178 +102,115 @@ class TestTosReviewTask(unittest.TestCase):
         self.task.run(service)
         mock_save.assert_called_once_with(3, {"contentHash": corpus_hash})
 
+    @patch(
+        "pyworker.tasks.tos_review.prompt_check_tos_review",
+        return_value={"isComplete": True},
+    )
+    @patch("pyworker.tasks.tos_review.prompt_tos_review")
+    @patch("pyworker.tasks.tos_review.record_document_changes")
+    @patch("pyworker.tasks.tos_review.save_tos_review")
+    @patch("pyworker.tasks.tos_review.fetch_legal_corpus")
+    def test_force_reviews_an_unchanged_corpus(
+        self,
+        mock_corpus: MagicMock,
+        mock_save: MagicMock,
+        mock_record: MagicMock,
+        mock_prompt: MagicMock,
+        mock_check: MagicMock,
+    ):
+        corpus_hash = "b" * 64
+        mock_corpus.return_value = LegalCorpus(
+            pages=[
+                LegalPage(
+                    url_key="x",
+                    url="https://x",
+                    kind=LegalDocumentKind.TERMS,
+                    markdown="body",
+                    normalized_text="body",
+                    content_hash=corpus_hash,
+                )
+            ],
+            combined="===== PAGE: x =====\nbody\n===== END PAGE =====",
+            corpus_hash=corpus_hash,
+        )
+        mock_prompt.return_value = {"summary": "fresh", "highlights": []}
+        service: Dict[str, Any] = {
+            "id": 4,
+            "name": "Test Service",
+            "verificationStatus": "APPROVED",
+            "tosUrls": ["https://example.com/tos"],
+            "tosReview": {"contentHash": corpus_hash, "summary": "stale"},
+        }
+
+        TosReviewTask(force=True).run(service)
+
+        mock_prompt.assert_called_once()
+        self.assertEqual(mock_save.call_args[0][1]["summary"], "fresh")
+
 
 if __name__ == "__main__":
     unittest.main()
 
 
-class TestRecordDocumentChanges(unittest.TestCase):
-    """The change log must record real edits and ignore republish noise."""
+class SupportedHighlightsTests(unittest.TestCase):
+    """What a review is allowed to say about a service without a reviewer."""
+
+    QUOTE = "we may require identity verification at any time and for any reason"
 
     def setUp(self):
+        from pyworker.tasks.tos_review import TosReviewTask
+        from pyworker.utils.legal_crawl import LegalCorpus, LegalPage
+
         self.task = TosReviewTask()
-
-    FILLER = "\n".join(f"Clause {i} is unchanged boilerplate text." for i in range(30))
-
-    @classmethod
-    def _corpus(cls, text: str) -> LegalCorpus:
-        from pyworker.utils.legal_text import legal_content_hash, normalize_legal_markdown
-
-        text = f"{text}\n{cls.FILLER}"
-        page = LegalPage(
+        self.terms = LegalPage(
             url_key="x.com/terms",
             url="https://x.com/terms",
-            kind=LegalDocumentKind.TERMS,
-            markdown=text,
-            normalized_text=normalize_legal_markdown(text),
-            content_hash=legal_content_hash(text),
+            kind="TERMS",
+            markdown=f"Section 4. {self.QUOTE}. Section 5.",
+            normalized_text="",
+            content_hash="a",
         )
-        return LegalCorpus(pages=[page], combined=text, corpus_hash=page.content_hash)
+        self.privacy = LegalPage(
+            url_key="x.com/privacy",
+            url="https://x.com/privacy",
+            kind="PRIVACY",
+            markdown="We keep logs for twelve months and share them on request.",
+            normalized_text="",
+            content_hash="b",
+        )
+        self.corpus = LegalCorpus(
+            pages=[self.terms, self.privacy], combined="", corpus_hash=""
+        )
 
-    @patch("pyworker.tasks.tos_review.create_legal_revision")
-    @patch("pyworker.tasks.tos_review.upsert_legal_document", return_value=7)
-    @patch("pyworker.tasks.tos_review.get_legal_documents", return_value={})
-    def test_first_crawl_stores_without_recording_a_change(
-        self, mock_docs: MagicMock, mock_upsert: MagicMock, mock_revision: MagicMock
-    ):
-        self.task.record_document_changes(1, self._corpus("We may block funds."))
-
-        mock_upsert.assert_called_once()
-        self.assertFalse(mock_upsert.call_args.kwargs["changed"])
-        mock_revision.assert_not_called()
-
-    @patch("pyworker.tasks.tos_review.create_legal_revision")
-    @patch("pyworker.tasks.tos_review.upsert_legal_document", return_value=7)
-    @patch("pyworker.tasks.tos_review.get_legal_documents")
-    def test_cosmetic_republish_records_nothing(
-        self, mock_docs: MagicMock, mock_upsert: MagicMock, mock_revision: MagicMock
-    ):
-        mock_docs.return_value = {
-            "x.com/terms": {
-                "id": 7,
-                "urlKey": "x.com/terms",
-                "contentHash": "irrelevant",
-                "normalizedText": f"We may block funds.\n{TestRecordDocumentChanges.FILLER}",
-            }
+    def _review(self, **highlight):
+        review = {
+            "highlights": [
+                {"title": "T", "content": "C", "rating": "negative", **highlight}
+            ]
         }
-        self.task.record_document_changes(
-            1, self._corpus("Last updated: 4 June 2026\nWe  may block funds.")
-        )
+        self.task.keep_supported_highlights(review, self.corpus)
+        return review["highlights"]
 
-        self.assertFalse(mock_upsert.call_args.kwargs["changed"])
-        mock_revision.assert_not_called()
+    def test_a_quoted_claim_is_kept(self):
+        kept = self._review(evidence=self.QUOTE)
 
-    @patch("pyworker.tasks.tos_review.prompt_legal_change_summary", return_value="Adds an identity check before withdrawal.")
-    @patch("pyworker.tasks.tos_review.create_legal_revision")
-    @patch("pyworker.tasks.tos_review.upsert_legal_document", return_value=7)
-    @patch("pyworker.tasks.tos_review.get_legal_documents")
-    def test_new_clause_is_recorded_as_material(
-        self,
-        mock_docs: MagicMock,
-        mock_upsert: MagicMock,
-        mock_revision: MagicMock,
-        mock_summary: MagicMock,
-    ):
-        mock_docs.return_value = {
-            "x.com/terms": {
-                "id": 7,
-                "urlKey": "x.com/terms",
-                "contentHash": "irrelevant",
-                "normalizedText": f"We do not collect personal data.\n{TestRecordDocumentChanges.FILLER}",
-            }
-        }
-        self.task.record_document_changes(
-            1,
-            self._corpus(
-                "We require government issued identification before any withdrawal is processed."
-            ),
-        )
+        self.assertEqual(len(kept), 1)
 
-        self.assertTrue(mock_upsert.call_args.kwargs["changed"])
-        mock_revision.assert_called_once()
-        self.assertEqual(mock_revision.call_args.kwargs["change_level"], "MATERIAL")
-        self.assertEqual(
-            mock_revision.call_args.kwargs["summary"], "Adds an identity check before withdrawal."
-        )
+    def test_the_address_comes_from_the_page_holding_the_quote(self):
+        # Not from the model, which can attribute a clause to the wrong document
+        # and send a reader to a page that never said it.
+        kept = self._review(evidence=self.QUOTE, sourceUrl="https://x.com/privacy")
 
-    @patch("pyworker.tasks.tos_review.prompt_legal_change_summary")
-    def test_minor_changes_are_not_summarized(self, mock_summary: MagicMock):
-        summary = self.task.summarize_change(LegalChangeLevel.MINOR, "@@ -1 +1 @@", "Svc", "TERMS")
+        self.assertEqual(kept[0]["sourceUrl"], "https://x.com/terms")
 
-        self.assertIsNone(summary)
-        mock_summary.assert_not_called()
+    def test_a_claim_with_an_invented_quote_is_dropped_whole(self):
+        # Keeping the claim without its quote publishes an assertion nobody can
+        # check, from a model just caught inventing one.
+        kept = self._review(evidence="we never ask anyone for identity documents")
 
-    @patch("pyworker.tasks.tos_review.prompt_legal_change_summary", side_effect=RuntimeError("model down"))
-    def test_a_failed_summary_does_not_lose_the_revision(self, mock_summary: MagicMock):
-        summary = self.task.summarize_change(LegalChangeLevel.MATERIAL, "@@ -1 +1 @@", "Svc", "TERMS")
+        self.assertEqual(kept, [])
 
-        self.assertIsNone(summary)
+    def test_a_claim_with_no_quote_at_all_is_dropped(self):
+        kept = self._review()
 
-
-class TestRecordRemovedDocuments(unittest.TestCase):
-    """A page that stops being published is an edit, but an outage is not."""
-
-    def setUp(self):
-        self.task = TosReviewTask()
-        self.stored = {
-            "x.com/terms": {"id": 7, "urlKey": "x.com/terms", "normalizedText": "We may block funds."}
-        }
-
-    @staticmethod
-    def _corpus(url_key: str) -> LegalCorpus:
-        page = LegalPage(
-            url_key=url_key,
-            url=f"https://{url_key}",
-            kind=LegalDocumentKind.TERMS,
-            markdown="body",
-            normalized_text="body",
-            content_hash="h",
-        )
-        return LegalCorpus(pages=[page], combined="body", corpus_hash="h")
-
-    @patch("pyworker.tasks.tos_review.create_legal_revision")
-    def test_a_withdrawn_document_is_recorded(self, mock_revision: MagicMock):
-        self.task.record_removed_documents(1, self._corpus("x.com/privacy"), self.stored)
-
-        mock_revision.assert_called_once()
-        self.assertEqual(mock_revision.call_args.kwargs["change_level"], "MATERIAL")
-
-    @patch("pyworker.tasks.tos_review.create_legal_revision")
-    def test_a_still_published_document_is_not_recorded(self, mock_revision: MagicMock):
-        self.task.record_removed_documents(1, self._corpus("x.com/terms"), self.stored)
-
-        mock_revision.assert_not_called()
-
-    @patch("pyworker.tasks.tos_review.create_legal_revision")
-    def test_an_empty_crawl_is_treated_as_an_outage(self, mock_revision: MagicMock):
-        empty = LegalCorpus(pages=[], combined="", corpus_hash="")
-        self.task.record_removed_documents(1, empty, self.stored)
-
-        mock_revision.assert_not_called()
-
-
-class TestUnusablePagesAreNotStored(unittest.TestCase):
-    """A challenge page must leave the previous baseline untouched."""
-
-    def setUp(self):
-        self.task = TosReviewTask()
-
-    @patch("pyworker.tasks.tos_review.create_legal_revision")
-    @patch("pyworker.tasks.tos_review.upsert_legal_document", return_value=1)
-    @patch("pyworker.tasks.tos_review.get_legal_documents", return_value={})
-    def test_a_blocked_fetch_is_skipped(
-        self, mock_docs: MagicMock, mock_upsert: MagicMock, mock_revision: MagicMock
-    ):
-        blocked = "Just a moment... checking your browser."
-        page = LegalPage(
-            url_key="x.com/terms",
-            url="https://x.com/terms",
-            kind=LegalDocumentKind.TERMS,
-            markdown=blocked,
-            normalized_text=blocked,
-            content_hash="h",
-        )
-        self.task.record_document_changes(1, LegalCorpus([page], blocked, "h"))
-
-        mock_upsert.assert_not_called()
-        mock_revision.assert_not_called()
+        self.assertEqual(kept, [])

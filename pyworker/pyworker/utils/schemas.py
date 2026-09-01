@@ -32,11 +32,15 @@ def _validate_highlights(highlights: list[Any]) -> None:
             if field not in h:
                 raise ValueError(f"highlights[{i}] missing field: {field}")
         if h["rating"] not in ("negative", "neutral", "positive"):
-            raise ValueError(f"highlights[{i}].rating must be negative|neutral|positive, got {h['rating']!r}")
+            raise ValueError(
+                f"highlights[{i}].rating must be negative|neutral|positive, got {h['rating']!r}"
+            )
         # A model that omits topic, evidence or sourceUrl costs that highlight
         # its extra detail; rejecting here would cost the service its review.
         if "topic" in h and h["topic"] not in HIGHLIGHT_TOPICS:
-            raise ValueError(f"highlights[{i}].topic must be one of {sorted(HIGHLIGHT_TOPICS)}, got {h['topic']!r}")
+            raise ValueError(
+                f"highlights[{i}].topic must be one of {sorted(HIGHLIGHT_TOPICS)}, got {h['topic']!r}"
+            )
         for field in ("evidence", "sourceUrl"):
             if field in h and not isinstance(h[field], str):
                 raise ValueError(f"highlights[{i}].{field} must be a string")
@@ -63,7 +67,9 @@ def _validate_tos_review(data: dict[str, Any]) -> None:
         raise ValueError("summary must be a string")
 
     if data["complexity"] not in ("low", "medium", "high"):
-        raise ValueError(f"complexity must be low|medium|high, got {data['complexity']!r}")
+        raise ValueError(
+            f"complexity must be low|medium|high, got {data['complexity']!r}"
+        )
 
     if not isinstance(data["highlights"], list):
         raise ValueError("highlights must be a list")
@@ -78,6 +84,7 @@ def _validate_deep_scan(data: dict[str, Any]) -> None:
         "complexity",
         "highlights",
         "kycPolicyNotesMd",
+        "listingChecks",
         "kycLevelRationale",
         "attributesToAdd",
         "attributesToRemove",
@@ -95,7 +102,9 @@ def _validate_deep_scan(data: dict[str, Any]) -> None:
         raise ValueError("summary must be a string")
 
     if data["complexity"] not in ("low", "medium", "high"):
-        raise ValueError(f"complexity must be low|medium|high, got {data['complexity']!r}")
+        raise ValueError(
+            f"complexity must be low|medium|high, got {data['complexity']!r}"
+        )
 
     if not isinstance(data["highlights"], list):
         raise ValueError("highlights must be a list")
@@ -116,6 +125,18 @@ def _validate_deep_scan(data: dict[str, Any]) -> None:
                 raise ValueError(f"{list_field}[{i}].attributeId must be an int")
             if not isinstance(a.get("rationale"), str):
                 raise ValueError(f"{list_field}[{i}].rationale must be a string")
+            # quote and sourceUrl are not required here. A proposal without a
+            # usable quote is dropped downstream by the grounding check, and
+            # raising would throw away the whole scan over one missing string.
+
+    if not isinstance(data["listingChecks"], list):
+        raise ValueError("listingChecks must be a list")
+    for i, c in enumerate(data["listingChecks"]):
+        if not isinstance(c, dict):
+            raise ValueError(f"listingChecks[{i}] must be a dict")
+        for field in ("field", "current", "found", "quote", "sourceUrl"):
+            if not isinstance(c.get(field), str):
+                raise ValueError(f"listingChecks[{i}].{field} must be a string")
 
     if not isinstance(data["warnings"], list):
         raise ValueError("warnings must be a list")
@@ -126,7 +147,9 @@ def _validate_deep_scan(data: dict[str, Any]) -> None:
             if field not in w:
                 raise ValueError(f"warnings[{i}] missing field: {field}")
         if w["severity"] not in ("info", "warning", "alert"):
-            raise ValueError(f"warnings[{i}].severity must be info|warning|alert, got {w['severity']!r}")
+            raise ValueError(
+                f"warnings[{i}].severity must be info|warning|alert, got {w['severity']!r}"
+            )
 
 
 def _validate_comment_moderation(data: dict[str, Any]) -> None:
@@ -151,7 +174,9 @@ def _validate_comment_moderation(data: dict[str, Any]) -> None:
 
     for bool_field in ("isSpam", "isBrigade", "ratingShouldBeDisabled"):
         if not isinstance(data[bool_field], bool):
-            raise ValueError(f"{bool_field} must be a bool, got {type(data[bool_field])}")
+            raise ValueError(
+                f"{bool_field} must be a bool, got {type(data[bool_field])}"
+            )
 
     for str_field in ("reasoning", "contextNote"):
         if not isinstance(data[str_field], str):
@@ -181,7 +206,9 @@ def _validate_comment_sentiment(data: dict[str, Any]) -> None:
         raise ValueError("summary must be a string")
 
     if data["sentiment"] not in ("positive", "negative", "neutral"):
-        raise ValueError(f"sentiment must be positive|negative|neutral, got {data['sentiment']!r}")
+        raise ValueError(
+            f"sentiment must be positive|negative|neutral, got {data['sentiment']!r}"
+        )
 
     for list_field in ("whatUsersLike", "whatUsersDislike"):
         if not isinstance(data[list_field], list):
@@ -192,6 +219,7 @@ TOS_CHECK = PromptSchema(
     ts_type='{ "isComplete": true } | { "isComplete": false }',
     validate=_validate_tos_check,
 )
+
 
 def _validate_legal_change_summary(data: dict[str, Any]) -> None:
     if "summary" not in data:
@@ -237,7 +265,7 @@ DEEP_SCAN = PromptSchema(
     ts_type="""type DeepScan = {
     /** 0=Guaranteed no KYC, 1=No KYC mention, 2=KYC on authorities request, 3=Shotgun KYC, 4=Mandatory KYC */
     kycLevel: 0 | 1 | 2 | 3 | 4
-    /** Less than 200 characters. Plain English description of what the document does. */
+    /** Less than 260 characters. What the terms mean for someone using the service. */
     summary: MarkdownString
     complexity: 'high' | 'low' | 'medium'
     highlights: {
@@ -246,6 +274,22 @@ DEEP_SCAN = PromptSchema(
         /** Less than 200 characters. */
         content: MarkdownString
         rating: 'negative' | 'neutral' | 'positive'
+        topic: 'custody' | 'dataSharing' | 'disputes' | 'fundBlocking' | 'jurisdiction' | 'logging' | 'other' | 'refunds' | 'verification'
+        /** The clause this rests on, copied verbatim from the corpus. */
+        evidence: string
+        /** The page the quoted clause came from. */
+        sourceUrl: string
+    }[]
+    /** Fields where the platform's record disagrees with the documents. */
+    listingChecks: {
+        field: string
+        /** What the platform currently records. */
+        current: string
+        /** What the document says instead. */
+        found: string
+        /** The clause showing it, copied verbatim from the corpus. */
+        quote: string
+        sourceUrl: string
     }[]
     /** Concise plain-English markdown notes describing the service's KYC policy. At most 2 short lines when possible. May be empty string. */
     kycPolicyNotesMd: MarkdownString
@@ -256,11 +300,17 @@ DEEP_SCAN = PromptSchema(
         attributeId: number
         /** Why the attribute applies to this service, evidence-grounded. */
         rationale: string
+        /** The clause it rests on, copied verbatim from the corpus. */
+        quote: string
+        sourceUrl: string
     }[]
     /** Attributes the service currently has that no longer apply per the corpus. */
     attributesToRemove: {
         attributeId: number
         rationale: string
+        /** The contradicting clause, copied verbatim from the corpus. */
+        quote: string
+        sourceUrl: string
     }[]
     /** User-facing warnings. Reserve 'alert' for material risks. May be empty. */
     warnings: {

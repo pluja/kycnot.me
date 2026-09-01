@@ -15,35 +15,25 @@ Treat the corpus union as one document. When two pages overlap, prefer the most 
 
 Produce a single JSON object with all of the following fields:
 
-1. **kycLevel** on a 0-4 scale:
-   - **0 Guaranteed no KYC**: terms explicitly state KYC will never be requested.
-   - **1 No KYC mention**: the document does not mention KYC at all.
-   - **2 KYC on authorities request**: no routine KYC, but data sharing, fund blocking, or transaction rejection at authority request.
-   - **3 Shotgun KYC**: KYC may be requested and funds blocked based on automated transaction flagging. Not mandatory by default but can trigger any time.
-   - **4 Mandatory KYC**: required for key features or registration.
+{{fields}}
 
-2. **summary** (max 200 chars, markdown). Concise, plain English description of what the document actually does. No promotional adjectives ("strong", "robust", "great"), no aspirational phrasing ("ensures", "is committed to", "strives to").
-
-3. **complexity**: `'low' | 'medium' | 'high'` for a non-technical reader.
-
-4. **highlights**: items that materially affect a privacy-conscious user's decision. Topics: automated transaction scanning, fund blocking or rejection, refund policy and its KYC implications, data sharing, logging and retention, custody arrangements, censorship-resistance, jurisdictional risk, dispute clauses.
+5. **listingChecks**: places where the platform's own record of this service disagrees with its legal documents. The platform record is given above. This is a comparison, not a correction: report the disagreement and quote the clause, and a human decides which side is right.
 
    **Hard rules**:
-   - **Quality over quantity.** Hard ceiling of **10 highlights**, but the typical output is **3 to 6**. If nothing meets the bar beyond what `summary` and `kycLevel` already convey, return an empty list.
-   - **Decode marketing language.** Describe what features concretely do in operational terms based on the document text. If the operational meaning is not stated, omit the claim.
-   - **Evidence-grounded.** Each `highlight.content` must reflect a clause that exists in the corpus. Do not infer beyond what the text says.
-   - **No duplication.** Do not include highlights that restate the summary, the kycLevel, or another highlight.
-   - **No filler.** Skip universal clauses (standard liability disclaimers, generic copyright notices, "we may update these terms") unless they materially differ from the norm.
-   - **Skip implications already encoded.** If `kycLevel` already conveys the KYC posture, do not add a highlight that just repeats it.
-   - **Neutral phrasing.** Describe what the document says, not what it promises in spirit.
+   - Only the fields named in the platform record. Do not invent fields.
+   - **Quote or drop it.** `quote` must be the clause showing the document's value, copied verbatim from the corpus, at most 300 characters. Without one, omit the check entirely.
+   - Report a disagreement only when the document states its value plainly. A document that is silent on a field is not a disagreement, it is silence.
+   - `sourceUrl` is the `===== PAGE: <url> =====` header the clause appeared under.
+   - A service may use a legal template naming a different jurisdiction than where it is registered. Report what the clause says and let the reviewer weigh it. Do not assert which is correct.
+   - Empty list when nothing plainly disagrees. That is the normal result.
 
-5. **kycPolicyNotesMd** (markdown, may be empty string). Concise plain-English notes describing the service's actual KYC posture in operational terms (when KYC is requested, what triggers it, what data is collected, how funds may be impacted). Write for a non-technical reader. Keep it to at most 2 short lines when possible. Do not duplicate the `summary` or generic boilerplate. Empty string if the corpus says nothing concrete.
+6. **kycPolicyNotesMd** (markdown, may be empty string). Three things, in this order: what sets KYC off here, what it asks you to hand over, and what happens to your money if you refuse or they suspect you. Two or three short sentences. Do not repeat the `summary`. Empty string if the corpus says nothing concrete.
 
-6. **kycLevelRationale**: one short paragraph (1-3 sentences) explaining why you chose the kycLevel value, citing the specific clause types that drove the decision. Plain text, no markdown.
+7. **kycLevelRationale**: one short paragraph (1-3 sentences) explaining why you chose the kycLevel value, citing the specific clause types that drove the decision. Plain text, no markdown.
 
-7. **attributesToAdd**: items from the **attribute catalog** that should be assigned to this service per the corpus. Use the exact `attributeId` from the catalog. **Do not** propose attributes already assigned. Each entry needs a one-sentence `rationale` that ties the attribute to a specific clause type in the corpus.
+8. **attributesToAdd**: items from the **attribute catalog** that should be assigned to this service per the corpus. Use the exact `attributeId` from the catalog. **Do not** propose attributes already assigned. Each entry needs a one-sentence `rationale` and a verbatim `quote` of the clause it rests on, plus the `sourceUrl` of the page that clause came from. Without a quote, omit the entry.
 
-8. **attributesToRemove**: items currently assigned to the service that the corpus contradicts. Use the exact `attributeId`. **Do not** propose attributes that are not currently assigned. Each entry needs a `rationale` citing the contradicting clause type.
+9. **attributesToRemove**: items currently assigned to the service that the corpus contradicts. Use the exact `attributeId`. **Do not** propose attributes that are not currently assigned. Each entry needs a `rationale` and a verbatim `quote` of the contradicting clause, plus its `sourceUrl`. Without a quote, omit the entry.
 
    **Hard rules for attributes**:
    - Reference IDs **only** from the provided catalog. Do not invent IDs.
@@ -51,7 +41,7 @@ Produce a single JSON object with all of the following fields:
    - Do not propose an attribute that is borderline or weakly supported.
    - Do not propose adding and removing the same `attributeId`.
 
-9. **warnings**: user-facing notices that material to a privacy-conscious reader and that do not fit elsewhere. Severities:
+10. **warnings**: user-facing notices that material to a privacy-conscious reader and that do not fit elsewhere. Severities:
    - `'info'` informational, no risk implication.
    - `'warning'` notable concern (e.g. broad data sharing, surprising retention).
    - `'alert'` material risk (e.g. funds may be confiscated under specified conditions, terms allow account termination without notice plus KYC trigger). Reserve for genuine risks.

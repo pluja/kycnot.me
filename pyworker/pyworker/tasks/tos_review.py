@@ -10,31 +10,37 @@ import requests
 from pyworker.database import (
     TosReviewType,
     create_kyc_edit_suggestion,
-    create_legal_revision,
-    get_legal_documents,
     save_tos_review,
-    upsert_legal_document,
 )
 from pyworker.tasks.base import Task
-from pyworker.utils.ai import (
-    prompt_check_tos_review,
-    prompt_legal_change_summary,
-    prompt_tos_review,
+from pyworker.utils.ai import prompt_check_tos_review, prompt_tos_review
+from pyworker.utils.legal_crawl import LegalCorpus, fetch_legal_corpus
+from pyworker.utils.legal_changes import (
+    record_document_changes,
+    tracked_document_urls,
 )
-from pyworker.utils.crawl import LegalCorpus, fetch_legal_corpus
-from pyworker.utils.legal_text import (
-    LegalChangeLevel,
-    diff_legal_text,
-    is_usable_legal_page,
-)
+from pyworker.utils.legal_text import is_grounded
+
+# A quote long enough to be a whole page is not a quote. Grounding only proves
+# the text is somewhere in the corpus, so without a ceiling a model could
+# "quote" the entire terms and pass.
+MAX_EVIDENCE_CHARS = 600
+
+# A review is only written for a listing the team has vetted. A
+# community-contributed one is not shown a review in the UI, so reviewing it
+# spends model budget and files KYC suggestions against a listing nobody has
+# checked. Those are done on request, one service at a time.
+REVIEWABLE_STATUSES = ("VERIFICATION_SUCCESS", "APPROVED")
 
 
 class TosReviewTask(Task):
     """Task for retrieving Terms of Service (TOS) text."""
 
-    def __init__(self):
-        """Initialize the TOS review task."""
+    def __init__(self, force: bool = False):
         super().__init__("tos_review")
+        # Review again even when the corpus is unchanged, to carry existing
+        # reviews onto a revised prompt. Costs one model call per service.
+        self.force = force
 
     def run(self, service: Dict[str, Any]) -> Optional[TosReviewType]:
         """
@@ -50,14 +56,7 @@ class TosReviewTask(Task):
         service_name = service["name"]
         verification_status = service.get("verificationStatus")
 
-        # Only process verified or approved services. Community-contributed
-        # listings are excluded: their TOS review is never shown in the UI, so
-        # reviewing them only spends AI budget and files unactionable KYC
-        # suggestions on listings the team has not vetted.
-        if verification_status not in [
-            "VERIFICATION_SUCCESS",
-            "APPROVED",
-        ]:
+        if verification_status not in REVIEWABLE_STATUSES:
             self.logger.info(
                 f"Skipping TOS review for service: {service_name} (ID: {service_id}) - Status: {verification_status}"
             )
@@ -76,10 +75,14 @@ class TosReviewTask(Task):
         )
         self.logger.info(f"TOS URLs: {tos_urls}")
 
-        corpus = fetch_legal_corpus(tos_urls)
-        self.record_document_changes(service_id, corpus, service_name)
+        corpus = fetch_legal_corpus(
+            tos_urls, known_urls=tracked_document_urls(service_id)
+        )
+        record_document_changes(service_id, corpus, service_name)
 
         review = self.get_tos_review(corpus, service.get("tosReview"), service_name)
+        if review is not None:
+            self.keep_supported_highlights(review, corpus)
 
         # Always update the processed timestamp, even if review is None
         save_tos_review(service_id, review)
@@ -126,107 +129,52 @@ class TosReviewTask(Task):
 
         return review
 
-    def record_document_changes(
-        self, service_id: int, corpus: LegalCorpus, service_name: str = ""
-    ) -> None:
-        """Store each crawled page and log the ones whose text actually moved.
+    def keep_supported_highlights(self, review: Dict[str, Any], corpus) -> None:
+        """Drop every highlight the crawled pages do not back up.
 
-        Detection is deterministic: normalization has already removed the
-        republish noise, so a surviving difference is a real edit. Nothing here
-        calls a model, which keeps a service unable to talk the detector out of
-        noticing a change to its own terms.
+        This review publishes itself: it renders as a quoted clause on the
+        service page and is emitted as a schema.org Review under kycnot.me's own
+        name, with no reviewer in between. A highlight is a claim about the
+        service, and the quote is what a reader is invited to check it against.
+        Keeping the claim after finding its quote invented is the worst of both:
+        an assertion nobody can check, made by a model we have just caught
+        making one up.
+
+        The address is taken from the page the quote was found in rather than
+        from the model, so a clause cannot be attributed to the wrong document.
         """
-        stored = get_legal_documents(service_id)
-        self.record_removed_documents(service_id, corpus, stored)
+        highlights = review.get("highlights")
+        if not highlights:
+            return
 
-        for page in corpus.pages:
-            if not is_usable_legal_page(page.normalized_text):
-                self.logger.info(
-                    f"Skipping unusable legal page for service {service_id}: {page.url} "
-                    f"({len(page.normalized_text)} chars)"
+        kept = []
+        for highlight in highlights:
+            evidence = highlight.get("evidence") or ""
+            if not evidence:
+                self.logger.warning(
+                    f"Dropping highlight with no quote: {highlight.get('title')!r}"
+                )
+                continue
+            if len(evidence) > MAX_EVIDENCE_CHARS:
+                self.logger.warning(
+                    f"Dropping highlight quoting {len(evidence)} chars: {highlight.get('title')!r}"
                 )
                 continue
 
-            previous = stored.get(page.url_key)
-            diff = (
-                diff_legal_text(previous["normalizedText"], page.normalized_text)
-                if previous
-                else None
+            source = next(
+                (page for page in corpus.pages if is_grounded(evidence, page.markdown)),
+                None,
             )
-            changed = previous is not None and diff is not None and diff.level is not LegalChangeLevel.NONE
-
-            document_id = upsert_legal_document(
-                service_id=service_id,
-                url_key=page.url_key,
-                url=page.url,
-                kind=page.kind.value,
-                content_hash=page.content_hash,
-                normalized_text=page.normalized_text,
-                changed=changed,
-            )
-
-            if not changed or document_id is None or diff is None:
+            if source is None:
+                self.logger.warning(
+                    f"Dropping highlight whose quote is in no crawled page: {evidence[:80]!r}"
+                )
                 continue
 
-            create_legal_revision(
-                service_id=service_id,
-                document_id=document_id,
-                change_level=diff.level.value,
-                changed_words=diff.changed_words,
-                summary=self.summarize_change(diff.level, diff.hunks, service_name, page.kind.value),
-                diff=diff.hunks,
-            )
-            self.logger.info(
-                f"Legal change recorded for service {service_id}: {page.url} "
-                f"({diff.level.value}, {diff.changed_words} words)"
-            )
+            highlight["sourceUrl"] = source.url
+            kept.append(highlight)
 
-    def record_removed_documents(
-        self,
-        service_id: int,
-        corpus: LegalCorpus,
-        stored: Dict[str, Any],
-    ) -> None:
-        """Log documents that were stored before but are absent from this crawl.
-
-        Deleting a page is an edit like any other, and without this a service
-        could drop a clause by dropping the page that carried it. Skipped when
-        the crawl returned nothing at all, since that is far more likely to be
-        an outage than every document being withdrawn at once.
-        """
-        if not corpus.pages:
-            return
-
-        crawled = {page.url_key for page in corpus.pages}
-        for url_key, document in stored.items():
-            if url_key in crawled or not document.get("normalizedText"):
-                continue
-            create_legal_revision(
-                service_id=service_id,
-                document_id=document["id"],
-                change_level=LegalChangeLevel.MATERIAL.value,
-                changed_words=0,
-                summary="The document is no longer published at this address.",
-                diff=None,
-            )
-            self.logger.info(f"Legal document removed for service {service_id}: {url_key}")
-
-    def summarize_change(
-        self, level: LegalChangeLevel, hunks: str, service_name: str, document_kind: str
-    ) -> Optional[str]:
-        """Describe a material change in plain English, or return None.
-
-        Minor edits are recorded without a summary: a reworded sentence does not
-        warrant a model call, and an empty summary reads better than one
-        explaining that nothing meaningful happened.
-        """
-        if level is not LegalChangeLevel.MATERIAL or not hunks:
-            return None
-        try:
-            return prompt_legal_change_summary(hunks, service_name, document_kind)
-        except Exception as exc:
-            self.logger.warning(f"Legal change summary failed: {exc}")
-            return None
+        review["highlights"] = kept
 
     def get_tos_review(
         self,
@@ -235,7 +183,11 @@ class TosReviewTask(Task):
         service_name: str,
     ) -> Optional[TosReviewType]:
         """Run a single review pass over the combined legal corpus."""
-        combined, fetched_urls, corpus_hash = corpus.combined, corpus.urls, corpus.corpus_hash
+        combined, fetched_urls, corpus_hash = (
+            corpus.combined,
+            corpus.urls,
+            corpus.corpus_hash,
+        )
 
         if not combined:
             self.logger.warning("Empty legal corpus")
@@ -245,8 +197,14 @@ class TosReviewTask(Task):
             f"Corpus assembled: {len(fetched_urls)} pages, {len(combined)} chars, hash={corpus_hash[:12]}"
         )
 
-        if current_review and current_review.get("contentHash") == corpus_hash:
-            self.logger.info(f"Corpus unchanged (hash {corpus_hash[:12]}), skipping LLM call")
+        if (
+            not self.force
+            and current_review
+            and current_review.get("contentHash") == corpus_hash
+        ):
+            self.logger.info(
+                f"Corpus unchanged (hash {corpus_hash[:12]}), skipping LLM call"
+            )
             return current_review
 
         # Drop pages that the fast model flags as blocked / incomplete before
@@ -259,7 +217,9 @@ class TosReviewTask(Task):
             try:
                 check = prompt_check_tos_review(section)
             except Exception as exc:
-                self.logger.warning(f"Completeness check failed: {exc}; keeping section")
+                self.logger.warning(
+                    f"Completeness check failed: {exc}; keeping section"
+                )
                 filtered_sections.append(section)
                 continue
             if check and check.get("isComplete"):

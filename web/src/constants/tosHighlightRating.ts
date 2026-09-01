@@ -8,6 +8,8 @@ type TosHighlightRatingInfo<T extends string | null | undefined = string> = {
   id: T
   icon: string
   name: string
+  /// Counted above the highlights, so a reader sees the balance before reading them.
+  countLabel: { one: string; many: string }
   classNames: {
     icon: string
     borderColor: string
@@ -25,6 +27,7 @@ export const {
     id,
     icon: 'ri:question-line',
     name: typeof id === 'string' ? transformCase(id, 'title') : String(id),
+    countLabel: { one: 'point', many: 'points' },
     classNames: {
       icon: 'text-yellow-400',
       borderColor: 'border-yellow-500/40',
@@ -36,6 +39,7 @@ export const {
       id: 'negative',
       icon: 'ri:thumb-down-line',
       name: 'Negative',
+      countLabel: { one: 'concern', many: 'concerns' },
       classNames: {
         icon: 'text-red-400',
         borderColor: 'border-red-500/40',
@@ -46,6 +50,7 @@ export const {
       id: 'positive',
       icon: 'ri:thumb-up-line',
       name: 'Positive',
+      countLabel: { one: 'good sign', many: 'good signs' },
       classNames: {
         icon: 'text-green-400',
         borderColor: 'border-green-500/40',
@@ -56,6 +61,7 @@ export const {
       id: 'neutral',
       icon: 'ri:information-line',
       name: 'Neutral',
+      countLabel: { one: 'note', many: 'notes' },
       classNames: {
         icon: 'text-blue-400',
         borderColor: 'border-blue-500/40',

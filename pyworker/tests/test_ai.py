@@ -4,12 +4,14 @@ from pyworker.utils.ai import _strip_thinking
 
 
 def test_strip_thinking_think_tags():
-    content = "<think>This is reasoning</think>\n{\"key\": \"value\"}"
+    content = '<think>This is reasoning</think>\n{"key": "value"}'
     assert _strip_thinking(content) == '{"key": "value"}'
 
 
 def test_strip_thinking_thinking_tags():
-    content = "<thinking>Long reasoning\nover multiple lines</thinking>\n{\"key\": \"value\"}"
+    content = (
+        '<thinking>Long reasoning\nover multiple lines</thinking>\n{"key": "value"}'
+    )
     assert _strip_thinking(content) == '{"key": "value"}'
 
 
@@ -19,20 +21,24 @@ def test_strip_thinking_no_tags():
 
 
 def test_strip_thinking_multiline():
-    content = "<think>\nStep 1\nStep 2\n</think>\n\n{\"result\": true}"
+    content = '<think>\nStep 1\nStep 2\n</think>\n\n{"result": true}'
     assert _strip_thinking(content) == '{"result": true}'
 
 
 def _make_loader(prompts_dir):
     """Return a _load_prompt-equivalent that reads from a temp directory."""
+
     def load(filename: str, **static_vars: str) -> str:
         text = (prompts_dir / filename).read_text()
         for key, value in static_vars.items():
             placeholder = f"{{{{{key}}}}}"
             if placeholder not in text:
-                raise ValueError(f"Prompt '{filename}' is missing placeholder {placeholder}")
+                raise ValueError(
+                    f"Prompt '{filename}' is missing placeholder {placeholder}"
+                )
             text = text.replace(placeholder, value)
         return text
+
     return load
 
 
@@ -57,8 +63,15 @@ def test_load_prompt_missing_placeholder_raises(tmp_path):
 def test_load_prompt_schema_substituted():
     """Schema placeholder should not remain in loaded prompts."""
     from pyworker.utils.ai import _PROMPT_TOS_REVIEW, _PROMPT_COMMENT_MODERATION
-    from pyworker.utils.ai import PROMPT_COMMENT_SENTIMENT_SUMMARY, PROMPT_CHECK_TOS_REVIEW
+    from pyworker.utils.ai import (
+        PROMPT_COMMENT_SENTIMENT_SUMMARY,
+        PROMPT_CHECK_TOS_REVIEW,
+    )
 
-    for prompt in (_PROMPT_TOS_REVIEW, _PROMPT_COMMENT_MODERATION,
-                   PROMPT_COMMENT_SENTIMENT_SUMMARY, PROMPT_CHECK_TOS_REVIEW):
+    for prompt in (
+        _PROMPT_TOS_REVIEW,
+        _PROMPT_COMMENT_MODERATION,
+        PROMPT_COMMENT_SENTIMENT_SUMMARY,
+        PROMPT_CHECK_TOS_REVIEW,
+    ):
         assert "{{schema}}" not in prompt

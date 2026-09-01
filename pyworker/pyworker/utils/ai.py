@@ -44,12 +44,20 @@ def _today() -> str:
     return f"Today's date: {date.today().isoformat()}\n\n"
 
 
+# Shared by both legal-review prompts so the nightly review and the deep scan
+# cannot drift into judging the same corpus by different rules.
+_LEGAL_REVIEW_FIELDS = (_PROMPTS_DIR / "_legal_review_fields.md").read_text()
+
 PROMPT_CHECK_TOS_REVIEW = _load_prompt("tos_check.md", schema=schemas.TOS_CHECK.ts_type)
-_PROMPT_TOS_REVIEW = _load_prompt("tos_review.md", schema=schemas.TOS_REVIEW.ts_type)
+_PROMPT_TOS_REVIEW = _load_prompt(
+    "tos_review.md", schema=schemas.TOS_REVIEW.ts_type, fields=_LEGAL_REVIEW_FIELDS
+)
 _PROMPT_LEGAL_CHANGE_SUMMARY = _load_prompt(
     "legal_change_summary.md", schema=schemas.LEGAL_CHANGE_SUMMARY.ts_type
 )
-_PROMPT_DEEP_SCAN = _load_prompt("deep_scan.md", schema=schemas.DEEP_SCAN.ts_type)
+_PROMPT_DEEP_SCAN = _load_prompt(
+    "deep_scan.md", schema=schemas.DEEP_SCAN.ts_type, fields=_LEGAL_REVIEW_FIELDS
+)
 PROMPT_COMMENT_SENTIMENT_SUMMARY = _load_prompt(
     "comment_sentiment.md", schema=schemas.COMMENT_SEN.ts_type
 )
@@ -169,7 +177,9 @@ def prompt_tos_review(content: str, service_name: str) -> TosReviewType:
     return cast(TosReviewType, result_dict)
 
 
-def prompt_legal_change_summary(diff: str, service_name: str, document_kind: str) -> str:
+def prompt_legal_change_summary(
+    diff: str, service_name: str, document_kind: str
+) -> str:
     """Describe one legal document edit in plain English.
 
     The model only describes the diff. Whether the change counted as a change at
@@ -196,6 +206,7 @@ def prompt_deep_scan(
     service_name: str,
     attribute_catalog_md: str,
     current_attribute_ids: list[int],
+    listing_record: dict[str, str],
 ) -> DeepScanResultType:
     scope = (
         f"You are reviewing the service named exactly '{service_name}'. "
@@ -211,6 +222,12 @@ def prompt_deep_scan(
         f"{attribute_catalog_md}\n\n"
         "## Attribute IDs currently assigned to this service\n\n"
         f"{current_attribute_ids}\n\n"
+        "## Platform record for this service (compare against the documents)\n\n"
+        + "".join(
+            f"- {field}: {value or '(not set)'}\n"
+            for field, value in listing_record.items()
+        )
+        + "\n"
         "## Legal corpus\n\n"
         f"{content}"
     )
