@@ -113,6 +113,30 @@ export const commentActions = {
           })
         }
 
+        const comment = await prisma.comment.findUnique({
+          where: { id: input.commentId },
+          select: { authorId: true, status: true },
+        })
+        if (!comment) {
+          throw new ActionError({ code: 'NOT_FOUND', message: 'Comment not found' })
+        }
+        // Reddit and Hacker News both refuse this, and without it one account
+        // that reaches the voting threshold can raise its own karma without limit.
+        if (comment.authorId === context.locals.user.id) {
+          throw new ActionError({
+            code: 'FORBIDDEN',
+            message: 'You cannot vote on your own comment.',
+          })
+        }
+        // The form only offers votes on visible comments, but the action takes a
+        // comment id, so a hidden or pending one is otherwise reachable directly.
+        if (comment.status !== 'APPROVED' && comment.status !== 'VERIFIED') {
+          throw new ActionError({
+            code: 'FORBIDDEN',
+            message: 'This comment cannot be voted on.',
+          })
+        }
+
         // Handle the vote in a transaction
         await prisma.$transaction(async (tx) => {
           // Get existing vote if any
