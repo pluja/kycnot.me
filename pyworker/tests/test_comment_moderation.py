@@ -1,8 +1,17 @@
 from pyworker.tasks.comment_moderation import _decide, _pick_mute_reason
 
 
-def _ctx(*, affiliated=False, karma=10, is_root=True, rating=5,
-         private_proof=False, kyc=False, funds=False, strict=False):
+def _ctx(
+    *,
+    affiliated=False,
+    karma=10,
+    is_root=True,
+    rating=5,
+    private_proof=False,
+    kyc=False,
+    funds=False,
+    strict=False,
+):
     return {
         "comment": {
             "submission": {
@@ -18,8 +27,9 @@ def _ctx(*, affiliated=False, karma=10, is_root=True, rating=5,
     }
 
 
-def _ai(*, action="approve", spam=False, brigade=False, bconf=0,
-        quality=5, disable=False):
+def _ai(
+    *, action="approve", spam=False, brigade=False, bconf=0, quality=5, disable=False
+):
     return {
         "recommendedAction": action,
         "isSpam": spam,
@@ -33,6 +43,7 @@ def _ai(*, action="approve", spam=False, brigade=False, bconf=0,
 
 
 # --- subjective rating-disable: no auto-mute, escalate instead ---
+
 
 def test_subjective_disable_does_not_mute_and_escalates():
     d = _decide(_ai(action="approve", disable=True), _ctx(karma=5))
@@ -58,6 +69,7 @@ def test_no_disable_keeps_rating_active_and_approves():
 
 
 # --- concrete bases still auto-mute (and do not over-escalate) ---
+
 
 def test_affiliated_positive_auto_mutes_without_escalation():
     d = _decide(_ai(action="approve", disable=True), _ctx(affiliated=True, rating=5))
@@ -99,6 +111,7 @@ def test_spam_auto_mutes_template():
 
 # --- a comment held for a hard topic is not also rating-muted by the AI ---
 
+
 def test_hard_topic_hold_keeps_rating_active_when_ai_did_not_flag():
     d = _decide(_ai(action="approve", disable=False), _ctx(karma=5, funds=True))
     assert d["status"] == "PENDING"
@@ -107,6 +120,7 @@ def test_hard_topic_hold_keeps_rating_active_when_ai_did_not_flag():
 
 
 # --- the COI fallback is retired: no concrete signal never returns a reason ---
+
 
 def test_pick_mute_reason_subjective_returns_none():
     assert _pick_mute_reason(_ai(disable=True), _ctx(karma=5), False) is None

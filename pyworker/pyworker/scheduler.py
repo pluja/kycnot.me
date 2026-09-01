@@ -190,7 +190,9 @@ class TaskScheduler:
         for thread in self.threads:
             thread.join(timeout=1.0)
 
-        alive_threads = [str(thread.name) for thread in self.threads if thread.is_alive()]
+        alive_threads = [
+            str(thread.name) for thread in self.threads if thread.is_alive()
+        ]
         if alive_threads:
             self.logger.warning(
                 "Scheduler stopped while task threads were still running: %s",

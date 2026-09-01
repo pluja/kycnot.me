@@ -529,6 +529,133 @@ def mark_scan_job_done(job_id: int, error: Optional[str] = None) -> None:
         logger.error(f"Error marking scan job {job_id} done: {e}")
 
 
+# Fields whose value the legal documents can speak to plainly. Every field added
+# here widens what the scanner may raise, so it grows only when a field earns it.
+LISTING_CHECK_FIELDS = ("registrationCountryCode", "registeredCompanyName")
+
+
+def fetch_service_listing_record(service_id: int) -> Dict[str, str]:
+    """The platform's own record of a service, for the scanner to compare against."""
+    columns = ", ".join(f'"{field}"' for field in LISTING_CHECK_FIELDS)
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    f'SELECT {columns} FROM "Service" WHERE id = %s', (service_id,)
+                )
+                row = cursor.fetchone()
+                return {k: (v or "") for k, v in (row or {}).items()}
+    except Exception as e:
+        logger.error(f"Error loading listing record for service {service_id}: {e}")
+        return {}
+
+
+def fetch_scan_declines(service_id: int) -> set:
+    """Proposals turned down whose source document still reads as it did.
+
+    A decline lifts only when the page it was drawn from changes, so editing a
+    fee table cannot reopen a question answered from the terms. One with no
+    source document never lifts.
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    SELECT d.fingerprint
+                    FROM "ServiceScanDecline" d
+                    LEFT JOIN "ServiceLegalDocument" doc
+                      ON doc."serviceId" = d."serviceId"
+                     AND doc."urlKey" = d."sourceUrlKey"
+                    WHERE d."serviceId" = %s
+                      AND (
+                        d."sourceUrlKey" IS NULL
+                        OR doc."contentHash" IS NULL
+                        OR doc."contentHash" = d."sourceContentHash"
+                      )
+                    """,
+                    (service_id,),
+                )
+                return {row["fingerprint"] for row in cursor.fetchall()}
+    except Exception as e:
+        logger.error(f"Error loading scan declines for service {service_id}: {e}")
+        return set()
+
+
+def fetch_services_needing_scan(limit: int) -> List[Dict[str, Any]]:
+    """Services whose legal documents moved since a scan last looked at them.
+
+    Decided from recorded document changes rather than by crawling, so a sweep
+    costs one query and then crawls only the services that actually changed.
+    The limit is what staggers the first pass, where every service qualifies
+    because none has been scanned yet.
+
+    Ordered by when each was last tried rather than when one last succeeded, so
+    a service whose scan keeps failing stays eligible without taking a slot from
+    everything else every night.
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    SELECT s.id, s.name, s.slug, s."tosChangedAt", s."lastLegalScanAt"
+                    FROM "Service" s
+                    WHERE s."serviceVisibility" = 'PUBLIC'
+                      AND s."verificationStatus" IN ('VERIFICATION_SUCCESS', 'APPROVED')
+                      AND array_length(s."tosUrls", 1) > 0
+                      AND (
+                        s."lastLegalScanAt" IS NULL
+                        OR (
+                          s."tosChangedAt" IS NOT NULL
+                          AND s."tosChangedAt" > s."lastLegalScanAt"
+                        )
+                      )
+                    ORDER BY s."lastLegalScanAttemptAt" ASC NULLS FIRST, s.id
+                    LIMIT %s
+                    """,
+                    (limit,),
+                )
+                return list(cursor.fetchall())
+    except Exception as e:
+        logger.error(f"Error selecting services needing a scan: {e}")
+        return []
+
+
+def mark_service_scan_attempted(service_id: int) -> None:
+    """Record that a scan tried, whatever came of it.
+
+    Kept apart from the stamp below so a scan that fails is still known to have
+    run. The sweep takes the least recently tried first, so a service failing
+    every night waits its turn rather than holding a slot, and a service that
+    failed once is looked at again instead of waiting for its documents to move.
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    'UPDATE "Service" SET "lastLegalScanAttemptAt" = NOW() WHERE id = %s',
+                    (service_id,),
+                )
+                conn.commit()
+    except Exception as e:
+        logger.error(f"Error stamping scan attempt for service {service_id}: {e}")
+
+
+def mark_service_scanned(service_id: int) -> None:
+    """Record that a scan read this service's documents through to an answer."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    'UPDATE "Service" SET "lastLegalScanAt" = NOW() WHERE id = %s',
+                    (service_id,),
+                )
+                conn.commit()
+    except Exception as e:
+        logger.error(f"Error stamping scan time for service {service_id}: {e}")
+
+
 def save_deep_scan_proposed_edits(
     service_id: int,
     proposed_edits: Dict[str, Any],
@@ -750,7 +877,7 @@ def get_legal_documents(service_id: int) -> Dict[str, LegalDocumentRow]:
         with get_db_connection() as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 cursor.execute(
-                    'SELECT id, "urlKey", "normalizedText" '
+                    'SELECT id, "urlKey", url, "normalizedText", "removedAt" '
                     'FROM "ServiceLegalDocument" WHERE "serviceId" = %s',
                     (service_id,),
                 )
@@ -788,20 +915,81 @@ def upsert_legal_document(
                         "contentHash" = EXCLUDED."contentHash",
                         "normalizedText" = EXCLUDED."normalizedText",
                         "checkedAt" = NOW(),
+                        "removedAt" = NULL,
+                        "unreachableAt" = NULL,
                         "changedAt" = CASE
                             WHEN %s THEN NOW()
                             ELSE "ServiceLegalDocument"."changedAt"
                         END
                     RETURNING id
                     """,
-                    (service_id, url_key, url, kind, content_hash, normalized_text, changed, changed),
+                    (
+                        service_id,
+                        url_key,
+                        url,
+                        kind,
+                        content_hash,
+                        normalized_text,
+                        changed,
+                        changed,
+                    ),
                 )
                 row = cursor.fetchone()
                 conn.commit()
                 return int(row["id"]) if row else None
     except Exception as e:
-        logger.error(f"Error saving legal document {url_key} for service {service_id}: {e}")
+        logger.error(
+            f"Error saving legal document {url_key} for service {service_id}: {e}"
+        )
         return None
+
+
+def mark_legal_document_removed(document_id: int) -> None:
+    """Stamp a document as gone so the removal is recorded once, not every crawl."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    'UPDATE "ServiceLegalDocument" SET "removedAt" = NOW() WHERE id = %s',
+                    (document_id,),
+                )
+                conn.commit()
+    except Exception as e:
+        logger.error(f"Error marking legal document {document_id} removed: {e}")
+
+
+def clear_legal_document_removal(document_id: int) -> None:
+    """Clear the removal stamp of a page that answers again.
+
+    Done here rather than left to the upsert, which does not run for a page the
+    crawler reached but could not use, and would then let the restoration be
+    recorded again on every later crawl.
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    'UPDATE "ServiceLegalDocument" SET "removedAt" = NULL WHERE id = %s',
+                    (document_id,),
+                )
+                conn.commit()
+    except Exception as e:
+        logger.error(f"Error clearing removal of legal document {document_id}: {e}")
+
+
+def mark_legal_document_unreachable(document_id: int) -> None:
+    """Stamp a document the crawler could not read, leaving its stored text alone."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    'UPDATE "ServiceLegalDocument" SET "unreachableAt" = NOW() '
+                    'WHERE id = %s AND "unreachableAt" IS NULL',
+                    (document_id,),
+                )
+                conn.commit()
+    except Exception as e:
+        logger.error(f"Error marking legal document {document_id} unreachable: {e}")
 
 
 def create_legal_revision(
@@ -827,11 +1015,19 @@ def create_legal_revision(
                     VALUES (%s, %s, %s::"LegalChangeLevel", %s, %s, %s)
                     RETURNING id
                     """,
-                    (service_id, document_id, change_level, changed_words, summary, diff),
+                    (
+                        service_id,
+                        document_id,
+                        change_level,
+                        changed_words,
+                        summary,
+                        diff,
+                    ),
                 )
                 row = cursor.fetchone()
                 cursor.execute(
-                    'UPDATE "Service" SET "tosChangedAt" = NOW() WHERE id = %s', (service_id,)
+                    'UPDATE "Service" SET "tosChangedAt" = NOW() WHERE id = %s',
+                    (service_id,),
                 )
                 conn.commit()
                 return int(row["id"]) if row else None
@@ -1160,7 +1356,9 @@ def apply_ai_moderation_decision(
                 conn.commit()
                 return True
     except Exception as e:
-        logger.error(f"Error applying AI moderation decision for comment {comment_id}: {e}")
+        logger.error(
+            f"Error applying AI moderation decision for comment {comment_id}: {e}"
+        )
         return False
 
 

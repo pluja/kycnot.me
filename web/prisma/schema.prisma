@@ -1,3 +1,9 @@
+// After changing this file: create a migration, run `npm run db-gen`, check
+// `npm run db-drift`, and RESTART any running dev server. A server started
+// before the client was generated keeps the old one in memory, and every query
+// touching a new model fails at runtime while the code and the database are
+// both correct.
+
 // This is your Prisma schema file
 
 datasource db {
@@ -519,6 +525,42 @@ model ServiceSuggestion {
   @@index([serviceId])
 }
 
+/// The target is a type and an id rather than a relation: Prisma cannot express
+/// a relation whose target varies, and the alternative is a nullable foreign key
+/// per kind of thing, which grows every time something else wants a trail.
+/// Nothing cascades from here, because a log that disappears with its subject
+/// cannot answer what happened to it.
+model AuditLog {
+  id         Int             @id @default(autoincrement())
+  actor      User?           @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  /// Null once the account is gone, which reads the same as an act by the
+  /// platform. Name the person in the summary when that distinction matters.
+  actorId    Int?
+  action     AuditAction
+  targetType AuditTargetType
+  targetId   Int
+  summary    String
+  createdAt  DateTime        @default(now())
+
+  @@index([targetType, targetId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+enum AuditAction {
+  CREATED
+  UPDATED
+  STATUS_CHANGED
+  DELETED
+}
+
+enum AuditTargetType {
+  SERVICE
+  SERVICE_SUGGESTION
+  USER
+  COMMENT
+  CASE
+}
+
 model ServiceSuggestionMessage {
   id            Int               @id @default(autoincrement())
   content       String
@@ -545,6 +587,15 @@ model Service {
   kycLevel                Int                          @default(4)
   /// Markdown. Per-service narrative on nuances of KYC/AML/refund policy that a taxonomy of attributes alone can't capture.
   kycPolicyMd             String?
+  /// When a scan last read this service's legal documents through to an answer,
+  /// whatever that answer was. Stamped when nothing was proposed too, or a quiet
+  /// service is rescanned nightly. Not stamped when the scan could not read the
+  /// documents at all, so a service that failed is picked up again.
+  lastLegalScanAt         DateTime?
+  /// When a scan last tried, whether or not it got anywhere. The sweep takes the
+  /// least recently tried first, so a service that fails every night waits its
+  /// turn behind the others instead of holding a slot forever.
+  lastLegalScanAttemptAt  DateTime?
   /// Date only, no time.
   operatingSince          DateTime?                    @db.Date
   overallScore            Int                          @default(0)
@@ -587,6 +638,7 @@ model Service {
   tosChangedAt            DateTime?
   legalDocuments          ServiceLegalDocument[]
   legalRevisions          ServiceLegalRevision[]
+  scanDeclines            ServiceScanDecline[]
   createdAt               DateTime                     @default(now())
   updatedAt               DateTime                     @default(now()) @updatedAt
   /// Computed via trigger when the visibility is PUBLIC or (ARCHIVED and listedAt was null). Do not update through prisma.
@@ -793,6 +845,8 @@ model User {
   participatingCases       Case[]                       @relation("CaseParticipants")
   createdEvents            Event[]                      @relation("EventCreatedBy")
   updatedEvents            Event[]                      @relation("EventUpdatedBy")
+  scanDeclines             ServiceScanDecline[]
+  auditLogs                AuditLog[]
 
   @@index([createdAt])
   @@index([totalKarma])
@@ -885,6 +939,12 @@ model CommentVote {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    Int
   createdAt DateTime @default(now())
+
+  /// Karma this vote actually moved, decided once by the trigger and never by
+  /// the application. Removing or flipping the vote hands back exactly this, so
+  /// what a pair of accounts can move stays bounded however the votes are
+  /// churned. Deciding it again at reversal time did not.
+  karmaApplied Int @default(0)
 
   @@unique([commentId, userId]) // Ensure one vote per user per comment
   @@index([commentId])
@@ -1203,10 +1263,46 @@ model ServiceLegalDocument {
   normalizedText String
   checkedAt      DateTime               @default(now())
   changedAt      DateTime?
+  /// Set only when a fetch of this URL answered 404 or 410, cleared when it returns.
+  /// Absence from a crawl is not removal: a service that blocks the crawler still publishes.
+  removedAt      DateTime?
+  /// Set when the page could not be read at all, so a stale copy is not read as current.
+  unreachableAt  DateTime?
+  /// Admin decision to keep tracking the page without announcing its changes.
+  ignoredAt      DateTime?
   revisions      ServiceLegalRevision[]
   createdAt      DateTime               @default(now())
 
   @@unique([serviceId, urlKey])
+  @@index([serviceId])
+}
+
+/// A proposal a reviewer turned down, so the scanner stops raising it.
+///
+/// Held against the one document the proposal was drawn from, not the whole
+/// corpus: a service editing its fee table must not reopen a question answered
+/// from its terms. A decline with no source document never expires, which is the
+/// quiet direction to err in. The quoted clause is not part of the identity,
+/// since the model quotes the same clause with different boundaries between runs.
+model ServiceScanDecline {
+  id                Int      @id @default(autoincrement())
+  service           Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId         Int
+  /// sha256 of serviceId, kind and key. The quoted clause is deliberately out of
+  /// it, since the model quotes one clause with different boundaries per run.
+  fingerprint       String
+  /// The document the proposal was drawn from, and how it read at the time. Null
+  /// when the proposal named no source, which makes the decline final.
+  sourceUrlKey      String?
+  sourceContentHash String?
+  /// What was proposed, for the audit trail. Not part of identity.
+  kind              String
+  label             String
+  declinedBy        User?    @relation(fields: [declinedById], references: [id], onDelete: SetNull)
+  declinedById      Int?
+  createdAt         DateTime @default(now())
+
+  @@unique([serviceId, fingerprint])
   @@index([serviceId])
 }
 

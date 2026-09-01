@@ -4,6 +4,7 @@ Command line interface for the pyworker package.
 
 import argparse
 import logging
+import os
 import sys
 import time
 from functools import partial
@@ -14,6 +15,7 @@ from pyworker.database import (
     claim_next_scan_job,
     close_db_pool,
     fetch_all_services,
+    fetch_services_needing_scan,
     fetch_services_with_pending_comments,
     mark_scan_job_done,
 )
@@ -28,13 +30,18 @@ from .tasks import (
     TosReviewTask,
     UserSentimentTask,
 )
+from pyworker.tasks.tos_review import REVIEWABLE_STATUSES
 from pyworker.utils.app_logging import configure_logging
 
 configure_logging()
 logger = logging.getLogger(__name__)
 
 _DISABLED_SCHEDULE_VALUES = {"", "disabled", "off", "false", "none"}
-_TASKS_WITHOUT_SCHEDULER_INSTANCE = {"deep_scan", "service_score_recalc_all"}
+_TASKS_WITHOUT_SCHEDULER_INSTANCE = {
+    "deep_scan",
+    "scan_sweep",
+    "service_score_recalc_all",
+}
 
 
 def is_disabled_schedule(schedule: str) -> bool:
@@ -47,7 +54,9 @@ def should_use_scheduler_task_instance(task_name: str) -> bool:
     return task_name not in _TASKS_WITHOUT_SCHEDULER_INSTANCE
 
 
-def group_task_schedules(task_schedules: dict[str, str]) -> tuple[dict[str, str], list[str]]:
+def group_task_schedules(
+    task_schedules: dict[str, str],
+) -> tuple[dict[str, str], list[str]]:
     """Split cron schedules into enabled and intentionally disabled groups."""
     enabled_task_schedules = {
         task_name: schedule
@@ -90,6 +99,11 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     )
     tos_parser.add_argument(
         "--service-id", type=int, help="Specific service ID to process (optional)"
+    )
+    tos_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Review again even when the legal text has not changed",
     )
 
     # User sentiment task
@@ -149,7 +163,17 @@ def parse_args(args: List[str]) -> argparse.Namespace:
         help="Delete resolved contact threads past their 30-day retention window",
     )
 
-    # Deep scan task
+    sweep_parser = subparsers.add_parser(
+        "scan-sweep",
+        help="Scan services whose legal documents changed since their last scan",
+    )
+    sweep_parser.add_argument(
+        "--limit",
+        type=int,
+        default=5,
+        help="How many services to scan in this run (default 5)",
+    )
+
     deep_scan_parser = subparsers.add_parser(
         "deep-scan",
         help="Deep-scan a service (TOS + KYC + attribute proposals + warnings)",
@@ -163,7 +187,9 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     return parser.parse_args(args)
 
 
-def run_tos_task(service_id: Optional[int] = None, close_pool: bool = True) -> int:
+def run_tos_task(
+    service_id: Optional[int] = None, close_pool: bool = True, force: bool = False
+) -> int:
     """
     Run the TOS retrieval task.
 
@@ -176,8 +202,14 @@ def run_tos_task(service_id: Optional[int] = None, close_pool: bool = True) -> i
     logger.info("Starting TOS retrieval task")
 
     try:
-        # Fetch services
-        services = fetch_all_services()
+        # Narrowed here as well as in the task, so a sweep over every service
+        # does not walk the ones it will refuse. The task keeps its own check,
+        # which is what holds when a single service is named.
+        services = [
+            service
+            for service in fetch_all_services()
+            if service.get("verificationStatus") in REVIEWABLE_STATUSES
+        ]
         if not services:
             logger.error("No services found")
             return 1
@@ -190,7 +222,7 @@ def run_tos_task(service_id: Optional[int] = None, close_pool: bool = True) -> i
                 return 1
 
         # Initialize task and use as context manager
-        with TosReviewTask() as task:  # type: ignore
+        with TosReviewTask(force=force) as task:  # type: ignore
             # Process services using the same database connection
             for service in services:
                 if not service.get("tosUrls"):
@@ -441,6 +473,46 @@ def run_service_score_recalc_all_task(close_pool: bool = True) -> int:
     return run_service_score_recalc_task(all_services=True, close_pool=close_pool)
 
 
+def run_scan_sweep_task(limit: int = 5, close_pool: bool = True) -> int:
+    """Scan the services whose legal documents changed since a scan last ran.
+
+    The limit is a deliberate throttle rather than a performance guard: every
+    service qualifies until it has been scanned once, and a reviewer working
+    through a queue of fifty in one morning will stop reading them.
+    """
+    logger.info(f"Starting scan sweep (limit {limit})")
+
+    try:
+        services = fetch_services_needing_scan(limit)
+        if not services:
+            logger.info(
+                "No service has changed its legal documents since its last scan"
+            )
+            return 0
+
+        created = 0
+        with DeepScanTask(only_when_actionable=True) as task:  # type: ignore
+            for service in services:
+                service_id = int(service["id"])
+                try:
+                    if task.run(service_id):  # type: ignore
+                        created += 1
+                except Exception as e:
+                    logger.error(f"Scan sweep failed for service {service_id}: {e}")
+
+        logger.info(
+            f"Scan sweep looked at {len(services)} service(s), "
+            f"{created} produced something to review"
+        )
+        return 0
+    except Exception as e:
+        logger.error(f"Error in scan sweep task: {e}")
+        return 1
+    finally:
+        if close_pool:
+            close_db_pool()
+
+
 def run_deep_scan_task(
     service_id: Optional[int] = None, close_pool: bool = True
 ) -> int:
@@ -477,9 +549,7 @@ def run_deep_scan_task(
 
                 job_id = int(job["id"])
                 job_service_id = int(job["serviceId"])
-                logger.info(
-                    f"Claimed scan job {job_id} for service {job_service_id}"
-                )
+                logger.info(f"Claimed scan job {job_id} for service {job_service_id}")
 
                 try:
                     suggestion_id = task.run(job_service_id)  # type: ignore
@@ -568,7 +638,9 @@ def run_worker_mode() -> int:
         "Found %s enabled cron schedule%s from environment variables: %s",
         len(enabled_task_schedules),
         "s" if len(enabled_task_schedules) != 1 else "",
-        ", ".join(enabled_task_schedules.keys()) if enabled_task_schedules else "<none>",
+        ", ".join(enabled_task_schedules.keys())
+        if enabled_task_schedules
+        else "<none>",
     )
     if disabled_task_names:
         logger.info("Disabled cron task schedules: %s", ", ".join(disabled_task_names))
@@ -587,6 +659,11 @@ def run_worker_mode() -> int:
             run_service_score_recalc_all_task, close_pool=False
         ),
         "deep_scan": partial(run_deep_scan_task, close_pool=False),
+        "scan_sweep": partial(
+            run_scan_sweep_task,
+            limit=int(os.environ.get("SCAN_SWEEP_LIMIT", "5")),
+            close_pool=False,
+        ),
     }
     scheduler = TaskScheduler()
 
@@ -641,7 +718,7 @@ def main() -> int:
 
         # Otherwise, run the specified task once
         if args.task == "tos":
-            return run_tos_task(args.service_id)
+            return run_tos_task(args.service_id, force=args.force)
         elif args.task == "sentiment":
             return run_sentiment_task(args.service_id)
         elif args.task == "moderation":
@@ -658,6 +735,8 @@ def main() -> int:
             return run_inactive_users_task()
         elif args.task == "contact-cleanup":
             return run_contact_cleanup_task()
+        elif args.task == "scan-sweep":
+            return run_scan_sweep_task(args.limit)
         elif args.task == "deep-scan":
             return run_deep_scan_task(args.service_id)
         elif args.task:

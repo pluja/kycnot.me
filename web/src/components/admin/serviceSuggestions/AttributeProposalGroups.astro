@@ -6,6 +6,8 @@ import { cn } from '../../../lib/cn'
 import { formatNumber } from '../../../lib/numbers'
 import BadgeSmall from '../../BadgeSmall.astro'
 
+import QuotedClause from '../../QuotedClause.astro'
+
 import type { Prisma } from '@prisma/client'
 
 type Attribute = Prisma.AttributeGetPayload<{
@@ -20,10 +22,7 @@ type Attribute = Prisma.AttributeGetPayload<{
   }
 }>
 
-type AttributeProposal = {
-  attributeId: number
-  rationale: string
-}
+type AttributeProposal = PrismaJson.ProposedAttribute
 
 type Props = {
   add: AttributeProposal[]
@@ -112,6 +111,11 @@ const scoreTextClass = (value: number) =>
                       <p class="mt-1 text-xs text-day-500">{attribute.description}</p>
                     )}
                     <p class="mt-2 text-sm text-day-300">{proposal.rationale}</p>
+                    <QuotedClause
+                      quote={proposal.quote}
+                      sourceUrl={proposal.sourceUrl}
+                      class="text-day-500"
+                    />
                   </div>
                 </label>
               )
@@ -181,6 +185,11 @@ const scoreTextClass = (value: number) =>
                       <p class="mt-1 text-xs text-day-500">{attribute.description}</p>
                     )}
                     <p class="mt-2 text-sm text-day-300">{proposal.rationale}</p>
+                    <QuotedClause
+                      quote={proposal.quote}
+                      sourceUrl={proposal.sourceUrl}
+                      class="text-day-500"
+                    />
                   </div>
                 </label>
               )

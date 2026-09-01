@@ -1,0 +1,44 @@
+[
+  {
+    "serviceId": 1,
+    "kind": "attribute:add",
+    "key": "42",
+    "expected": "666c267c2ed65b4b7a695d1e99114a9a0413437e0ed5e21945e66a984014cfc2"
+  },
+  {
+    "serviceId": 1,
+    "kind": "attribute:remove",
+    "key": "42",
+    "expected": "9f5f689f796fcbc0b9182d19cf4cef6375b86de9b1b603e71125582d838c5079"
+  },
+  {
+    "serviceId": 2,
+    "kind": "attribute:add",
+    "key": "42",
+    "expected": "10485e9de5c425a0f117ddd5a22c5face717d6337fbc8b8c22c028aadd367a40"
+  },
+  {
+    "serviceId": 1,
+    "kind": "attribute:add",
+    "key": "43",
+    "expected": "37257c946ab5f22def9d8bb40cb9617ef0b4f57c1bd8f326810727d942f824a7"
+  },
+  {
+    "serviceId": 1,
+    "kind": "attribute:add",
+    "key": " 42 ",
+    "expected": "666c267c2ed65b4b7a695d1e99114a9a0413437e0ed5e21945e66a984014cfc2"
+  },
+  {
+    "serviceId": 2884,
+    "kind": "listing:registrationCountryCode",
+    "key": "VG",
+    "expected": "4ac871af1d6572329402ac614a79cb0d6ebc9118cad097f3bacacc4f30fd2e50"
+  },
+  {
+    "serviceId": 2884,
+    "kind": "kycLevel",
+    "key": "3",
+    "expected": "3fe90fd1f3e799438026c7d51b13f33ee23bca266f7b8537002b3f2a9bac560a"
+  }
+]

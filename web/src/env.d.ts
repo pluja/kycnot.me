@@ -73,22 +73,53 @@ declare global {
           title: string
           content: MarkdownString
           rating: 'negative' | 'neutral' | 'positive'
+          /** Absent on scans generated before topics were introduced. */
+          topic?: TosHighlightTopic
+          evidence?: string
+          sourceUrl?: string
         }[]
       }
       kycPolicy: {
+        /** Set while a level change is still open; null once declined or unchanged. */
+        levelFingerprint?: string | null
         inferredLevel: 0 | 1 | 2 | 3 | 4
         notesMd: MarkdownString
         rationale: string
       }
       attributes: {
-        add: { attributeId: number; rationale: string }[]
-        remove: { attributeId: number; rationale: string }[]
+        add: ProposedAttribute[]
+        remove: ProposedAttribute[]
       }
+      /** Fields where the platform's record disagrees with the documents. */
+      listingChecks?: {
+        field: string
+        /** What the platform records today. */
+        current: string
+        /** What the document says instead. */
+        found: string
+        quote: string
+        sourceUrl: string
+        /** The source document as ServiceLegalDocument keys it. */
+        sourceUrlKey?: string
+        fingerprint: string
+      }[]
       warnings: {
         title: string
         bodyMd: MarkdownString
         severity: 'alert' | 'info' | 'warning'
       }[]
+    }
+
+    type ProposedAttribute = {
+      attributeId: number
+      rationale: string
+      /** Absent on scans generated before proposals had to quote a clause. */
+      quote?: string
+      sourceUrl?: string
+      /** Identity of this proposal, so declining it is remembered. */
+      fingerprint?: string
+      /** The source document as ServiceLegalDocument keys it. */
+      sourceUrlKey?: string
     }
 
     type UserSentiment = {

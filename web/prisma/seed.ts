@@ -28,6 +28,8 @@ import {
   LegalDocumentKind,
   PrismaClient,
   RatingMuteReason,
+  AuditAction,
+  AuditTargetType,
   ServiceSuggestionStatus,
   ServiceUserRole,
   type Prisma,
@@ -1419,6 +1421,8 @@ async function cleanup() {
     await prisma.caseEvidence.deleteMany()
     await prisma.caseUpdate.deleteMany()
     await prisma.case.deleteMany()
+    await prisma.auditLog.deleteMany()
+    await prisma.serviceScanDecline.deleteMany()
     await prisma.serviceSuggestionMessage.deleteMany()
     await prisma.serviceSuggestion.deleteMany()
     await prisma.contactMessage.deleteMany()
@@ -1668,9 +1672,37 @@ async function main() {
               })
             )
           )
-          return datedRevisions.at(-1)?.createdAt ?? null
+          return {
+            documentId: document.id,
+            urlKey: document.urlKey,
+            contentHash: document.contentHash,
+            changedAt: datedRevisions.at(-1)?.createdAt ?? null,
+          }
         })
-        const changedAts = (await Promise.all(changePromises)).filter((d) => d !== null)
+        const seededDocuments = await Promise.all(changePromises)
+        const changedAts = seededDocuments.map((seeded) => seeded.changedAt).filter((d) => d !== null)
+
+        // A proposal a reviewer turned down, held against the document it was
+        // drawn from. Pointed at a real one, or the check that asks whether the
+        // document still reads the same has nothing to compare and the decline
+        // reads as permanent.
+        const declineSource = seededDocuments[0]
+        if (declineSource) {
+          await prisma.serviceScanDecline.create({
+            data: {
+              serviceId: service.id,
+              fingerprint: crypto
+                .createHash('sha256')
+                .update(`${String(service.id)}:attribute:add:${String(declineSource.documentId)}`)
+                .digest('hex'),
+              sourceUrlKey: declineSource.urlKey,
+              sourceContentHash: declineSource.contentHash,
+              kind: 'attribute:add',
+              label: 'Mandatory KYC',
+              declinedById: specialUsers.admin.id,
+            },
+          })
+        }
         if (changedAts.length > 0) {
           await prisma.service.update({
             where: { id: service.id },
@@ -1895,6 +1927,31 @@ async function main() {
           })
         )
       )
+
+      // Who decided what, so the trail on a suggestion renders without waiting
+      // for someone to decide something.
+      await prisma.auditLog.create({
+        data: {
+          actorId: specialUsers.admin.id,
+          action: AuditAction.CREATED,
+          targetType: AuditTargetType.SERVICE_SUGGESTION,
+          targetId: suggestion.id,
+          summary: 'Suggestion opened',
+          createdAt: faker.date.recent({ days: 30 }),
+        },
+      })
+      if (status !== ServiceSuggestionStatus.PENDING) {
+        await prisma.auditLog.create({
+          data: {
+            actorId: specialUsers.admin.id,
+            action: AuditAction.STATUS_CHANGED,
+            targetType: AuditTargetType.SERVICE_SUGGESTION,
+            targetId: suggestion.id,
+            summary: `Status set to ${status.toLowerCase()}, from pending`,
+            createdAt: faker.date.recent({ days: 20 }),
+          },
+        })
+      }
     })
   )
 

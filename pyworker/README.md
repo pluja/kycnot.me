@@ -85,6 +85,15 @@ Tasks will run according to their configured cron schedules.
 - Updates service records with TOS information
 - Scheduled via `CRON_TOSREVIEW_TASK`
 
+### Scan Sweep Task
+
+- Deep-scans the services whose legal documents changed since a scan last read them
+- Selects from recorded document changes, so it crawls only what moved
+- Creates a suggestion only when it finds something a reviewer has to decide
+- `SCAN_SWEEP_LIMIT` caps how many services one run scans, which staggers the
+  first pass where every service still qualifies
+- Scheduled via `CRON_SCAN_SWEEP_TASK`
+
 ### User Sentiment Task
 
 - Analyzes user comments to determine overall sentiment

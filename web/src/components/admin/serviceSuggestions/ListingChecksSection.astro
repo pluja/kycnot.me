@@ -1,0 +1,63 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { isListingCheckFieldId, listingCheckFieldLabels } from '../../../constants/listingCheckFields'
+import { cn } from '../../../lib/cn'
+import QuotedClause from '../../QuotedClause.astro'
+
+type Props = {
+  checks: NonNullable<PrismaJson.ProposedEdits['listingChecks']>
+  isActionable: boolean
+}
+
+const { checks, isActionable } = Astro.props
+---
+
+{
+  checks.length > 0 && (
+    <div class="space-y-3 p-4">
+      <div class="flex items-center gap-2 font-title text-sm font-semibold text-day-100">
+        <Icon name="ri:scales-3-line" class="size-4 text-day-400" />
+        Listing disagrees with the documents
+      </div>
+      <p class="text-xs text-day-500">
+        The documents say something different from our record. A service may use a legal template naming
+        another jurisdiction, so read the clause before changing anything. Tick to update our record, leave
+        unticked to keep it and stop being asked.
+      </p>
+
+      <ul class="space-y-2">
+        {checks.map((check) => (
+          <li class="rounded-sm border border-night-600 bg-night-900 p-3">
+            <label class={cn('flex gap-3', isActionable && 'cursor-pointer')}>
+              <input
+                type="checkbox"
+                name="listingFields"
+                value={check.field}
+                disabled={!isActionable}
+                class="mt-1 size-4 shrink-0 accent-blue-500"
+              />
+              <div class="min-w-0 flex-1">
+                <div class="font-semibold text-day-100">
+                  {isListingCheckFieldId(check.field) ? listingCheckFieldLabels[check.field] : check.field}
+                </div>
+                <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                  <span class="text-day-400">Our record</span>
+                  <span class="rounded-sm bg-night-700 px-1.5 py-0.5 font-medium text-day-100">
+                    {check.current || '(not set)'}
+                  </span>
+                  <Icon name="ri:arrow-right-line" class="size-3.5 text-day-500" />
+                  <span class="text-day-400">Documents say</span>
+                  <span class="rounded-sm bg-night-700 px-1.5 py-0.5 font-medium text-yellow-200">
+                    {check.found}
+                  </span>
+                </p>
+                <QuotedClause quote={check.quote} sourceUrl={check.sourceUrl} class="text-day-500" />
+              </div>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}

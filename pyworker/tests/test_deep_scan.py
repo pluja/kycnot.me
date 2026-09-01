@@ -1,13 +1,27 @@
 """Tests for the DeepScanTask helpers and integration."""
 
+import json
 import unittest
 from typing import Any, Dict, List, cast
 from unittest.mock import MagicMock, patch
 
 from pyworker.database import save_deep_scan_proposed_edits
-from pyworker.tasks.deep_scan import DeepScanTask, _format_attribute_catalog
-from pyworker.utils.crawl import LegalCorpus, LegalPage
+from pyworker.tasks.deep_scan import (
+    DeepScanTask,
+    _has_actionable_items,
+    _format_attribute_catalog,
+)
+from pyworker.utils.legal_crawl import LegalCorpus, LegalPage, document_key
 from pyworker.utils.legal_text import LegalDocumentKind
+
+
+QUOTE = "We may demand identity verification on any flagged transaction."
+QUOTE_JURISDICTION = "organized under the laws of the British Virgin Islands"
+URL = "https://x.com/terms"
+# Every quote the sample proposals rest on has to be findable here, since an
+# ungrounded proposal is dropped before it reaches a reviewer.
+SAMPLE_CORPUS = f"===== PAGE: {URL} =====\n{QUOTE}\n{QUOTE_JURISDICTION}\n"
+CRAWLED_KEYS = {document_key(URL)}
 
 
 SAMPLE_LLM_RESULT: Dict[str, Any] = {
@@ -24,16 +38,74 @@ SAMPLE_LLM_RESULT: Dict[str, Any] = {
     "kycPolicyNotesMd": "Triggered on automated risk flags.",
     "kycLevelRationale": "Clauses describe non-mandatory KYC triggered by transaction flags.",
     "attributesToAdd": [
-        {"attributeId": 12, "rationale": "Document mentions KYC trigger."},
-        {"attributeId": 99, "rationale": "Not in catalog, must be dropped."},
-        {"attributeId": 7, "rationale": "Already assigned, must be dropped."},
+        {
+            "attributeId": 12,
+            "rationale": "Doc mentions KYC.",
+            "quote": QUOTE,
+            "sourceUrl": URL,
+        },
+        {
+            "attributeId": 99,
+            "rationale": "Not in catalog.",
+            "quote": QUOTE,
+            "sourceUrl": URL,
+        },
+        {
+            "attributeId": 7,
+            "rationale": "Already assigned.",
+            "quote": QUOTE,
+            "sourceUrl": URL,
+        },
+        {
+            "attributeId": 21,
+            "rationale": "Nothing backs this.",
+            "quote": "invented clause never published",
+            "sourceUrl": URL,
+        },
     ],
     "attributesToRemove": [
-        {"attributeId": 5, "rationale": "Not assigned, must be dropped."},
-        {"attributeId": 7, "rationale": "Currently assigned and contradicted."},
+        {
+            "attributeId": 5,
+            "rationale": "Not assigned.",
+            "quote": QUOTE,
+            "sourceUrl": URL,
+        },
+        {
+            "attributeId": 7,
+            "rationale": "Contradicted.",
+            "quote": QUOTE,
+            "sourceUrl": URL,
+        },
+    ],
+    "listingChecks": [
+        {
+            "field": "registrationCountryCode",
+            "current": "SC",
+            "found": "VG",
+            "quote": QUOTE_JURISDICTION,
+            "sourceUrl": URL,
+        },
+        {
+            "field": "registeredCompanyName",
+            "current": "Acme Ltd",
+            "found": "Acme Ltd",
+            "quote": QUOTE_JURISDICTION,
+            "sourceUrl": URL,
+        },
+        {
+            "field": "notAField",
+            "current": "x",
+            "found": "y",
+            "quote": QUOTE_JURISDICTION,
+            "sourceUrl": URL,
+        },
     ],
     "warnings": [
-        {"title": "Funds may be frozen", "bodyMd": "Per ToS clause X.", "severity": "alert"}
+        {
+            "title": "Funds may be frozen",
+            "bodyMd": "Per ToS clause X.",
+            "severity": "alert",
+        }
     ],
 }
 
@@ -132,6 +204,15 @@ class TestBuildProposedEdits(unittest.TestCase):
             corpus_hash="0" * 64,
             current_attribute_ids=current_ids,
             catalog_ids=catalog_ids,
+            corpus=SAMPLE_CORPUS,
+            service_id=1,
+            listing_record={
+                "registrationCountryCode": "SC",
+                "registeredCompanyName": "Acme Ltd",
+            },
+            declined=set(),
+            crawled_keys=CRAWLED_KEYS,
+            current_kyc_level=2,
         )
 
         add_ids = [a["attributeId"] for a in proposed["attributes"]["add"]]
@@ -149,11 +230,22 @@ class TestBuildProposedEdits(unittest.TestCase):
             corpus_hash="abc",
             current_attribute_ids=[],
             catalog_ids={12},
+            corpus=SAMPLE_CORPUS,
+            service_id=1,
+            listing_record={
+                "registrationCountryCode": "SC",
+                "registeredCompanyName": "Acme Ltd",
+            },
+            declined=set(),
+            crawled_keys=CRAWLED_KEYS,
+            current_kyc_level=2,
         )
         self.assertEqual(proposed["contentHash"], "abc")
         self.assertEqual(proposed["tosReview"]["kycLevel"], 3)
         self.assertEqual(proposed["kycPolicy"]["inferredLevel"], 3)
-        self.assertEqual(proposed["kycPolicy"]["notesMd"], "Triggered on automated risk flags.")
+        self.assertEqual(
+            proposed["kycPolicy"]["notesMd"], "Triggered on automated risk flags."
+        )
         self.assertEqual(len(proposed["warnings"]), 1)
 
 
@@ -266,5 +358,275 @@ class TestDeepScanTaskRun(unittest.TestCase):
         self.assertIn("KYC level: 1 -> 3", edits_call["summary_notes"])
 
 
+class TestDeepScanRecordsLegalDocuments(unittest.TestCase):
+    """The admin panel is populated by the scan, not only by the nightly review."""
+
+    def setUp(self):
+        self.task = DeepScanTask()
+        self.service = {
+            "id": 42,
+            "name": "ChangeHero",
+            "kycLevel": 1,
+            "tosUrls": ["https://example.com/tos"],
+        }
+
+    @staticmethod
+    def _corpus(combined: str) -> LegalCorpus:
+        page = LegalPage(
+            url_key="example.com/tos",
+            url="https://example.com/tos",
+            kind=LegalDocumentKind.TERMS,
+            markdown=combined,
+            normalized_text=combined,
+            content_hash="hash",
+        )
+        return LegalCorpus(pages=[page], combined=combined, corpus_hash="hash")
+
+    @patch("pyworker.tasks.deep_scan.record_document_changes")
+    @patch("pyworker.tasks.deep_scan.fetch_service_for_deep_scan")
+    @patch("pyworker.tasks.deep_scan.fetch_legal_corpus")
+    def test_documents_are_recorded_even_when_the_review_bails(
+        self, mock_corpus: MagicMock, mock_service: MagicMock, mock_record: MagicMock
+    ):
+        mock_service.return_value = self.service
+        mock_corpus.return_value = self._corpus("")
+
+        self.task.run(self.service["id"])
+
+        mock_record.assert_called_once()
+        self.assertEqual(mock_record.call_args.args[0], 42)
+
+
+class TestScanProposalGates(unittest.TestCase):
+    """What reaches a reviewer, and what must never reach them twice."""
+
+    LISTING = {"registrationCountryCode": "SC", "registeredCompanyName": "Acme Ltd"}
+
+    def _build(self, declined=frozenset(), corpus=None):
+        return DeepScanTask()._build_proposed_edits(
+            result=cast(Any, SAMPLE_LLM_RESULT),
+            corpus_hash="0" * 64,
+            current_attribute_ids=[7],
+            catalog_ids={7, 12, 21},
+            corpus=SAMPLE_CORPUS if corpus is None else corpus,
+            service_id=1,
+            listing_record=self.LISTING,
+            declined=set(declined),
+            crawled_keys=CRAWLED_KEYS,
+            current_kyc_level=2,
+        )
+
+    def test_a_proposal_without_a_real_quote_is_dropped(self):
+        # Attribute 21 quotes a clause that is not in the corpus.
+        add_ids = [a["attributeId"] for a in self._build()["attributes"]["add"]]
+
+        self.assertNotIn(21, add_ids)
+        self.assertIn(12, add_ids)
+
+    def test_only_disagreements_on_known_fields_are_reported(self):
+        checks = self._build()["listingChecks"]
+
+        # SC vs VG disagrees and is a known field; the matching company name and
+        # the invented field are both dropped.
+        self.assertEqual([c["field"] for c in checks], ["registrationCountryCode"])
+        self.assertEqual(checks[0]["found"], "VG")
+
+    def test_a_declined_proposal_is_not_raised_again(self):
+        first = self._build()
+        declined = {
+            item["fingerprint"]
+            for item in first["attributes"]["add"] + first["listingChecks"]
+        }
+
+        second = self._build(declined=declined)
+
+        self.assertEqual(second["attributes"]["add"], [])
+        self.assertEqual(second["listingChecks"], [])
+
+    def test_a_decline_survives_the_model_requoting_the_same_clause(self):
+        # Observed against a real service: two runs quoted one clause with
+        # different boundaries, so identity must not move with the boundaries.
+        declined = {item["fingerprint"] for item in self._build()["attributes"]["add"]}
+        requoted = json.loads(json.dumps(SAMPLE_LLM_RESULT))
+        wider = f"In limited circumstances, {QUOTE} Further conditions apply."
+        for item in requoted["attributesToAdd"]:
+            if item["attributeId"] == 12:
+                item["quote"] = wider
+                item["rationale"] = "Same clause, different words around it."
+
+        with patch.dict(SAMPLE_LLM_RESULT, requoted, clear=False):
+            add = self._build(declined=declined, corpus=SAMPLE_CORPUS + wider)[
+                "attributes"
+            ]["add"]
+
+        self.assertEqual(add, [])
+
+    def test_a_scan_with_nothing_to_decide_is_not_actionable(self):
+        empty = {
+            "attributes": {"add": [], "remove": []},
+            "listingChecks": [],
+        }
+
+        self.assertFalse(_has_actionable_items(empty, kyc_level_changed=False))
+        self.assertTrue(_has_actionable_items(self._build(), kyc_level_changed=False))
+
+    def test_a_changed_kyc_level_is_worth_a_reviewer_on_its_own(self):
+        # The sweep only runs because the documents moved, so a service that
+        # rewrote its KYC posture and nothing else must not be discarded.
+        empty = {
+            "attributes": {"add": [], "remove": []},
+            "listingChecks": [],
+        }
+
+        self.assertTrue(_has_actionable_items(empty, kyc_level_changed=True))
+
+    def test_a_listing_check_survives_the_model_naming_the_value_differently(self):
+        # "VG" and "British Virgin Islands" are one finding, not two.
+        first = self._build()["listingChecks"][0]["fingerprint"]
+        renamed = json.loads(json.dumps(SAMPLE_LLM_RESULT))
+        for check in renamed["listingChecks"]:
+            if check["field"] == "registrationCountryCode":
+                check["found"] = "British Virgin Islands"
+
+        with patch.dict(SAMPLE_LLM_RESULT, renamed, clear=False):
+            second = self._build()["listingChecks"][0]["fingerprint"]
+
+        self.assertEqual(first, second)
+
+    def test_a_record_written_differently_is_not_a_disagreement(self):
+        spelled_out = json.loads(json.dumps(SAMPLE_LLM_RESULT))
+        for check in spelled_out["listingChecks"]:
+            if check["field"] == "registrationCountryCode":
+                check["found"] = "Seychelles"
+
+        with patch.dict(SAMPLE_LLM_RESULT, spelled_out, clear=False):
+            checks = self._build()["listingChecks"]
+
+        self.assertEqual(checks, [])
+
+
 if __name__ == "__main__":
     unittest.main()
+
+
+class DeclineAnchorTests(unittest.TestCase):
+    """A decline is only remembered against a page that was really crawled."""
+
+    def _proposed(self, source_url: str, crawled: set) -> dict:
+        result = json.loads(json.dumps(SAMPLE_LLM_RESULT))
+        for item in result["attributesToAdd"]:
+            item["sourceUrl"] = source_url
+        return DeepScanTask()._build_proposed_edits(
+            result=cast(Any, result),
+            corpus_hash="0" * 64,
+            current_attribute_ids=[],
+            catalog_ids={12, 34, 56, 78},
+            corpus=SAMPLE_CORPUS,
+            service_id=1,
+            listing_record={
+                "registrationCountryCode": "SC",
+                "registeredCompanyName": "Acme Ltd",
+            },
+            declined=set(),
+            crawled_keys=crawled,
+            current_kyc_level=2,
+        )
+
+    def test_a_crawled_source_anchors_the_decline(self):
+        proposed = self._proposed(URL, CRAWLED_KEYS)
+
+        keys = {item["sourceUrlKey"] for item in proposed["attributes"]["add"]}
+        self.assertEqual(keys, CRAWLED_KEYS)
+
+    def test_a_source_no_page_carries_anchors_nothing(self):
+        # The prompt asks for the marker line, so the model hands back shapes
+        # like this. Stored as-is it matches no document, and a decline against
+        # a document that cannot be found never lifts: the proposal would be
+        # gone for good the first time a reviewer said no.
+        proposed = self._proposed(f"===== PAGE: {URL} =====", CRAWLED_KEYS)
+
+        keys = {item["sourceUrlKey"] for item in proposed["attributes"]["add"]}
+        self.assertEqual(keys, {""})
+
+
+@patch("pyworker.tasks.deep_scan.mark_service_scanned")
+@patch("pyworker.tasks.deep_scan.mark_service_scan_attempted")
+class ScanCompletionTests(unittest.TestCase):
+    """What counts as having scanned a service, and so as not needing another."""
+
+    def setUp(self):
+        self.task = DeepScanTask(only_when_actionable=True)
+        self.service = {
+            "id": 7,
+            "name": "S",
+            "kycLevel": 2,
+            "tosUrls": ["https://x.com/terms"],
+        }
+
+    @patch("pyworker.tasks.deep_scan.record_document_changes")
+    @patch("pyworker.tasks.deep_scan.tracked_document_urls", return_value=[])
+    @patch("pyworker.tasks.deep_scan.fetch_legal_corpus")
+    @patch("pyworker.tasks.deep_scan.fetch_service_for_deep_scan")
+    def test_a_crawl_that_read_nothing_is_not_a_scan(
+        self, fetch, corpus, _tracked, _record, attempted, scanned
+    ):
+        # Blocked, timed out, or served an empty page. Calling that scanned
+        # leaves the service alone until its documents happen to change, which
+        # is exactly what a scan was supposed to find out.
+        fetch.return_value = self.service
+        corpus.return_value = LegalCorpus(pages=[], combined="", corpus_hash="")
+
+        self.assertIsNone(self.task.run(7))
+
+        attempted.assert_called_once_with(7)
+        scanned.assert_not_called()
+
+    @patch("pyworker.tasks.deep_scan.record_document_changes")
+    @patch("pyworker.tasks.deep_scan.tracked_document_urls", return_value=[])
+    @patch("pyworker.tasks.deep_scan.fetch_legal_corpus")
+    @patch("pyworker.tasks.deep_scan.fetch_service_for_deep_scan")
+    def test_a_scan_that_throws_is_not_a_scan_either(
+        self, fetch, corpus, _tracked, _record, attempted, scanned
+    ):
+        fetch.return_value = self.service
+        corpus.side_effect = RuntimeError("crawler down")
+
+        with self.assertRaises(RuntimeError):
+            self.task.run(7)
+
+        attempted.assert_called_once_with(7)
+        scanned.assert_not_called()
+
+    @patch("pyworker.tasks.deep_scan.fetch_service_for_deep_scan")
+    def test_finding_nothing_to_propose_is_a_scan(self, fetch, attempted, scanned):
+        # The ordinary nightly outcome. Not recording it would rescan every
+        # quiet service every night for as long as it stayed quiet.
+        fetch.return_value = self.service
+        with patch.object(self.task, "_run", return_value=(None, True)):
+            self.assertIsNone(self.task.run(7))
+
+        attempted.assert_called_once_with(7)
+        scanned.assert_called_once_with(7)
+
+
+class StorableListingValueTests(unittest.TestCase):
+    """A proposal a reviewer cannot apply is not worth showing them."""
+
+    def setUp(self):
+        from pyworker.utils.listing_values import storable_value
+
+        self.storable = storable_value
+
+    def test_a_country_written_out_becomes_the_code_the_column_holds(self):
+        self.assertEqual(
+            self.storable("registrationCountryCode", "British Virgin Islands"), "VG"
+        )
+        self.assertEqual(self.storable("registrationCountryCode", "seychelles"), "SC")
+
+    def test_a_country_nobody_recognises_is_not_storable(self):
+        self.assertIsNone(self.storable("registrationCountryCode", "Atlantis"))
+
+    def test_a_company_name_is_kept_as_written(self):
+        self.assertEqual(
+            self.storable("registeredCompanyName", " Acme Ltd "), "Acme Ltd"
+        )
