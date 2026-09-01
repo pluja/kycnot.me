@@ -26,3 +26,6 @@ sync-all.sh
 !README.md
 !pyworker/pyworker/prompts/*.md
 !web/src/content/blog/**/*.md
+
+# Data exports and archives, which land here from a download and are never ours
+*.zip
