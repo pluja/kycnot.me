@@ -7,7 +7,6 @@ from .deep_scan import DeepScanTask
 from .force_triggers import ForceTriggersTask
 from .inactive_users import InactiveUsersTask
 from .service_score_recalc import ServiceScoreRecalculationTask
-from .tos_review import TosReviewTask
 from .user_sentiment import UserSentimentTask
 
 __all__ = [
@@ -18,6 +17,5 @@ __all__ = [
     "ForceTriggersTask",
     "InactiveUsersTask",
     "ServiceScoreRecalculationTask",
-    "TosReviewTask",
     "UserSentimentTask",
 ]

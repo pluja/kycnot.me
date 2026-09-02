@@ -14,7 +14,6 @@ from pyworker.database import (
     CommentModerationType,
     CommentSentimentSummaryType,
     DeepScanResultType,
-    TosReviewType,
 )
 from pyworker.utils import schemas
 
@@ -49,9 +48,6 @@ def _today() -> str:
 _LEGAL_REVIEW_FIELDS = (_PROMPTS_DIR / "_legal_review_fields.md").read_text()
 
 PROMPT_CHECK_TOS_REVIEW = _load_prompt("tos_check.md", schema=schemas.TOS_CHECK.ts_type)
-_PROMPT_TOS_REVIEW = _load_prompt(
-    "tos_review.md", schema=schemas.TOS_REVIEW.ts_type, fields=_LEGAL_REVIEW_FIELDS
-)
 _PROMPT_LEGAL_CHANGE_SUMMARY = _load_prompt(
     "legal_change_summary.md", schema=schemas.LEGAL_CHANGE_SUMMARY.ts_type
 )
@@ -155,26 +151,6 @@ def prompt_check_tos_review(content: str) -> TosReviewCheck:
 
     schemas.TOS_CHECK.validate(result_dict)
     return cast(TosReviewCheck, result_dict)
-
-
-def prompt_tos_review(content: str, service_name: str) -> TosReviewType:
-    scope = (
-        f"You are reviewing the service named exactly '{service_name}'. "
-        "The corpus may include clauses that apply to sibling products from the same operator "
-        "(e.g. shared legal terms covering multiple products). Include only clauses that apply "
-        f"to '{service_name}' or to the operator/account level that affects it. Exclude clauses "
-        "explicitly scoped to a different product, unless the same clause also applies to "
-        f"'{service_name}'.\n\n"
-    )
-    messages: List[ChatCompletionMessageParam] = [
-        {"role": "system", "content": _today() + scope + _PROMPT_TOS_REVIEW},
-        {"role": "user", "content": content},
-    ]
-
-    result_dict = query_openai_json(messages)
-
-    schemas.TOS_REVIEW.validate(result_dict)
-    return cast(TosReviewType, result_dict)
 
 
 def prompt_legal_change_summary(

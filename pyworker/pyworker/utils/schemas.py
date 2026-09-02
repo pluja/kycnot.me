@@ -8,7 +8,7 @@ class PromptSchema:
     validate: Callable[[dict[str, Any]], None]
 
 
-# Mirrors the topic union in TOS_REVIEW.ts_type and the TosReview type in the web app.
+# Mirrors the topic union in DEEP_SCAN.ts_type and the TosReview type in the web app.
 HIGHLIGHT_TOPICS = frozenset(
     {
         "custody",
@@ -51,30 +51,6 @@ def _validate_tos_check(data: dict[str, Any]) -> None:
         raise ValueError("Missing required field: isComplete")
     if not isinstance(data["isComplete"], bool):
         raise ValueError(f"isComplete must be a bool, got {type(data['isComplete'])}")
-
-
-def _validate_tos_review(data: dict[str, Any]) -> None:
-    required = {"kycLevel", "summary", "complexity", "highlights"}
-    missing = required - data.keys()
-    if missing:
-        raise ValueError(f"Missing required fields: {missing}")
-
-    kyc = data["kycLevel"]
-    if not isinstance(kyc, int) or kyc not in range(5):
-        raise ValueError(f"kycLevel must be an int in 0-4, got {kyc!r}")
-
-    if not isinstance(data["summary"], str):
-        raise ValueError("summary must be a string")
-
-    if data["complexity"] not in ("low", "medium", "high"):
-        raise ValueError(
-            f"complexity must be low|medium|high, got {data['complexity']!r}"
-        )
-
-    if not isinstance(data["highlights"], list):
-        raise ValueError("highlights must be a list")
-
-    _validate_highlights(data["highlights"])
 
 
 def _validate_deep_scan(data: dict[str, Any]) -> None:
@@ -236,30 +212,6 @@ LEGAL_CHANGE_SUMMARY = PromptSchema(
     validate=_validate_legal_change_summary,
 )
 
-TOS_REVIEW = PromptSchema(
-    ts_type="""type TosReview = {
-    kycLevel: 0 | 1 | 2 | 3 | 4
-    /** Less than 200 characters */
-    summary: MarkdownString
-    complexity: 'high' | 'low' | 'medium'
-    highlights: {
-        /** Very short title, max 2-3 words */
-        title: string
-        /** Less than 200 characters. Highlight the most important information with markdown formatting. */
-        content: MarkdownString
-        /** In regards to KYC, Privacy, Anonymity, Self-Sovereignity, etc. */
-        /** anything that could harm the user's privacy, identity, self-sovereignity or anonymity is negative, anything that otherwise helps is positive. else it is neutral. */
-        rating: 'negative' | 'neutral' | 'positive'
-        /** Which aspect of the service this concerns. */
-        topic: 'custody' | 'dataSharing' | 'disputes' | 'fundBlocking' | 'jurisdiction' | 'logging' | 'other' | 'refunds' | 'verification'
-        /** The clause this is based on, quoted from the corpus verbatim. Max 300 characters. */
-        evidence: string
-        /** The `===== PAGE: <url>` the quoted clause came from. */
-        sourceUrl: string
-    }[] // max 10 highlights, but typically 3-6. Quality over quantity, do not pad. May be empty.
-}""",
-    validate=_validate_tos_review,
-)
 
 DEEP_SCAN = PromptSchema(
     ts_type="""type DeepScan = {

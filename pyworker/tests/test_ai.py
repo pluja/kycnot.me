@@ -62,14 +62,13 @@ def test_load_prompt_missing_placeholder_raises(tmp_path):
 
 def test_load_prompt_schema_substituted():
     """Schema placeholder should not remain in loaded prompts."""
-    from pyworker.utils.ai import _PROMPT_TOS_REVIEW, _PROMPT_COMMENT_MODERATION
+    from pyworker.utils.ai import _PROMPT_COMMENT_MODERATION
     from pyworker.utils.ai import (
         PROMPT_COMMENT_SENTIMENT_SUMMARY,
         PROMPT_CHECK_TOS_REVIEW,
     )
 
     for prompt in (
-        _PROMPT_TOS_REVIEW,
         _PROMPT_COMMENT_MODERATION,
         PROMPT_COMMENT_SENTIMENT_SUMMARY,
         PROMPT_CHECK_TOS_REVIEW,

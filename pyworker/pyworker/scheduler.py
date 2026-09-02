@@ -17,7 +17,6 @@ from .tasks import (
     ForceTriggersTask,
     InactiveUsersTask,
     ServiceScoreRecalculationTask,
-    TosReviewTask,
     UserSentimentTask,
 )
 import logging
@@ -79,9 +78,7 @@ class TaskScheduler:
 
         if instantiate:
             # Initialize the appropriate task class based on the task name
-            if task_name.lower() == "tosreview":
-                task_instance = TosReviewTask()
-            elif task_name.lower() == "user_sentiment":
+            if task_name.lower() == "user_sentiment":
                 task_instance = UserSentimentTask()
             elif task_name.lower() == "comment_moderation":
                 task_instance = CommentModerationTask()

@@ -27,10 +27,9 @@ from .tasks import (
     ForceTriggersTask,
     InactiveUsersTask,
     ServiceScoreRecalculationTask,
-    TosReviewTask,
     UserSentimentTask,
 )
-from pyworker.tasks.tos_review import REVIEWABLE_STATUSES
+from pyworker.tasks.deep_scan import REVIEWABLE_STATUSES
 from pyworker.utils.app_logging import configure_logging
 
 configure_logging()
@@ -92,19 +91,6 @@ def parse_args(args: List[str]) -> argparse.Namespace:
 
     # Add subparsers for different tasks
     subparsers = parser.add_subparsers(dest="task", help="Task to run")
-
-    # TOS retrieval task
-    tos_parser = subparsers.add_parser(
-        "tos", help="Retrieve Terms of Service (TOS) text"
-    )
-    tos_parser.add_argument(
-        "--service-id", type=int, help="Specific service ID to process (optional)"
-    )
-    tos_parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Review again even when the legal text has not changed",
-    )
 
     # User sentiment task
     sentiment_parser = subparsers.add_parser(
@@ -183,70 +169,18 @@ def parse_args(args: List[str]) -> argparse.Namespace:
         type=int,
         help="Specific service ID to scan. If omitted, drains the ServiceScanJob queue.",
     )
+    deep_scan_parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Scan every reviewable service instead of draining the queue",
+    )
+    deep_scan_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="With --all, scan a service even when its legal documents have not changed",
+    )
 
     return parser.parse_args(args)
-
-
-def run_tos_task(
-    service_id: Optional[int] = None, close_pool: bool = True, force: bool = False
-) -> int:
-    """
-    Run the TOS retrieval task.
-
-    Args:
-        service_id: Optional specific service ID to process.
-
-    Returns:
-        Exit code.
-    """
-    logger.info("Starting TOS retrieval task")
-
-    try:
-        # Narrowed here as well as in the task, so a sweep over every service
-        # does not walk the ones it will refuse. The task keeps its own check,
-        # which is what holds when a single service is named.
-        services = [
-            service
-            for service in fetch_all_services()
-            if service.get("verificationStatus") in REVIEWABLE_STATUSES
-        ]
-        if not services:
-            logger.error("No services found")
-            return 1
-
-        # Filter by service ID if specified
-        if service_id:
-            services = [s for s in services if s["id"] == service_id]
-            if not services:
-                logger.error(f"Service with ID {service_id} not found")
-                return 1
-
-        # Initialize task and use as context manager
-        with TosReviewTask(force=force) as task:  # type: ignore
-            # Process services using the same database connection
-            for service in services:
-                if not service.get("tosUrls"):
-                    logger.info(
-                        f"Skipping service {service['name']} (ID: {service['id']}) - no TOS URLs"
-                    )
-                    continue
-
-                result = task.run(service)  # type: ignore
-                if result:
-                    logger.info(
-                        f"Successfully retrieved TOS for service {service['name']}"
-                    )
-                else:
-                    logger.warning(
-                        f"Failed to retrieve TOS for service {service['name']}"
-                    )
-
-        logger.info("TOS retrieval task completed")
-        return 0
-    finally:
-        if close_pool:
-            # Ensure connection pool is closed even if an error occurs
-            close_db_pool()
 
 
 def run_sentiment_task(
@@ -513,19 +447,69 @@ def run_scan_sweep_task(limit: int = 5, close_pool: bool = True) -> int:
             close_db_pool()
 
 
+def _scan_every_service(force: bool) -> int:
+    """Scan the whole catalogue, one service at a time.
+
+    Without force this takes the same services the nightly sweep would, so
+    re-running it costs nothing for a service whose documents have not moved.
+    With force every reviewable service is read again, which is one model call
+    each and the way to rebuild reviews from scratch.
+
+    Suggestions are only raised where there is something to decide, as in the
+    sweep: a bulk pass that queued one per service would hand a reviewer a list
+    nobody works through.
+    """
+    if force:
+        services = [
+            service
+            for service in fetch_all_services()
+            if service.get("verificationStatus") in REVIEWABLE_STATUSES
+            and service.get("tosUrls")
+        ]
+    else:
+        services = fetch_services_needing_scan(limit=10_000)
+
+    if not services:
+        logger.info("No service needs a scan")
+        return 0
+
+    logger.info(f"Scanning {len(services)} services")
+    created = 0
+    with DeepScanTask(only_when_actionable=True) as task:  # type: ignore
+        for service in services:
+            service_id = int(service["id"])
+            try:
+                if task.run(service_id):  # type: ignore
+                    created += 1
+            except Exception as e:
+                logger.error(f"Deep scan failed for service {service_id}: {e}")
+
+    logger.info(f"Scanned {len(services)} services, {created} suggestions created")
+    return 0
+
+
 def run_deep_scan_task(
-    service_id: Optional[int] = None, close_pool: bool = True
+    service_id: Optional[int] = None,
+    scan_all: bool = False,
+    force: bool = False,
+    close_pool: bool = True,
 ) -> int:
     """Run the deep scan task.
 
     With service_id: scan that single service once, ignoring the queue.
-    Without: drain the ServiceScanJob queue, claiming one job at a time. The
-    worker-mode scheduler ticks this on a short cron so admin clicks turn into
-    scans within a minute or so.
+    With scan_all: walk the catalogue rather than the queue, taking the services
+    whose legal documents have moved since a scan last read them, or every
+    reviewable service when force is set.
+    Without either: drain the ServiceScanJob queue, claiming one job at a time.
+    The worker-mode scheduler ticks this on a short cron so admin clicks turn
+    into scans within a minute or so.
     """
     logger.info("Starting deep scan task")
 
     try:
+        if scan_all:
+            return _scan_every_service(force=force)
+
         if service_id is not None:
             with DeepScanTask() as task:  # type: ignore
                 suggestion_id = task.run(service_id)  # type: ignore
@@ -646,7 +630,6 @@ def run_worker_mode() -> int:
         logger.info("Disabled cron task schedules: %s", ", ".join(disabled_task_names))
 
     task_callables: dict[str, Any] = {
-        "tosreview": partial(run_tos_task, close_pool=False),
         "user_sentiment": partial(run_sentiment_task, close_pool=False),
         "comment_moderation": partial(run_moderation_task, close_pool=False),
         "force_triggers": partial(run_force_triggers_task, close_pool=False),
@@ -717,8 +700,6 @@ def main() -> int:
             return run_worker_mode()
 
         # Otherwise, run the specified task once
-        if args.task == "tos":
-            return run_tos_task(args.service_id, force=args.force)
         elif args.task == "sentiment":
             return run_sentiment_task(args.service_id)
         elif args.task == "moderation":
@@ -738,7 +719,9 @@ def main() -> int:
         elif args.task == "scan-sweep":
             return run_scan_sweep_task(args.limit)
         elif args.task == "deep-scan":
-            return run_deep_scan_task(args.service_id)
+            return run_deep_scan_task(
+                args.service_id, scan_all=args.all, force=args.force
+            )
         elif args.task:
             logger.error(f"Unknown task: {args.task}")
             return 1

@@ -67,14 +67,6 @@ class KycOrSourceOfFundsType(TypedDict):
     rating: RatingType
 
 
-class TosReviewType(TypedDict, total=False):
-    contentHash: str
-    kycLevel: int
-    summary: str
-    complexity: TypeLiteral["low", "medium", "high"]
-    highlights: List[Dict[str, Any]]
-
-
 class DeepScanAttributeProposalType(TypedDict):
     attributeId: int
     rationale: str
@@ -286,65 +278,6 @@ def ensure_bot_user() -> int:
 
 
 # --- Edit Suggestions ---
-
-
-def create_kyc_edit_suggestion(
-    service_id: int,
-    old_level: Optional[int],
-    new_level: int,
-    review_summary: Optional[str] = None,
-) -> Optional[int]:
-    """
-    Create a ServiceSuggestion proposing a KYC level change, authored by the bot user.
-
-    Returns:
-        The suggestion ID, or None on failure.
-    """
-    bot_user_id = ensure_bot_user()
-
-    lines = [
-        "AI-Generated Suggestion: Requires human review",
-        "",
-        f"Proposed KYC level change: {old_level} -> {new_level}",
-    ]
-
-    if review_summary:
-        lines += [
-            "",
-            "AI reasoning (from TOS review):",
-            review_summary,
-        ]
-
-    notes = "\n".join(lines)
-
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor(row_factory=dict_row) as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO "ServiceSuggestion" (type, status, notes, "userId", "serviceId", "createdAt", "updatedAt")
-                    VALUES ('EDIT_SERVICE', 'PENDING', %s, %s, %s, NOW(), NOW())
-                    RETURNING id
-                    """,
-                    (notes, bot_user_id, service_id),
-                )
-                conn.commit()
-                row = cursor.fetchone()
-                suggestion_id = row["id"] if row else None
-                if suggestion_id:
-                    logger.info(
-                        f"Created KYC edit suggestion #{suggestion_id} for service {service_id} "
-                        f"(level {old_level} -> {new_level})"
-                    )
-                return suggestion_id
-    except Exception as e:
-        logger.error(
-            f"Error creating KYC edit suggestion for service {service_id}: {e}"
-        )
-        return None
-
-
-# --- Database Functions ---
 
 
 def fetch_all_services() -> List[Dict[str, Any]]:
@@ -830,37 +763,6 @@ def remove_service_attribute_by_slug(service_id: int, attribute_slug: str) -> bo
         logger.error(f"Attribute with slug '{attribute_slug}' not found.")
         return False
     return remove_service_attribute(service_id, attribute_id)
-
-
-def save_tos_review(service_id: int, review: Optional[TosReviewType]):
-    """Persist a TOS review and/or update the timestamp for a service.
-
-    If *review* is ``None`` the existing review (if any) is preserved while
-    only the ``tosReviewAt`` column is updated. This ensures we still track
-    when the review task last ran even if the review generation failed or
-    produced no changes.
-    """
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor(row_factory=dict_row) as cursor:
-                if review is None:
-                    cursor.execute(
-                        'UPDATE "Service" SET "tosReviewAt" = NOW() WHERE id = %s AND "tosReview" IS NULL',
-                        (service_id,),
-                    )
-                else:
-                    review_json = json.dumps(review)
-                    cursor.execute(
-                        'UPDATE "Service" SET "tosReview" = %s, "tosReviewAt" = NOW() WHERE id = %s',
-                        (review_json, service_id),
-                    )
-
-                conn.commit()
-                logger.info(
-                    f"Successfully saved TOS review (updated={review is not None}) for service {service_id}"
-                )
-    except Exception as e:
-        logger.error(f"Error saving TOS review for service {service_id}: {e}")
 
 
 class LegalDocumentRow(TypedDict):

@@ -48,8 +48,8 @@ Required environment variables:
 Run tasks directly:
 
 ```bash
-# Run TOS review task
-uv run -m pyworker tos [--service-id ID]
+# Deep-scan services: terms, KYC level, attributes and listing checks
+uv run -m pyworker deep-scan [--service-id ID] [--all] [--force]
 
 # Run user sentiment analysis task
 uv run -m pyworker sentiment [--service-id ID]
@@ -155,7 +155,6 @@ pyworker/
 │   │   ├── force_triggers.py
 │   │   ├── inactive_users.py
 │   │   ├── service_score_recalc.py
-│   │   ├── tos_review.py
 │   │   └── user_sentiment.py
 │   └── utils/
 │       ├── __init__.py

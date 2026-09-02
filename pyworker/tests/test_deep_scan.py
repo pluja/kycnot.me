@@ -467,8 +467,14 @@ class TestScanProposalGates(unittest.TestCase):
             "listingChecks": [],
         }
 
-        self.assertFalse(_has_actionable_items(empty, kyc_level_changed=False))
-        self.assertTrue(_has_actionable_items(self._build(), kyc_level_changed=False))
+        self.assertFalse(
+            _has_actionable_items(empty, kyc_level_changed=False, review_changed=False)
+        )
+        self.assertTrue(
+            _has_actionable_items(
+                self._build(), kyc_level_changed=False, review_changed=False
+            )
+        )
 
     def test_a_changed_kyc_level_is_worth_a_reviewer_on_its_own(self):
         # The sweep only runs because the documents moved, so a service that
@@ -478,7 +484,9 @@ class TestScanProposalGates(unittest.TestCase):
             "listingChecks": [],
         }
 
-        self.assertTrue(_has_actionable_items(empty, kyc_level_changed=True))
+        self.assertTrue(
+            _has_actionable_items(empty, kyc_level_changed=True, review_changed=False)
+        )
 
     def test_a_listing_check_survives_the_model_naming_the_value_differently(self):
         # "VG" and "British Virgin Islands" are one finding, not two.
@@ -630,3 +638,123 @@ class StorableListingValueTests(unittest.TestCase):
         self.assertEqual(
             self.storable("registeredCompanyName", " Acme Ltd "), "Acme Ltd"
         )
+
+
+class ReviewChangeIsActionableTests(unittest.TestCase):
+    """A review that now reads differently is a decision for a reviewer."""
+
+    def setUp(self):
+        from pyworker.tasks.deep_scan import _has_actionable_items, _review_differs
+
+        self.differs = _review_differs
+        self.actionable = _has_actionable_items
+        self.published = {
+            "summary": "Terms allow account closure on notice.",
+            "complexity": "medium",
+            "highlights": [
+                {"title": "Closure", "content": "On notice.", "rating": "neutral"}
+            ],
+        }
+        self.nothing_else = {
+            "attributes": {"add": [], "remove": []},
+            "listingChecks": [],
+        }
+
+    def test_the_same_review_is_not_a_decision(self):
+        self.assertFalse(self.differs(dict(self.published), self.published))
+
+    def test_a_reworded_summary_is(self):
+        proposed = {**self.published, "summary": "Terms allow closure without notice."}
+
+        self.assertTrue(self.differs(proposed, self.published))
+
+    def test_a_new_highlight_is(self):
+        proposed = {
+            **self.published,
+            "highlights": self.published["highlights"]
+            + [
+                {
+                    "title": "Fees",
+                    "content": "Withdrawal fees apply.",
+                    "rating": "negative",
+                }
+            ],
+        }
+
+        self.assertTrue(self.differs(proposed, self.published))
+
+    def test_a_service_with_no_review_yet_is(self):
+        self.assertTrue(self.differs(dict(self.published), None))
+
+    def test_a_changed_review_alone_queues_a_suggestion(self):
+        # Nothing else moved: no attributes, no listing disagreement, same KYC
+        # level. Before, that meant the sweep proposed nothing and the summary on
+        # the service page stayed as it was, describing terms that had changed.
+        self.assertTrue(self.actionable(self.nothing_else, False, True))
+
+    def test_an_unchanged_review_alone_does_not(self):
+        self.assertFalse(self.actionable(self.nothing_else, False, False))
+
+
+class SupportedHighlightsTests(unittest.TestCase):
+    """What a review is allowed to say about a service without a reviewer."""
+
+    QUOTE = "we may require identity verification at any time and for any reason"
+
+    def setUp(self):
+        from pyworker.tasks.deep_scan import DeepScanTask
+        from pyworker.utils.legal_crawl import LegalCorpus, LegalPage
+
+        self.task = DeepScanTask()
+        self.terms = LegalPage(
+            url_key="x.com/terms",
+            url="https://x.com/terms",
+            kind="TERMS",
+            markdown=f"Section 4. {self.QUOTE}. Section 5.",
+            normalized_text="",
+            content_hash="a",
+        )
+        self.privacy = LegalPage(
+            url_key="x.com/privacy",
+            url="https://x.com/privacy",
+            kind="PRIVACY",
+            markdown="We keep logs for twelve months and share them on request.",
+            normalized_text="",
+            content_hash="b",
+        )
+        self.corpus = LegalCorpus(
+            pages=[self.terms, self.privacy], combined="", corpus_hash=""
+        )
+
+    def _review(self, **highlight):
+        review = {
+            "highlights": [
+                {"title": "T", "content": "C", "rating": "negative", **highlight}
+            ]
+        }
+        self.task.keep_supported_highlights(review, self.corpus)
+        return review["highlights"]
+
+    def test_a_quoted_claim_is_kept(self):
+        kept = self._review(evidence=self.QUOTE)
+
+        self.assertEqual(len(kept), 1)
+
+    def test_the_address_comes_from_the_page_holding_the_quote(self):
+        # Not from the model, which can attribute a clause to the wrong document
+        # and send a reader to a page that never said it.
+        kept = self._review(evidence=self.QUOTE, sourceUrl="https://x.com/privacy")
+
+        self.assertEqual(kept[0]["sourceUrl"], "https://x.com/terms")
+
+    def test_a_claim_with_an_invented_quote_is_dropped_whole(self):
+        # Keeping the claim without its quote publishes an assertion nobody can
+        # check, from a model just caught inventing one.
+        kept = self._review(evidence="we never ask anyone for identity documents")
+
+        self.assertEqual(kept, [])
+
+    def test_a_claim_with_no_quote_at_all_is_dropped(self):
+        kept = self._review()
+
+        self.assertEqual(kept, [])

@@ -1,7 +1,8 @@
 """Deep scan task: produces a structured ServiceSuggestion with proposed edits.
 
-Unlike the cron-driven `tos_review` task, this task is admin-triggered through
-the ServiceScanJob queue and authored by the bot user. It crawls the legal
+Triggered from the admin queue, the nightly sweep, or the CLI, and authored by
+the bot user. It is the only path that reads a service's terms: it crawls the
+legal
 corpus once and asks the LLM for a single combined output covering ToS
 highlights, an inferred KYC level, KYC policy notes, attribute add/remove
 proposals, and freeform warnings. The result lands on
@@ -38,6 +39,18 @@ from pyworker.utils.listing_values import storable_value, values_disagree
 from pyworker.utils.scan_fingerprint import scan_fingerprint
 
 
+# A scan is only run against a listing the team has vetted. A
+# community-contributed one is not shown a review in the UI, so scanning it
+# spends model budget on a listing nobody has checked. Those are done on
+# request, one service at a time.
+REVIEWABLE_STATUSES = ("VERIFICATION_SUCCESS", "APPROVED")
+
+# A quote long enough to be a whole page is not a quote. Grounding only proves
+# the text is somewhere in the corpus, so without a ceiling a model could
+# "quote" the entire terms and pass.
+MAX_EVIDENCE_CHARS = 600
+
+
 def _format_attribute_catalog(catalog: List[Dict[str, Any]]) -> str:
     """Render the attribute catalog as compact markdown the LLM can scan."""
     by_category: Dict[str, List[Dict[str, Any]]] = {}
@@ -58,17 +71,48 @@ def _format_attribute_catalog(catalog: List[Dict[str, Any]]) -> str:
     return "\n".join(lines).strip()
 
 
+def _review_differs(
+    proposed: Dict[str, Any], published: Optional[Dict[str, Any]]
+) -> bool:
+    """Whether the scan reads the terms differently from what the site shows.
+
+    Compared on what a reader sees, so a corpus that moved without changing what
+    the terms mean does not queue a decision. A service with no review yet has
+    one to make.
+    """
+    if not published:
+        return True
+
+    def shown(review: Dict[str, Any]) -> Any:
+        return (
+            review.get("summary"),
+            review.get("complexity"),
+            [
+                (h.get("title"), h.get("content"), h.get("rating"), h.get("evidence"))
+                for h in review.get("highlights") or []
+            ],
+        )
+
+    return shown(proposed) != shown(published)
+
+
 def _has_actionable_items(
-    proposed_edits: Dict[str, Any], kyc_level_changed: bool
+    proposed_edits: Dict[str, Any],
+    kyc_level_changed: bool,
+    review_changed: bool,
 ) -> bool:
     """Whether a scan found anything a reviewer has to decide.
 
     A refreshed review of unchanged terms is not a decision. Without this the
     nightly pass would queue a suggestion for every service it looked at.
+
+    A review that now reads differently is a decision, though: it is the summary
+    and the clauses the service page shows, and nothing else updates them.
     """
     attributes = proposed_edits["attributes"]
     return bool(
         kyc_level_changed
+        or review_changed
         or attributes["add"]
         or attributes["remove"]
         or proposed_edits["listingChecks"]
@@ -169,6 +213,8 @@ class DeepScanTask(Task):
             listing_record=listing_record,
         )
 
+        self.keep_supported_highlights(result, corpus)
+
         proposed_edits = self._build_proposed_edits(
             result=result,
             corpus_hash=corpus_hash,
@@ -184,8 +230,11 @@ class DeepScanTask(Task):
 
         # A level a reviewer already turned down is not something to decide again.
         kyc_level_changed = bool(proposed_edits["kycPolicy"]["levelFingerprint"])
+        review_changed = _review_differs(
+            proposed_edits["tosReview"], service.get("tosReview")
+        )
         if self.only_when_actionable and not _has_actionable_items(
-            proposed_edits, kyc_level_changed
+            proposed_edits, kyc_level_changed, review_changed
         ):
             self.logger.info(
                 f"Nothing to propose for service {service_id}, no suggestion created"
@@ -201,6 +250,52 @@ class DeepScanTask(Task):
             ),
             True,
         )
+
+    def keep_supported_highlights(self, review: Dict[str, Any], corpus) -> None:
+        """Drop every highlight the crawled pages do not back up.
+
+        A highlight is a claim about the service, and the quote is what a reader
+        is invited to check it against. Keeping the claim after finding its
+        quote invented is the worst of both: an assertion nobody can check, made
+        by a model we have just caught making one up. A reviewer approving the
+        proposal publishes these, so they are held to the same bar here as
+        anywhere else.
+
+        The address is taken from the page the quote was found in rather than
+        from the model, so a clause cannot be attributed to the wrong document.
+        """
+        highlights = review.get("highlights")
+        if not highlights:
+            return
+
+        kept = []
+        for highlight in highlights:
+            evidence = highlight.get("evidence") or ""
+            if not evidence:
+                self.logger.warning(
+                    f"Dropping highlight with no quote: {highlight.get('title')!r}"
+                )
+                continue
+            if len(evidence) > MAX_EVIDENCE_CHARS:
+                self.logger.warning(
+                    f"Dropping highlight quoting {len(evidence)} chars: {highlight.get('title')!r}"
+                )
+                continue
+
+            source = next(
+                (page for page in corpus.pages if is_grounded(evidence, page.markdown)),
+                None,
+            )
+            if source is None:
+                self.logger.warning(
+                    f"Dropping highlight whose quote is in no crawled page: {evidence[:80]!r}"
+                )
+                continue
+
+            highlight["sourceUrl"] = source.url
+            kept.append(highlight)
+
+        review["highlights"] = kept
 
     def _filter_complete_pages(self, combined: str) -> str:
         """Drop pages flagged incomplete by the fast model before the expensive call."""
