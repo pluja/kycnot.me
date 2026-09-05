@@ -98,7 +98,7 @@ const kycLevelInfo = getKycLevelInfo(`${kycLevel}`)
       />
 
       <div class="flex min-w-0 flex-1 flex-col justify-center self-stretch">
-        <h2 class="font-title text-lg leading-none font-medium tracking-wide text-white">
+        <h2 class="font-title text-lg leading-none font-medium tracking-wide wrap-anywhere text-white">
           {name}{
             statusIcon &&
               (verificationStatus === 'VERIFICATION_FAILED' ? (
@@ -183,7 +183,7 @@ const kycLevelInfo = getKycLevelInfo(`${kycLevel}`)
 
       <div class="ml-3 inline-flex items-center gap-1.5 text-sm font-medium text-day-400">
         <Tooltip class="inline-flex" text={kycLevelInfo.description}>
-          <SwapKycBadge kycInfo={kycLevelInfo} class="min-w-0 h-6 opacity-80" />
+          <SwapKycBadge kycInfo={kycLevelInfo} class="h-6 min-w-0 opacity-80" />
         </Tooltip>
       </div>
 
