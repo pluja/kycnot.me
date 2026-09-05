@@ -20,7 +20,7 @@ const links = urls
 
 {
   links.length > 0 && (
-    <p
+    <span
       class={cn('flex flex-wrap justify-center gap-x-3 gap-y-1 text-center text-xs text-day-400', className)}
     >
       {links.map((link) => (
@@ -33,6 +33,6 @@ const links = urls
           {link.label}
         </a>
       ))}
-    </p>
+    </span>
   )
 }
