@@ -1,11 +1,12 @@
 name: Deploy preprod
 
-# Runs on every push to dev. To put another branch on preprod, open
-# Actions > Deploy preprod > Run workflow and pick the branch there.
+# Deploys on demand, never on ordinary pushes. Either point the preprod branch
+# at the commit you want (`just preprod`, or `git push -f origin HEAD:preprod`),
+# or open Actions > Deploy preprod > Run workflow and pick a branch there.
 on:
   push:
     branches:
-      - dev
+      - preprod
   workflow_dispatch:
     inputs:
       database:
@@ -56,9 +57,15 @@ jobs:
       - name: Reclaim disk from old deploy images
         run: |
           set -euo pipefail
-          # Each deploy builds a new tagged image; without pruning these
-          # accumulate until the disk fills and the build (and Postgres) die.
-          docker image prune -af || true
+          # Old build images pile up until the disk fills. Images no container
+          # uses go; the BuildKit layer cache stays, capped, so the next build
+          # only redoes what changed.
+          docker images --format '{{.Repository}}:{{.Tag}}' --filter 'reference=tig.cx/pluja/kycnot/*' \
+            | while IFS= read -r image; do
+                docker ps -a --format '{{.Image}}' | grep -qxF "$image" || docker image rm "$image" >/dev/null 2>&1 || true
+              done
+          docker image prune -f >/dev/null || true
+          docker builder prune -f --keep-storage 8GB >/dev/null || true
 
       # Built with the host's docker, so the stack on this machine sees the
       # image at once. Preprod images never go to the registry.

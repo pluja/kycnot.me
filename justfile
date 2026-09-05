@@ -6,9 +6,13 @@ pyworker_image := env_var_or_default("PYWORKER_IMAGE", "tig.cx/pluja/kycnot/pywo
 @default:
   just --list
 
-# Build and deploy a branch to preprod through tig.cx (needs FORGEJO_REPO and FORGEJO_API_TOKEN in .env)
-preprod branch="dev" database="auto":
-  just _dispatch deploy-preprod.yaml "{{branch}}" '{"database": "{{database}}"}'
+# Deploy a commit to preprod: points the preprod branch at it, which tig.cx builds and rolls out
+preprod ref="HEAD":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  commit=$(git rev-parse --verify "{{ref}}^{commit}")
+  git push --force origin "$commit:refs/heads/preprod"
+  echo "preprod -> $(git log --oneline -1 "$commit"). Follow the build in Actions on tig.cx."
 
 # Release a branch through tig.cx: fast-forward master, tag (empty = vYYYYMMDD.N), build, deploy prod, publish (publish=false keeps it private)
 release branch="dev" tag="" publish="true":
