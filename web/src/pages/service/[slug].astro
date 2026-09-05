@@ -11,6 +11,7 @@ import AttributeCard from '../../components/AttributeCard.astro'
 import BadgeStandard from '../../components/BadgeStandard.astro'
 import CommentSection from '../../components/CommentSection.astro'
 import CommentSummary from '../../components/CommentSummary.astro'
+import Button from '../../components/Button.astro'
 import DropdownButton from '../../components/DropdownButton.astro'
 import DropdownButtonItemForm from '../../components/DropdownButtonItemForm.astro'
 import DropdownButtonItemLink from '../../components/DropdownButtonItemLink.astro'
@@ -573,9 +574,11 @@ type ServiceFact = {
   href?: string
   icon?: string
   rating?: { value: number | null; count: number }
+  /** May be cut with an ellipsis on phones so the row stays on one line. */
+  shrinkable?: boolean
 }
 const serviceFactCandidates: (ServiceFact | false | null)[] = [
-  registrationCountry && { text: registrationCountry.name, icon: 'ri:map-pin-line' },
+  registrationCountry && { text: registrationCountry.name, icon: 'ri:map-pin-line', shrinkable: true },
   service.operatingSince && {
     text: formatDistanceToNowStrict(service.operatingSince, { roundingMethod: 'floor' }),
     icon: 'ri:cake-2-line',
@@ -589,9 +592,11 @@ const serviceFactCandidates: (ServiceFact | false | null)[] = [
   },
 ]
 const serviceFacts = serviceFactCandidates.filter((fact): fact is ServiceFact => !!fact)
-const badgeSizeClass = 'px-3 py-1 text-[13px] whitespace-nowrap'
-// One size down from the default button, the way a repo header does it.
-const compactButtonClass = 'px-2.5 py-1.5 text-xs'
+const badgeSizeClass = 'px-2.5 py-0.5 text-xs whitespace-nowrap sm:px-3 sm:py-1 sm:text-[13px]'
+// One size down from the default button, the way a repo header does it. Icon only on phones.
+const compactButtonClass = 'h-8 px-2.5 text-xs max-sm:w-8 max-sm:px-0'
+const compactButtonLabelClass = 'max-sm:sr-only'
+const compactButtonArrowClass = 'max-sm:hidden'
 const acceptedCurrencies = currencies.filter((currency) => service.acceptedCurrencies.includes(currency.id))
 
 const checkSegments = [
@@ -793,7 +798,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
         <MyPicture
           src={service.imageUrl}
           alt={service.name || "Service's logo"}
-          class="size-14 shrink-0 rounded-sm object-contain sm:size-16"
+          class="size-12 shrink-0 rounded-sm object-contain sm:size-16"
           width={64}
           height={64}
         />
@@ -801,13 +806,17 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
     }
 
     <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
-      <h1 class="min-w-0 font-title text-2xl/tight font-bold tracking-wider text-white">{service.name}</h1>
+      <h1
+        class="min-w-0 flex-1 font-title text-xl/tight font-bold tracking-wider text-white sm:text-2xl/tight"
+      >
+        {service.name}
+      </h1>
 
       {
         /* Badges sit on their own row under the name; on phones the currencies share that row, under the buttons. */
       }
       <div class="order-last flex basis-full flex-wrap items-center gap-2">
-        <div class="flex min-w-0 flex-1 basis-48 flex-wrap items-center gap-2">
+        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           {/* Outside the category list: it is a verdict, not a category. */}
           <Tooltip class="inline-flex" text={statusInfo.description} position="bottom">
             <BadgeStandard
@@ -833,13 +842,20 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
             </li>
           </ul>
         </div>
-        <AcceptedCurrencies accepted={service.acceptedCurrencies} class="ml-auto sm:hidden" />
       </div>
 
       <div class="ml-auto flex items-center justify-center gap-2">
         {
           user ? (
-            <DropdownButton label="Watch" icon="ri:eye-line" classNames={{ button: compactButtonClass }}>
+            <DropdownButton
+              label="Watch"
+              icon="ri:eye-line"
+              classNames={{
+                button: compactButtonClass,
+                label: compactButtonLabelClass,
+                arrow: compactButtonArrowClass,
+              }}
+            >
               <DropdownButtonItemForm
                 action={actions.notification.preferences.watchService}
                 method="post"
@@ -923,26 +939,27 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
               </DropdownButtonItemForm>
             </DropdownButton>
           ) : (
-            <a
+            <Button
+              as="a"
               href={makeLoginUrl(Astro.url)}
-              data-astro-reload
+              dataAstroReload
               aria-label="Log in to watch this service"
-              class={cn(
-                'inline-flex items-center gap-2 rounded-lg border border-night-500 bg-night-800 shadow-sm transition-colors duration-200 hover:bg-night-900 hover:text-day-200 focus-visible:bg-night-900 focus-visible:text-day-200',
-                compactButtonClass
-              )}
-            >
-              <Icon name="ri:eye-line" class="size-4" />
-              Watch
-            </a>
+              label="Watch"
+              icon="ri:eye-line"
+              class={compactButtonClass}
+              classNames={{ label: compactButtonLabelClass }}
+            />
           )
         }
 
         <DropdownButton
           label="Contribute"
           icon="ri:edit-line"
-          class="hidden 2xs:block"
-          classNames={{ button: compactButtonClass }}
+          classNames={{
+            button: compactButtonClass,
+            label: compactButtonLabelClass,
+            arrow: compactButtonArrowClass,
+          }}
         >
           <DropdownButtonItemLink
             href={`/service-suggestion/edit?serviceId=${service.id}`}
@@ -983,14 +1000,17 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
     {
       (acceptedCurrencies.length > 0 || serviceFacts.length > 0) && (
         <ul
-          class="order-first mt-3 flex flex-wrap items-center gap-y-1.5 text-sm text-day-400 sm:order-none [&>li]:before:mx-2.5 [&>li]:before:text-day-600 [&>li]:before:content-['·'] [&>li:first-child]:before:hidden max-sm:[&>li:nth-child(2)]:before:hidden"
+          class="order-first mt-3 flex flex-wrap items-center gap-y-1.5 text-sm text-day-400 max-sm:flex-nowrap sm:order-none [&>li]:before:mx-2.5 [&>li]:before:text-day-600 [&>li]:before:content-['·'] [&>li:first-child]:before:hidden"
           aria-label="Key facts"
         >
-          <li class="hidden sm:flex">
-            <AcceptedCurrencies accepted={service.acceptedCurrencies} />
+          <li class="flex shrink-0">
+            <AcceptedCurrencies
+              accepted={service.acceptedCurrencies}
+              class="max-sm:gap-1.5 max-sm:[&_svg]:size-4"
+            />
           </li>
           {serviceFacts.map((fact) => (
-            <li class="flex items-center gap-1.5">
+            <li class={cn('flex items-center gap-1.5', fact.shrinkable ? 'min-w-0' : 'shrink-0')}>
               {fact.icon && <Icon name={fact.icon} class="size-4 shrink-0 text-day-500" />}
               {fact.rating ? (
                 <a
@@ -1008,7 +1028,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
                   {fact.text}
                 </a>
               ) : (
-                fact.text
+                <span class={cn(fact.shrinkable && 'truncate')}>{fact.text}</span>
               )}
             </li>
           ))}
