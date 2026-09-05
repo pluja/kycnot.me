@@ -1,0 +1,42 @@
+---
+import { Icon } from 'astro-icon/components'
+import { clamp } from 'lodash-es'
+
+import { cn } from '../lib/cn'
+
+type Props = {
+  rating: number | null
+  class?: string
+  starClass?: string
+  fillClass?: string
+  emptyClass?: string
+}
+
+const {
+  rating,
+  class: className,
+  starClass = 'size-5',
+  fillClass = 'text-yellow-400',
+  emptyClass = 'text-zinc-500',
+} = Astro.props
+---
+
+<div class={cn('flex items-center space-x-1', className)}>
+  {
+    ([1, 2, 3, 4, 5] as const).map((star) => (
+      <div
+        class={cn('relative', starClass)}
+        style={`--percent: ${clamp((rating ?? 0) - (star - 1), 0, 1) * 100}%`}
+      >
+        <Icon name="ri:star-line" class={cn('absolute inset-0 size-full', emptyClass)} />
+        <Icon
+          name="ri:star-fill"
+          class={cn(
+            'absolute inset-0 size-full [clip-path:inset(0_calc(100%_-_var(--percent))_0_0)]',
+            fillClass
+          )}
+        />
+      </div>
+    ))
+  }
+</div>

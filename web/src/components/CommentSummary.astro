@@ -1,12 +1,13 @@
 ---
 import { Icon } from 'astro-icon/components'
 import { Schema } from 'astro-seo-schema'
-import { clamp, round, sum } from 'lodash-es'
+import { round, sum } from 'lodash-es'
 
 import { MIN_TRUSTED_RATING_WEIGHT } from '../constants/karmaUnlocks'
 import { cn } from '../lib/cn'
 import { prisma } from '../lib/prisma'
 
+import RatingStars from './RatingStars.astro'
 import Tooltip from './Tooltip.astro'
 
 import type { CommentStatus, Prisma } from '@prisma/client'
@@ -137,22 +138,7 @@ const trustWeightedUserRating =
         <Icon name="ri:information-line" class="size-4" />
       </Tooltip>
     </div>
-    <div class="flex items-center space-x-1">
-      {
-        ([1, 2, 3, 4, 5] as const).map((rating) => (
-          <div
-            class="relative size-5"
-            style={`--percent: ${clamp((trustWeightedUserRating ?? 0) - (rating - 1), 0, 1) * 100}%`}
-          >
-            <Icon name="ri:star-line" class="absolute inset-0 size-full text-zinc-500" />
-            <Icon
-              name="ri:star-fill"
-              class="absolute inset-0 size-full text-yellow-400 [clip-path:inset(0_calc(100%_-_var(--percent))_0_0)]"
-            />
-          </div>
-        ))
-      }
-    </div>
+    <RatingStars rating={trustWeightedUserRating} />
   </div>
 
   <div class="grid min-w-32 flex-1 grid-cols-[auto_1fr_auto] items-center gap-1">

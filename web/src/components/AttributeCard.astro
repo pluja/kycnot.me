@@ -2,7 +2,8 @@
 import { Icon } from 'astro-icon/components'
 
 import { cn } from '../lib/cn'
-import { formatNumber, type FormatNumberOptions } from '../lib/numbers'
+import { formatNumber } from '../lib/numbers'
+import { attributeAnchor } from '../lib/serviceAnswers'
 import { stripMarkdown } from '../lib/strings'
 
 import Markdown from './Markdown.astro'
@@ -12,6 +13,7 @@ import type { getAttributeTypeInfo } from '../constants/attributeTypes'
 
 type Props = {
   attribute: {
+    slug: string
     title: string
     description: string
     privacyPoints: number
@@ -37,34 +39,19 @@ const excerpt = stripMarkdown(attribute.description.split('\n')[0] ?? '')
 const note = attribute.note?.trim()
 const preview = note ?? excerpt
 
-const baseFormatOptions = {
-  roundDigits: 2,
-  showSign: true,
-  removeTrailingZeros: true,
-} as const satisfies FormatNumberOptions
-
-const weights = [
-  {
-    type: 'privacy',
-    label: 'Privacy',
-    value: attribute.privacyPoints,
-    formatOptions: baseFormatOptions,
-  },
-  {
-    type: 'trust',
-    label: 'Trust',
-    value: attribute.trustPoints,
-    formatOptions: baseFormatOptions,
-  },
-] as const satisfies {
-  type: string
-  label: string
-  value: number
-  formatOptions: FormatNumberOptions
-}[]
+// Privacy then trust, always both, so the columns line up with the group
+// totals above them.
+const points = [attribute.privacyPoints, attribute.trustPoints]
+const formatPoints = (value: number) =>
+  formatNumber(value, { roundDigits: 2, showSign: true, removeTrailingZeros: true })
 ---
 
-<li>
+{
+  /* The anchor sits inside the body: browsers expand a closed details when a fragment inside it is navigated to, which is what a caveat link relies on. */
+}
+<li
+  class="rounded-md has-[:target]:ring-2 has-[:target]:ring-orange-500 has-[:target]:ring-offset-2 has-[:target]:ring-offset-night-800"
+>
   <details class="group/attribute">
     <summary
       class={cn(
@@ -74,48 +61,42 @@ const weights = [
       )}
     >
       <div class="flex items-center">
-        <span class="mr-auto ml-1">{attribute.title}</span>
+        <span class="mr-auto ml-1 min-w-0 truncate font-bold" title={attribute.title}>
+          {attribute.title}
+        </span>
         {
-          weights.map((w) => (
+          points.map((value) => (
             <span
-              class={cn('ml-2 text-center text-sm', w.value === 0 ? 'text-current/50' : 'text-current/80')}
+              class={cn(
+                'ml-2 min-w-7 text-center text-sm',
+                value === 0 ? 'text-current/50' : 'text-current/80'
+              )}
             >
-              {formatNumber(w.value, w.formatOptions)}
+              {formatPoints(value)}
             </span>
           ))
         }
+      </div>
+      {/* Always two lines, so collapsed cards share a height without stretching to the tallest neighbour. */}
+      <div class="mt-0.5 flex items-center gap-1 group-open/attribute:hidden">
         {
-          !preview && (
-            <Icon
-              name="ri:arrow-down-s-line"
-              class={cn('ml-1 size-5 group-open/attribute:rotate-180', attribute.typeInfo.classNames.icon)}
-            />
+          note && (
+            <Tooltip text="We added a note specific to this service" class="ml-1 inline-flex shrink-0">
+              <Icon name="ri:sticky-note-line" class={cn('size-3.5', attribute.typeInfo.classNames.icon)} />
+            </Tooltip>
           )
         }
+        <p class={cn('line-clamp-1 flex-1 text-xs font-normal text-current/80', !note && 'ml-1')}>
+          {preview || '\u00a0'}
+        </p>
+        <Icon name="ri:arrow-down-s-line" class={cn('size-5 shrink-0', attribute.typeInfo.classNames.icon)} />
       </div>
-      {
-        preview && (
-          <div class="mt-0.5 flex items-center gap-1 group-open/attribute:hidden">
-            {note && (
-              <Tooltip text="We added a note specific to this service" class="ml-1 inline-flex shrink-0">
-                <Icon name="ri:sticky-note-line" class={cn('size-3.5', attribute.typeInfo.classNames.icon)} />
-              </Tooltip>
-            )}
-            <p class={cn('line-clamp-1 flex-1 text-xs font-normal text-current/80', !note && 'ml-1')}>
-              {preview}
-            </p>
-            <Icon
-              name="ri:arrow-down-s-line"
-              class={cn('size-5 shrink-0', attribute.typeInfo.classNames.icon)}
-            />
-          </div>
-        )
-      }
     </summary>
 
     <div
+      id={attributeAnchor(attribute.slug)}
       class={cn(
-        'mx-2 rounded-b-lg border-2 border-t-0 border-night-400 bg-night-400/20 p-3 pt-2 text-xs text-day-300',
+        'mx-2 scroll-mt-24 rounded-b-lg border-2 border-t-0 border-night-400 bg-night-400/20 p-3 pt-2 text-xs text-day-300',
         attribute.typeInfo.classNames.subcontainer,
         attribute.typeInfo.classNames.text
       )}
@@ -133,29 +114,6 @@ const weights = [
           </p>
         )
       }
-
-      <div class="mt-1 flex justify-evenly gap-4">
-        {
-          weights.map((w) => (
-            <div class="inline-flex basis-12 flex-col items-center text-day-200">
-              <span
-                class={cn('text-base', attribute.typeInfo.classNames.textLight, {
-                  'text-red-400': w.value < 0,
-                  'text-green-400': w.value > 0,
-                  'opacity-50': w.value === 0,
-                })}
-              >
-                {formatNumber(w.value, w.formatOptions)}
-              </span>
-              <span
-                class={cn('text-2xs font-bold text-white uppercase', attribute.typeInfo.classNames.textLight)}
-              >
-                {w.label}
-              </span>
-            </div>
-          ))
-        }
-      </div>
 
       {
         attribute.links.length > 0 && (
