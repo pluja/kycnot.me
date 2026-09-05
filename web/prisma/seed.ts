@@ -875,6 +875,7 @@ const generateFakeService = (users: User[]) => {
               title: faker.lorem.sentence(),
               description: faker.lorem.paragraph(),
               status: faker.helpers.arrayElement(Object.values(VerificationStepStatus)),
+              showBanner: faker.datatype.boolean(0.5),
               evidenceMd: faker.lorem.paragraph(),
               createdAt: faker.date.recent(),
               updatedAt: faker.date.recent(),
@@ -1401,8 +1402,7 @@ async function createFakeContactThread({
     select: { id: true },
   })
 
-  for (let i = 0; i < messages.length; i++) {
-    const message = messages[i]!
+  for (const [i, message] of messages.entries()) {
     await prisma.contactMessage.create({
       data: {
         threadId: thread.id,
@@ -1735,6 +1735,9 @@ async function main() {
             data: {
               serviceId: service.id,
               attributeId: attr.id,
+              note: faker.helpers.maybe(() => faker.lorem.sentence({ min: 6, max: 18 }), {
+                probability: 0.25,
+              }),
             },
           })
         )
@@ -1972,12 +1975,13 @@ async function main() {
   const contactCombos = Object.values(ContactCategory).flatMap((category) =>
     Object.values(ContactStatus).map((status) => ({ category, status }))
   )
-  for (let i = 0; i < contactCombos.length; i++) {
-    const { category, status } = contactCombos[i]!
+  for (const [i, { category, status }] of contactCombos.entries()) {
+    const authorId = contactAuthorIds[i % contactAuthorIds.length]
+    if (authorId === undefined) throw new Error('Seed needs at least one contact author')
     await createFakeContactThread({
       category,
       status,
-      authorId: contactAuthorIds[i % contactAuthorIds.length]!,
+      authorId,
       staffIds: contactStaffIds,
     })
   }
