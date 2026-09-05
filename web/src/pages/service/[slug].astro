@@ -1055,22 +1055,22 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
 
   {
     service.contactMethods.length > 0 && (
-      <div class="mt-2 flex flex-wrap items-center gap-1.5 pl-1 text-xs">
-        <Tooltip text="Support and contact" class="inline-flex">
-          <Icon name="ri:customer-service-2-line" class="size-4 text-day-500" />
-        </Tooltip>
+      <div class="mt-4 flex flex-wrap items-center gap-y-1.5 pl-1 text-sm max-sm:gap-x-4 [&_li]:before:mx-2.5 [&_li]:before:text-day-600 [&_li]:before:content-['·'] max-sm:[&_li]:before:hidden">
+        <span class="font-title text-xs leading-none font-bold tracking-wider text-day-500 uppercase">
+          Support
+        </span>
         <ul aria-label="Support and contact methods" class="contents">
           {service.contactMethods.map((method) => {
             const methodInfo = formatContactMethod(method.value)
             return (
-              <li>
+              <li class="flex min-w-0 items-center">
                 <a
                   href={method.value}
                   target="_blank"
                   rel="nofollow noopener"
-                  class="inline-flex h-7 items-center gap-1 rounded-md border border-night-600 bg-night-800 px-2 text-day-200 transition-colors hover:border-night-400 hover:bg-night-700 hover:text-white"
+                  class="inline-flex min-w-0 items-center gap-1.5 text-day-300 underline decoration-night-500 underline-offset-4 transition-colors hover:text-white hover:decoration-day-400"
                 >
-                  <Icon name={methodInfo.icon} class="size-3.5 text-day-400" />
+                  <Icon name={methodInfo.icon} class="size-4 shrink-0 text-day-500" />
                   <span class="truncate">{method.label ?? methodInfo.formattedValue}</span>
                 </a>
               </li>
