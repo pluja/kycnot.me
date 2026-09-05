@@ -1,0 +1,28 @@
+---
+import { round } from 'lodash-es'
+
+import { cn } from '../lib/cn'
+
+import RatingStars from './RatingStars.astro'
+
+type Props = {
+  rating: number | null
+  count: number
+  class?: string
+}
+
+const { rating, count, class: className } = Astro.props
+const value = rating !== null ? round(rating, 1).toLocaleString() : '-'
+---
+
+<span class={cn('inline-flex items-center gap-1.5', className)} aria-hidden="true">
+  <span class="font-bold text-day-200">{value}</span>
+  <RatingStars
+    rating={rating}
+    starClass="size-3.5"
+    fillClass="text-day-100"
+    emptyClass="text-day-700"
+    class="space-x-0.5"
+  />
+  <span class="text-day-500">({count.toLocaleString()})</span>
+</span>

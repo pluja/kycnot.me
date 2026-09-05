@@ -1,0 +1,36 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { currencies } from '../../constants/currencies'
+import { cn } from '../../lib/cn'
+import Tooltip from '../Tooltip.astro'
+
+import type { Currency } from '@prisma/client'
+
+type Props = {
+  accepted: Currency[]
+  class?: string
+}
+
+const { accepted, class: className } = Astro.props
+const acceptedNames = currencies
+  .filter((currency) => accepted.includes(currency.id))
+  .map((currency) => currency.name)
+---
+
+<div
+  role="img"
+  class={cn('flex items-center gap-2', className)}
+  aria-label={`Accepts ${acceptedNames.join(', ')}`}
+>
+  {
+    currencies.map((currency) => {
+      const isAccepted = accepted.includes(currency.id)
+      return (
+        <Tooltip text={`${currency.name}: ${isAccepted ? 'accepted' : 'not accepted'}`} class="inline-flex">
+          <Icon name={currency.icon} class={cn('size-5', isAccepted ? 'text-day-100' : 'text-day-700')} />
+        </Tooltip>
+      )
+    })
+  }
+</div>

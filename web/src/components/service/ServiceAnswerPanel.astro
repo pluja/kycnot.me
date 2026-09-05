@@ -1,0 +1,108 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { kycLevels, type getKycLevelInfo } from '../../constants/kycLevels'
+import { cn } from '../../lib/cn'
+import SwapKycBadge from '../swap/SwapKycBadge.astro'
+import Tooltip from '../Tooltip.astro'
+
+import type { ServiceAnswer } from '../../lib/serviceAnswers'
+
+type Props = {
+  kyc: ServiceAnswer
+  safety: ServiceAnswer
+  /** The level badge: the site's own vocabulary, next to the plain-English headline. */
+  kycLevel: ReturnType<typeof getKycLevelInfo>
+}
+
+const { kyc, safety, kycLevel } = Astro.props
+
+const toneClass = {
+  good: 'text-green-400',
+  caution: 'text-yellow-400',
+  bad: 'text-red-400',
+  unknown: 'text-day-400',
+} as const
+
+// Enough to name what matters; the full list sits in the attributes below.
+const SHOWN_CAVEATS = 3
+
+const questions = [
+  { label: 'KYC policy', icon: 'ri:fingerprint-line', level: kycLevel, ...kyc },
+  { label: 'Trust', icon: 'ri:shield-check-line', level: null, ...safety },
+]
+---
+
+<section aria-label="Summary">
+  <div class="grid gap-px rounded-lg border border-night-600 bg-night-600 sm:grid-cols-2">
+    {
+      questions.map((question) => (
+        <div class="bg-night-800 p-4 first:rounded-t-[7px] last:rounded-b-[7px] sm:first:rounded-l-[7px] sm:first:rounded-tr-none sm:last:rounded-r-[7px] sm:last:rounded-bl-none">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="flex items-center gap-1.5 font-title text-xs font-bold tracking-wider text-day-300 uppercase">
+              <Icon name={question.icon} class="size-4" />
+              {question.label}
+            </h2>
+            {question.level && (
+              <Tooltip
+                text={`Level ${String(question.level.value)} of ${String(kycLevels.length - 1)}. ${question.level.description}`}
+                position="top"
+                class="inline-flex"
+              >
+                {/* Grey on purpose: the headline carries the colour, the badge is the name. */}
+                <SwapKycBadge kycInfo={question.level} class="bg-night-600 text-day-200" />
+              </Tooltip>
+            )}
+          </div>
+          <p class={cn('mt-1.5 font-title text-sm font-bold sm:text-base', toneClass[question.tone])}>
+            {question.answer}
+          </p>
+          {question.detail && <p class="mt-1.5 text-sm text-day-300">{question.detail}</p>}
+          {question.incidents && question.incidents.length > 0 && (
+            <ul class="mt-2 space-y-1.5 text-sm text-day-300">
+              {question.incidents.map((incident) => (
+                <li>
+                  <a
+                    href={incident.href}
+                    class="inline-flex gap-1.5 underline decoration-day-700 underline-offset-4 hover:text-day-100 hover:decoration-day-400"
+                  >
+                    <Icon
+                      name="ri:alarm-warning-line"
+                      class={cn('mt-0.5 size-4 shrink-0', toneClass[question.tone])}
+                    />
+                    <span>
+                      {incident.title}
+                      <span class="text-day-500"> · {incident.note}</span>
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          {question.caveats && question.caveats.length > 0 && (
+            <ul class="mt-2 space-y-1 text-sm text-day-300">
+              {question.caveats.slice(0, SHOWN_CAVEATS).map((caveat) => (
+                <li>
+                  <a
+                    href={caveat.href}
+                    class="inline-flex gap-1.5 underline decoration-day-700 underline-offset-4 hover:text-day-100 hover:decoration-day-400"
+                  >
+                    <Icon name="ri:alert-line" class="mt-0.5 size-4 shrink-0 text-yellow-400" />
+                    <span>{caveat.note?.trim() ? caveat.note : caveat.title}</span>
+                  </a>
+                </li>
+              ))}
+              {question.caveats.length > SHOWN_CAVEATS && (
+                <li class="pl-5.5">
+                  <a href="#attributes" class="text-day-400 underline underline-offset-4 hover:text-day-200">
+                    +{question.caveats.length - SHOWN_CAVEATS} more below
+                  </a>
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+      ))
+    }
+  </div>
+</section>

@@ -165,6 +165,7 @@ const categoriesToCreate = [
     name: 'Exchange',
     namePluralLong: 'Exchanges',
     slug: 'exchange',
+    holdsFunds: true,
     icon: 'ri:arrow-left-right-fill',
   },
   {
@@ -195,12 +196,14 @@ const categoriesToCreate = [
     name: 'Gift Cards',
     namePluralLong: 'Gift cards',
     slug: 'gift-cards',
+    holdsFunds: true,
     icon: 'ri:gift-line',
   },
   {
     name: 'Goods',
     namePluralLong: 'Goods providers',
     slug: 'goods',
+    holdsFunds: true,
     icon: 'ri:shopping-basket-fill',
   },
   {
@@ -219,6 +222,7 @@ const categoriesToCreate = [
     name: 'Store',
     namePluralLong: 'Stores',
     slug: 'store',
+    holdsFunds: true,
     icon: 'ri:store-2-line',
   },
   {
@@ -231,12 +235,14 @@ const categoriesToCreate = [
     name: 'Market',
     namePluralLong: 'Markets',
     slug: 'market',
+    holdsFunds: true,
     icon: 'ri:price-tag-3-line',
   },
   {
     name: 'Aggregator',
     namePluralLong: 'Aggregators',
     slug: 'aggregator',
+    holdsFunds: true,
     icon: 'ri:list-ordered',
   },
   {
@@ -249,12 +255,14 @@ const categoriesToCreate = [
     name: 'CEX',
     namePluralLong: 'CEXs',
     slug: 'cex',
+    holdsFunds: true,
     icon: 'ri:rotate-lock-fill',
   },
   {
     name: 'DEX',
     namePluralLong: 'DEXs',
     slug: 'dex',
+    holdsFunds: true,
     icon: 'ri:fediverse-line',
   },
 ] as const satisfies Prisma.CategoryCreateInput[]

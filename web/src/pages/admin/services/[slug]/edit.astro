@@ -121,9 +121,13 @@ const [service, categories, attributes] = await Astro.locals.banners.tryMany([
         include: {
           attributes: {
             select: {
+              note: true,
               attribute: {
                 select: {
                   id: true,
+                  title: true,
+                  category: true,
+                  type: true,
                 },
               },
             },
@@ -422,14 +426,16 @@ const navItems = [
           addInputErrors={errorsOf(internalNoteCreateResult)}
         />
 
-        {canManageEvents && (
-          <EventsSection
-            serviceId={service.id}
-            events={service.events}
-            createInputErrors={errorsOf(eventCreateResult)}
-            updateInputErrors={errorsOf(eventUpdateResult)}
-          />
-        )}
+        {
+          canManageEvents && (
+            <EventsSection
+              serviceId={service.id}
+              events={service.events}
+              createInputErrors={errorsOf(eventCreateResult)}
+              updateInputErrors={errorsOf(eventUpdateResult)}
+            />
+          )
+        }
 
         <VerificationStepsSection
           serviceId={service.id}
@@ -466,11 +472,7 @@ const navItems = [
     class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm"
     data-lightbox-overlay
   >
-    <button
-      type="button"
-      class="absolute inset-0 cursor-default"
-      data-lightbox-close
-      aria-label="Close"
+    <button type="button" class="absolute inset-0 cursor-default" data-lightbox-close aria-label="Close"
     ></button>
     <button
       type="button"
@@ -515,9 +517,7 @@ const navItems = [
         document.body.style.overflow = ''
       }
 
-      overlay.querySelectorAll('[data-lightbox-close]').forEach((el) =>
-        el.addEventListener('click', close)
-      )
+      overlay.querySelectorAll('[data-lightbox-close]').forEach((el) => el.addEventListener('click', close))
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && !overlay.classList.contains('hidden')) close()
       })

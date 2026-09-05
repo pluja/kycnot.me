@@ -53,6 +53,10 @@ const serviceSchemaBase = z.object({
   kycLevel: z.coerce.number().int().min(0).max(4),
   kycPolicyMd: z.string().trim().max(4000).optional().nullable().default(null),
   attributes: z.array(z.coerce.number().int().positive()),
+  // Parallel arrays because HTML form data has no nested objects. Zipped below;
+  // a note only applies if its attribute is still assigned.
+  attributeNoteIds: z.array(z.coerce.number().int().positive()).default([]),
+  attributeNotes: z.array(z.string().max(300)).default([]),
   categories: z.array(z.coerce.number().int().positive()).min(1),
   verificationStatus: z.nativeEnum(VerificationStatus),
   verificationSummary: z.string().optional().nullable().default(null),
@@ -251,6 +255,12 @@ export const adminServiceActions = {
       const attributesToAdd = input.attributes.filter((aId) => !existingAttributeIds.includes(aId))
       const attributesToRemove = existingAttributeIds.filter((aId) => !input.attributes.includes(aId))
 
+      // Notes are presentational, so they are written after the add/remove diff
+      // and only for attributes the service still has. Blank clears the note.
+      const noteUpdates = input.attributeNoteIds
+        .map((attributeId, index) => ({ attributeId, note: input.attributeNotes[index]?.trim() ?? '' }))
+        .filter(({ attributeId }) => input.attributes.includes(attributeId))
+
       const imageUrl = input.removeImage
         ? null
         : input.imageFile
@@ -313,6 +323,11 @@ export const adminServiceActions = {
 
             deleteMany: attributesToRemove.map((attributeId) => ({
               attributeId,
+            })),
+
+            updateMany: noteUpdates.map(({ attributeId, note }) => ({
+              where: { attributeId },
+              data: { note: note || null },
             })),
           },
           operatingSince: input.operatingSince,

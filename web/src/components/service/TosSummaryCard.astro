@@ -1,0 +1,51 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../lib/cn'
+import { countTosHighlightRatings, isTosReviewable, TOS_REVIEW_ANCHOR } from '../../lib/tosHighlights'
+import Markdown from '../Markdown.astro'
+
+import type { ServiceDetail } from '../../lib/serviceDetail'
+
+type Props = {
+  service: Pick<ServiceDetail, 'tosReview' | 'verificationStatus'>
+}
+
+const { service } = Astro.props
+
+const isReviewable = isTosReviewable(service.verificationStatus)
+const summary = isReviewable ? service.tosReview?.summary : null
+const highlightCounts = countTosHighlightRatings(service.tosReview?.highlights ?? [])
+---
+
+{
+  summary && (
+    <section
+      aria-label="Terms of service summary"
+      class="rounded-lg border border-night-600 bg-night-800 p-4"
+    >
+      <h2 class="flex items-center gap-1.5 font-title text-xs font-bold tracking-wider text-day-300 uppercase">
+        <Icon name="ri:file-list-3-line" class="size-4" />
+        Terms of service
+      </h2>
+      <div class="prose prose-sm mt-1.5 max-w-none text-sm text-pretty text-day-300 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
+        <Markdown content={summary} />
+      </div>
+      <p class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        {highlightCounts.map((rating) => (
+          <span class="inline-flex items-center gap-1 text-day-400">
+            <Icon name={rating.icon} class={cn(rating.classNames.icon, 'size-4')} />
+            {`${String(rating.count)} ${rating.count === 1 ? rating.countLabel.one : rating.countLabel.many}`}
+          </span>
+        ))}
+        <a
+          href={`#${TOS_REVIEW_ANCHOR}`}
+          class="inline-flex items-center gap-1 text-day-400 underline underline-offset-4 hover:text-day-200"
+        >
+          Read the highlights
+          <Icon name="ri:arrow-down-line" class="size-4" />
+        </a>
+      </p>
+    </section>
+  )
+}

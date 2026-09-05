@@ -128,3 +128,21 @@ export const transformCase = <T extends string, C extends TransformCaseType>(
       return str as any
   }
 }
+
+/**
+ * Trim a pasted block and drop the indentation every line shares. Markdown
+ * turns four leading spaces into a code block, so a description pasted from
+ * an indented source renders as monospace unless it is normalised on the way
+ * in. Relative indentation survives, so nested lists stay nested.
+ */
+export const normalizeMultilineInput = (text: string): string => {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n')
+  const indents = lines
+    .filter((line) => line.trim() !== '')
+    .map((line) => /^[ \t]*/.exec(line)?.[0].length ?? 0)
+  const shared = indents.length > 0 ? Math.min(...indents) : 0
+  return lines
+    .map((line) => line.slice(shared).trimEnd())
+    .join('\n')
+    .trim()
+}
