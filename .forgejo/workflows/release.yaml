@@ -1,0 +1,229 @@
+name: Release
+
+# The way to production. Run it from Actions > Release > Run workflow in the
+# private repository, with the branch to release selected there (normally dev).
+# It checks the commits, fast-forwards master, tags the release, and then:
+#
+#   publish on   pushes master and the tag to the public repository, where the
+#                Deploy production workflow builds and deploys in the open
+#   publish off  builds and deploys from here, for a fix that must ship before
+#                it can be public. Run again later with the same tag and
+#                publish on to make it public; production sees no change.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag. Leave empty for vYYYYMMDD.N with the next free N. Give an existing tag to publish it."
+        type: string
+        default: ""
+      publish:
+        description: "Push master and the tag to the public repository, which deploys production from there."
+        type: boolean
+        default: true
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+env:
+  ASTRO_IMAGE: tig.cx/pluja/kycnot/astro
+  PYWORKER_IMAGE: tig.cx/pluja/kycnot/pyworker
+  PUBLIC_REPO: pluja/kycnotme
+
+jobs:
+  prepare:
+    runs-on: preprod
+    outputs:
+      tag: ${{ steps.promote.outputs.tag }}
+      mode: ${{ steps.promote.outputs.mode }}
+    steps:
+      - name: Checkout
+        run: |
+          set -euo pipefail
+
+          rm -rf "$FORGEJO_WORKSPACE"
+          mkdir -p "$FORGEJO_WORKSPACE"
+          cd "$FORGEJO_WORKSPACE"
+
+          git init -q
+          git remote add origin "$FORGEJO_SERVER_URL/$FORGEJO_REPOSITORY.git"
+          git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" fetch -q origin \
+            "+refs/heads/master:refs/remotes/origin/master" "+refs/tags/*:refs/tags/*" "$FORGEJO_SHA"
+          git checkout -q --detach "$FORGEJO_SHA"
+
+      - name: Check commits
+        working-directory: ${{ forgejo.workspace }}
+        env:
+          ALLOWED_AUTHOR_EMAILS: ${{ vars.ALLOWED_AUTHOR_EMAILS }}
+          FORBIDDEN_STRINGS: ${{ vars.FORBIDDEN_STRINGS }}
+        run: |
+          set -euo pipefail
+          if ! git merge-base --is-ancestor origin/master HEAD; then
+            echo "master has commits that $FORGEJO_REF_NAME does not. Merge master into it first." >&2
+            exit 1
+          fi
+          scripts/ci/check-commits.sh origin/master HEAD
+
+      - name: Promote to master and tag
+        id: promote
+        working-directory: ${{ forgejo.workspace }}
+        run: |
+          set -euo pipefail
+
+          tag="${{ inputs.tag }}"
+          if [ -n "$tag" ] && git rev-parse -q --verify "refs/tags/$tag^{commit}" >/dev/null; then
+            if [ "$(git rev-parse "refs/tags/$tag^{commit}")" != "$(git rev-parse HEAD)" ]; then
+              echo "Tag $tag exists but points elsewhere than $FORGEJO_REF_NAME. Pick another tag or branch." >&2
+              exit 1
+            fi
+            echo "Tag $tag already exists here, reusing it."
+          else
+            if [ -z "$tag" ]; then
+              prefix="v$(date +%Y%m%d)"
+              n=1
+              while git rev-parse -q --verify "refs/tags/${prefix}.${n}" >/dev/null; do
+                n=$((n + 1))
+              done
+              tag="${prefix}.${n}"
+            fi
+            case "$tag" in
+              v[0-9]*) ;;
+              *) echo "Release tags must look like v20260905.1, got '$tag'." >&2; exit 1 ;;
+            esac
+            git -c user.name="Release" -c user.email="release@tig.cx" tag -a "$tag" -m "Release $tag"
+          fi
+
+          git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" push -q origin \
+            "HEAD:refs/heads/master" "refs/tags/$tag"
+
+          case "${{ inputs.publish }}" in
+            true) mode="public" ;;
+            *) mode="private" ;;
+          esac
+          echo "Release $tag from $FORGEJO_REF_NAME ($FORGEJO_SHA), mode $mode"
+          echo "tag=${tag}" >> "$FORGEJO_OUTPUT"
+          echo "mode=${mode}" >> "$FORGEJO_OUTPUT"
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.mode == 'private'
+    runs-on: preprod
+    outputs:
+      image_tag: ${{ steps.images.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        run: |
+          set -euo pipefail
+
+          rm -rf "$FORGEJO_WORKSPACE"
+          mkdir -p "$FORGEJO_WORKSPACE"
+          cd "$FORGEJO_WORKSPACE"
+
+          git init -q
+          git remote add origin "$FORGEJO_SERVER_URL/$FORGEJO_REPOSITORY.git"
+          git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" fetch -q --depth=1 origin "$FORGEJO_SHA"
+          git checkout -q --detach FETCH_HEAD
+
+      - name: Login to tig.cx registry
+        run: |
+          set -euo pipefail
+          export DOCKER_CONFIG="$FORGEJO_WORKSPACE/.docker"
+          mkdir -p "$DOCKER_CONFIG"
+
+          if [ -z "${{ secrets.TIG_PACKAGE_USER }}" ] || [ -z "${{ secrets.TIG_PACKAGE_TOKEN }}" ]; then
+            echo "Missing TIG_PACKAGE_USER or TIG_PACKAGE_TOKEN action secret." >&2
+            exit 1
+          fi
+
+          printf '%s' "${{ secrets.TIG_PACKAGE_TOKEN }}" \
+            | docker login tig.cx \
+              --username "${{ secrets.TIG_PACKAGE_USER }}" \
+              --password-stdin
+
+      - name: Reclaim disk from old deploy images
+        run: |
+          set -euo pipefail
+          docker image prune -af || true
+
+      - name: Build and push images
+        id: images
+        working-directory: ${{ forgejo.workspace }}
+        run: |
+          set -euo pipefail
+          export DOCKER_CONFIG="$FORGEJO_WORKSPACE/.docker"
+
+          image_tag="prod-${{ needs.prepare.outputs.tag }}"
+
+          docker build \
+            -f web/Dockerfile \
+            --build-arg ASTRO_BUILD_MODE=production \
+            -t "${ASTRO_IMAGE}:${image_tag}" \
+            .
+          docker build \
+            -t "${PYWORKER_IMAGE}:${image_tag}" \
+            ./pyworker
+
+          docker push "${ASTRO_IMAGE}:${image_tag}"
+          docker push "${PYWORKER_IMAGE}:${image_tag}"
+
+          echo "image_tag=${image_tag}" >> "$FORGEJO_OUTPUT"
+
+  deploy:
+    needs: build
+    runs-on: prod
+    steps:
+      - name: Deploy production
+        run: |
+          set -euo pipefail
+
+          /opt/forgejo-runner/bin/deploy-prod "${{ needs.build.outputs.image_tag }}"
+
+  publish:
+    needs: prepare
+    if: needs.prepare.outputs.mode == 'public'
+    runs-on: preprod
+    steps:
+      - name: Publish master and the tag to the public repository
+        run: |
+          set -euo pipefail
+
+          token="${{ secrets.PUBLIC_REPO_TOKEN }}"
+          if [ -z "$token" ]; then
+            echo "Missing PUBLIC_REPO_TOKEN action secret." >&2
+            exit 1
+          fi
+          tag="${{ needs.prepare.outputs.tag }}"
+
+          rm -rf "$FORGEJO_WORKSPACE"
+          mkdir -p "$FORGEJO_WORKSPACE"
+          cd "$FORGEJO_WORKSPACE"
+          git init -q
+          git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" fetch -q \
+            "$FORGEJO_SERVER_URL/$FORGEJO_REPOSITORY.git" \
+            "+refs/heads/master:refs/heads/master" "+refs/tags/*:refs/tags/*"
+
+          if [ "$(git rev-parse "refs/tags/$tag^{commit}")" != "$(git rev-parse refs/heads/master)" ]; then
+            echo "master moved past $tag since this release started. Not publishing." >&2
+            exit 1
+          fi
+
+          # Deploy production in the public repository starts when this tag lands there.
+          git -c http.extraHeader="Authorization: token $token" push -q \
+            "$FORGEJO_SERVER_URL/$PUBLIC_REPO.git" \
+            "refs/heads/master:refs/heads/master" "refs/tags/$tag:refs/tags/$tag"
+
+          previous="$(git tag --list 'v*' --sort=-creatordate | grep -vx "$tag" | head -n 1 || true)"
+          if [ -n "$previous" ]; then
+            notes="$(git log --format='- %s' "$previous..$tag")"
+          else
+            notes="First published release."
+          fi
+          payload="$(jq -n --arg tag "$tag" --arg notes "$notes" '{tag_name: $tag, name: $tag, body: $notes}')"
+
+          curl -sS --fail-with-body -o /dev/null \
+            -X POST "$FORGEJO_SERVER_URL/api/v1/repos/$PUBLIC_REPO/releases" \
+            -H "Authorization: token $token" \
+            -H "Content-Type: application/json" \
+            --data-binary "$payload"
+
+          echo "Published $tag to $PUBLIC_REPO. Watch its Deploy production run for the rollout."

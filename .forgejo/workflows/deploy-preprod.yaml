@@ -1,10 +1,21 @@
 name: Deploy preprod
 
+# Runs on every push to dev. To put another branch on preprod, open
+# Actions > Deploy preprod > Run workflow and pick the branch there.
 on:
   push:
     branches:
       - dev
   workflow_dispatch:
+    inputs:
+      database:
+        description: "auto: reset preprod from the latest prod dump only when the database holds migrations this branch lacks. keep: never reset. sync-prod: always reset."
+        type: choice
+        default: auto
+        options:
+          - auto
+          - keep
+          - sync-prod
 
 concurrency:
   group: preprod-deploy
@@ -18,15 +29,6 @@ jobs:
   build-and-deploy:
     runs-on: preprod
     steps:
-      - name: Check branch
-        run: |
-          set -euo pipefail
-
-          if [ "$FORGEJO_REF_NAME" != "dev" ]; then
-            echo "Preprod deploys must run from dev. Current ref: $FORGEJO_REF_NAME" >&2
-            exit 1
-          fi
-
       - name: Checkout
         run: |
           set -euo pipefail
@@ -35,26 +37,21 @@ jobs:
           mkdir -p "$FORGEJO_WORKSPACE"
           cd "$FORGEJO_WORKSPACE"
 
-          git init
+          git init -q
           git remote add origin "$FORGEJO_SERVER_URL/$FORGEJO_REPOSITORY.git"
-          git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" fetch --depth=1 origin "$FORGEJO_SHA"
-          git checkout --detach FETCH_HEAD
+          git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" fetch -q origin \
+            "+refs/heads/master:refs/remotes/origin/master" "$FORGEJO_SHA"
+          git checkout -q --detach "$FORGEJO_SHA"
 
-      - name: Login to tig.cx registry
+      - name: Check commits
+        working-directory: ${{ forgejo.workspace }}
+        env:
+          ALLOWED_AUTHOR_EMAILS: ${{ vars.ALLOWED_AUTHOR_EMAILS }}
+          FORBIDDEN_STRINGS: ${{ vars.FORBIDDEN_STRINGS }}
         run: |
           set -euo pipefail
-          export DOCKER_CONFIG="$FORGEJO_WORKSPACE/.docker"
-          mkdir -p "$DOCKER_CONFIG"
-
-          if [ -z "${{ secrets.TIG_PACKAGE_USER }}" ] || [ -z "${{ secrets.TIG_PACKAGE_TOKEN }}" ]; then
-            echo "Missing TIG_PACKAGE_USER or TIG_PACKAGE_TOKEN action secret." >&2
-            exit 1
-          fi
-
-          printf '%s' "${{ secrets.TIG_PACKAGE_TOKEN }}" \
-            | docker login tig.cx \
-              --username "${{ secrets.TIG_PACKAGE_USER }}" \
-              --password-stdin
+          base="$(git merge-base origin/master HEAD)"
+          scripts/ci/check-commits.sh "$base" HEAD
 
       - name: Reclaim disk from old deploy images
         run: |
@@ -63,15 +60,17 @@ jobs:
           # accumulate until the disk fills and the build (and Postgres) die.
           docker image prune -af || true
 
-      - name: Build and push images
+      # Built with the host's docker, so the stack on this machine sees the
+      # image at once. Preprod images never go to the registry.
+      - name: Build images
         id: images
         working-directory: ${{ forgejo.workspace }}
         run: |
           set -euo pipefail
-          export DOCKER_CONFIG="$FORGEJO_WORKSPACE/.docker"
 
           short_sha="$(printf '%s' "$FORGEJO_SHA" | cut -c1-8)"
-          image_tag="pre-${short_sha}"
+          branch_slug="$(printf '%s' "$FORGEJO_REF_NAME" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-40)"
+          image_tag="pre-${branch_slug}-${short_sha}"
 
           docker build \
             -f web/Dockerfile \
@@ -82,13 +81,10 @@ jobs:
             -t "${PYWORKER_IMAGE}:${image_tag}" \
             ./pyworker
 
-          docker push "${ASTRO_IMAGE}:${image_tag}"
-          docker push "${PYWORKER_IMAGE}:${image_tag}"
-
           echo "image_tag=${image_tag}" >> "$FORGEJO_OUTPUT"
 
       - name: Deploy preprod
         run: |
           set -euo pipefail
 
-          /opt/forgejo-runner/bin/deploy-pre "${{ steps.images.outputs.image_tag }}"
+          /opt/forgejo-runner/bin/deploy-pre "${{ steps.images.outputs.image_tag }}" "${{ inputs.database || 'auto' }}"

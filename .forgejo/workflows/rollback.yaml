@@ -1,0 +1,25 @@
+name: Rollback production
+
+# Puts production back on an earlier image without touching the database.
+# Safe because migrations only ever add; see scripts/ci/check-commits.sh.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to return to, like prod-v20260902.1. Leave empty for the one that ran before the current release."
+        type: string
+        default: ""
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: prod
+    steps:
+      - name: Roll back production
+        run: |
+          set -euo pipefail
+
+          /opt/forgejo-runner/bin/deploy-prod --rollback "${{ inputs.tag }}"

@@ -6,7 +6,32 @@ pyworker_image := env_var_or_default("PYWORKER_IMAGE", "tig.cx/pluja/kycnot/pywo
 @default:
   just --list
 
-# Build & roll out preprod from dev (image tag pre-<8-char-sha>). Mirrors deploy-preprod.yaml. Pass `nocache` to skip the docker layer cache.
+# Build and deploy a branch to preprod through tig.cx (needs FORGEJO_REPO and FORGEJO_API_TOKEN in .env)
+preprod branch="dev" database="auto":
+  just _dispatch deploy-preprod.yaml "{{branch}}" '{"database": "{{database}}"}'
+
+# Release a branch through tig.cx: fast-forward master, tag (empty = vYYYYMMDD.N), build, deploy prod, publish (publish=false keeps it private)
+release branch="dev" tag="" publish="true":
+  just _dispatch release.yaml "{{branch}}" '{"tag": "{{tag}}", "publish": "{{publish}}"}'
+
+# Put production back on an earlier image through tig.cx (empty tag = the previous one)
+rollback tag="":
+  just _dispatch rollback.yaml master '{"tag": "{{tag}}"}'
+
+_dispatch workflow ref inputs:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  : "${FORGEJO_REPO:?Set FORGEJO_REPO=owner/repo in .env}"
+  : "${FORGEJO_API_TOKEN:?Set FORGEJO_API_TOKEN in .env (a token with write:repository)}"
+  url="${FORGEJO_URL:-https://tig.cx}"
+  curl -sS --fail-with-body \
+    -X POST "$url/api/v1/repos/$FORGEJO_REPO/actions/workflows/{{workflow}}/dispatches" \
+    -H "Authorization: token $FORGEJO_API_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "$(jq -n --arg ref "{{ref}}" --argjson inputs '{{inputs}}' '{ref: $ref, inputs: $inputs}')"
+  echo "Started {{workflow}} on {{ref}}: $url/$FORGEJO_REPO/actions"
+
+# Fallback when tig.cx is down: build here and roll out preprod over ssh (`nocache` skips the layer cache)
 deploy-pre flag="":
   #!/usr/bin/env bash
   set -euo pipefail
@@ -17,18 +42,14 @@ deploy-pre flag="":
     exit 1
   fi
 
-  current=$(git symbolic-ref --short HEAD)
-  if [ "$current" != "dev" ]; then
-    echo "Preprod deploys must run from dev (currently on $current)." >&2
-    exit 1
-  fi
-
+  branch=$(git symbolic-ref --short HEAD)
+  branch_slug=$(printf '%s' "$branch" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-40)
   short_sha=$(git rev-parse HEAD | cut -c1-8)
-  image_tag="pre-${short_sha}"
+  image_tag="pre-${branch_slug}-${short_sha}"
 
   exec just _deploy pre staging SSH_PRE_TARGET APP_DIR_PRE no "$image_tag"
 
-# Build & roll out prod from a v* git tag on master (image tag prod-<tag>). Mirrors deploy-production.yaml. Pass `nocache` to skip the docker layer cache.
+# Fallback when tig.cx is down: build here and roll out prod over ssh; HEAD needs a v* tag on master (`nocache` skips the layer cache)
 deploy-prod flag="":
   #!/usr/bin/env bash
   set -euo pipefail
@@ -45,6 +66,7 @@ deploy-prod flag="":
     echo "HEAD has no v* tag. Tag the release commit first, then re-run:" >&2
     echo "  git tag ${next}    # bump the trailing number for same-day releases" >&2
     echo "  git push origin ${next}" >&2
+    echo "Prefer 'just release' when tig.cx is up: it tags, deploys and publishes on its own." >&2
     exit 1
   fi
 
@@ -59,8 +81,7 @@ deploy-prod flag="":
 
   exec just _deploy prod production SSH_PROD_TARGET APP_DIR_PROD yes "$image_tag"
 
-# Fast-forward master to dev and push. Run after preprod is verified, before
-# tagging: deploy-prod refuses a tag that is not already on master.
+# Fast-forward master to dev and push, for the ssh fallback only; the release workflow does this itself
 promote-to-master:
   #!/usr/bin/env bash
   set -euo pipefail
