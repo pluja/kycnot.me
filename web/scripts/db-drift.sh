@@ -12,6 +12,16 @@
 # the primary at all and this cannot be got wrong from a typo.
 set -eu
 
+# Prisma reads .env on its own, but the checks below run before Prisma does, so
+# the two URLs are read here too. Only these two keys are taken: sourcing the
+# whole file would execute whatever a secret happens to contain.
+read_env() {
+  [ -f .env ] || return 0
+  sed -n "s/^[[:space:]]*$1=//p" .env | tail -n 1 | sed -e 's/^"//' -e 's/"$//'
+}
+: "${DATABASE_URL:=$(read_env DATABASE_URL)}"
+: "${SHADOW_DATABASE_URL:=$(read_env SHADOW_DATABASE_URL)}"
+
 if [ -z "${DATABASE_URL:-}" ]; then
   echo "DATABASE_URL is not set" >&2
   exit 1

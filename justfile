@@ -156,6 +156,18 @@ _deploy env mode ssh_var dir_var confirm image_tag:
 dev-database:
   docker compose -f docker-compose.yml -f docker-compose.dev.yml up database redis db-admin
 
+# Create the throwaway database `npm run db-drift` replays migrations into (Prisma empties it but will not create it)
+db-shadow:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  shadow="${POSTGRES_DATABASE:-kycnot}_shadow"
+  exists=$(docker compose exec -T database psql -U ${POSTGRES_USER:-kycnot} -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$shadow'")
+  if [ -z "$exists" ]; then
+    docker compose exec -T database psql -U ${POSTGRES_USER:-kycnot} -d postgres -c "CREATE DATABASE $shadow;"
+  else
+    echo "Shadow database $shadow already exists."
+  fi
+
 # Import all triggers to the database
 import-triggers:
   #!/bin/bash
@@ -258,7 +270,9 @@ import-db file="":
   
   echo "Production database import completed successfully!"
   echo "Migration status:"
-  cd web && npx prisma migrate status || echo "(Skipped migration status check; DATABASE_URL likely points at the docker network. Run inside a container or override DATABASE_URL=postgresql://kycnot:kycnot@localhost:3399/kycnot if you need this.)"
+  # DATABASE_URL names the database on the compose network, which the host cannot
+  # resolve, so the published port is used instead.
+  cd web && DATABASE_URL="postgresql://${POSTGRES_USER:-kycnot}:${POSTGRES_PASSWORD:-kycnot}@127.0.0.1:${POSTGRES_HOST_PORT:-3399}/${POSTGRES_DATABASE:-kycnot}?schema=public" npx prisma migrate status
 
 # Scaffold a new blog post (markdown + image folder co-located in one directory)
 new-blog:
