@@ -74,6 +74,8 @@ jobs:
         working-directory: ${{ forgejo.workspace }}
         run: |
           set -euo pipefail
+          # The runner's docker config is mounted read-only; buildx keeps its state here instead.
+          export BUILDX_CONFIG="$FORGEJO_WORKSPACE/.buildx"
 
           short_sha="$(printf '%s' "$FORGEJO_SHA" | cut -c1-8)"
           branch_slug="$(printf '%s' "$FORGEJO_REF_NAME" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-40)"
