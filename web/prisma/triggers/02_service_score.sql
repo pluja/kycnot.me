@@ -303,8 +303,11 @@ CREATE TRIGGER service_score_update_trigger
     EXECUTE FUNCTION calculate_service_scores();
 
 -- Create trigger to recalculate scores when service attributes change
+-- UPDATE is scoped to the two columns the score reads. `note` is per-service
+-- prose, so editing it must not recalculate scores and fire score-change
+-- notifications to everyone watching the service.
 CREATE TRIGGER service_attribute_change_trigger
-    AFTER INSERT OR UPDATE OR DELETE
+    AFTER INSERT OR DELETE OR UPDATE OF "serviceId", "attributeId"
     ON "ServiceAttribute"
     FOR EACH ROW
     WHEN (pg_trigger_depth() < 2)  -- Prevent recursive triggering

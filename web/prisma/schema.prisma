@@ -956,6 +956,13 @@ model ServiceAttribute {
   serviceId   Int
   attribute   Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
   attributeId Int
+  /// What this attribute means for this specific service, where the shared
+  /// description cannot be specific enough (a guarantee's cap and exclusions,
+  /// which partner can still ask for ID).
+  ///
+  /// Presentational only. Scores sum points from Attribute, so nothing written
+  /// here can move a number; that is what keeps scoring hand-proof.
+  note        String?   @db.VarChar(300)
   createdAt   DateTime  @default(now())
 
   @@id([serviceId, attributeId])

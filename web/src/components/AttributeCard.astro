@@ -6,6 +6,7 @@ import { formatNumber, type FormatNumberOptions } from '../lib/numbers'
 import { stripMarkdown } from '../lib/strings'
 
 import Markdown from './Markdown.astro'
+import Tooltip from './Tooltip.astro'
 
 import type { getAttributeTypeInfo } from '../constants/attributeTypes'
 
@@ -15,6 +16,8 @@ type Props = {
     description: string
     privacyPoints: number
     trustPoints: number
+    /** Per-service detail. Sits under the shared description, never scored. */
+    note?: string | null
     typeInfo: ReturnType<typeof getAttributeTypeInfo>
     links: {
       url: string
@@ -27,6 +30,12 @@ type Props = {
 const { attribute } = Astro.props
 
 const excerpt = stripMarkdown(attribute.description.split('\n')[0] ?? '')
+
+// A per-service note is the more specific of the two, so it becomes the
+// collapsed preview and carries a marker: otherwise the only cards worth
+// opening look exactly like the ones that are not.
+const note = attribute.note?.trim()
+const preview = note ?? excerpt
 
 const baseFormatOptions = {
   roundDigits: 2,
@@ -68,13 +77,15 @@ const weights = [
         <span class="mr-auto ml-1">{attribute.title}</span>
         {
           weights.map((w) => (
-            <span class={cn('ml-2 text-center text-sm', w.value === 0 ? 'text-current/50' : 'text-current/80')}>
+            <span
+              class={cn('ml-2 text-center text-sm', w.value === 0 ? 'text-current/50' : 'text-current/80')}
+            >
               {formatNumber(w.value, w.formatOptions)}
             </span>
           ))
         }
         {
-          !excerpt && (
+          !preview && (
             <Icon
               name="ri:arrow-down-s-line"
               class={cn('ml-1 size-5 group-open/attribute:rotate-180', attribute.typeInfo.classNames.icon)}
@@ -83,10 +94,20 @@ const weights = [
         }
       </div>
       {
-        excerpt && (
+        preview && (
           <div class="mt-0.5 flex items-center gap-1 group-open/attribute:hidden">
-            <p class="ml-1 line-clamp-1 flex-1 text-xs font-normal text-current/80">{excerpt}</p>
-            <Icon name="ri:arrow-down-s-line" class={cn('size-5 shrink-0', attribute.typeInfo.classNames.icon)} />
+            {note && (
+              <Tooltip text="We added a note specific to this service" class="ml-1 inline-flex shrink-0">
+                <Icon name="ri:sticky-note-line" class={cn('size-3.5', attribute.typeInfo.classNames.icon)} />
+              </Tooltip>
+            )}
+            <p class={cn('line-clamp-1 flex-1 text-xs font-normal text-current/80', !note && 'ml-1')}>
+              {preview}
+            </p>
+            <Icon
+              name="ri:arrow-down-s-line"
+              class={cn('size-5 shrink-0', attribute.typeInfo.classNames.icon)}
+            />
           </div>
         )
       }
@@ -105,6 +126,14 @@ const weights = [
         <Markdown content={attribute.description} />
       </div>
 
+      {
+        attribute.note && (
+          <p class="mt-1.5 border-l-2 border-current/25 pl-2 text-xs/normal text-pretty text-current/90">
+            <span class="font-bold">For this service:</span> {attribute.note}
+          </p>
+        )
+      }
+
       <div class="mt-1 flex justify-evenly gap-4">
         {
           weights.map((w) => (
@@ -118,7 +147,9 @@ const weights = [
               >
                 {formatNumber(w.value, w.formatOptions)}
               </span>
-              <span class={cn('text-2xs font-bold text-white uppercase', attribute.typeInfo.classNames.textLight)}>
+              <span
+                class={cn('text-2xs font-bold text-white uppercase', attribute.typeInfo.classNames.textLight)}
+              >
                 {w.label}
               </span>
             </div>

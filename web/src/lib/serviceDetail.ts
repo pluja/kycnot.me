@@ -74,6 +74,7 @@ export function serviceDetailSelect(viewerId: number) {
     },
     attributes: {
       select: {
+        note: true,
         attribute: {
           select: {
             id: true,

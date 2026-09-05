@@ -1,4 +1,5 @@
 ---
+import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 import { orderBy } from 'lodash-es'
 
@@ -9,6 +10,7 @@ import { currencies } from '../../../../constants/currencies'
 import { kycLevels } from '../../../../constants/kycLevels'
 import { serviceVisibilities } from '../../../../constants/serviceVisibility'
 import { verificationStatuses } from '../../../../constants/verificationStatus'
+import { cn } from '../../../../lib/cn'
 import FormSection from '../../../FormSection.astro'
 import InputCardGroup from '../../../InputCardGroup.astro'
 import InputCheckbox from '../../../InputCheckbox.astro'
@@ -18,13 +20,21 @@ import InputSelect from '../../../InputSelect.astro'
 import InputSubmitButton from '../../../InputSubmitButton.astro'
 import InputText from '../../../InputText.astro'
 import InputTextArea from '../../../InputTextArea.astro'
+import Tooltip from '../../../Tooltip.astro'
+import EditableListItem from '../../EditableListItem.astro'
+import EditToggleButton from '../../EditToggleButton.astro'
 
 import type { Prisma } from '@prisma/client'
 
 type Props = {
   service: Prisma.ServiceGetPayload<{
     include: {
-      attributes: { select: { attribute: { select: { id: true } } } }
+      attributes: {
+        select: {
+          note: true
+          attribute: { select: { id: true; title: true; category: true; type: true } }
+        }
+      }
       categories: { select: { id: true; name: true; icon: true } }
     }
   }>
@@ -36,6 +46,19 @@ type Props = {
 
 const { service, categories, attributes, inputErrors, id = 'details' } = Astro.props
 const sectionHash = `#${id}`
+
+// Filled notes first: on a service with a dozen attributes the two that carry a
+// note should not be buried among empty boxes.
+const noteFields = orderBy(
+  service.attributes.map(({ attribute, note }) => ({
+    attribute,
+    note,
+    categoryInfo: getAttributeCategoryInfo(attribute.category),
+    typeInfo: getAttributeTypeInfo(attribute.type),
+  })),
+  [({ note }) => (note ? 0 : 1), 'categoryInfo.order', 'typeInfo.order']
+)
+const notedCount = noteFields.filter(({ note }) => note).length
 ---
 
 <FormSection title="Service Details" id={id}>
@@ -220,6 +243,86 @@ const sectionHash = `#${id}`
         error={inputErrors.attributes}
       />
     </div>
+
+    {
+      noteFields.length > 0 && (
+        <details class="group/notes rounded-lg border border-night-600">
+          <summary class="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm select-none hover:bg-night-800">
+            <Icon
+              name="ri:arrow-right-s-line"
+              class="size-4 shrink-0 text-day-500 group-open/notes:rotate-90"
+            />
+            <span class="font-title font-medium text-day-200">Per-service attribute notes</span>
+            <span class="text-xs text-day-500">
+              {notedCount > 0
+                ? `${notedCount.toString()} of ${noteFields.length.toString()} have a note`
+                : `none of ${noteFields.length.toString()}`}
+            </span>
+          </summary>
+
+          <div class="space-y-2 border-t border-night-600 p-3">
+            <p class="text-xs text-day-500">
+              What an attribute means for <b class="text-day-400">this</b> service, where the shared
+              description cannot be specific. State a fact, do not argue a case, and do not repeat the
+              description. Never affects the score.
+            </p>
+
+            <ul class="space-y-1.5">
+              {noteFields.map(({ attribute, note, categoryInfo, typeInfo }) => {
+                const itemId = `attribute-note-${attribute.id.toString()}`
+                return (
+                  <li>
+                    <EditableListItem id={itemId} borderClass={typeInfo.classNames.subcontainer} class="p-2">
+                      <Fragment slot="header">
+                        <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+                          <Tooltip text={categoryInfo.label}>
+                            <Icon
+                              name={categoryInfo.icon}
+                              class={cn('size-3.5', categoryInfo.classNames.icon)}
+                            />
+                          </Tooltip>
+                          <Tooltip text={typeInfo.label}>
+                            <Icon name={typeInfo.icon} class={cn('size-3.5', typeInfo.classNames.icon)} />
+                          </Tooltip>
+                          <span class="font-medium text-day-100">{attribute.title}</span>
+                          <span
+                            class={cn(
+                              'w-full min-w-0 truncate text-xs sm:w-auto sm:flex-1',
+                              note ? 'text-day-400' : 'text-day-600 italic'
+                            )}
+                          >
+                            {note ?? 'No note'}
+                          </span>
+                        </div>
+                      </Fragment>
+
+                      <Fragment slot="actions">
+                        <EditToggleButton for={itemId} />
+                      </Fragment>
+
+                      <Fragment slot="edit">
+                        <input type="hidden" name="attributeNoteIds" value={attribute.id.toString()} />
+                        <InputTextArea
+                          name="attributeNotes"
+                          label={`Note for ${attribute.title}`}
+                          hideLabel
+                          value={note}
+                          inputProps={{
+                            rows: 3,
+                            maxlength: 300,
+                            placeholder: 'Leave empty to remove the note',
+                          }}
+                        />
+                      </Fragment>
+                    </EditableListItem>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        </details>
+      )
+    }
 
     <InputCardGroup
       name="kycLevel"
