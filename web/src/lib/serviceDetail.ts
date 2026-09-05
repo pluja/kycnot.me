@@ -78,6 +78,7 @@ export function serviceDetailSelect(viewerId: number) {
         attribute: {
           select: {
             id: true,
+            slug: true,
             type: true,
             category: true,
             title: true,
@@ -146,6 +147,7 @@ export function serviceDetailSelect(viewerId: number) {
     },
     verificationSteps: {
       select: {
+        id: true,
         title: true,
         description: true,
         status: true,

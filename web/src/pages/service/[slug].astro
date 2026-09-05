@@ -3,11 +3,11 @@ import { VerificationStepStatus } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
 import { Schema } from 'astro-seo-schema'
 import { actions } from 'astro:actions'
-import { head, orderBy, pick, shuffle, tail } from 'lodash-es'
+import { formatDistanceToNowStrict } from 'date-fns'
+import { orderBy, pick } from 'lodash-es'
 
 import AdminOnly from '../../components/AdminOnly.astro'
 import AttributeCard from '../../components/AttributeCard.astro'
-import BadgeSmall from '../../components/BadgeSmall.astro'
 import BadgeStandard from '../../components/BadgeStandard.astro'
 import CommentSection from '../../components/CommentSection.astro'
 import CommentSummary from '../../components/CommentSummary.astro'
@@ -20,25 +20,29 @@ import InputSubmitButton from '../../components/InputSubmitButton.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
 import Markdown from '../../components/Markdown.astro'
 import MyPicture from '../../components/MyPicture.astro'
+import RatingBadge from '../../components/RatingBadge.astro'
 import ScoreGauge from '../../components/ScoreGauge.astro'
 import ScoreSquare from '../../components/ScoreSquare.astro'
+import AcceptedCurrencies from '../../components/service/AcceptedCurrencies.astro'
+import ServiceAnswerPanel from '../../components/service/ServiceAnswerPanel.astro'
+import ServiceRiskAlert from '../../components/service/ServiceRiskAlert.astro'
 import TosReviewSection from '../../components/service/TosReviewSection.astro'
+import TosSummaryCard from '../../components/service/TosSummaryCard.astro'
 import ServiceLinkButton from '../../components/ServiceLinkButton.astro'
 import SwapCTA from '../../components/swap/SwapCTA.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import Tooltip from '../../components/Tooltip.astro'
 import UserBadge from '../../components/UserBadge.astro'
-import VerificationSnapshot from '../../components/VerificationSnapshot.astro'
-import VerificationWarningBanner from '../../components/VerificationWarningBanner.astro'
 import { getAttributeCategoryInfo } from '../../constants/attributeCategories'
 import { baseScoreType, getAttributeTypeInfo } from '../../constants/attributeTypes'
 import { formatContactMethod } from '../../constants/contactMethods'
+import { getCountryInfo } from '../../constants/countries'
 import { currencies, getCurrencyInfo } from '../../constants/currencies'
 import { incidentSeverities } from '../../constants/incidentSeverities'
-import { getKycLevelInfo, kycLevels } from '../../constants/kycLevels'
+import { getKycLevelInfo } from '../../constants/kycLevels'
 import { getServiceVisibilityInfo } from '../../constants/serviceVisibility'
 import { getUserSentimentInfo } from '../../constants/userSentiment'
-import { getServiceStatusIcon, getVerificationStatusInfo } from '../../constants/verificationStatus'
+import { getVerificationStatusInfo } from '../../constants/verificationStatus'
 import { getVerificationStepStatusInfo } from '../../constants/verificationStepStatus'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { someButNotAll, undefinedIfEmpty } from '../../lib/arrays'
@@ -48,6 +52,7 @@ import { getEventDisplay, pickPrimaryEvent } from '../../lib/eventKind'
 import { getSupportedProviderSlugs } from '../../lib/exchange/supportedProviders'
 import { computeIncidentTrustPenalty, totalIncidentTrustPenalty } from '../../lib/incidentPenalty'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
+import { formatNumber } from '../../lib/numbers'
 import { makeOgImageUrl } from '../../lib/ogImageUrl'
 import { setPublicPageCacheHeaders } from '../../lib/pageCacheHeaders'
 import { fitPageTitle } from '../../lib/pageTitle'
@@ -55,17 +60,27 @@ import { pluralize } from '../../lib/pluralize'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
 import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
+import {
+  checkAnchor,
+  hasBeenReviewed,
+  makeKycAnswer,
+  makeSafetyAnswer,
+  makeQuestions,
+  pickCaveats,
+} from '../../lib/serviceAnswers'
 import { isEmbeddableBadgeStatus } from '../../lib/serviceBadges'
 import { serviceDetailSelect } from '../../lib/serviceDetail'
+import { makeServiceFaq } from '../../lib/serviceFaq'
 import { getServiceVerificationOverview } from '../../lib/serviceVerification'
-import { firstParagraph, transformCase } from '../../lib/strings'
+import { transformCase } from '../../lib/strings'
 import { formatDateShort } from '../../lib/timeAgo'
-import { absoluteSiteUrl, siteOrigin, urlWithParams } from '../../lib/urls'
+import { absoluteSiteUrl, siteOrigin, urlDomain, urlWithParams } from '../../lib/urls'
 
 import type { BreadcrumArray } from '../../components/BaseHead.astro'
+import type { TailwindColor } from '../../lib/colors'
 import type { OgImagePublicTemplateWithProps } from '../../lib/ogImageProps'
 import type { Prisma, ServiceVisibility } from '@prisma/client'
-import type { ContactPoint, ListItem, Organization, Review, WebPage, WithContext } from 'schema-dts'
+import type { ContactPoint, FAQPage, ListItem, Organization, Review, WebPage, WithContext } from 'schema-dts'
 
 const { slug } = Astro.params
 
@@ -143,9 +158,6 @@ if (!visibleStatuses.includes(service.serviceVisibility)) {
 // Set after the 404/redirect returns above so only a real service page is
 // cached. Signed-in visitors get `no-store`, which is also what keeps a
 // HIDDEN service (visible only via `services:edit`) out of a shared cache.
-// The mirror-URL shuffle below is frozen for the edge TTL as a result; that
-// affects the 22 of 367 public services with more than one URL, and only
-// changes which mirror is listed first.
 setPublicPageCacheHeaders(Astro.response.headers, {
   isAuthenticated: user !== null,
   hasErrors: Astro.locals.banners.errors.length > 0,
@@ -188,21 +200,8 @@ const makeWatchingDetails = (
 
 const watchingDetails = makeWatchingDetails(dbNotificationPreferences, service.id)
 
-const statusBadge = getServiceStatusIcon(service.verificationStatus)
-
-const shuffledLinks = {
-  clearnet: shuffle(service.serviceUrls),
-  onion: shuffle(service.onionUrls),
-  i2p: shuffle(service.i2pUrls),
-}
-const shownLinks = [head(shuffledLinks.clearnet), head(shuffledLinks.onion), head(shuffledLinks.i2p)].filter(
-  (url) => url !== undefined
-)
-const hiddenLinks = [
-  ...tail(shuffledLinks.clearnet),
-  ...tail(shuffledLinks.onion),
-  ...tail(shuffledLinks.i2p),
-]
+// Clearnet first, then the private networks, each in the order the listing has them.
+const serviceLinks = [...service.serviceUrls, ...service.onionUrls, ...service.i2pUrls]
 
 const kycLevelInfo = getKycLevelInfo(`${service.kycLevel}`)
 
@@ -223,8 +222,9 @@ const userSentiment = service.userSentiment
 
 const attributes = sortAttributes([
   ...makeNonDbAttributes(service, { filter: true }),
-  ...service.attributes.map(({ attribute }) => ({
+  ...service.attributes.map(({ attribute, note }) => ({
     ...attribute,
+    note,
     links:
       attribute.type === 'GOOD' || attribute.type === 'INFO'
         ? [
@@ -255,8 +255,17 @@ const attributes = sortAttributes([
   }
 })
 
-const kycAttributes = attributes.filter((a) => a.category === 'KYC')
-const nonKycAttributes = attributes.filter((a) => a.category !== 'KYC')
+const formatPoints = (value: number) =>
+  formatNumber(value, { roundDigits: 2, showSign: true, removeTrailingZeros: true })
+
+// The ledger groups by what a fact does to the score, not by its type badge:
+// a reader adding things up wants to see what pulled the number down.
+const pointsOf = (attribute: { privacyPoints: number; trustPoints: number }) =>
+  attribute.privacyPoints + attribute.trustPoints
+const subtotalOf = (rows: { privacyPoints: number; trustPoints: number }[]) => [
+  { label: 'privacy', value: rows.reduce((sum, row) => sum + row.privacyPoints, 0) },
+  { label: 'trust', value: rows.reduce((sum, row) => sum + row.trustPoints, 0) },
+]
 
 const isFlaggedScam = service.verificationStatus === 'VERIFICATION_FAILED'
 
@@ -318,8 +327,11 @@ const getKycPolicySummary = (kycLevel: number) => {
   }
 }
 
+// Acronym category names (VPN, VPS, SMS, DEX) must survive the lowercasing
+// that makes the rest read as prose.
+const asProseCategory = (name: string) => (name === name.toUpperCase() ? name : name.toLowerCase())
 const categorySummary = service.categories.length
-  ? `${sentenceListFormatter.format(service.categories.map((category) => category.name.toLowerCase()))} service`
+  ? `${sentenceListFormatter.format(service.categories.map((category) => asProseCategory(category.name)))} service`
   : 'service'
 const acceptedCurrencyNames = service.acceptedCurrencies.map((currency) => getCurrencyInfo(currency).name)
 // A flagged service leads with the verdict. The neutral facts below otherwise
@@ -338,6 +350,7 @@ const serviceFactsSummary = [
   .filter((sentence): sentence is string => !!sentence)
   .join(' ')
 const serviceSummary = transformCase(serviceFactsSummary, 'first-upper')
+
 // The shorter fallbacks stay scam-led too: the meta description is what search
 // results show, so a flagged service must never fall back to a neutral blurb.
 const scamDescription = `${service.name} is flagged as a scam on KYCnot.me. ${statusInfo.headline}.`
@@ -393,6 +406,59 @@ const incidentsByImpact = incidents.map((entry) => ({
 const activeIncidents = incidentsByImpact.filter((entry) => !entry.faded)
 const pastIncidents = incidentsByImpact.filter((entry) => entry.faded)
 
+// The incident penalty is not an attribute row in the database, but it reads
+// as one in the ledger: same card, same columns, linking to the incidents.
+const incidentPenaltyAttribute = {
+  slug: 'active-incidents',
+  title: 'Active incidents',
+  description:
+    'Open incidents, and resolved ones still inside their decay window, cost trust until they fade.',
+  privacyPoints: 0,
+  trustPoints: incidentTrustPenalty,
+  typeInfo: getAttributeTypeInfo('BAD'),
+  links: [{ url: '#incidents', label: 'See the incidents', icon: 'ri:alarm-warning-line' }],
+}
+
+const baseScoreAttribute = {
+  slug: baseScoreType.slug,
+  title: baseScoreType.label,
+  description: 'Every service starts at 50 privacy and 50 trust before its attributes are added.',
+  privacyPoints: 50,
+  trustPoints: 50,
+  typeInfo: baseScoreType,
+  links: [],
+}
+
+const hurtingRows = attributes.filter((attribute) => pointsOf(attribute) < 0)
+const helpingRows = attributes.filter((attribute) => pointsOf(attribute) > 0)
+const neutralRows = attributes.filter((attribute) => pointsOf(attribute) === 0)
+const ledgerGroupCandidates = [
+  {
+    title: 'Negative',
+    rows: hurtingRows,
+    showIncidentPenalty: incidentTrustPenalty < 0,
+    showBaseScore: false,
+    subtotal: subtotalOf([...hurtingRows, { privacyPoints: 0, trustPoints: incidentTrustPenalty }]),
+  },
+  {
+    title: 'Positive',
+    rows: helpingRows,
+    showIncidentPenalty: false,
+    showBaseScore: false,
+    subtotal: subtotalOf(helpingRows),
+  },
+  { title: 'Neutral', rows: neutralRows, showIncidentPenalty: false, showBaseScore: false, subtotal: [] },
+]
+const ledgerGroups = (
+  ledgerGroupCandidates.filter((group) => group.rows.length > 0 || group.showIncidentPenalty).length > 0
+    ? ledgerGroupCandidates.filter((group) => group.rows.length > 0 || group.showIncidentPenalty)
+    : // A listing with no attributes at all still gets the base score, under Neutral.
+      ledgerGroupCandidates.filter((group) => group.title === 'Neutral')
+)
+  // The base score closes the ledger under whatever group comes last. It is
+  // the starting point, so it stays out of every subtotal.
+  .map((group, index, groups) => ({ ...group, showBaseScore: index === groups.length - 1 }))
+
 const pastSeverityBreakdown = [...incidentSeverities]
   .sort((a, b) => b.order - a.order)
   .map((info) => ({
@@ -421,17 +487,27 @@ const getVerificationStepPriority = (status: VerificationStepStatus) => {
   }
 }
 
+// Timeline dots. Tailwind cannot build class names from data, so the status
+// colours are spelled out once here.
+const stepDotClass = {
+  green: 'bg-green-400',
+  red: 'bg-red-400',
+  yellow: 'bg-yellow-400',
+  blue: 'bg-blue-400',
+  gray: 'bg-gray-400',
+} satisfies Partial<Record<NonNullable<TailwindColor>, string>>
+
 const sortedVerificationSteps = orderBy(
   service.verificationSteps,
   [(step) => getVerificationStepPriority(step.status), (step) => step.updatedAt],
   ['asc', 'desc'] // Priority ascending (failed first), date descending (newest first)
 )
 
-const bannerVerificationSteps = sortedVerificationSteps.filter(
-  (step) =>
-    step.showBanner &&
-    (step.status === VerificationStepStatus.WARNING || step.status === VerificationStepStatus.FAILED)
-)
+// `showBanner` is the moderator's call on whether a failed or warned check
+// belongs in the verdict; the rest stay in the timeline only.
+const flaggedChecks = sortedVerificationSteps
+  .filter((step) => step.showBanner && (step.status === 'FAILED' || step.status === 'WARNING'))
+  .map((step) => ({ title: step.title, href: `#${checkAnchor(step.id)}`, failed: step.status === 'FAILED' }))
 
 const exchangeSlugs = ['exchange', 'cex', 'dex']
 const isExchange = service.categories.some((c) => exchangeSlugs.includes(c.slug))
@@ -445,6 +521,78 @@ const isSwapSupported =
   (supportedProviderSlugs.has(service.slug) || (import.meta.env.DEV && supportedProviderSlugs.size === 0))
 
 const verificationOverview = getServiceVerificationOverview(service)
+
+const needsAlternative =
+  isFlaggedScam ||
+  activeIncidents.some(
+    (entry) =>
+      entry.incident.state === 'ONGOING' &&
+      (entry.incident.severity === 'HIGH' || entry.incident.severity === 'CRITICAL')
+  )
+
+// The two questions a visitor actually arrives with. Kept apart because
+// `overallScore` averages privacy and trust, which hides the case that matters
+// most: a service can refuse to ask for ID and still be sitting on your money.
+const caveats = pickCaveats(attributes)
+const kycAnswer = makeKycAnswer(service.kycLevel, caveats.kyc, service.kycPolicyMd, isFlaggedScam)
+const safetyAnswer = makeSafetyAnswer({
+  verificationStatus: service.verificationStatus,
+  incidents: activeIncidents.map((entry) => ({
+    id: entry.id,
+    title: entry.title,
+    ...pick(entry.incident, ['severity', 'state', 'occurredAt', 'resolvedAt']),
+  })),
+  hasBeenReviewed: hasBeenReviewed(service.verificationStatus),
+  caveats: caveats.trust,
+  checks: flaggedChecks,
+  recentlyApprovedAt: service.isRecentlyApproved ? service.approvedAt : null,
+})
+const questions = makeQuestions(service.name, service.categories)
+const serviceFaq = makeServiceFaq({
+  name: service.name,
+  description: service.description,
+  summary: serviceSummary,
+  questions,
+  kyc: kycAnswer,
+  safety: safetyAnswer,
+  isFlaggedScam,
+  statusLabel: statusInfo.label,
+  statusDescription: statusInfo.description,
+  currencyNames: acceptedCurrencyNames,
+  onionHosts: service.onionUrls.map(urlDomain),
+  i2pHosts: service.i2pUrls.map(urlDomain),
+  ratingCount: service.userRatingCount,
+  averageRating: service.averageUserRating,
+  tosSummary: service.tosReview?.summary ?? null,
+})
+const registrationCountry = service.registrationCountryCode
+  ? getCountryInfo(service.registrationCountryCode)
+  : null
+type ServiceFact = {
+  text?: string
+  href?: string
+  icon?: string
+  rating?: { value: number | null; count: number }
+}
+const serviceFactCandidates: (ServiceFact | false | null)[] = [
+  registrationCountry && { text: registrationCountry.name, icon: 'ri:map-pin-line' },
+  service.operatingSince && {
+    text: formatDistanceToNowStrict(service.operatingSince, { roundingMethod: 'floor' }),
+    icon: 'ri:cake-2-line',
+  },
+  service.userRatingCount > 0 && {
+    href: '#comments',
+    rating: {
+      value: service.trustWeightedUserRating ?? service.averageUserRating,
+      count: service.userRatingCount,
+    },
+  },
+]
+const serviceFacts = serviceFactCandidates.filter((fact): fact is ServiceFact => !!fact)
+const badgeSizeClass = 'px-3 py-1 text-[13px] whitespace-nowrap'
+// One size down from the default button, the way a repo header does it.
+const compactButtonClass = 'px-2.5 py-1.5 text-xs'
+const acceptedCurrencies = currencies.filter((currency) => service.acceptedCurrencies.includes(currency.id))
 
 const checkSegments = [
   verificationOverview.counts.PASSED > 0 && {
@@ -595,68 +743,6 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
   ]}
 >
   {
-    !!activeEventToShow && (
-      <a
-        href={`#event-${activeEventToShow.id.toString()}`}
-        aria-label={`${activeEventToShow.display.label}: ${activeEventToShow.title}. Read this entry.`}
-        class={cn(
-          'mb-3 block rounded-lg border border-day-500/10 px-3 py-2 text-sm transition-colors',
-          activeEventToShow.display.classNames.banner
-        )}
-      >
-        <span class="flex items-start gap-1.5">
-          <Icon name={activeEventToShow.display.icon} class="mt-0.5 size-4 shrink-0" />
-          <span class="min-w-0">
-            <span class="block font-bold wrap-anywhere">{activeEventToShow.title}</span>
-            <span class="line-clamp-2 wrap-anywhere text-current/80">
-              {firstParagraph(activeEventToShow.content)}
-            </span>
-          </span>
-        </span>
-        <span class="mt-1 flex items-center gap-1 text-xs text-current/70">
-          {activeAlertOrWarningEvents.length >= 2 && (
-            <>
-              +{activeAlertOrWarningEvents.length - 1} more active
-              <span aria-hidden="true">·</span>
-            </>
-          )}
-          <span class="underline">Read this entry</span>
-          <Icon name="ri:arrow-right-s-line" class="size-4" />
-        </span>
-      </a>
-    )
-  }
-
-  {
-    bannerVerificationSteps.map((step) => {
-      const statusInfo = getVerificationStepStatusInfo(step.status)
-      const isFailed = step.status === VerificationStepStatus.FAILED
-      return (
-        <div
-          class={cn(
-            'mb-3 rounded-lg border px-3 py-2 text-sm',
-            isFailed
-              ? 'border-red-500/30 bg-red-500/10 text-red-100'
-              : 'border-yellow-500/30 bg-yellow-500/10 text-yellow-100'
-          )}
-        >
-          <Icon
-            name={statusInfo.icon}
-            class={cn('me-1.5 inline-block size-4 align-[-0.15em]', statusInfo.iconClass)}
-          />
-          <span class="font-bold">
-            {statusInfo.label}: {step.title}.
-          </span>{' '}
-          {step.description}{' '}
-          <a href="#verification-steps" class="underline hover:opacity-80">
-            See verification
-          </a>
-        </div>
-      )
-    })
-  }
-
-  {
     (serviceVisibilityInfo.value === 'UNLISTED' || serviceVisibilityInfo.value === 'ARCHIVED') && (
       <div
         class={cn(
@@ -673,6 +759,14 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
   }
 
   {
+    !!activeEventToShow && (
+      <div class="mb-4">
+        <ServiceRiskAlert event={activeEventToShow} activeCount={activeAlertOrWarningEvents.length} />
+      </div>
+    )
+  }
+
+  {
     serviceVisibilityInfo.value === 'HIDDEN' && (
       <div class="mb-3 rounded-lg border border-red-500/20 bg-red-900/40 px-3 py-2 text-sm text-red-300">
         <Icon name="ri:eye-off-line" class="me-1.5 inline-block size-4 align-[-0.15em] text-red-400" />
@@ -682,9 +776,16 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
     )
   }
 
-  <VerificationWarningBanner service={service} />
-
-  <VerificationSnapshot service={service} verificationOverview={verificationOverview} />
+  {
+    /* On a scam or a service with a severe open incident the same banner answers a different question. */
+    isSwapSupported && (
+      <SwapCTA
+        class="mb-4"
+        heading={needsAlternative ? 'Looking for an alternative?' : 'Compare rates'}
+        description="Find the best rate across privacy-respecting exchanges."
+      />
+    )
+  }
 
   <div class="flex items-center gap-4">
     {
@@ -692,305 +793,291 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
         <MyPicture
           src={service.imageUrl}
           alt={service.name || "Service's logo"}
-          class="size-16 shrink-0 rounded-sm object-contain"
+          class="size-14 shrink-0 rounded-sm object-contain sm:size-16"
           width={64}
           height={64}
         />
       )
     }
 
-    <div class="flex min-w-0 flex-1 flex-col gap-2">
-      <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h1 class="font-title text-2xl/tight font-bold tracking-wider text-white">
-          {service.name}
-        </h1>
+    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
+      <h1 class="min-w-0 font-title text-2xl/tight font-bold tracking-wider text-white">{service.name}</h1>
 
+      {
+        /* Badges sit on their own row under the name; on phones the currencies share that row, under the buttons. */
+      }
+      <div class="order-last flex basis-full flex-wrap items-center gap-2">
+        <div class="flex min-w-0 flex-1 basis-48 flex-wrap items-center gap-2">
+          {/* Outside the category list: it is a verdict, not a category. */}
+          <Tooltip class="inline-flex" text={statusInfo.description} position="bottom">
+            <BadgeStandard
+              icon={statusInfo.icon}
+              text={statusInfo.labelShort}
+              class={cn('font-bold', badgeSizeClass, statusInfo.classNames.badgeBig)}
+            />
+          </Tooltip>
+
+          <ul class="contents" aria-label="Categories">
+            <li class="contents">
+              {
+                service.categories.map((category) => (
+                  <BadgeStandard
+                    as="a"
+                    href={urlWithParams(new URL('/', Astro.url), { categories: [category.slug] })}
+                    icon={category.icon}
+                    text={category.name}
+                    class={badgeSizeClass}
+                  />
+                ))
+              }
+            </li>
+          </ul>
+        </div>
+        <AcceptedCurrencies accepted={service.acceptedCurrencies} class="ml-auto sm:hidden" />
+      </div>
+
+      <div class="ml-auto flex items-center justify-center gap-2">
         {
-          /* Outside the category list: it is a verdict, not a category. */
-          !!statusBadge && (
-            <Tooltip class="inline-flex" text={statusBadge.description} position="bottom">
-              <BadgeStandard
-                icon={statusBadge.icon}
-                text={statusBadge.labelShort}
-                class={cn('font-bold', statusBadge.classNames.badgeBig)}
-              />
-            </Tooltip>
+          user ? (
+            <DropdownButton label="Watch" icon="ri:eye-line" classNames={{ button: compactButtonClass }}>
+              <DropdownButtonItemForm
+                action={actions.notification.preferences.watchService}
+                method="post"
+                data={{ serviceId: service.id, watchType: 'all', value: !watchingDetails?.all }}
+                label="All"
+                icon="ri:alert-line"
+                class="font-bold"
+              >
+                {!!watchingDetails && (
+                  <slot slot="end">
+                    <input
+                      type="checkbox"
+                      disabled
+                      checked={watchingDetails.all}
+                      data-mark-indeterminate={watchingDetails.all === null ? 'true' : 'false'}
+                      class="pointer-events-none"
+                    />
+                  </slot>
+                )}
+              </DropdownButtonItemForm>
+
+              <DropdownButtonItemForm
+                action={actions.notification.preferences.watchService}
+                method="post"
+                data={{ serviceId: service.id, watchType: 'comments', value: !watchingDetails?.comments }}
+                label="Comments"
+                icon="ri:chat-1-line"
+              >
+                {!!watchingDetails && (
+                  <slot slot="end">
+                    <input
+                      type="checkbox"
+                      disabled
+                      checked={watchingDetails.comments}
+                      class="pointer-events-none"
+                    />
+                  </slot>
+                )}
+              </DropdownButtonItemForm>
+
+              <DropdownButtonItemForm
+                action={actions.notification.preferences.watchService}
+                method="post"
+                data={{ serviceId: service.id, watchType: 'events', value: !watchingDetails?.events }}
+                label="Events"
+                icon="ri:calendar-line"
+              >
+                {!!watchingDetails && (
+                  <slot slot="end">
+                    <input
+                      type="checkbox"
+                      disabled
+                      checked={watchingDetails.events}
+                      class="pointer-events-none"
+                    />
+                  </slot>
+                )}
+              </DropdownButtonItemForm>
+
+              <DropdownButtonItemForm
+                action={actions.notification.preferences.watchService}
+                method="post"
+                data={{
+                  serviceId: service.id,
+                  watchType: 'verification',
+                  value: !watchingDetails?.verification,
+                }}
+                label="Verification"
+                icon="ri:check-line"
+              >
+                {!!watchingDetails && (
+                  <slot slot="end">
+                    <input
+                      type="checkbox"
+                      disabled
+                      checked={watchingDetails.verification}
+                      class="pointer-events-none"
+                    />
+                  </slot>
+                )}
+              </DropdownButtonItemForm>
+            </DropdownButton>
+          ) : (
+            <a
+              href={makeLoginUrl(Astro.url)}
+              data-astro-reload
+              aria-label="Log in to watch this service"
+              class={cn(
+                'inline-flex items-center gap-2 rounded-lg border border-night-500 bg-night-800 shadow-sm transition-colors duration-200 hover:bg-night-900 hover:text-day-200 focus-visible:bg-night-900 focus-visible:text-day-200',
+                compactButtonClass
+              )}
+            >
+              <Icon name="ri:eye-line" class="size-4" />
+              Watch
+            </a>
           )
         }
 
-        <ul class="flex flex-wrap gap-2" aria-label="Categories">
-          <li class="contents">
-            {
-              service.categories.map((category) => (
-                <BadgeStandard
-                  as="a"
-                  href={urlWithParams(new URL('/', Astro.url), { categories: [category.slug] })}
-                  icon={category.icon}
-                  text={category.name}
-                />
-              ))
-            }
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="flex items-center justify-center gap-2 sm:gap-4">
-      {
-        user ? (
-          <DropdownButton
-            label="Watch"
-            icon="ri:eye-line"
-            classNames={{
-              label: 'hidden sm:inline-block',
-              arrow: 'hidden sm:inline-block',
-              button: 'px-2 sm:px-4',
-            }}
-          >
-            <DropdownButtonItemForm
-              action={actions.notification.preferences.watchService}
-              method="post"
-              data={{ serviceId: service.id, watchType: 'all', value: !watchingDetails?.all }}
-              label="All"
-              icon="ri:alert-line"
-              class="font-bold"
-            >
-              {!!watchingDetails && (
-                <slot slot="end">
-                  <input
-                    type="checkbox"
-                    disabled
-                    checked={watchingDetails.all}
-                    data-mark-indeterminate={watchingDetails.all === null ? 'true' : 'false'}
-                    class="pointer-events-none"
-                  />
-                </slot>
-              )}
-            </DropdownButtonItemForm>
-
-            <DropdownButtonItemForm
-              action={actions.notification.preferences.watchService}
-              method="post"
-              data={{ serviceId: service.id, watchType: 'comments', value: !watchingDetails?.comments }}
-              label="Comments"
-              icon="ri:chat-1-line"
-            >
-              {!!watchingDetails && (
-                <slot slot="end">
-                  <input
-                    type="checkbox"
-                    disabled
-                    checked={watchingDetails.comments}
-                    class="pointer-events-none"
-                  />
-                </slot>
-              )}
-            </DropdownButtonItemForm>
-
-            <DropdownButtonItemForm
-              action={actions.notification.preferences.watchService}
-              method="post"
-              data={{ serviceId: service.id, watchType: 'events', value: !watchingDetails?.events }}
-              label="Events"
-              icon="ri:calendar-line"
-            >
-              {!!watchingDetails && (
-                <slot slot="end">
-                  <input
-                    type="checkbox"
-                    disabled
-                    checked={watchingDetails.events}
-                    class="pointer-events-none"
-                  />
-                </slot>
-              )}
-            </DropdownButtonItemForm>
-
-            <DropdownButtonItemForm
-              action={actions.notification.preferences.watchService}
-              method="post"
-              data={{
-                serviceId: service.id,
-                watchType: 'verification',
-                value: !watchingDetails?.verification,
-              }}
-              label="Verification"
-              icon="ri:check-line"
-            >
-              {!!watchingDetails && (
-                <slot slot="end">
-                  <input
-                    type="checkbox"
-                    disabled
-                    checked={watchingDetails.verification}
-                    class="pointer-events-none"
-                  />
-                </slot>
-              )}
-            </DropdownButtonItemForm>
-          </DropdownButton>
-        ) : (
-          <a
-            href={makeLoginUrl(Astro.url)}
-            data-astro-reload
-            aria-label="Watch this service"
-            class="inline-flex items-center gap-2 rounded-lg border border-night-500 bg-night-800 px-4 py-2 text-sm shadow-sm transition-colors duration-200 hover:bg-night-900 hover:text-day-200 focus-visible:bg-night-900 focus-visible:text-day-200"
-            aria-haspopup="true"
-          >
-            <Icon name="ri:eye-line" class="size-4" />
-            <span class="hidden sm:inline-block">Watch</span>
-          </a>
-        )
-      }
-
-      <DropdownButton
-        label="Contribute"
-        icon="ri:edit-line"
-        class="hidden 2xs:block"
-        classNames={{
-          label: 'hidden md:inline-block',
-          arrow: 'hidden md:inline-block',
-          button: 'px-2 md:px-4',
-        }}
-      >
-        <DropdownButtonItemLink
-          href={`/service-suggestion/edit?serviceId=${service.id}`}
-          label="Edit"
+        <DropdownButton
+          label="Contribute"
           icon="ri:edit-line"
-        />
-        <DropdownButtonItemLink
-          href={`/service/${service.slug}#comments`}
-          label="Review"
-          icon="ri:star-line"
-        />
-        <AdminOnly>
+          class="hidden 2xs:block"
+          classNames={{ button: compactButtonClass }}
+        >
           <DropdownButtonItemLink
-            href={`/admin/services/${service.slug}/edit`}
-            label="Edit (Admin)"
-            icon="ri:edit-box-line"
+            href={`/service-suggestion/edit?serviceId=${service.id}`}
+            label="Suggest changes"
+            icon="ri:edit-line"
           />
-        </AdminOnly>
-      </DropdownButton>
+          <DropdownButtonItemLink
+            href={`/service/${service.slug}#comments`}
+            label="Review"
+            icon="ri:star-line"
+          />
+          <AdminOnly>
+            <DropdownButtonItemLink
+              href={`/admin/services/${service.slug}/edit`}
+              label="Edit (Admin)"
+              icon="ri:edit-box-line"
+            />
+          </AdminOnly>
+        </DropdownButton>
+      </div>
     </div>
   </div>
 
-  <ul class="mt-0 flex justify-end px-1 py-0" aria-label="Supported currencies">
+  <div class="flex flex-col">
     {
-      currencies.map((currency) => {
-        const isAccepted = service.acceptedCurrencies.includes(currency.id)
-
-        return (
-          <li aria-label={`${currency.name}: ${isAccepted ? 'supported' : 'not supported'}`}>
-            <Tooltip text={currency.name}>
-              <Icon
-                name={currency.icon}
-                class={cn('box-content size-5 p-1.5 text-day-600', {
-                  'text-white': isAccepted,
-                })}
-              />
-            </Tooltip>
-          </li>
-        )
-      })
-    }
-  </ul>
-
-  {
-    shownLinks.length + hiddenLinks.length > 0 && (
-      <ul aria-label="Service links" class="mt-1 flex flex-wrap justify-center gap-2 xs:justify-start">
-        {shownLinks.map((url) => (
-          <li>
-            <ServiceLinkButton
-              url={url}
-              referral={service.referral}
-              enableMinWidth={shuffledLinks.onion.length + shuffledLinks.i2p.length > 0}
-              isScam={service.verificationStatus === 'VERIFICATION_FAILED'}
-            />
-          </li>
-        ))}
-
-        <input
-          type="checkbox"
-          class="peer sr-only checked:hidden"
-          id="show-more-links"
-          checked={hiddenLinks.length === 0}
-        />
-
-        {hiddenLinks.length > 0 && (
-          <li class="rounded-full peer-checked:hidden peer-focus-visible:ring-4 peer-focus-visible:ring-orange-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-night-700">
-            <label
-              for="show-more-links"
-              class="inline-flex h-8 cursor-pointer items-center gap-2 rounded-full bg-day-800 px-3 text-sm whitespace-nowrap text-day-100 transition-colors duration-200 hover:bg-day-900 2xs:px-4"
-            >
-              +{hiddenLinks.length.toLocaleString()} more
-            </label>
-          </li>
-        )}
-
-        {hiddenLinks.map((url) => (
-          <li class="hidden peer-checked:block">
-            <ServiceLinkButton
-              url={url}
-              referral={service.referral}
-              enableMinWidth={shuffledLinks.onion.length + shuffledLinks.i2p.length > 0}
-              isScam={service.verificationStatus === 'VERIFICATION_FAILED'}
-            />
-          </li>
-        ))}
-      </ul>
-    )
-  }
-
-  <div class="prose prose-sm mt-4 text-pretty text-day-400 prose-invert">
-    <Markdown content={service.description} />
-    {
-      serviceSummary && (
-        <p class="!mt-4 text-day-300">
-          <span aria-hidden="true" class="font-bold tracking-wide text-day-500 uppercase">
-            Summary
-          </span>
-          <span aria-hidden="true" class="mx-1 font-bold text-day-500">
-            •
-          </span>
-          {serviceSummary}
+      isFlaggedScam ? (
+        <p class="mt-4 max-w-[80ch] text-pretty text-red-200">
+          {service.name} is flagged as a scam. We have evidence of serious, unresolved harm to users. Do not
+          use it.
         </p>
+      ) : (
+        <div class="prose mt-4 max-w-[80ch] text-pretty text-day-300 prose-invert">
+          <Markdown content={service.description} />
+        </div>
+      )
+    }
+
+    {
+      (acceptedCurrencies.length > 0 || serviceFacts.length > 0) && (
+        <ul
+          class="order-first mt-3 flex flex-wrap items-center gap-y-1.5 text-sm text-day-400 sm:order-none [&>li]:before:mx-2.5 [&>li]:before:text-day-600 [&>li]:before:content-['·'] [&>li:first-child]:before:hidden max-sm:[&>li:nth-child(2)]:before:hidden"
+          aria-label="Key facts"
+        >
+          <li class="hidden sm:flex">
+            <AcceptedCurrencies accepted={service.acceptedCurrencies} />
+          </li>
+          {serviceFacts.map((fact) => (
+            <li class="flex items-center gap-1.5">
+              {fact.icon && <Icon name={fact.icon} class="size-4 shrink-0 text-day-500" />}
+              {fact.rating ? (
+                <a
+                  href={fact.href}
+                  class="hover:text-day-200"
+                  aria-label={`${fact.rating.value !== null ? fact.rating.value.toFixed(1) : '-'} out of 5 from ${fact.rating.count.toLocaleString()} ${pluralize('rating', fact.rating.count)}`}
+                >
+                  <RatingBadge rating={fact.rating.value} count={fact.rating.count} />
+                </a>
+              ) : fact.href ? (
+                <a
+                  href={fact.href}
+                  class="underline decoration-day-700 underline-offset-4 hover:text-day-200"
+                >
+                  {fact.text}
+                </a>
+              ) : (
+                fact.text
+              )}
+            </li>
+          ))}
+        </ul>
       )
     }
   </div>
 
   {
-    isSwapSupported && (
-      <SwapCTA
-        class="mt-4"
-        heading="Compare rates"
-        description="Find the best rate across privacy-respecting exchanges."
-      />
+    serviceLinks.length > 0 && (
+      <ul aria-label="Service links" class="mt-6 flex flex-wrap gap-2">
+        {serviceLinks.map((url) => (
+          <li>
+            <ServiceLinkButton
+              url={url}
+              referral={service.referral}
+              isScam={service.verificationStatus === 'VERIFICATION_FAILED'}
+            />
+          </li>
+        ))}
+      </ul>
     )
   }
 
   {
     service.contactMethods.length > 0 && (
-      <ul class="mt-4 inline-flex flex-wrap justify-center xs:justify-start">
-        {service.contactMethods.map((method) => {
-          const methodInfo = formatContactMethod(method.value)
-
-          return (
-            <li>
-              <a
-                href={method.value}
-                target="_blank"
-                rel="nofollow noopener"
-                class="flex items-center gap-1 px-2 py-1 text-day-300 hover:text-day-200 hover:underline"
-              >
-                <Icon name={methodInfo.icon} class="size-5 text-day-200" />
-                <span>{method.label ?? methodInfo.formattedValue}</span>
-              </a>
-            </li>
-          )
-        })}
-      </ul>
+      <div class="mt-2 flex flex-wrap items-center gap-1.5 pl-1 text-xs">
+        <Tooltip text="Support and contact" class="inline-flex">
+          <Icon name="ri:customer-service-2-line" class="size-4 text-day-500" />
+        </Tooltip>
+        <ul aria-label="Support and contact methods" class="contents">
+          {service.contactMethods.map((method) => {
+            const methodInfo = formatContactMethod(method.value)
+            return (
+              <li>
+                <a
+                  href={method.value}
+                  target="_blank"
+                  rel="nofollow noopener"
+                  class="inline-flex h-7 items-center gap-1 rounded-md border border-night-600 bg-night-800 px-2 text-day-200 transition-colors hover:border-night-400 hover:bg-night-700 hover:text-white"
+                >
+                  <Icon name={methodInfo.icon} class="size-3.5 text-day-400" />
+                  <span class="truncate">{method.label ?? methodInfo.formattedValue}</span>
+                </a>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
     )
   }
+
+  <div class="mt-6 space-y-4 sm:mt-8">
+    <ServiceAnswerPanel kyc={kycAnswer} safety={safetyAnswer} kycLevel={kycLevelInfo} />
+
+    <TosSummaryCard service={service} />
+  </div>
+
+  <Schema
+    item={{
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: serviceFaq.map(({ question, answer }) => ({
+        '@type': 'Question',
+        name: question,
+        acceptedAnswer: { '@type': 'Answer', text: answer },
+      })),
+    } satisfies WithContext<FAQPage>}
+  />
 
   <AdminOnly>
     <div class="mt-6 mb-3 flex items-center justify-between border-b border-day-500">
@@ -1047,13 +1134,23 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
     </form>
   </AdminOnly>
 
-  <h2 class="mt-6 mb-3 border-b border-day-500 font-title text-lg font-bold text-day-200" id="scores">
-    Scores
-  </h2>
-  <div
-    id="attributes"
-    class="flex flex-row flex-wrap items-stretch justify-center gap-4 xs:gap-8 sm:justify-between"
-  >
+  <Schema
+    item={{
+      '@context': 'https://schema.org',
+      '@type': 'Review',
+      itemReviewed: { '@id': itemReviewedId },
+      reviewAspect: 'KYC Level',
+      name: kycLevelInfo.name,
+      // No numeric rating here: on our scale 0 is the best level, which
+      // schema.org would read as the worst. The privacy score carries the number.
+      reviewBody: kycLevelInfo.description,
+      author: KYCNOTME_SCHEMA_MINI,
+    } satisfies WithContext<Review>}
+  />
+
+  <section id="scores" class="mt-8">
+    <h2 class="mb-3 border-b border-day-500 font-title text-lg font-bold text-day-200">Score</h2>
+
     <div class="flex max-w-84 grow flex-row items-center justify-evenly gap-4">
       <ScoreSquare
         as="a"
@@ -1090,131 +1187,72 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
         showInfo
       />
     </div>
-    <div
-      class="@container flex max-w-md shrink-0 grow-100 basis-64 flex-row items-start rounded-lg bg-white px-3 py-2 text-black"
-    >
-      <Schema
-        item={{
-          '@context': 'https://schema.org',
-          '@type': 'Review',
-          itemReviewed: { '@id': itemReviewedId },
-          reviewAspect: 'KYC Level',
-          name: kycLevelInfo.name,
-          reviewBody: kycLevelInfo.description,
-          reviewRating: {
-            '@type': 'Rating',
-            ratingValue: kycLevelInfo.value,
-            bestRating: kycLevels.length - 1,
-            worstRating: 0,
-          },
-          author: KYCNOTME_SCHEMA_MINI,
-        } satisfies WithContext<Review>}
-      />
-      <div class="mr-2 flex h-full flex-col items-center justify-around @sm:mr-4">
-        <Icon name={kycLevelInfo.icon} class="block size-13 @sm:size-16" />
-        <div class="h-4 text-center text-xs leading-none whitespace-nowrap text-zinc-600 @sm:text-sm">
-          <span class="font-title">lvl.</span>
-          <span class="text-base leading-none font-bold tracking-wider text-zinc-700 @sm:text-lg"
-            >{kycLevelInfo.value}</span
-          ><span class="tracking-wider text-zinc-600">/<span>{kycLevels.length - 1}</span></span>
-        </div>
-      </div>
 
-      <dl class="grow-5 basis-0">
-        <dt class="text-base font-bold text-pretty">
-          {kycLevelInfo.name}
-        </dt>
-        <dd class="mt-1 font-sans text-sm text-pretty text-zinc-600">
-          {kycLevelInfo.description}
-        </dd>
-      </dl>
-    </div>
-  </div>
-
-  {
-    incidentTrustPenalty < 0 && (
-      <p class="mt-3 flex items-center justify-center gap-1.5 text-sm text-red-300 sm:justify-start">
-        <Icon name="ri:alarm-warning-line" class="size-4 shrink-0" />
-        <span>
-          <strong>{incidentTrustPenalty}</strong> trust from active incidents.{' '}
-          <a href="#incidents" class="underline hover:text-red-200">
-            See details
-          </a>
-        </span>
-      </p>
-    )
-  }
-
-  {
-    (kycAttributes.length > 0 || service.kycPolicyMd) && (
-      <section class="mt-4 rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-        <header class="mb-2 flex items-center gap-2 text-xs font-bold tracking-wider text-blue-300 uppercase">
-          <Icon name="ri:fingerprint-line" class="size-4" />
-          KYC Policy
-        </header>
-
-        {service.kycPolicyMd && (
-          <div class="prose prose-sm mb-3 max-w-none text-sm text-pretty text-day-200 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
-            <Markdown content={service.kycPolicyMd} />
+    <div id="attributes" class="mt-6 space-y-4">
+      {
+        ledgerGroups.map((group) => (
+          <div>
+            <div class="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-night-500 pb-1">
+              <h3 class="font-title text-xs font-bold tracking-wider text-day-300 uppercase">
+                {group.title}
+              </h3>
+              {group.subtotal.length > 0 && (
+                <p class="text-xs text-day-400">
+                  {group.subtotal.map((effect, index) => (
+                    <>
+                      {index > 0 && <span class="mx-1.5 text-day-600">·</span>}
+                      <span class="font-bold text-day-200">
+                        {effect.value === 0 ? '+0' : formatPoints(effect.value)}
+                      </span>{' '}
+                      {effect.label}
+                    </>
+                  ))}
+                </p>
+              )}
+            </div>
+            <ul class="grid items-start gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+              {group.rows.map((attribute) => (
+                <AttributeCard attribute={attribute} />
+              ))}
+              {group.showIncidentPenalty && <AttributeCard attribute={incidentPenaltyAttribute} />}
+              {group.showBaseScore && <AttributeCard attribute={baseScoreAttribute} />}
+            </ul>
           </div>
-        )}
+        ))
+      }
+    </div>
 
-        {kycAttributes.length > 0 && (
-          <ul class="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-2 md:gap-3">
-            {kycAttributes.map((attribute) => (
-              <AttributeCard attribute={attribute} />
-            ))}
-          </ul>
-        )}
-      </section>
-    )
-  }
-
-  {
-    nonKycAttributes.length > 0 && (
-      <ul class="mt-4 grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-2 md:gap-3">
-        {nonKycAttributes.map((attribute) => (
-          <AttributeCard attribute={attribute} />
-        ))}
-        <li
-          class={cn(
-            'flex items-center self-start rounded-md bg-night-400 p-2 text-sm text-pretty select-none',
-            baseScoreType.classNames.container,
-            baseScoreType.classNames.text
-          )}
-        >
-          <span class="mr-auto ml-1 font-title">{baseScoreType.label}</span>
-          <span class="mr-2 text-current/60">+50</span>
-          <span class="mr-1 text-current/60">+50</span>
-        </li>
-      </ul>
-    )
-  }
-
-  <div class="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-day-400">
-    <span>Privacy <span class="font-semibold text-day-200">{service.privacyScore}</span> × 60%</span>
-    <span class="text-day-500">+</span>
-    <span>Trust <span class="font-semibold text-day-200">{service.trustScore}</span> × 40%</span>
-    <span class="text-day-500">=</span>
-    <span>Overall <span class="font-semibold text-day-200">{service.overallScore}</span>/10</span>
-    {isFlaggedScam && <span class="text-red-400">capped at 3</span>}
-  </div>
-  <div class="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs xs:gap-x-6">
-    <a
-      href="/about#service-scores"
-      class="inline-flex items-center gap-1 text-day-400 transition-colors hover:text-day-200 hover:underline"
-    >
-      <Icon name="ri:information-line" class="size-3" />
-      Learn about scores
-    </a>
-    <a
-      href="/attributes"
-      class="inline-flex items-center gap-1 text-day-400 transition-colors hover:text-day-200 hover:underline"
-    >
-      <Icon name="ri:information-line" class="size-3" />
-      All attributes list
-    </a>
-  </div>
+    <div class="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-day-400">
+      <span>
+        Privacy <span class="font-semibold text-day-200">{service.privacyScore}</span> × 60%
+      </span>
+      <span class="text-day-500">+</span>
+      <span>
+        Trust <span class="font-semibold text-day-200">{service.trustScore}</span> × 40%
+      </span>
+      <span class="text-day-500">=</span>
+      <span>
+        Overall <span class="font-semibold text-day-200">{service.overallScore}</span>/10
+      </span>
+      {isFlaggedScam && <span class="text-red-400">capped at 3</span>}
+    </div>
+    <div class="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs xs:gap-x-6">
+      <a
+        href="/about#service-scores"
+        class="inline-flex items-center gap-1 text-day-400 transition-colors hover:text-day-200 hover:underline"
+      >
+        <Icon name="ri:information-line" class="size-3" />
+        Learn about scores
+      </a>
+      <a
+        href="/attributes"
+        class="inline-flex items-center gap-1 text-day-400 transition-colors hover:text-day-200 hover:underline"
+      >
+        <Icon name="ri:information-line" class="size-3" />
+        All attributes list
+      </a>
+    </div>
+  </section>
 
   <TosReviewSection service={service} itemReviewedId={itemReviewedId} statusLabel={statusInfo.label} />
 
@@ -1446,20 +1484,6 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
             }
           </span>
         </li>
-        {
-          service.operatingSince && (
-            <li class="inline-flex items-center gap-1.5">
-              <Icon name="ri:rocket-2-line" class="size-3.5 text-day-500" />
-              <span class="text-day-500">Operating since</span>
-              <span class="text-day-200">
-                {formatDateShort(service.operatingSince, {
-                  prefix: false,
-                  hourPrecision: false,
-                })}
-              </span>
-            </li>
-          )
-        }
       </ul>
     </div>
 
@@ -1526,51 +1550,48 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
   {
     sortedVerificationSteps.length > 0 && (
       <>
-        <h3 class="mt-6 mb-2 font-title font-semibold" id="verification-steps">
-          Verification Steps
+        <h3 class="mt-6 mb-3 font-title font-semibold" id="verification-steps">
+          Tests we ran
         </h3>
-        <ul class="mb-8 space-y-2">
+        <ol class="mb-8 ml-1.5 space-y-5 border-l border-night-500 pl-5">
           {sortedVerificationSteps.map((step) => {
             const statusInfo = getVerificationStepStatusInfo(step.status)
-
             return (
-              <li class="grow rounded-md border border-night-500 bg-night-700/50 p-2.5 shadow-sm">
-                <div class="flex items-start justify-between gap-2">
-                  <div class="flex flex-col">
-                    <div class="text-sm/tight font-semibold text-white">
-                      <BadgeSmall
-                        text={statusInfo.label}
-                        icon={statusInfo.icon}
-                        color={statusInfo.color}
-                        inlineIcon={statusInfo.iconSpin}
-                        classNames={{
-                          icon: cn(statusInfo.iconSpin && 'animate-spin'),
-                        }}
-                        class="me-1"
-                      />
-
-                      {step.title}
-                    </div>
-                    <p class="mt-1.5 text-xs text-day-300">{step.description}</p>
-                  </div>
-                  <p class="shrink-0 pt-0.5 text-2xs whitespace-nowrap text-day-400">
-                    <TimeFormatted date={step.updatedAt} prefix={false} />
-                  </p>
-                </div>
-
+              <li class="relative scroll-mt-24" id={checkAnchor(step.id)}>
+                <span
+                  aria-hidden="true"
+                  class={cn(
+                    'absolute top-1 -left-[26px] size-3 rounded-full ring-4 ring-night-900',
+                    stepDotClass[statusInfo.color]
+                  )}
+                />
+                <p class="flex flex-wrap items-center gap-x-2 text-xs text-day-500">
+                  <TimeFormatted date={step.updatedAt} prefix={false} />
+                  <span aria-hidden="true" class="text-day-700">
+                    ·
+                  </span>
+                  <span class={cn('inline-flex items-center gap-0.5', statusInfo.iconClass)}>
+                    <Icon
+                      name={statusInfo.icon}
+                      class={cn('size-3.5', statusInfo.iconSpin && 'animate-spin')}
+                    />
+                    {statusInfo.label}
+                  </span>
+                </p>
+                <p class="mt-0.5 font-title font-bold text-day-100">{step.title}</p>
+                <p class="mt-0.5 text-sm text-day-300">{step.description}</p>
                 {step.evidenceMd && (
-                  <div class="prose prose-sm mt-2 block max-w-none text-xs/relaxed prose-invert">
+                  <div class="prose prose-sm mt-1.5 max-w-none text-xs/relaxed prose-invert">
                     <Markdown content={step.evidenceMd} />
                   </div>
                 )}
               </li>
             )
           })}
-        </ul>
+        </ol>
       </>
     )
   }
-
   <div class="mt-6 mb-3 flex items-center justify-between border-b border-day-500" id="comments">
     <h2 class="font-title text-lg font-bold text-day-200">Comments</h2>
     <a
