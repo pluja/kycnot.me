@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { firstParagraph, proseBlocks, stripMarkdown } from './strings'
+import { firstParagraph, normalizeMultilineInput, proseBlocks, stripMarkdown } from './strings'
 
 void test('stripMarkdown flattens a body to one line of prose', () => {
   assert.equal(stripMarkdown('## See [docs](https://x.dev)\n\n**now**'), 'See docs now')
@@ -48,4 +48,12 @@ void test('proseBlocks answers whether anything follows the lead', () => {
     'One paragraph with no breaks at all.',
   ])
   assert.deepEqual(proseBlocks('## Only a heading'), [])
+})
+
+void test('normalizeMultilineInput strips shared indentation without flattening nested lists', () => {
+  const pasted =
+    '\n                              The service requires JavaScript.\n                            '
+  assert.equal(normalizeMultilineInput(pasted), 'The service requires JavaScript.')
+  assert.equal(normalizeMultilineInput('    - item\n      - nested\n'), '- item\n  - nested')
+  assert.equal(normalizeMultilineInput('plain'), 'plain')
 })

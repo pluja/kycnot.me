@@ -6,12 +6,16 @@ import slugify from 'slugify'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
+import { normalizeMultilineInput } from '../../lib/strings'
 
 import type { Prisma } from '@prisma/client'
 
 const attributeInputSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().min(1, 'Description is required'),
+  title: z.string().trim().min(1, 'Title is required'),
+  description: z
+    .string()
+    .transform(normalizeMultilineInput)
+    .pipe(z.string().min(1, 'Description is required')),
   category: z.nativeEnum(AttributeCategory),
   type: z.nativeEnum(AttributeType),
   privacyPoints: z.coerce.number().int().min(-100).max(100).default(0),
@@ -40,8 +44,11 @@ export const adminAttributeActions = {
     accept: 'form',
     permissions: cap('attributes:manage'),
     input: z.object({
-      title: z.string().min(1, 'Title is required'),
-      description: z.string().min(1, 'Description is required'),
+      title: z.string().trim().min(1, 'Title is required'),
+      description: z
+        .string()
+        .transform(normalizeMultilineInput)
+        .pipe(z.string().min(1, 'Description is required')),
       category: z.nativeEnum(AttributeCategory),
       type: z.nativeEnum(AttributeType),
       privacyPoints: z.coerce.number().int().min(-100).max(100).default(0),
