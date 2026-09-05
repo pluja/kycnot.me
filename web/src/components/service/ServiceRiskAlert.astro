@@ -1,0 +1,91 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { getIncidentSeverityInfo } from '../../constants/incidentSeverities'
+import { cn } from '../../lib/cn'
+import { firstParagraph } from '../../lib/strings'
+
+import type { IncidentSeverity } from '@prisma/client'
+
+type Props = {
+  event: {
+    id: number
+    title: string
+    content: string
+    display: { icon: string; label: string }
+    incident: { severity: IncidentSeverity; occurredAt: Date; amountText: string | null } | null
+  }
+  /** Total active alert/warning events, used for the "+N more" line. */
+  activeCount: number
+}
+
+const { event, activeCount } = Astro.props
+
+const severityInfo = event.incident ? getIncidentSeverityInfo(event.incident.severity) : null
+
+// An ongoing update is worth surfacing but is not an alarm, and a low-severity
+// incident should not shout as loudly as a critical one. Severity drives the
+// colour so the page never cries wolf.
+const tone = severityInfo?.classNames ?? {
+  text: 'text-sky-300',
+  border: 'border-sky-500/30',
+  bg: 'bg-sky-500/5',
+}
+
+const label = severityInfo ? `${severityInfo.label} severity · unresolved` : event.display.label
+
+const dateFormatter = new Intl.DateTimeFormat('en', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+})
+---
+
+<aside class={cn('rounded-lg border p-4', tone.border, tone.bg)} aria-label={`${label}: ${event.title}`}>
+  <p class={cn('flex items-center gap-2 font-title text-xs font-bold tracking-wider uppercase', tone.text)}>
+    <Icon name={severityInfo?.icon ?? event.display.icon} class="size-4 shrink-0" />
+    {label}
+  </p>
+
+  <p class="mt-2 font-title text-lg font-bold text-balance text-white">
+    <a href={`#event-${event.id.toString()}`} class="hover:underline hover:underline-offset-4">
+      {event.title}
+    </a>
+  </p>
+
+  <p class="mt-1 line-clamp-2 text-sm text-day-200">{firstParagraph(event.content)}</p>
+
+  <p class="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
+    {
+      event.incident && (
+        <span class="text-day-400">
+          {`First recorded ${dateFormatter.format(event.incident.occurredAt)}${event.incident.amountText ? `, reported losses ${event.incident.amountText}` : ''}`}
+        </span>
+      )
+    }
+    <a
+      href={`#event-${event.id.toString()}`}
+      tabindex="-1"
+      aria-hidden="true"
+      class={cn('inline-flex items-center gap-1 font-medium underline underline-offset-4', tone.text)}
+    >
+      Read what happened
+      <Icon name="ri:arrow-down-line" class="size-4" />
+    </a>
+    {
+      activeCount >= 2 && (
+        <a
+          href={event.incident ? '#incidents' : '#events'}
+          class={cn(
+            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-bold',
+            tone.text,
+            tone.border
+          )}
+        >
+          <Icon name="ri:alarm-warning-line" class="size-3.5" />
+          {activeCount - 1} more active
+        </a>
+      )
+    }
+  </p>
+</aside>
