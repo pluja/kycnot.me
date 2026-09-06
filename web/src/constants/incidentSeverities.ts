@@ -17,6 +17,9 @@ type IncidentSeverityInfo<T extends string | null | undefined = string> = {
     rail: string
     text: string
     border: string
+    /// Border and background when the whole element is a hover target.
+    borderHover: string
+    bgHover: string
     bg: string
     bar: string
   }
@@ -39,6 +42,8 @@ export const {
       rail: 'bg-gray-500',
       text: 'text-gray-300',
       border: 'border-gray-500/25',
+      borderHover: 'hover:border-gray-500/45',
+      bgHover: 'hover:bg-gray-500/10',
       bg: 'bg-gray-500/5',
       bar: 'bg-gray-400',
     },
@@ -55,6 +60,8 @@ export const {
         rail: 'bg-slate-400',
         text: 'text-slate-300',
         border: 'border-slate-500/25',
+        borderHover: 'hover:border-slate-500/45',
+        bgHover: 'hover:bg-slate-500/10',
         bg: 'bg-slate-500/5',
         bar: 'bg-slate-400',
       },
@@ -70,6 +77,8 @@ export const {
         rail: 'bg-amber-400',
         text: 'text-amber-300',
         border: 'border-amber-500/25',
+        borderHover: 'hover:border-amber-500/45',
+        bgHover: 'hover:bg-amber-500/10',
         bg: 'bg-amber-500/5',
         bar: 'bg-amber-400',
       },
@@ -85,6 +94,8 @@ export const {
         rail: 'bg-orange-400',
         text: 'text-orange-300',
         border: 'border-orange-500/30',
+        borderHover: 'hover:border-orange-500/45',
+        bgHover: 'hover:bg-orange-500/10',
         bg: 'bg-orange-500/5',
         bar: 'bg-orange-400',
       },
@@ -100,6 +111,8 @@ export const {
         rail: 'bg-red-500',
         text: 'text-red-300',
         border: 'border-red-500/30',
+        borderHover: 'hover:border-red-500/45',
+        bgHover: 'hover:bg-red-500/10',
         bg: 'bg-red-500/[0.07]',
         bar: 'bg-red-500',
       },
@@ -107,6 +120,4 @@ export const {
   ] as const satisfies IncidentSeverityInfo<IncidentSeverity>[]
 )
 
-type _ExpectToHaveAllValues = Assert<
-  Equals<(typeof incidentSeverities)[number]['id'], IncidentSeverity>
->
+type _ExpectToHaveAllValues = Assert<Equals<(typeof incidentSeverities)[number]['id'], IncidentSeverity>>

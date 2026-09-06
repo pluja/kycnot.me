@@ -381,6 +381,9 @@ const activeAlertOrWarningEvents = service.events
   .map((event) => ({ ...event, display: getEventDisplay(event, now) }))
   .filter((event) => event.display.showBanner && (event.endedAt === null || event.endedAt >= now))
 const activeEventToShow = pickPrimaryEvent(activeAlertOrWarningEvents, now)
+const otherActiveEvents = activeAlertOrWarningEvents.filter((event) => event.id !== activeEventToShow?.id)
+const moreActiveIncidents = otherActiveEvents.filter((event) => event.incident).length
+const moreActiveWarnings = otherActiveEvents.length - moreActiveIncidents
 
 // Incidents (trust-affecting) are shown in their own section and pulled out of
 // the general events timeline below. Their current trust penalty mirrors the
@@ -760,7 +763,11 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
   {
     !!activeEventToShow && (
       <div class="mb-4">
-        <ServiceRiskAlert event={activeEventToShow} activeCount={activeAlertOrWarningEvents.length} />
+        <ServiceRiskAlert
+          event={activeEventToShow}
+          moreIncidents={moreActiveIncidents}
+          moreWarnings={moreActiveWarnings}
+        />
       </div>
     )
   }
