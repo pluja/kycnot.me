@@ -1,7 +1,6 @@
 ---
 import { Icon } from 'astro-icon/components'
 
-import { cn } from '../../lib/cn'
 import { countTosHighlightRatings, isTosReviewable, TOS_REVIEW_ANCHOR } from '../../lib/tosHighlights'
 import Markdown from '../Markdown.astro'
 import Tooltip from '../Tooltip.astro'
@@ -40,7 +39,7 @@ const highlightCounts = countTosHighlightRatings(service.tosReview?.highlights ?
             class="inline-flex items-center"
           >
             <span class="inline-flex items-center gap-1 tabular-nums">
-              <Icon name={rating.icon} class={cn(rating.classNames.icon, 'size-4')} />
+              <Icon name={rating.icon} class="size-4 text-day-500" />
               {rating.count}
             </span>
           </Tooltip>

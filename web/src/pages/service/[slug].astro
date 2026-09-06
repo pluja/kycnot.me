@@ -574,11 +574,11 @@ type ServiceFact = {
   href?: string
   icon?: string
   rating?: { value: number | null; count: number }
-  /** May be cut with an ellipsis on phones so the row stays on one line. */
-  shrinkable?: boolean
+  /** Least important: on phones it is shown only when it fits the single row. */
+  optional?: boolean
 }
 const serviceFactCandidates: (ServiceFact | false | null)[] = [
-  registrationCountry && { text: registrationCountry.name, icon: 'ri:map-pin-line', shrinkable: true },
+  registrationCountry && { text: registrationCountry.name, icon: 'ri:map-pin-line', optional: true },
   service.operatingSince && {
     text: formatDistanceToNowStrict(service.operatingSince, { roundingMethod: 'floor' }),
     icon: 'ri:cake-2-line',
@@ -1002,7 +1002,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
     {
       (acceptedCurrencies.length > 0 || serviceFacts.length > 0) && (
         <ul
-          class="order-first mt-3 flex flex-wrap items-center gap-y-1.5 text-sm text-day-400 max-sm:flex-nowrap sm:order-none [&>li]:before:mx-2.5 [&>li]:before:text-day-600 [&>li]:before:content-['·'] [&>li:first-child]:before:hidden"
+          class="order-first mt-3 flex max-h-6 flex-wrap items-center gap-y-6 overflow-hidden text-sm text-day-400 sm:order-none sm:max-h-none sm:gap-y-1.5 sm:overflow-visible [&>li]:before:mx-2.5 [&>li]:before:text-day-600 [&>li]:before:content-['·'] [&>li:first-child]:before:hidden"
           aria-label="Key facts"
         >
           <li class="flex shrink-0">
@@ -1012,7 +1012,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
             />
           </li>
           {serviceFacts.map((fact) => (
-            <li class={cn('flex items-center gap-1.5', fact.shrinkable ? 'min-w-0' : 'shrink-0')}>
+            <li class={cn('flex shrink-0 items-center gap-1.5', fact.optional && 'max-sm:order-last')}>
               {fact.icon && <Icon name={fact.icon} class="size-4 shrink-0 text-day-500" />}
               {fact.rating ? (
                 <a
@@ -1030,7 +1030,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
                   {fact.text}
                 </a>
               ) : (
-                <span class={cn(fact.shrinkable && 'truncate')}>{fact.text}</span>
+                fact.text
               )}
             </li>
           ))}
