@@ -5,6 +5,7 @@ import { round, sum } from 'lodash-es'
 
 import { MIN_TRUSTED_RATING_WEIGHT } from '../constants/karmaUnlocks'
 import { cn } from '../lib/cn'
+import { pluralize } from '../lib/pluralize'
 import { prisma } from '../lib/prisma'
 
 import RatingStars from './RatingStars.astro'
@@ -139,6 +140,10 @@ const trustWeightedUserRating =
       </Tooltip>
     </div>
     <RatingStars rating={trustWeightedUserRating} />
+    <p class="mt-1 text-sm text-day-400">
+      {userRatingCount.toLocaleString()}
+      {pluralize('rating', userRatingCount)}
+    </p>
   </div>
 
   <div class="grid min-w-32 flex-1 grid-cols-[auto_1fr_auto] items-center gap-1">
