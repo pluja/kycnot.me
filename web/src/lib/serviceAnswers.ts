@@ -243,7 +243,7 @@ export function makeSafetyAnswer({
     return {
       tone: 'unknown',
       answer: 'Not reviewed yet',
-      detail: 'Nobody has checked this listing. A low trust score reflects that, not bad behaviour.',
+      detail: 'Nobody has checked this listing yet. Everything on it comes from whoever submitted it.',
       caveats: flaggedChecks,
     }
   }
@@ -267,13 +267,21 @@ export function makeSafetyAnswer({
     ? `Approved ${formatDaysAgo(recentlyApprovedAt)}, so the record is short.`
     : ''
 
-  // Named caveats beat a vague hedge. "Mostly, with caveats" reads as suspicion
-  // of a service that may simply have a no-refund policy worth knowing about.
-  if (caveats.length > 0) {
+  // The costliest caveat is the headline: "May freeze or seize funds" tells the
+  // reader something, "2 caveats" only tells them to keep reading. Caveats
+  // arrive sorted, costliest first.
+  const first = caveats[0]
+  if (first) {
+    const others = caveats.length - 1
     return {
       tone: 'caution',
-      answer: caveats.length === 1 ? 'One caveat' : `${String(caveats.length)} caveats`,
-      detail: [shortRecord, 'Nothing on record against it, but worth knowing before you use it:']
+      answer: others === 0 ? first.title : `${first.title}, and ${String(others)} more`,
+      detail: [
+        shortRecord,
+        others === 0
+          ? 'Nothing on record against it. One thing to know:'
+          : 'Nothing on record against it, but worth knowing before you use it:',
+      ]
         .filter(Boolean)
         .join(' '),
       caveats,

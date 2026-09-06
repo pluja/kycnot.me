@@ -131,12 +131,19 @@ void test('a clean record reads as clean regardless of the score', () => {
   assert.equal(answer.answer, 'Nothing negative on record')
 })
 
-void test('real caveats are named rather than hinted at', () => {
+void test('the costliest caveat is the headline, the rest a count', () => {
   const caveats = [{ title: 'No-refund policy' }, { title: 'May suspend your account' }]
   const answer = makeSafetyAnswer({ ...base, caveats })
   assert.equal(answer.tone, 'caution')
-  assert.equal(answer.answer, '2 caveats')
+  assert.equal(answer.answer, 'No-refund policy, and 1 more')
+  assert.match(answer.detail, /worth knowing/)
   assert.deepEqual(answer.caveats, caveats)
+})
+
+void test('a single caveat is the headline on its own', () => {
+  const answer = makeSafetyAnswer({ ...base, caveats: [{ title: 'No-refund policy' }] })
+  assert.equal(answer.answer, 'No-refund policy')
+  assert.equal(answer.detail, 'Nothing on record against it. One thing to know:')
 })
 
 void test('hasBeenReviewed only counts states where a person looked', () => {
