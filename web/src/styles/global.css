@@ -23,6 +23,10 @@
 }
 
 @layer base {
+  html {
+    @apply motion-safe:scroll-smooth;
+  }
+
   button:not(:disabled),
   [role='button']:not(:disabled),
   label[for] {
