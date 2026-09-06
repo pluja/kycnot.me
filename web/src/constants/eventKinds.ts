@@ -21,6 +21,8 @@ type EventKindInfo<T extends string | null | undefined = string> = {
     banner: string
     rail: string
     card: string
+    /// Label colour on a card's meta line.
+    text: string
   }
   icon: string
   color: TailwindColor
@@ -38,6 +40,8 @@ export const { dataArray: eventKinds, getFn: getEventKindInfo } = makeHelpersFor
     classNames: {
       banner: 'bg-night-800/60 text-day-300 hover:bg-night-700/70 focus-visible:bg-night-700/70',
       rail: 'bg-night-400',
+
+      text: 'text-day-400',
       card: 'border-day-800 bg-night-800/30',
     },
     icon: 'ri:question-fill',
@@ -53,6 +57,8 @@ export const { dataArray: eventKinds, getFn: getEventKindInfo } = makeHelpersFor
       classNames: {
         banner: 'bg-night-800/60 text-day-300 hover:bg-night-700/70 focus-visible:bg-night-700/70',
         rail: 'bg-night-400',
+
+        text: 'text-day-400',
         card: 'border-day-800 bg-night-800/30',
       },
       icon: 'ri:pencil-fill',
@@ -67,6 +73,8 @@ export const { dataArray: eventKinds, getFn: getEventKindInfo } = makeHelpersFor
       classNames: {
         banner: 'bg-sky-900/50 text-sky-300 hover:bg-sky-800/60 focus-visible:bg-sky-800/60',
         rail: 'bg-sky-800',
+
+        text: 'text-sky-300',
         card: 'border-sky-500/20 bg-sky-950/15',
       },
       icon: 'ri:information-fill',
@@ -81,6 +89,8 @@ export const { dataArray: eventKinds, getFn: getEventKindInfo } = makeHelpersFor
       classNames: {
         banner: 'bg-green-900/50 text-green-300 hover:bg-green-800/60 focus-visible:bg-green-800/60',
         rail: 'bg-green-800',
+
+        text: 'text-green-300',
         card: 'border-green-500/20 bg-green-950/15',
       },
       icon: 'ri:arrow-up-circle-fill',
@@ -95,6 +105,8 @@ export const { dataArray: eventKinds, getFn: getEventKindInfo } = makeHelpersFor
       classNames: {
         banner: 'bg-amber-900/50 text-amber-200 hover:bg-amber-800/60 focus-visible:bg-amber-800/60',
         rail: 'bg-amber-800',
+
+        text: 'text-amber-300',
         card: 'border-amber-500/25 bg-amber-950/15',
       },
       icon: 'ri:alert-fill',
@@ -112,6 +124,8 @@ export const { dataArray: eventKinds, getFn: getEventKindInfo } = makeHelpersFor
       classNames: {
         banner: 'bg-red-900/50 text-red-300 hover:bg-red-800/60 focus-visible:bg-red-800/60',
         rail: 'bg-red-800',
+
+        text: 'text-red-300',
         card: 'border-red-500/25 bg-red-950/15',
       },
       icon: 'ri:alarm-warning-fill',
@@ -126,6 +140,8 @@ export const { dataArray: eventKinds, getFn: getEventKindInfo } = makeHelpersFor
       classNames: {
         banner: 'bg-red-900/50 text-red-300 hover:bg-red-800/60 focus-visible:bg-red-800/60',
         rail: 'bg-red-800',
+
+        text: 'text-red-300',
         card: 'border-red-500/30 bg-red-950/20',
       },
       icon: 'ri:spam-fill',
@@ -143,5 +159,7 @@ type _ExpectToHaveAllValues = Assert<Equals<(typeof eventKinds)[number]['id'], E
 export const resolvedEventClassNames = {
   banner: 'bg-night-800/60 text-day-300 hover:bg-night-700/70 focus-visible:bg-night-700/70',
   rail: 'bg-green-900',
+
+  text: 'text-green-400',
   card: 'border-day-800 bg-night-800/30',
 } as const satisfies EventKindInfo['classNames']

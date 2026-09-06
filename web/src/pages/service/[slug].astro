@@ -9,14 +9,12 @@ import { orderBy, pick } from 'lodash-es'
 import AdminOnly from '../../components/AdminOnly.astro'
 import AttributeCard from '../../components/AttributeCard.astro'
 import BadgeStandard from '../../components/BadgeStandard.astro'
+import Button from '../../components/Button.astro'
 import CommentSection from '../../components/CommentSection.astro'
 import CommentSummary from '../../components/CommentSummary.astro'
-import Button from '../../components/Button.astro'
 import DropdownButton from '../../components/DropdownButton.astro'
 import DropdownButtonItemForm from '../../components/DropdownButtonItemForm.astro'
 import DropdownButtonItemLink from '../../components/DropdownButtonItemLink.astro'
-import EventTimeline from '../../components/events/EventTimeline.astro'
-import IncidentCard from '../../components/IncidentCard.astro'
 import InputSubmitButton from '../../components/InputSubmitButton.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
 import Markdown from '../../components/Markdown.astro'
@@ -27,6 +25,7 @@ import ScoreSquare from '../../components/ScoreSquare.astro'
 import AcceptedCurrencies from '../../components/service/AcceptedCurrencies.astro'
 import ServiceAnswerPanel from '../../components/service/ServiceAnswerPanel.astro'
 import ServiceRiskAlert from '../../components/service/ServiceRiskAlert.astro'
+import ServiceTimeline from '../../components/service/ServiceTimeline.astro'
 import TosReviewSection from '../../components/service/TosReviewSection.astro'
 import TosSummaryCard from '../../components/service/TosSummaryCard.astro'
 import ServiceLinkButton from '../../components/ServiceLinkButton.astro'
@@ -39,7 +38,6 @@ import { baseScoreType, getAttributeTypeInfo } from '../../constants/attributeTy
 import { formatContactMethod } from '../../constants/contactMethods'
 import { getCountryInfo } from '../../constants/countries'
 import { currencies, getCurrencyInfo } from '../../constants/currencies'
-import { incidentSeverities } from '../../constants/incidentSeverities'
 import { getKycLevelInfo } from '../../constants/kycLevels'
 import { getServiceVisibilityInfo } from '../../constants/serviceVisibility'
 import { getUserSentimentInfo } from '../../constants/userSentiment'
@@ -398,14 +396,12 @@ const incidentTrustPenalty = totalIncidentTrustPenalty(
   now
 )
 
-// Incidents whose penalty has decayed to zero are kept for the record but moved
-// out of the active list into a collapsed "Past incidents" group.
+// Incidents whose penalty has decayed to zero no longer feed the verdict or the ledger.
 const incidentsByImpact = incidents.map((entry) => ({
   ...entry,
   faded: computeIncidentTrustPenalty(entry.incident, now).points === 0,
 }))
 const activeIncidents = incidentsByImpact.filter((entry) => !entry.faded)
-const pastIncidents = incidentsByImpact.filter((entry) => entry.faded)
 
 // The incident penalty is not an attribute row in the database, but it reads
 // as one in the ledger: same card, same columns, linking to the incidents.
@@ -459,16 +455,6 @@ const ledgerGroups = (
   // The base score closes the ledger under whatever group comes last. It is
   // the starting point, so it stays out of every subtotal.
   .map((group, index, groups) => ({ ...group, showBaseScore: index === groups.length - 1 }))
-
-const pastSeverityBreakdown = [...incidentSeverities]
-  .sort((a, b) => b.order - a.order)
-  .map((info) => ({
-    info,
-    count: pastIncidents.filter((entry) => entry.incident.severity === info.id).length,
-  }))
-  .filter((entry) => entry.count > 0)
-
-const timelineEvents = service.events.filter((event) => event.class !== 'INCIDENT')
 
 // Sort verification steps: failed first, then warnings, then others, newest first within each group
 const getVerificationStepPriority = (status: VerificationStepStatus) => {
@@ -1278,135 +1264,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
 
   <TosReviewSection service={service} itemReviewedId={itemReviewedId} statusLabel={statusInfo.label} />
 
-  {
-    incidents.length > 0 && (
-      <>
-        <div
-          class="mt-6 mb-3 flex items-center justify-between gap-3 border-b border-day-500 pb-1"
-          id="incidents"
-        >
-          <h2 class="flex items-center gap-2 font-title text-lg font-bold text-day-100">
-            <Icon
-              name={activeIncidents.length > 0 ? 'ri:alarm-warning-line' : 'ri:history-line'}
-              class={cn('size-5', activeIncidents.length > 0 ? 'text-red-400' : 'text-day-500')}
-            />
-            Security incidents
-          </h2>
-          <a
-            href="/about#service-scores"
-            class="inline-flex shrink-0 items-center gap-1 text-xs text-day-500 transition-colors hover:text-day-200 hover:underline"
-          >
-            How trust is affected
-            <Icon name="ri:arrow-right-s-line" class="size-4" />
-          </a>
-        </div>
-
-        {activeIncidents.length > 1 && incidentTrustPenalty < 0 && (
-          <p class="mb-3 text-sm text-day-400">
-            Combined trust impact across {activeIncidents.length} active incidents:{' '}
-            <strong class="text-red-300">{incidentTrustPenalty} trust</strong>
-          </p>
-        )}
-
-        {activeIncidents.length > 0 && (
-          <ul class="mb-2 space-y-2.5">
-            {activeIncidents.map((entry) => (
-              <li>
-                <IncidentCard
-                  eventId={entry.id}
-                  title={entry.title}
-                  content={entry.content}
-                  source={entry.source}
-                  severity={entry.incident.severity}
-                  state={entry.incident.state}
-                  occurredAt={entry.incident.occurredAt}
-                  resolvedAt={entry.incident.resolvedAt}
-                  outcome={entry.incident.outcome}
-                  amountText={entry.incident.amountText}
-                  trustOverride={entry.incident.trustOverride}
-                  serviceSlug={service.slug}
-                  cases={entry.incident.cases}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {pastIncidents.length > 0 && (
-          <details class="group/past mb-2">
-            <summary class="flex w-fit cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 py-1 text-sm text-day-500 transition-colors hover:text-day-300 [&::-webkit-details-marker]:hidden">
-              <span class="inline-flex items-center gap-1.5">
-                <Icon name="ri:history-line" class="size-4 shrink-0" />
-                {activeIncidents.length > 0 ? 'Past incidents' : 'Incidents'} ({pastIncidents.length})
-              </span>
-              <span class="flex flex-wrap items-center gap-x-1.5 text-2xs font-semibold tracking-wide uppercase">
-                {pastSeverityBreakdown.map(({ info, count }, i) => (
-                  <>
-                    {i > 0 && (
-                      <span class="text-day-700" aria-hidden="true">
-                        ·
-                      </span>
-                    )}
-                    <span class={info.classNames.text}>
-                      {count} {info.label}
-                    </span>
-                  </>
-                ))}
-              </span>
-              <Icon
-                name="ri:arrow-down-s-line"
-                class="size-4 shrink-0 transition-transform group-open/past:rotate-180"
-              />
-            </summary>
-            <ul class="mt-2 space-y-2">
-              {pastIncidents.map((entry) => (
-                <li>
-                  <IncidentCard
-                    eventId={entry.id}
-                    faded
-                    title={entry.title}
-                    content={entry.content}
-                    source={entry.source}
-                    severity={entry.incident.severity}
-                    state={entry.incident.state}
-                    occurredAt={entry.incident.occurredAt}
-                    resolvedAt={entry.incident.resolvedAt}
-                    outcome={entry.incident.outcome}
-                    amountText={entry.incident.amountText}
-                    trustOverride={entry.incident.trustOverride}
-                    serviceSlug={service.slug}
-                    cases={entry.incident.cases}
-                  />
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
-      </>
-    )
-  }
-
-  <div class="mt-6 mb-3 flex items-center justify-between border-b border-day-500" id="events">
-    <h2 class="font-title text-lg font-bold text-day-100">Events</h2>
-    <a
-      href="/events"
-      class="inline-flex items-center gap-1 text-xs leading-none text-day-500 transition-colors hover:text-day-200 hover:underline"
-    >
-      View all
-      <Icon name="ri:arrow-right-s-line" class="size-4" />
-    </a>
-  </div>
-  <EventTimeline events={timelineEvents} now={now} />
-
-  <div class="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs xs:gap-x-6">
-    <a
-      href="/about#events"
-      class="inline-flex items-center gap-1 text-day-400 transition-colors hover:text-day-200 hover:underline"
-    >
-      <Icon name="ri:information-line" class="size-3" />
-      Learn about events
-    </a>
-  </div>
+  <ServiceTimeline events={service.events} serviceSlug={service.slug} now={now} />
 
   <div
     class="mt-6 mb-3 flex items-center justify-between gap-3 border-b border-day-500 pb-1"

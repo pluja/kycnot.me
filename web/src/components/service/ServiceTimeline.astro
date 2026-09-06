@@ -1,0 +1,271 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { incidentSeverities } from '../../constants/incidentSeverities'
+import { cn } from '../../lib/cn'
+import { totalIncidentTrustPenalty } from '../../lib/incidentPenalty'
+import { splitOlder, tierTimeline } from '../../lib/serviceTimeline'
+import EventCard from '../events/EventCard.astro'
+
+import type { TimelineEntry, TimelineEvent } from '../../lib/serviceTimeline'
+import type { ComponentProps } from 'astro/types'
+
+type TimelineEntryEvent = ComponentProps<typeof EventCard>['event'] & TimelineEvent
+
+type Props = {
+  events: TimelineEntryEvent[]
+  serviceSlug: string
+  now?: Date
+}
+
+const { events, serviceSlug, now = new Date() } = Astro.props
+
+const tiers = tierTimeline(events, now)
+const isIncident = (entry: TimelineEntry<TimelineEntryEvent>) => !!entry.event.incident
+
+const incidents = {
+  ongoing: tiers.ongoing.filter(isIncident),
+  recent: tiers.recent.filter(isIncident),
+  older: tiers.older.filter(isIncident),
+}
+const plain = {
+  ongoing: tiers.ongoing.filter((entry) => !isIncident(entry)),
+  recent: tiers.recent.filter((entry) => !isIncident(entry)),
+  older: tiers.older.filter((entry) => !isIncident(entry)),
+}
+
+const activeIncidents = [...incidents.ongoing, ...incidents.recent]
+const olderIncidents = splitOlder(activeIncidents.length, incidents.older)
+const olderEvents = splitOlder(plain.ongoing.length + plain.recent.length, plain.older)
+const activePenalty = totalIncidentTrustPenalty(
+  activeIncidents.flatMap((entry) => (entry.event.incident ? [entry.event.incident] : [])),
+  now
+)
+const hasIncidents = activeIncidents.length + incidents.older.length > 0
+
+const olderBySeverity = [...incidentSeverities]
+  .sort((a, b) => b.order - a.order)
+  .map((info) => ({
+    info,
+    count: olderIncidents.folded.filter((entry) => entry.event.incident?.severity === info.id).length,
+  }))
+  .filter((entry) => entry.count > 0)
+
+const hasEvents = plain.ongoing.length + plain.recent.length + plain.older.length + tiers.changes.length > 0
+
+const headerClass = 'mt-6 mb-3 flex items-center justify-between gap-3 border-b border-day-500 pb-1'
+const titleClass = 'flex items-center gap-2 font-title text-lg font-bold text-day-100'
+const headerLinkClass =
+  'inline-flex shrink-0 items-center gap-1 text-xs text-day-500 transition-colors hover:text-day-200 hover:underline'
+const foldClass =
+  'flex w-fit cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 py-1 text-sm text-day-500 transition-colors hover:text-day-300 [&::-webkit-details-marker]:hidden'
+---
+
+{
+  hasIncidents && (
+    <section aria-labelledby="incidents-heading">
+      <div class={headerClass} id="incidents">
+        <h2 class={titleClass} id="incidents-heading">
+          <Icon
+            name={activeIncidents.length > 0 ? 'ri:alarm-warning-line' : 'ri:history-line'}
+            class={cn('size-5', activeIncidents.length > 0 ? 'text-red-400' : 'text-day-500')}
+          />
+          Security incidents
+        </h2>
+        <a href="/about#service-scores" class={headerLinkClass}>
+          How trust is affected
+          <Icon name="ri:arrow-right-s-line" class="size-4" />
+        </a>
+      </div>
+
+      {activeIncidents.length > 0 && (
+        <p class="mb-3 text-sm text-day-400">
+          {activeIncidents.length === 1
+            ? 'One incident still counts'
+            : `${String(activeIncidents.length)} incidents still count`}{' '}
+          against the trust score: <strong class="font-bold text-red-300">{activePenalty} trust</strong>
+        </p>
+      )}
+
+      {incidents.ongoing.length > 0 && (
+        <ol class="space-y-2" aria-label="Ongoing incidents">
+          {incidents.ongoing.map((entry) => (
+            <li>
+              <EventCard event={entry.event} serviceSlug={serviceSlug} now={now} preview="two-lines" />
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {incidents.recent.length > 0 && (
+        <ol class={cn('space-y-1.5', incidents.ongoing.length > 0 && 'mt-2')} aria-label="Recent incidents">
+          {incidents.recent.map((entry) => (
+            <li>
+              <EventCard
+                event={entry.event}
+                serviceSlug={serviceSlug}
+                now={now}
+                preview={entry.isResolved ? 'title' : 'one-line'}
+              />
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {olderIncidents.shown.length > 0 && (
+        <ol class={cn('space-y-1.5', activeIncidents.length > 0 && 'mt-1.5')} aria-label="Past incidents">
+          {olderIncidents.shown.map((entry) => (
+            <li>
+              <EventCard event={entry.event} serviceSlug={serviceSlug} now={now} preview="one-line" faded />
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {olderIncidents.folded.length > 0 && (
+        <details class="group/older mt-3">
+          <summary class={foldClass}>
+            <span class="inline-flex items-center gap-1.5">
+              <Icon name="ri:history-line" class="size-4 shrink-0" />
+              {activeIncidents.length > 0 || olderIncidents.shown.length > 0
+                ? 'Past incidents'
+                : 'Incidents'}{' '}
+              ({olderIncidents.folded.length})
+            </span>
+            <span class="flex flex-wrap items-center gap-x-1.5 text-2xs font-semibold tracking-wide uppercase">
+              {olderBySeverity.map(({ info, count }, i) => (
+                <>
+                  {i > 0 && (
+                    <span class="text-day-700" aria-hidden="true">
+                      ·
+                    </span>
+                  )}
+                  <span class={info.classNames.text}>{`${String(count)} ${info.label}`}</span>
+                </>
+              ))}
+            </span>
+            <Icon
+              name="ri:arrow-down-s-line"
+              class="size-4 shrink-0 transition-transform group-open/older:rotate-180"
+            />
+          </summary>
+          <ol class="mt-2 space-y-1.5">
+            {olderIncidents.folded.map((entry) => (
+              <li>
+                <EventCard event={entry.event} serviceSlug={serviceSlug} now={now} preview="one-line" faded />
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
+    </section>
+  )
+}
+
+<section aria-labelledby="events-heading">
+  <div class={headerClass} id="events">
+    <h2 class={titleClass} id="events-heading">
+      <Icon name="ri:calendar-event-line" class="size-5 text-day-500" />
+      Events
+    </h2>
+    <a href="/events" class={headerLinkClass}>
+      All events
+      <Icon name="ri:arrow-right-s-line" class="size-4" />
+    </a>
+  </div>
+
+  {!hasEvents && <p class="my-10 text-center text-day-400">No events reported</p>}
+
+  {
+    plain.ongoing.length > 0 && (
+      <ol class="space-y-2" aria-label="Ongoing">
+        {plain.ongoing.map((entry) => (
+          <li>
+            <EventCard event={entry.event} now={now} preview="two-lines" />
+          </li>
+        ))}
+      </ol>
+    )
+  }
+
+  {
+    plain.recent.length > 0 && (
+      <ol class={cn('space-y-1.5', plain.ongoing.length > 0 && 'mt-2')} aria-label="Recent">
+        {plain.recent.map((entry) => (
+          <li>
+            <EventCard event={entry.event} now={now} preview={entry.isResolved ? 'title' : 'one-line'} />
+          </li>
+        ))}
+      </ol>
+    )
+  }
+
+  {
+    olderEvents.shown.length > 0 && (
+      <ol
+        class={cn('space-y-1.5', plain.ongoing.length + plain.recent.length > 0 && 'mt-1.5')}
+        aria-label="Older"
+      >
+        {olderEvents.shown.map((entry) => (
+          <li>
+            <EventCard event={entry.event} now={now} preview="one-line" faded />
+          </li>
+        ))}
+      </ol>
+    )
+  }
+
+  {
+    olderEvents.folded.length > 0 && (
+      <details class="group/older-events mt-3">
+        <summary class={foldClass}>
+          <Icon name="ri:history-line" class="size-4 shrink-0" />
+          Older events ({olderEvents.folded.length})
+          <Icon
+            name="ri:arrow-down-s-line"
+            class="size-4 shrink-0 transition-transform group-open/older-events:rotate-180"
+          />
+        </summary>
+        <ol class="mt-2 space-y-1.5">
+          {olderEvents.folded.map((entry) => (
+            <li>
+              <EventCard event={entry.event} now={now} preview="one-line" faded />
+            </li>
+          ))}
+        </ol>
+      </details>
+    )
+  }
+
+  {
+    tiers.changes.length > 0 && (
+      <details class="group/changes mt-3">
+        <summary class={foldClass}>
+          <Icon name="ri:pencil-line" class="size-4 shrink-0" />
+          Listing edits ({tiers.changes.length})
+          <Icon
+            name="ri:arrow-down-s-line"
+            class="size-4 shrink-0 transition-transform group-open/changes:rotate-180"
+          />
+        </summary>
+        <ol class="mt-2 space-y-1.5">
+          {tiers.changes.map((event) => (
+            <li>
+              <EventCard event={event} now={now} preview="one-line" />
+            </li>
+          ))}
+        </ol>
+      </details>
+    )
+  }
+
+  <p class="mt-3 flex justify-center text-xs">
+    <a
+      href="/about#events"
+      class="inline-flex items-center gap-1 text-day-400 transition-colors hover:text-day-200 hover:underline"
+    >
+      <Icon name="ri:information-line" class="size-3" />
+      About events
+    </a>
+  </p>
+</section>

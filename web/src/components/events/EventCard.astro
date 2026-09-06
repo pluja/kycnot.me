@@ -1,176 +1,354 @@
 ---
 import { Icon } from 'astro-icon/components'
+import { format } from 'date-fns'
 
+import { getEventKindInfo } from '../../constants/eventKinds'
 import { getEventOriginInfo } from '../../constants/eventOrigins'
+import { getIncidentSeverityInfo } from '../../constants/incidentSeverities'
 import { cn } from '../../lib/cn'
-import { getEventDisplay } from '../../lib/eventKind'
+import { eventToDisplayKind, getEventDisplay, isEventOpen } from '../../lib/eventKind'
 import { safeHttpUrl } from '../../lib/exchange/safeUrl'
+import { computeIncidentTrustPenalty } from '../../lib/incidentPenalty'
 import { proseBlocks, stripMarkdown } from '../../lib/strings'
-import BadgeSmall from '../BadgeSmall.astro'
-import FormatTimeInterval from '../FormatTimeInterval.astro'
+import CaseReportsStrip from '../cases/CaseReportsStrip.astro'
 import Markdown from '../Markdown.astro'
 import Tooltip from '../Tooltip.astro'
 
 import type { DisplayableEvent } from '../../lib/eventKind'
-import type { EventOrigin } from '@prisma/client'
+import type { CaseStatus, EventOrigin, Incident, IncidentState } from '@prisma/client'
+
+type IncidentDetails = Pick<
+  Incident,
+  'occurredAt' | 'outcome' | 'resolvedAt' | 'severity' | 'state' | 'trustOverride'
+> & {
+  amountText?: string | null
+  cases?: { publicId: string; title: string; status: CaseStatus }[]
+}
 
 type Props = {
-  event: DisplayableEvent & {
+  event: Omit<DisplayableEvent, 'incident'> & {
     id: number
     title: string
     content: string
     source: string | null
     origin: EventOrigin
+    /// Lists that only know the state still get the kind styling. With the
+    /// details present the card shows severity, trust chip and penalty notes.
+    incident?: (Partial<IncidentDetails> & { state: IncidentState }) | null
   }
+  /// Needed to link case reports; only incidents on a service page have them.
+  serviceSlug?: string
   now?: Date
   /// Turns the title into a permalink. Needed on lists that are not already on
   /// the owning service page.
   titleHref?: string
   headingLevel?: 'h2' | 'h3'
-  /// Muted shell for entries that are no longer live, such as deleted rows.
+  /// Muted shell for entries that no longer weigh anything: deleted rows, or
+  /// incidents whose penalty has faded to zero.
   faded?: boolean
+  /// How much of the lead shows before opening: all of it, two lines for an
+  /// entry that deserves attention, one line for a folded row in a list, or
+  /// none for an entry that is over.
+  preview?: 'full' | 'one-line' | 'title' | 'two-lines'
 }
 
-const { event, now = new Date(), titleHref, headingLevel: Heading = 'h3', faded = false } = Astro.props
+const {
+  event,
+  serviceSlug,
+  now = new Date(),
+  titleHref,
+  headingLevel: Heading = 'h3',
+  faded = false,
+  preview = 'full',
+} = Astro.props
 
+const incident: IncidentDetails | null =
+  event.incident?.severity && event.incident.occurredAt
+    ? {
+        severity: event.incident.severity,
+        state: event.incident.state,
+        occurredAt: event.incident.occurredAt,
+        resolvedAt: event.incident.resolvedAt ?? null,
+        outcome: event.incident.outcome ?? null,
+        trustOverride: event.incident.trustOverride ?? null,
+        amountText: event.incident.amountText,
+        cases: event.incident.cases,
+      }
+    : null
 const display = getEventDisplay(event, now)
+const kind = eventToDisplayKind(event)
+const closes = kind === 'WARNING' || kind === 'ALERT' || kind === 'INCIDENT'
 const originInfo = getEventOriginInfo(event.origin)
 // A listing edit already reads as automated, so the origin chip would only
-// repeat the badge next to it.
-const showOrigin = originInfo.showOnPublicEntries && display.kind !== 'CHANGE'
+// repeat the label next to it.
+const showOrigin = originInfo.showOnPublicEntries && kind !== 'CHANGE'
 const sourceUrl = safeHttpUrl(event.source)
+// The host says what kind of evidence it is before anyone clicks; the path is noise.
+const sourceHost = sourceUrl ? new URL(sourceUrl).hostname.replace(/^www\./, '').toLowerCase() : null
 
-// The lead shows in full; the disclosure exists only when something follows it.
+const severity = incident ? getIncidentSeverityInfo(incident.severity) : null
+const penalty = incident ? computeIncidentTrustPenalty(incident) : null
+const ongoing = incident ? incident.state === 'ONGOING' : closes && isEventOpen(event, now)
+const resolved = incident ? incident.state === 'RESOLVED' : closes && !ongoing
+
+const label = severity
+  ? {
+      icon: severity.icon,
+      text: severity.label,
+      tooltip: `${severity.label} severity incident. Weighs on the trust score until it fades.`,
+      className: severity.classNames.text,
+    }
+  : {
+      icon: display.icon,
+      // The state marker next to it already says resolved.
+      text: getEventKindInfo(kind).label,
+      tooltip: display.description,
+      className: display.classNames.text,
+    }
+
+const start = incident ? incident.occurredAt : event.startedAt
+const end = incident ? incident.resolvedAt : event.endedAt
+const dateLabel =
+  end && end.getTime() > start.getTime()
+    ? `${format(start, 'MMM d')} → ${format(end, 'MMM d, yyyy')}`
+    : ongoing
+      ? `Started ${format(start, 'MMM d, yyyy')}`
+      : format(start, 'MMM d, yyyy')
+
+const penaltyHint =
+  penalty && incident
+    ? ongoing
+      ? 'Taken off the trust score while this incident is open. Steps down on resolution, then fades over time.'
+      : `Taken off the trust score today. Stepped down from ${String(penalty.fullPoints)} on resolution${penalty.fadesOn ? `, fades to 0 by ${format(penalty.fadesOn, 'MMM yyyy')}` : ''}.`
+    : ''
+const barWidth = penalty ? `${Math.max(2, Math.round(penalty.decayRemaining * 100))}%` : '0%'
+
+const anchor = `event-${event.id.toString()}`
 const blocks = proseBlocks(event.content)
 const lead = blocks[0] ?? stripMarkdown(event.content)
-const hasMore = blocks.length > 1
+// A full preview shows the whole lead, so opening only matters when more follows.
+const canOpen = preview !== 'full' || blocks.length > 1 || !!incident
 
+// Colour lives in the rail and the label only; the shell is the site's plain card.
+const shell = faded
+  ? { rail: 'bg-day-700', card: 'border-day-800 bg-night-800/30' }
+  : {
+      rail: severity ? severity.classNames.rail : display.classNames.rail,
+      card: 'border-night-600 bg-night-800',
+    }
+
+const titleClass = cn(
+  'font-title font-semibold text-pretty wrap-anywhere',
+  faded || resolved ? 'text-day-200' : 'text-white'
+)
+const leadClass = {
+  full: 'text-pretty',
+  'two-lines': 'line-clamp-2',
+  'one-line': 'truncate',
+  title: 'hidden',
+}[preview]
+// Settled entries step back: dimmer rail and title, the green check the one bright mark.
+const settled = resolved && !faded
 const proseClass =
   'prose prose-sm max-w-none text-pretty wrap-anywhere text-day-400 prose-invert prose-a:text-current prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0'
-const headingClass = 'font-title text-base/snug font-semibold text-pretty wrap-anywhere text-white'
 ---
 
+{
+  /* The anchor sits inside the body when there is one, so a link to the entry
+    scrolls here and the browser opens the folds on the way (details ancestors
+    are revealed for a fragment target). */
+}
 <article
-  id={`event-${event.id.toString()}`}
+  id={canOpen ? undefined : anchor}
   class={cn(
-    'relative scroll-mt-24 rounded-lg border pl-3',
-    faded ? 'border-day-800 bg-night-900 opacity-70' : display.classNames.card
+    'relative scroll-mt-24 overflow-hidden rounded-lg border pl-3 has-[:target]:ring-2 has-[:target]:ring-day-400',
+    shell.card,
+    faded && 'opacity-80'
   )}
 >
-  <span
-    class={cn('absolute inset-y-0 left-0 w-1 rounded-l-lg', faded ? 'bg-day-800' : display.classNames.rail)}
-    aria-hidden="true"></span>
+  <span class={cn('absolute inset-y-0 left-0 w-1', shell.rail, settled && 'opacity-40')} aria-hidden="true"
+  ></span>
 
-  <div class="px-3 pt-2.5 pb-3">
-    <div class="flex flex-wrap items-start gap-x-2 gap-y-1">
-      <div class="flex min-w-0 grow flex-wrap items-center gap-x-2 gap-y-1">
-        <Tooltip text={display.description} position="top">
-          <BadgeSmall text={display.label} icon={display.icon} color={display.color} variant="faded" />
-        </Tooltip>
-
-        <slot name="badges" />
-
-        <FormatTimeInterval
-          as="span"
-          start={event.startedAt}
-          end={event.endedAt}
-          now={now}
-          class="text-xs text-day-400"
-        />
-
-        {
-          showOrigin && (
-            <Tooltip text={originInfo.description} position="top">
-              <span class="inline-flex items-center gap-1 text-2xs tracking-wide text-day-500 uppercase">
-                <Icon name={originInfo.icon} class="size-3.5" />
-                {originInfo.label}
-              </span>
-            </Tooltip>
-          )
-        }
-      </div>
-
-      {
-        Astro.slots.has('actions') && (
-          <div class="-my-0.5 flex shrink-0 items-center gap-0.5 rounded-md bg-night-900/50 p-0.5">
-            <slot name="actions" />
-          </div>
-        )
-      }
-    </div>
-
-    {
-      hasMore ? (
-        <details class="group/event">
-          {/* Title and lead both sit in the summary, padded out so the whole
-              block is one easy tap target. */}
-          <summary class="-mx-2 mt-0.5 cursor-pointer list-none rounded-md px-2 py-1.5 transition-colors hover:bg-day-500/5 [&::-webkit-details-marker]:hidden">
-            <Heading class={headingClass}>
-              {titleHref ? (
-                <a href={titleHref} class="transition-colors hover:text-day-200 hover:underline">
-                  {event.title}
-                </a>
-              ) : (
-                event.title
-              )}
-            </Heading>
-
-            <span
-              class="mt-1 block text-sm text-pretty wrap-anywhere text-day-400 group-open/event:hidden"
-              aria-hidden="true"
-            >
-              {lead}
+  <details class="group/event" open={!canOpen}>
+    <summary
+      class={cn(
+        'flex list-none items-start gap-3 px-3 pt-2 pb-2 [&::-webkit-details-marker]:hidden',
+        canOpen ? 'cursor-pointer transition-colors hover:bg-day-500/5' : 'pointer-events-none'
+      )}
+    >
+      <div class="min-w-0 flex-1">
+        <div
+          class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs leading-4 font-semibold tracking-wide uppercase"
+        >
+          <Tooltip text={label.tooltip} position="top" class="inline-flex">
+            <span class={cn('inline-flex items-center gap-1', faded ? 'text-day-500' : label.className)}>
+              <Icon name={label.icon} class="size-3.5" />
+              {label.text}
             </span>
+          </Tooltip>
+          {
+            (ongoing || resolved) && (
+              <>
+                <span class="text-day-700" aria-hidden="true">
+                  ·
+                </span>
+                {ongoing ? (
+                  <span class="inline-flex items-center gap-1.5 text-day-200">
+                    <span class="size-1.5 rounded-full bg-red-400 motion-safe:animate-pulse" />
+                    Ongoing
+                  </span>
+                ) : (
+                  <span
+                    class={cn('inline-flex items-center gap-1', faded ? 'text-day-500' : 'text-green-400')}
+                  >
+                    <Icon name="ri:checkbox-circle-fill" class="size-3.5" />
+                    Resolved
+                  </span>
+                )}
+              </>
+            )
+          }
+          <span class="text-day-700" aria-hidden="true">·</span>
+          <span class="inline-flex items-center gap-1 text-xs leading-4 font-medium text-day-400 normal-case">
+            <Icon name="ri:calendar-event-line" class="size-3.5 shrink-0" />
+            {dateLabel}
+          </span>
+          {
+            showOrigin && (
+              <Tooltip text={originInfo.description} position="top" class="inline-flex">
+                <span class="inline-flex items-center gap-1 text-day-500">
+                  <Icon name={originInfo.icon} class="size-3.5" />
+                  {originInfo.label}
+                </span>
+              </Tooltip>
+            )
+          }
+          <slot name="badges" />
+          {
+            penalty && severity && !faded && (
+              <Tooltip text={penaltyHint} position="top" class="inline-flex">
+                <span
+                  class={cn(
+                    'inline-flex items-center gap-1 rounded-md border border-night-500 bg-night-900 px-1.5 py-px text-xs font-bold normal-case tabular-nums',
+                    severity.classNames.text
+                  )}
+                >
+                  <Icon name="ri:shield-flash-line" class="size-3.5" />
+                  {penalty.points} trust
+                </span>
+              </Tooltip>
+            )
+          }
+        </div>
 
-            <span class="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-day-400 transition-colors group-hover/event:text-day-200">
-              <span class="group-open/event:hidden">Read more</span>
-              <span class="hidden group-open/event:inline">Show less</span>
-              <Icon
-                name="ri:arrow-down-s-line"
-                class="size-4 transition-transform group-open/event:rotate-180"
-              />
-            </span>
-          </summary>
-
-          <div class={cn('mt-1', proseClass)}>
-            <Markdown content={event.content} linkRel={['nofollow', 'noopener']} />
-          </div>
-        </details>
-      ) : (
-        <>
-          <Heading class={cn('mt-1', headingClass)}>
-            {titleHref ? (
+        <Heading class={cn('mt-1 text-base/snug', titleClass)}>
+          {
+            titleHref ? (
               <a href={titleHref} class="transition-colors hover:text-day-200 hover:underline">
                 {event.title}
               </a>
             ) : (
               event.title
-            )}
-          </Heading>
+            )
+          }
+        </Heading>
 
-          <div class={cn('mt-1', proseClass)}>
-            <Markdown content={event.content} linkRel={['nofollow', 'noopener']} />
+        <span
+          class={cn(
+            'mt-0.5 block text-sm wrap-anywhere text-day-400',
+            leadClass,
+            canOpen && 'group-open/event:hidden'
+          )}
+          aria-hidden="true"
+        >
+          {lead}
+        </span>
+      </div>
+
+      {
+        Astro.slots.has('actions') && (
+          <div class="flex shrink-0 items-center gap-0.5 rounded-md bg-night-900/50 p-0.5">
+            <slot name="actions" />
           </div>
-        </>
-      )
-    }
-
-    <slot name="meta" />
+        )
+      }
+      {
+        canOpen && (
+          <Icon
+            name="ri:arrow-down-s-line"
+            class="mt-1 size-4 shrink-0 text-day-500 transition-transform group-open/event:rotate-180"
+          />
+        )
+      }
+    </summary>
 
     {
-      sourceUrl && (
-        <a
-          href={sourceUrl}
-          target="_blank"
-          rel="nofollow noopener"
-          class="mt-2 inline-flex items-center gap-1 text-xs text-day-400 transition-colors hover:text-day-200 hover:underline"
-        >
-          <Icon name="ri:external-link-line" class="size-3.5" />
-          Source
-        </a>
+      canOpen && (
+        <div id={anchor} class="scroll-mt-32 px-3 pb-3">
+          <div class={proseClass}>
+            <Markdown content={event.content} linkRel={['nofollow', 'noopener']} />
+          </div>
+
+          {penalty && severity && (
+            <div class="mt-3">
+              {faded ? (
+                <p class="flex items-center gap-1.5 text-xs text-day-500">
+                  <Icon name="ri:history-line" class="size-3.5" />
+                  No longer counts against the trust score. Kept for the record.
+                </p>
+              ) : ongoing ? (
+                <p class="flex items-center gap-1.5 text-xs text-day-500">
+                  <span class={cn('inline-block size-1.5 rounded-full', severity.classNames.rail)} />
+                  Full penalty applies until resolved.
+                </p>
+              ) : (
+                <div>
+                  <div class="h-1.5 w-full overflow-hidden rounded-full bg-day-800">
+                    <div
+                      class={cn('h-full rounded-full transition-all', severity.classNames.bar)}
+                      style={`width:${barWidth}`}
+                    />
+                  </div>
+                  <p class="mt-1.5 text-xs text-day-500">{penaltyHint}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <slot name="meta" />
+
+          {serviceSlug && incident?.cases && (
+            <CaseReportsStrip serviceSlug={serviceSlug} cases={incident.cases} faded={faded} class="mt-3" />
+          )}
+
+          <slot name="footer" />
+        </div>
       )
     }
+  </details>
 
-    <slot name="footer" />
-  </div>
+  {
+    (sourceUrl || incident?.amountText) && (
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 pb-2 text-xs text-day-500">
+        {sourceUrl && sourceHost && (
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="nofollow noopener"
+            title={sourceUrl}
+            class="inline-flex items-center gap-1 transition-colors hover:text-day-200 hover:underline"
+          >
+            <Icon name="ri:external-link-line" class="size-3.5" />
+            {sourceHost}
+          </a>
+        )}
+        {incident?.amountText && (
+          <span class="inline-flex items-center gap-1">
+            <Icon name="ri:coins-line" class="size-3.5" />
+            {incident.amountText}
+          </span>
+        )}
+      </div>
+    )
+  }
 </article>
