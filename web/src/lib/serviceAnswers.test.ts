@@ -65,7 +65,12 @@ void test('a severe open incident outranks a healthy trust score and is named', 
   assert.equal(answer.tone, 'bad')
   assert.equal(answer.answer, 'Ongoing incident')
   assert.deepEqual(answer.incidents, [
-    { title: 'Withdrawals frozen for 23 users', href: '#event-42', note: 'Unresolved since Jun 2026' },
+    {
+      title: 'Withdrawals frozen for 23 users',
+      href: '#event-42',
+      note: 'Unresolved since Jun 2026',
+      kind: 'incident',
+    },
   ])
 })
 
@@ -105,7 +110,12 @@ void test('a resolved incident still in its decay window reads as recent, in cau
   assert.equal(answer.tone, 'caution')
   assert.equal(answer.answer, 'Recent incident')
   assert.deepEqual(answer.incidents, [
-    { title: 'Withdrawals frozen for 23 users', href: '#event-42', note: 'Resolved Jul 2026' },
+    {
+      title: 'Withdrawals frozen for 23 users',
+      href: '#event-42',
+      note: 'Resolved Jul 2026',
+      kind: 'incident',
+    },
   ])
 })
 
@@ -296,4 +306,35 @@ void test('a recently approved clean listing says its record is short', () => {
   const answer = makeSafetyAnswer({ ...base, recentlyApprovedAt: new Date() })
   assert.equal(answer.answer, 'Nothing negative on record')
   assert.match(answer.detail, /so the record is short\.$/)
+})
+
+void test('an open warning is a verdict of its own and rides under an incident', () => {
+  const warnings = [{ id: 9, title: 'Deposits delayed', startedAt: new Date('2026-09-01') }]
+  const alone = makeSafetyAnswer({ ...base, warnings })
+  assert.equal(alone.tone, 'caution')
+  assert.equal(alone.answer, 'Ongoing warning')
+  assert.deepEqual(
+    alone.incidents?.map((link) => [link.kind, link.title, link.note]),
+    [['warning', 'Deposits delayed', 'Since Sep 2026']]
+  )
+
+  const withIncident = makeSafetyAnswer({
+    ...base,
+    warnings,
+    incidents: [
+      {
+        id: 3,
+        title: 'Hot wallet drained',
+        severity: 'CRITICAL',
+        state: 'ONGOING',
+        occurredAt: new Date('2026-08-25'),
+        resolvedAt: null,
+      },
+    ],
+  })
+  assert.equal(withIncident.answer, '1 incident and 1 warning ongoing')
+  assert.deepEqual(
+    withIncident.incidents?.map((link) => link.kind),
+    ['incident', 'warning']
+  )
 })

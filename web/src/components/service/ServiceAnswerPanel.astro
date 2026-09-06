@@ -29,7 +29,7 @@ const SHOWN_CAVEATS = 3
 
 const questions = [
   { label: 'KYC policy', icon: 'ri:fingerprint-line', level: kycLevel, ...kyc },
-  { label: 'Trust', icon: 'ri:shield-check-line', level: null, ...safety },
+  { label: 'Trust', icon: 'ri:shield-flash-line', level: null, ...safety },
 ]
 ---
 
@@ -67,8 +67,11 @@ const questions = [
                     class="inline-flex gap-1.5 underline decoration-day-700 underline-offset-4 hover:text-day-100 hover:decoration-day-400"
                   >
                     <Icon
-                      name="ri:alarm-warning-line"
-                      class={cn('mt-0.5 size-4 shrink-0', toneClass[question.tone])}
+                      name={incident.kind === 'warning' ? 'ri:alert-line' : 'ri:alarm-warning-line'}
+                      class={cn(
+                        'mt-0.5 size-4 shrink-0',
+                        incident.kind === 'warning' ? toneClass.caution : toneClass[question.tone]
+                      )}
                     />
                     <span>
                       {incident.title}

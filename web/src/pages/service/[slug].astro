@@ -47,7 +47,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro'
 import { someButNotAll, undefinedIfEmpty } from '../../lib/arrays'
 import { makeNonDbAttributes, sortAttributes } from '../../lib/attributes'
 import { cn } from '../../lib/cn'
-import { getEventDisplay, pickPrimaryEvent } from '../../lib/eventKind'
+import { eventToDisplayKind, getEventDisplay, isEventOpen, pickPrimaryEvent } from '../../lib/eventKind'
 import { getSupportedProviderSlugs } from '../../lib/exchange/supportedProviders'
 import { computeIncidentTrustPenalty, totalIncidentTrustPenalty } from '../../lib/incidentPenalty'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
@@ -522,6 +522,11 @@ const needsAlternative =
 // most: a service can refuse to ask for ID and still be sitting on your money.
 const caveats = pickCaveats(attributes)
 const kycAnswer = makeKycAnswer(service.kycLevel, caveats.kyc, service.kycPolicyMd, isFlaggedScam)
+const openWarnings = service.events.filter((event) => {
+  if (event.class !== 'EVENT' || !isEventOpen(event, now)) return false
+  const kind = eventToDisplayKind(event)
+  return kind === 'WARNING' || kind === 'ALERT'
+})
 const safetyAnswer = makeSafetyAnswer({
   verificationStatus: service.verificationStatus,
   incidents: activeIncidents.map((entry) => ({
@@ -529,6 +534,7 @@ const safetyAnswer = makeSafetyAnswer({
     title: entry.title,
     ...pick(entry.incident, ['severity', 'state', 'occurredAt', 'resolvedAt']),
   })),
+  warnings: openWarnings.map((event) => ({ id: event.id, title: event.title, startedAt: event.startedAt })),
   hasBeenReviewed: hasBeenReviewed(service.verificationStatus),
   caveats: caveats.trust,
   checks: flaggedChecks,

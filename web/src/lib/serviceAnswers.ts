@@ -36,7 +36,7 @@ export type ServiceAnswer = {
   incidents?: IncidentLink[]
 }
 
-export type IncidentLink = { title: string; href: string; note: string }
+export type IncidentLink = { title: string; href: string; note: string; kind: 'incident' | 'warning' }
 
 const cleanTitle = (title: string) => title.replace(/[.;,]+$/, '')
 
@@ -132,6 +132,13 @@ type OpenIncident = {
   resolvedAt: Date | null
 }
 
+/** A warning-class event with no end date: a live problem short of an incident. */
+export type OpenWarning = {
+  id: number
+  title: string
+  startedAt: Date
+}
+
 type SafetyInput = {
   verificationStatus: VerificationStatus
   /**
@@ -140,6 +147,8 @@ type SafetyInput = {
    * "recent" means below. Faded ones do not count.
    */
   incidents: OpenIncident[]
+  /** Open warnings. Listed under any incident verdict, and a verdict of their own without one. */
+  warnings?: OpenWarning[]
   /** False when nobody has reviewed the listing, so a low score means "unknown". */
   hasBeenReviewed: boolean
   /** The trust half of `pickCaveats`. */
@@ -166,6 +175,19 @@ const TONE_BY_SEVERITY: Record<IncidentSeverity, Extract<ServiceAnswer['tone'], 
 
 const monthFormatter = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' })
 
+const count = (n: number, noun: string) => `${String(n)} ${noun}${n === 1 ? '' : 's'}`
+
+/** "Ongoing incident", "2 ongoing incidents", "Ongoing warning", "1 incident and 2 warnings ongoing". */
+function ongoingHeadline(incidents: number, warnings: number, tone: 'bad' | 'caution'): string {
+  if (incidents > 0 && warnings > 0)
+    {return `${count(incidents, 'incident')} and ${count(warnings, 'warning')} ongoing`}
+  if (incidents > 0) {
+    if (tone === 'caution') return 'Open incident'
+    return incidents === 1 ? 'Ongoing incident' : `${String(incidents)} ongoing incidents`
+  }
+  return warnings === 1 ? 'Ongoing warning' : `${String(warnings)} ongoing warnings`
+}
+
 /**
  * Answers "is your money safe here?".
  *
@@ -177,6 +199,7 @@ const monthFormatter = new Intl.DateTimeFormat('en', { month: 'short', year: 'nu
 export function makeSafetyAnswer({
   verificationStatus,
   incidents,
+  warnings = [],
   hasBeenReviewed,
   caveats,
   checks,
@@ -193,6 +216,13 @@ export function makeSafetyAnswer({
   // Our own failed or warned checks ride along under any incident verdict.
   const flaggedChecks = checks.map((check) => ({ title: check.title, href: check.href }))
 
+  const warningLinks: IncidentLink[] = warnings.map((warning) => ({
+    title: cleanTitle(warning.title),
+    href: `#${incidentAnchor(warning.id)}`,
+    note: `Since ${monthFormatter.format(warning.startedAt)}`,
+    kind: 'warning',
+  }))
+
   const ongoing = orderBy(
     incidents.filter((incident) => incident.state === 'ONGOING'),
     (incident) => getIncidentSeverityInfo(incident.severity).order,
@@ -201,21 +231,21 @@ export function makeSafetyAnswer({
   const worst = ongoing[0]
   const tone = worst && TONE_BY_SEVERITY[worst.severity]
   if (worst && tone) {
-    const plural = ongoing.length > 1
     return {
       tone,
-      answer:
-        tone === 'bad'
-          ? plural
-            ? `${String(ongoing.length)} ongoing incidents`
-            : 'Ongoing incident'
-          : 'Open incident',
+      answer: ongoingHeadline(ongoing.length, warningLinks.length, tone),
       detail: '',
-      incidents: ongoing.map((incident) => ({
-        title: cleanTitle(incident.title),
-        href: `#${incidentAnchor(incident.id)}`,
-        note: `Unresolved since ${monthFormatter.format(incident.occurredAt)}`,
-      })),
+      incidents: [
+        ...ongoing.map(
+          (incident): IncidentLink => ({
+            title: cleanTitle(incident.title),
+            href: `#${incidentAnchor(incident.id)}`,
+            note: `Unresolved since ${monthFormatter.format(incident.occurredAt)}`,
+            kind: 'incident',
+          })
+        ),
+        ...warningLinks,
+      ],
       caveats: flaggedChecks,
     }
   }
@@ -228,13 +258,35 @@ export function makeSafetyAnswer({
   if (recent.length > 0) {
     return {
       tone: 'caution',
-      answer: recent.length > 1 ? 'Recent incidents' : 'Recent incident',
+      answer:
+        warningLinks.length > 0
+          ? `${count(recent.length, 'recent incident')} and ${count(warningLinks.length, 'warning')} ongoing`
+          : recent.length > 1
+            ? 'Recent incidents'
+            : 'Recent incident',
       detail: '',
-      incidents: recent.map((incident) => ({
-        title: cleanTitle(incident.title),
-        href: `#${incidentAnchor(incident.id)}`,
-        note: incident.resolvedAt ? `Resolved ${monthFormatter.format(incident.resolvedAt)}` : 'Resolved',
-      })),
+      incidents: [
+        ...recent.map(
+          (incident): IncidentLink => ({
+            title: cleanTitle(incident.title),
+            href: `#${incidentAnchor(incident.id)}`,
+            note: incident.resolvedAt ? `Resolved ${monthFormatter.format(incident.resolvedAt)}` : 'Resolved',
+            kind: 'incident',
+          })
+        ),
+        ...warningLinks,
+      ],
+      caveats: flaggedChecks,
+    }
+  }
+
+  // A live warning is a fact about today, like an open incident, only smaller.
+  if (warningLinks.length > 0) {
+    return {
+      tone: 'caution',
+      answer: ongoingHeadline(0, warningLinks.length, 'caution'),
+      detail: '',
+      incidents: warningLinks,
       caveats: flaggedChecks,
     }
   }
