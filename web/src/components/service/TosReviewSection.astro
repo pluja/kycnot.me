@@ -13,6 +13,7 @@ import { transformCase } from '../../lib/strings'
 import { isTosReviewable, normalizeTosHighlightRating, TOS_REVIEW_ANCHOR } from '../../lib/tosHighlights'
 import Markdown from '../Markdown.astro'
 import QuotedClause from '../QuotedClause.astro'
+import SectionHeading from '../SectionHeading.astro'
 import TimeFormatted from '../TimeFormatted.astro'
 
 import TosSourceLinks from './TosSourceLinks.astro'
@@ -52,12 +53,7 @@ const highlights = sortBy(
 )
 ---
 
-<h2
-  id={TOS_REVIEW_ANCHOR}
-  class="mt-6 mb-3 scroll-mt-4 border-b border-day-500 font-title text-lg font-bold text-day-200"
->
-  Terms of Service Review
-</h2>
+<SectionHeading id={TOS_REVIEW_ANCHOR} title="Terms of Service Review" />
 
 {
   !isReviewable ? (

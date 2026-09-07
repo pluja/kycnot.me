@@ -21,6 +21,7 @@ import Markdown from '../../components/Markdown.astro'
 import MyPicture from '../../components/MyPicture.astro'
 import RatingBadge from '../../components/RatingBadge.astro'
 import ScoreGauge from '../../components/ScoreGauge.astro'
+import SectionHeading from '../../components/SectionHeading.astro'
 import ScoreSquare from '../../components/ScoreSquare.astro'
 import AcceptedCurrencies from '../../components/service/AcceptedCurrencies.astro'
 import ServiceAnswerPanel from '../../components/service/ServiceAnswerPanel.astro'
@@ -1105,16 +1106,10 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
   />
 
   <AdminOnly>
-    <div class="mt-6 mb-3 flex items-center justify-between border-b border-day-500">
-      <h2 class="font-title text-lg font-bold text-day-100">Internal Notes</h2>
-      <a
-        href={`/admin/services/${service.slug}/edit#internal-notes`}
-        class="inline-flex items-center gap-1 text-xs leading-none text-day-500 transition-colors hover:text-day-200 hover:underline"
-      >
-        Manage
-        <Icon name="ri:arrow-right-s-line" class="size-4" />
-      </a>
-    </div>
+    <SectionHeading
+      title="Internal Notes"
+      link={{ href: `/admin/services/${service.slug}/edit#internal-notes`, text: 'Manage' }}
+    />
 
     {
       service.internalNotes.length === 0 ? (
@@ -1283,28 +1278,12 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
 
   <ServiceTimeline events={service.events} serviceSlug={service.slug} now={now} />
 
-  <div
-    class="mt-6 mb-3 flex items-center justify-between gap-3 border-b border-day-500 pb-1"
+  <SectionHeading
     id="verification"
-  >
-    <h2 class="font-title text-lg font-bold text-day-100">Evidence and Review History</h2>
-    <div class="flex items-center gap-2 text-xs leading-none">
-      <a
-        href="/about#listing-statuses"
-        class="inline-flex items-center gap-1 rounded-full border border-day-500/20 px-2 py-1 text-day-400 transition-colors hover:border-day-500/40 hover:text-day-100"
-      >
-        <Icon name="ri:information-line" class="size-3.5" />
-        How statuses work
-      </a>
-      <a
-        href="/about#suggestion-review-process"
-        class="inline-flex items-center gap-0.5 text-day-500 transition-colors hover:text-day-200 hover:underline"
-      >
-        Our review process
-        <Icon name="ri:arrow-right-s-line" class="size-4" />
-      </a>
-    </div>
-  </div>
+    title="Evidence and Review History"
+    info={{ href: '/about#listing-statuses', text: 'How statuses work' }}
+    link={{ href: '/about#suggestion-review-process', text: 'Our review process' }}
+  />
 
   <div
     class={cn(
@@ -1489,16 +1468,11 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
       </>
     )
   }
-  <div class="mt-6 mb-3 flex items-center justify-between border-b border-day-500" id="comments">
-    <h2 class="font-title text-lg font-bold text-day-200">Comments</h2>
-    <a
-      href={`/comments?service=${service.slug}`}
-      class="inline-flex items-center gap-1 text-xs leading-none text-day-500 transition-colors hover:text-day-200 hover:underline"
-    >
-      In the feed
-      <Icon name="ri:arrow-right-s-line" class="size-4" />
-    </a>
-  </div>
+  <SectionHeading
+    id="comments"
+    title="Comments"
+    link={{ href: `/comments?service=${service.slug}`, text: 'In the feed' }}
+  />
   <div
     id="discuss"
     class='grid grid-cols-1 gap-8 [grid-template-areas:"about""rating""ai"] sm:grid-cols-[1fr_1fr] sm:gap-4 sm:[grid-template-areas:"about_ai""rating_ai"]'
