@@ -640,6 +640,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
   description={pageDescription}
   ogImage={ogImageTemplateData}
   widthClassName="max-w-5xl"
+  classNames={{ main: 'sm:mt-12' }}
   noindex={serviceVisibilityInfo.value === 'UNLISTED' ||
     serviceVisibilityInfo.value === 'HIDDEN' ||
     showsUnmoderatedComments}
@@ -981,12 +982,12 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
   <div class="flex flex-col">
     {
       isFlaggedScam ? (
-        <p class="mt-4 max-w-[80ch] text-pretty text-red-200">
+        <p class="mt-4 max-w-[80ch] text-balance text-red-200">
           {service.name} is flagged as a scam. We have evidence of serious, unresolved harm to users. Do not
           use it.
         </p>
       ) : (
-        <div class="prose mt-4 max-w-[80ch] text-pretty text-day-300 prose-invert">
+        <div class="prose mt-4 max-w-[80ch] text-balance text-day-300 prose-invert">
           <Markdown content={service.description} />
         </div>
       )
