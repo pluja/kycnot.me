@@ -8,33 +8,36 @@ import type { HTMLAttributes } from 'astro/types'
 type Props = HTMLAttributes<'a'> & {
   heading?: string
   description?: string
+  action?: string
 }
 
 const {
-  heading = 'Compare exchange rates',
-  description = 'Find the best rates across privacy-respecting exchanges.',
+  heading = 'Compare swap rates',
+  description = 'Live quotes from the exchanges we list, with the KYC level, scores and warnings next to each one.',
+  action = 'Open',
   class: className,
   ...htmlProps
 } = Astro.props
 ---
 
+{/* A house ad: one quiet line of tinted glass, so it reads as ours without competing with the service. */}
 <a
   href="/swap"
   class={cn(
-    'group flex items-center gap-2.5 rounded-lg border border-green-500/25 bg-green-500/5 px-3.5 py-2 text-sm transition-colors hover:border-green-500/45 hover:bg-green-500/10',
+    'group flex items-center gap-2.5 rounded-lg border border-night-600 bg-linear-to-r from-night-900/80 via-night-900/60 to-green-500/8 bg-clip-padding px-3 py-1.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] backdrop-blur-md transition-colors duration-300 hover:border-green-700 hover:to-green-500/15',
     className
   )}
   {...htmlProps}
 >
   <Icon name="ri:swap-line" class="size-4 shrink-0 text-green-500" />
-  <span class="font-title font-semibold text-green-400 group-hover:text-green-300">
-    {heading}
+  <span class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 text-sm">
+    <span class="font-semibold text-day-200">{heading}</span>
+    <span class="min-w-0 truncate text-xs text-day-400 max-sm:hidden">{description}</span>
   </span>
-  <span class="min-w-0 flex-1 truncate text-day-400 max-sm:hidden">
-    {description}
+  <span
+    class="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-green-500 transition-colors group-hover:text-green-400"
+  >
+    <span class="max-sm:hidden">{action}</span>
+    <Icon name="ri:arrow-right-line" class="size-4" />
   </span>
-  <Icon
-    name="ri:arrow-right-line"
-    class="ml-auto size-4 shrink-0 text-green-500/60 group-hover:text-green-400"
-  />
 </a>

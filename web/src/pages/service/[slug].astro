@@ -782,17 +782,6 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
     )
   }
 
-  {
-    /* On a scam or a service with a severe open incident the same banner answers a different question. */
-    isSwapSupported && (
-      <SwapCTA
-        class="mb-4"
-        heading={needsAlternative ? 'Looking for an alternative?' : 'Compare rates'}
-        description="Find the best rate across privacy-respecting exchanges."
-      />
-    )
-  }
-
   <div class="flex items-start gap-4">
     {
       !!service.imageUrl && (
@@ -1082,10 +1071,25 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
     )
   }
 
-  <div class="mt-6 space-y-4 sm:mt-8">
+  <div class="mt-6 space-y-2 sm:mt-8">
     <ServiceAnswerPanel kyc={kycAnswer} safety={safetyAnswer} kycLevel={kycLevelInfo} />
 
     <TosSummaryCard service={service} />
+
+    {
+      /* On a scam or a service with a severe open incident the same ad answers a different question. */
+      isSwapSupported && (
+        <SwapCTA
+          heading={needsAlternative ? 'Looking for an alternative?' : undefined}
+          description={
+            needsAlternative
+              ? 'Our tool: compare live rates from listed exchanges with a clean record.'
+              : undefined
+          }
+          action={needsAlternative ? 'Compare' : undefined}
+        />
+      )
+    }
   </div>
 
   <Schema
