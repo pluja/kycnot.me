@@ -37,10 +37,11 @@ const gauge = tv({
         label: 'hidden',
         text: 'hidden',
       },
+      // Named dial for a card corner: number and label, no verdict word.
       md: {
-        base: '-mb-5 size-14',
-        score: 'mt-[28%] text-base leading-none',
-        label: 'hidden',
+        base: '-mb-2 size-16',
+        score: 'mt-[28%] mb-0.5 text-lg leading-none',
+        label: 'text-2xs leading-none',
         text: 'hidden',
       },
     },
@@ -48,10 +49,33 @@ const gauge = tv({
       vivid: {},
       muted: {},
     },
+    // A three-digit score has to shrink to stay inside the dial.
+    long: {
+      true: {},
+      false: {},
+    },
   },
+  compoundVariants: [
+    {
+      size: 'lg',
+      long: true,
+      class: { score: 'mr-[0.05em] ml-[-0.025em] text-[1.75rem] leading-[calc(2/1.75)] tracking-[-0.075em]' },
+    },
+    {
+      size: 'md',
+      long: true,
+      class: { score: 'mt-[31%] text-[0.95rem] leading-none tracking-[-0.075em]' },
+    },
+    {
+      size: 'sm',
+      long: true,
+      class: { score: 'mt-[30%] text-xs leading-none tracking-[-0.075em]' },
+    },
+  ],
   defaultVariants: {
     size: 'lg',
     theme: 'vivid',
+    long: false,
   },
 })
 
@@ -63,6 +87,8 @@ type Props = Polymorphic<
     total?: number
     itemReviewedId?: string
     showInfo?: boolean
+    /** Defaults to the theme: vivid glows, muted does not. */
+    glow?: boolean
     children?: never
   }
 >
@@ -77,26 +103,30 @@ const {
   class: className,
   itemReviewedId,
   showInfo = false,
+  glow,
   ...htmlProps
 } = Astro.props
 
 const { text, step, angle, formattedScore } = makeScoreGaugeInfo(score, total)
 
 const muted = theme === 'muted'
+const glows = glow ?? !muted
 const numberColors = {
   vivid: [
-    'text-score-saturate-1 text-shadow-glow',
-    'text-score-saturate-2 text-shadow-glow',
-    'text-score-saturate-3 text-shadow-glow',
-    'text-score-saturate-4 text-shadow-glow',
-    'text-score-saturate-5 text-shadow-glow',
+    'text-score-saturate-1',
+    'text-score-saturate-2',
+    'text-score-saturate-3',
+    'text-score-saturate-4',
+    'text-score-saturate-5',
   ],
   muted: ['text-score-1', 'text-score-2', 'text-score-3', 'text-score-4', 'text-score-5'],
 }
-const numberColor = step ? numberColors[muted ? 'muted' : 'vivid'][step - 1] : ''
-const longNumber = size !== 'sm' && formattedScore.length > 2
+const palette = muted ? numberColors.muted : numberColors.vivid
+const infoScale = { lg: 1, md: 1.4, sm: 1.8 }[size ?? 'lg']
+const numberColor = step ? cn(palette[step - 1], glows && 'text-shadow-glow') : ''
+const longNumber = formattedScore.length > 2
 
-const { base, score: scoreSlot, label: labelSlot, text: textSlot } = gauge({ size, theme })
+const { base, score: scoreSlot, label: labelSlot, text: textSlot } = gauge({ size, theme, long: longNumber })
 ---
 
 {
@@ -123,15 +153,17 @@ const { base, score: scoreSlot, label: labelSlot, text: textSlot } = gauge({ siz
 }
 
 <Tag {...htmlProps} class={base({ class: className })} role={htmlProps.role ?? 'group'}>
-  <ScoreGaugeArch step={step} angle={angle} showInfo={showInfo} muted={muted} class="absolute inset-0" />
+  <ScoreGaugeArch
+    step={step}
+    angle={angle}
+    showInfo={showInfo}
+    muted={muted}
+    glow={glows}
+    infoScale={infoScale}
+    class="absolute inset-0"
+  />
 
-  <div
-    class={scoreSlot({
-      class: cn(numberColor, {
-        'mr-[0.05em] ml-[-0.025em] text-[1.75rem] leading-[calc(2/1.75)] tracking-[-0.075em]': longNumber,
-      }),
-    })}
-  >
+  <div class={scoreSlot({ class: numberColor })}>
     <span>{formattedScore}</span>
   </div>
 

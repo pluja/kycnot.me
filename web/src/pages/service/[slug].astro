@@ -20,9 +20,8 @@ import InputTextArea from '../../components/InputTextArea.astro'
 import Markdown from '../../components/Markdown.astro'
 import MyPicture from '../../components/MyPicture.astro'
 import RatingBadge from '../../components/RatingBadge.astro'
-import ScoreGauge from '../../components/ScoreGauge.astro'
-import SectionHeading from '../../components/SectionHeading.astro'
 import ScoreSquare from '../../components/ScoreSquare.astro'
+import SectionHeading from '../../components/SectionHeading.astro'
 import AcceptedCurrencies from '../../components/service/AcceptedCurrencies.astro'
 import ServiceAnswerPanel from '../../components/service/ServiceAnswerPanel.astro'
 import ServiceRiskAlert from '../../components/service/ServiceRiskAlert.astro'
@@ -434,31 +433,23 @@ const hurtingRows = attributes.filter((attribute) => pointsOf(attribute) < 0)
 const helpingRows = attributes.filter((attribute) => pointsOf(attribute) > 0)
 const neutralRows = attributes.filter((attribute) => pointsOf(attribute) === 0)
 const ledgerGroupCandidates = [
-  {
-    title: 'Negative',
-    rows: hurtingRows,
-    showIncidentPenalty: incidentTrustPenalty < 0,
-    showBaseScore: false,
-    subtotal: subtotalOf([...hurtingRows, { privacyPoints: 0, trustPoints: incidentTrustPenalty }]),
-  },
-  {
-    title: 'Positive',
-    rows: helpingRows,
-    showIncidentPenalty: false,
-    showBaseScore: false,
-    subtotal: subtotalOf(helpingRows),
-  },
-  { title: 'Neutral', rows: neutralRows, showIncidentPenalty: false, showBaseScore: false, subtotal: [] },
+  { title: 'Negative', rows: hurtingRows, showIncidentPenalty: incidentTrustPenalty < 0 },
+  { title: 'Positive', rows: helpingRows, showIncidentPenalty: false },
+  { title: 'Neutral', rows: neutralRows, showIncidentPenalty: false },
 ]
-const ledgerGroups = (
-  ledgerGroupCandidates.filter((group) => group.rows.length > 0 || group.showIncidentPenalty).length > 0
-    ? ledgerGroupCandidates.filter((group) => group.rows.length > 0 || group.showIncidentPenalty)
-    : // A listing with no attributes at all still gets the base score, under Neutral.
-      ledgerGroupCandidates.filter((group) => group.title === 'Neutral')
-)
-  // The base score closes the ledger under whatever group comes last. It is
-  // the starting point, so it stays out of every subtotal.
-  .map((group, index, groups) => ({ ...group, showBaseScore: index === groups.length - 1 }))
+// Neutral always shows: the base score lives there, since it is neither a
+// plus nor a minus, and each subtotal counts every card under it so the
+// subtotals add up to the score.
+const ledgerGroups = ledgerGroupCandidates
+  .filter((group) => group.rows.length > 0 || group.showIncidentPenalty || group.title === 'Neutral')
+  .map((group) => {
+    const showBaseScore = group.title === 'Neutral'
+    const extraRows = [
+      ...(group.showIncidentPenalty ? [{ privacyPoints: 0, trustPoints: incidentTrustPenalty }] : []),
+      ...(showBaseScore ? [baseScoreAttribute] : []),
+    ]
+    return { ...group, showBaseScore, subtotal: subtotalOf([...group.rows, ...extraRows]) }
+  })
 
 // Sort verification steps: failed first, then warnings, then others, newest first within each group
 const getVerificationStepPriority = (status: VerificationStepStatus) => {
@@ -797,11 +788,24 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
     }
 
     <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 sm:gap-y-1.5">
-      <h1
-        class="min-w-0 flex-1 font-title text-xl/tight font-bold tracking-wider text-white sm:text-2xl/tight"
-      >
-        {service.name}
-      </h1>
+      <div class="flex min-w-0 flex-1 items-center gap-2">
+        <ScoreSquare
+          as="a"
+          href="#scores"
+          role="link"
+          size="badge"
+          aria-label={`Overall score ${formatRating(service.overallScore)} out of 10. See the attributes behind it.`}
+          score={service.overallScore}
+          label="Overall"
+          itemReviewedId={itemReviewedId}
+          class="size-6 text-base sm:size-7 sm:text-lg"
+        />
+        <h1
+          class="min-w-0 flex-1 font-title text-xl/tight font-bold tracking-wider text-white sm:text-2xl/tight"
+        >
+          {service.name}
+        </h1>
+      </div>
 
       {
         /* Badges sit on their own row under the name; on phones the currencies share that row, under the buttons. */
@@ -1073,7 +1077,15 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
   }
 
   <div class="mt-6 space-y-2 sm:mt-8">
-    <ServiceAnswerPanel kyc={kycAnswer} safety={safetyAnswer} kycLevel={kycLevelInfo} />
+    <ServiceAnswerPanel
+      kyc={kycAnswer}
+      safety={safetyAnswer}
+      kycLevel={kycLevelInfo}
+      privacyScore={service.privacyScore}
+      trustScore={service.trustScore}
+      itemReviewedId={itemReviewedId}
+      serviceName={service.name}
+    />
 
     <TosSummaryCard service={service} />
 
@@ -1083,9 +1095,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
         <SwapCTA
           heading={needsAlternative ? 'Looking for an alternative?' : undefined}
           description={
-            needsAlternative
-              ? 'Our tool: compare live rates from listed exchanges with a clean record.'
-              : undefined
+            needsAlternative ? 'Live quotes from listed exchanges with a clean record.' : undefined
           }
           action={needsAlternative ? 'Compare' : undefined}
         />
@@ -1169,46 +1179,24 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
   />
 
   <section id="scores" class="mt-8">
-    <h2 class="mb-3 border-b border-day-500 font-title text-lg font-bold text-day-200">Score</h2>
+    <SectionHeading
+      title="Attributes"
+      info={{ href: '/about#service-scores', text: 'How scores work' }}
+      link={{ href: '/attributes', text: 'All attributes' }}
+      class="mt-0"
+    />
 
-    <div class="flex max-w-84 grow flex-row items-center justify-evenly gap-4">
-      <ScoreSquare
-        as="a"
-        href="/about#service-scores"
-        role="link"
-        aria-label={`Overall score ${formatRating(service.overallScore)} out of 10. Learn how scores are calculated.`}
-        score={service.overallScore}
-        label="Overall"
-        itemReviewedId={itemReviewedId}
-        showInfo
-      />
+    <p class="mb-4 text-sm text-day-400">
+      Each attribute is a fact we found, good or bad, and moves the privacy or trust score. We assign the
+      attributes, never the scores: those are the sum of the attributes. Wrong or missing?{' '}
+      <a
+        href={`/service-suggestion/edit?serviceId=${service.id}`}
+        class="underline decoration-day-700 decoration-[0.5px] underline-offset-4 hover:text-day-200 hover:decoration-day-400"
+        >Send an edit suggestion</a
+      >.
+    </p>
 
-      <div class="h-12 w-px shrink-0 self-center bg-day-800"></div>
-
-      <ScoreGauge
-        as="a"
-        href="/about#service-scores"
-        role="link"
-        aria-label={`Privacy score ${Math.round(service.privacyScore)} percent. Learn how scores are calculated.`}
-        score={service.privacyScore}
-        label="Privacy"
-        itemReviewedId={itemReviewedId}
-        showInfo
-      />
-
-      <ScoreGauge
-        as="a"
-        href="/about#service-scores"
-        role="link"
-        aria-label={`Trust score ${Math.round(service.trustScore)} percent. Learn how scores are calculated.`}
-        score={service.trustScore}
-        label="Trust"
-        itemReviewedId={itemReviewedId}
-        showInfo
-      />
-    </div>
-
-    <div id="attributes" class="mt-6 space-y-4">
+    <div id="attributes" class="space-y-4">
       {
         ledgerGroups.map((group) => (
           <div>
@@ -1217,15 +1205,14 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
                 {group.title}
               </h3>
               {group.subtotal.length > 0 && (
-                <p class="text-xs text-day-400">
-                  {group.subtotal.map((effect, index) => (
-                    <>
-                      {index > 0 && <span class="mx-1.5 text-day-600">·</span>}
+                <p class="flex gap-x-3 text-xs text-day-400">
+                  {group.subtotal.map((effect) => (
+                    <span>
                       <span class="font-bold text-day-200">
                         {effect.value === 0 ? '+0' : formatPoints(effect.value)}
                       </span>{' '}
                       {effect.label}
-                    </>
+                    </span>
                   ))}
                 </p>
               )}
@@ -1242,7 +1229,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
       }
     </div>
 
-    <div class="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-day-400">
+    <p class="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-day-400">
       <span>
         Privacy <span class="font-semibold text-day-200">{service.privacyScore}</span> × 60%
       </span>
@@ -1255,23 +1242,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
         Overall <span class="font-semibold text-day-200">{service.overallScore}</span>/10
       </span>
       {isFlaggedScam && <span class="text-red-400">capped at 3</span>}
-    </div>
-    <div class="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs xs:gap-x-6">
-      <a
-        href="/about#service-scores"
-        class="inline-flex items-center gap-1 text-day-400 transition-colors hover:text-day-200 hover:underline"
-      >
-        <Icon name="ri:information-line" class="size-3" />
-        Learn about scores
-      </a>
-      <a
-        href="/attributes"
-        class="inline-flex items-center gap-1 text-day-400 transition-colors hover:text-day-200 hover:underline"
-      >
-        <Icon name="ri:information-line" class="size-3" />
-        All attributes list
-      </a>
-    </div>
+    </p>
   </section>
 
   <TosReviewSection service={service} itemReviewedId={itemReviewedId} statusLabel={statusInfo.label} />

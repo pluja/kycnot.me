@@ -41,7 +41,10 @@ const preview = note ?? excerpt
 
 // Privacy then trust, always both, so the columns line up with the group
 // totals above them.
-const points = [attribute.privacyPoints, attribute.trustPoints]
+const points = [
+  { label: 'Privacy', value: attribute.privacyPoints },
+  { label: 'Trust', value: attribute.trustPoints },
+]
 const formatPoints = (value: number) =>
   formatNumber(value, { roundDigits: 2, showSign: true, removeTrailingZeros: true })
 ---
@@ -65,7 +68,7 @@ const formatPoints = (value: number) =>
           {attribute.title}
         </span>
         {
-          points.map((value) => (
+          points.map(({ value }) => (
             <span
               class={cn(
                 'ml-2 min-w-7 text-center text-sm',
@@ -114,6 +117,29 @@ const formatPoints = (value: number) =>
           </p>
         )
       }
+
+      <div class="mt-1 flex justify-evenly gap-4">
+        {
+          points.map(({ label, value }) => (
+            <div class="inline-flex basis-12 flex-col items-center text-day-200">
+              <span
+                class={cn('text-base', attribute.typeInfo.classNames.textLight, {
+                  'text-red-400': value < 0,
+                  'text-green-400': value > 0,
+                  'opacity-50': value === 0,
+                })}
+              >
+                {formatPoints(value)}
+              </span>
+              <span
+                class={cn('text-2xs font-bold text-white uppercase', attribute.typeInfo.classNames.textLight)}
+              >
+                {label}
+              </span>
+            </div>
+          ))
+        }
+      </div>
 
       {
         attribute.links.length > 0 && (

@@ -7,6 +7,7 @@ import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
 import { transformCase } from '../lib/strings'
 
 import type { HTMLTag, Polymorphic } from 'astro/types'
+import type { Review, WithContext } from 'schema-dts'
 
 type Props = Polymorphic<{
   as: HTMLTag
@@ -15,6 +16,8 @@ type Props = Polymorphic<{
   total?: number
   itemReviewedId?: string
   showInfo?: boolean
+  /** `badge` is only the coloured square with the number, sized by the caller. */
+  size?: 'badge' | 'lg'
   children?: never
 }>
 
@@ -23,6 +26,7 @@ const {
   score,
   label,
   total = 10,
+  size = 'lg',
   class: className,
   itemReviewedId,
   showInfo = false,
@@ -30,65 +34,81 @@ const {
 } = Astro.props
 
 const { text, classNameBg, formattedScore } = makeOverallScoreInfo(score, total)
+
+const schema = itemReviewedId
+  ? ({
+      '@context': 'https://schema.org',
+      '@type': 'Review',
+      reviewAspect: label,
+      name: `${text} ${transformCase(label, 'lower')}`,
+      itemReviewed: { '@id': itemReviewedId },
+      reviewRating: {
+        '@type': 'Rating',
+        ratingValue: score,
+        worstRating: 0,
+        bestRating: total,
+      },
+      author: KYCNOTME_SCHEMA_MINI,
+    } satisfies WithContext<Review>)
+  : null
 ---
 
-<Tag
-  {...htmlProps}
-  class={cn(
-    'relative flex aspect-square size-18 flex-col items-center justify-start text-white 2xs:size-24',
-    className
-  )}
-  role={htmlProps.role ?? 'group'}
->
-  {
-    !!itemReviewedId && (
-      <Schema
-        item={{
-          '@context': 'https://schema.org',
-          '@type': 'Review',
-          reviewAspect: label,
-          name: `${text} ${transformCase(label, 'lower')}`,
-          itemReviewed: { '@id': itemReviewedId },
-          reviewRating: {
-            '@type': 'Rating',
-            ratingValue: score,
-            worstRating: 0,
-            bestRating: total,
-          },
-          author: KYCNOTME_SCHEMA_MINI,
-        }}
-      />
-    )
-  }
-  {
-    showInfo && (
-      <svg
-        class="absolute top-0.5 left-[calc(50%+48px/2+2px)] size-3 text-current/60"
-        viewBox="0 0 12 12"
-        fill="currentColor"
-      >
-        <path d="M6 11C3.23857 11 1 8.7614 1 6C1 3.23857 3.23857 1 6 1C8.7614 1 11 3.23857 11 6C11 8.7614 8.7614 11 6 11ZM6 10C8.20915 10 10 8.20915 10 6C10 3.79086 8.20915 2 6 2C3.79086 2 2 3.79086 2 6C2 8.20915 3.79086 10 6 10ZM5.5 3.5H6.5V4.5H5.5V3.5ZM5.5 5.5H6.5V8.5H5.5V5.5Z" />
-      </svg>
-    )
-  }
-
-  <div
-    class={cn(
-      'mt-0.5 mb-1 flex size-10 shrink-0 items-center justify-center rounded-md leading-none font-bold tracking-tight text-black 2xs:mt-2 2xs:size-12',
-      classNameBg,
-      {
-        'text-[1.75rem] leading-[calc(2/1.75)] tracking-tighter': formattedScore.length > 2,
-      }
-    )}
-  >
-    <span class="text-[1.5rem] leading-none font-bold tracking-tight text-black 2xs:text-[2rem]">
+{
+  size === 'badge' && (
+    <Tag
+      {...htmlProps}
+      class={cn(
+        'flex shrink-0 items-center justify-center rounded-sm leading-none font-bold tracking-tight text-black',
+        classNameBg,
+        className
+      )}
+      role={htmlProps.role ?? 'group'}
+      title={`${text} ${transformCase(label, 'lower')}`}
+    >
+      {schema && <Schema item={schema} />}
       {formattedScore}
-    </span>
-  </div>
+    </Tag>
+  )
+}
 
-  <div class="text-base leading-none font-bold tracking-wide uppercase 2xs:mb-0.5">
-    {label}
-  </div>
+{
+  size === 'lg' && (
+    <Tag
+      {...htmlProps}
+      class={cn(
+        'relative flex aspect-square size-18 flex-col items-center justify-start text-white 2xs:size-24',
+        className
+      )}
+      role={htmlProps.role ?? 'group'}
+    >
+      {schema && <Schema item={schema} />}
+      {showInfo && (
+        <svg
+          class="absolute top-0.5 left-[calc(50%+48px/2+2px)] size-3 text-current/60"
+          viewBox="0 0 12 12"
+          fill="currentColor"
+        >
+          <path d="M6 11C3.23857 11 1 8.7614 1 6C1 3.23857 3.23857 1 6 1C8.7614 1 11 3.23857 11 6C11 8.7614 8.7614 11 6 11ZM6 10C8.20915 10 10 8.20915 10 6C10 3.79086 8.20915 2 6 2C3.79086 2 2 3.79086 2 6C2 8.20915 3.79086 10 6 10ZM5.5 3.5H6.5V4.5H5.5V3.5ZM5.5 5.5H6.5V8.5H5.5V5.5Z" />
+        </svg>
+      )}
 
-  <span class="text-xs leading-none tracking-wide text-current/80">{text}</span>
-</Tag>
+      <div
+        class={cn(
+          'mt-0.5 mb-1 flex size-10 shrink-0 items-center justify-center rounded-md leading-none font-bold tracking-tight text-black 2xs:mt-2 2xs:size-12',
+          classNameBg,
+          {
+            'text-[1.75rem] leading-[calc(2/1.75)] tracking-tighter': formattedScore.length > 2,
+          }
+        )}
+      >
+        <span class="text-[1.5rem] leading-none font-bold tracking-tight text-black 2xs:text-[2rem]">
+          {formattedScore}
+        </span>
+      </div>
+
+      <div class="text-base leading-none font-bold tracking-wide uppercase 2xs:mb-0.5">{label}</div>
+
+      <span class="text-xs leading-none tracking-wide text-current/80">{text}</span>
+    </Tag>
+  )
+}

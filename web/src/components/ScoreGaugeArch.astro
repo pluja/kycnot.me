@@ -6,10 +6,27 @@ type Props = {
   angle?: number
   showInfo?: boolean
   muted?: boolean
+  glow?: boolean
+  /** The info marker is drawn for the large dial; smaller dials scale it up so it stays legible. */
+  infoScale?: number
   class?: string
 }
 
-const { step, angle, showInfo = false, muted = false, class: className } = Astro.props
+const {
+  step,
+  angle,
+  showInfo = false,
+  muted = false,
+  glow = !muted,
+  infoScale = 1,
+  class: className,
+} = Astro.props
+
+const INFO_CENTER = { x: 88, y: 8 }
+const infoTransform =
+  infoScale === 1
+    ? undefined
+    : `translate(${String(INFO_CENTER.x)} ${String(INFO_CENTER.y)}) scale(${String(infoScale)}) translate(${String(-INFO_CENTER.x)} ${String(-INFO_CENTER.y)})`
 
 const SEGMENT_PATHS = [
   'M19.84 29.962C20.8221 30.3687 21.3066 31.4709 21.0222 32.4951C20.3586 34.8848 20.0039 37.4031 20.0039 40.0042C20.0039 42.6054 20.3586 45.1237 21.0223 47.5135C21.3067 48.5376 20.8221 49.6398 19.8401 50.0466L7.05214 55.3435C5.88072 55.8288 4.55702 55.1152 4.38993 53.8583C4.13532 51.9431 4.00391 49.989 4.00391 48.0042C4.00391 40.5588 5.85316 33.5454 9.11742 27.3981C9.58659 26.5145 10.656 26.1579 11.5803 26.5407L19.84 29.962Z',
@@ -55,7 +72,7 @@ const activeStep = step !== undefined && step >= 1 && step <= 5 ? step : undefin
     activeStep !== undefined && (
       <path
         d={SEGMENT_PATHS[activeStep - 1]}
-        class={cn('fill-current', !muted && 'drop-shadow-glow', activeText[activeStep - 1])}
+        class={cn('fill-current', glow && 'drop-shadow-glow', activeText[activeStep - 1])}
       />
     )
   }
@@ -66,5 +83,5 @@ const activeStep = step !== undefined && step >= 1 && step <= 5 ? step : undefin
     stroke-linejoin="round"
     transform={angle !== undefined ? `rotate(${angle}, 48, 48)` : undefined}
     class="stroke-night-700"></path>
-  {showInfo && <path d={INFO_PATH} class="text-current/60" fill="currentColor" />}
+  {showInfo && <path d={INFO_PATH} class="text-current/35" fill="currentColor" transform={infoTransform} />}
 </svg>
