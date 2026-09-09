@@ -6,6 +6,7 @@ from typing import Any, Dict, List, cast
 from unittest.mock import MagicMock, patch
 
 from pyworker.database import save_deep_scan_proposed_edits
+from pyworker.utils.scan_fingerprint import scan_fingerprint
 from pyworker.tasks.deep_scan import (
     DeepScanTask,
     _has_actionable_items,
@@ -402,7 +403,7 @@ class TestScanProposalGates(unittest.TestCase):
 
     LISTING = {"registrationCountryCode": "SC", "registeredCompanyName": "Acme Ltd"}
 
-    def _build(self, declined=frozenset(), corpus=None):
+    def _build(self, declined=frozenset(), corpus=None, current_kyc_notes=""):
         return DeepScanTask()._build_proposed_edits(
             result=cast(Any, SAMPLE_LLM_RESULT),
             corpus_hash="0" * 64,
@@ -414,7 +415,55 @@ class TestScanProposalGates(unittest.TestCase):
             declined=set(declined),
             crawled_keys=CRAWLED_KEYS,
             current_kyc_level=2,
+            current_kyc_notes=current_kyc_notes,
         )
+
+    def test_new_kyc_notes_are_a_decision_keyed_on_the_corpus(self):
+        kyc = self._build()["kycPolicy"]
+
+        self.assertEqual(kyc["notesMd"], "Triggered on automated risk flags.")
+        self.assertEqual(
+            kyc["notesFingerprint"], scan_fingerprint(1, "kycNotes", "0" * 64)
+        )
+
+    def test_notes_matching_the_current_text_are_not_proposed(self):
+        kyc = self._build(current_kyc_notes="Triggered  on automated\nrisk flags.")[
+            "kycPolicy"
+        ]
+
+        self.assertIsNone(kyc["notesFingerprint"])
+        self.assertEqual(kyc["notesMd"], "")
+
+    def test_declined_notes_stay_declined_until_the_corpus_changes(self):
+        declined = {self._build()["kycPolicy"]["notesFingerprint"]}
+
+        same_corpus = self._build(declined=declined)["kycPolicy"]
+        self.assertIsNone(same_corpus["notesFingerprint"])
+        self.assertEqual(same_corpus["notesMd"], "")
+
+    def test_notes_with_markdown_structure_are_dropped(self):
+        for notes in (
+            "## KYC\nNever asked.",
+            "Details [here](https://x.com/terms).",
+            "- never asked\n- no ID",
+            "x" * 601,
+        ):
+            with patch.dict(
+                SAMPLE_LLM_RESULT, {"kycPolicyNotesMd": notes}, clear=False
+            ):
+                kyc = self._build()["kycPolicy"]
+            self.assertIsNone(kyc["notesFingerprint"], notes[:20])
+            self.assertEqual(kyc["notesMd"], "")
+
+    def test_bold_in_notes_is_kept(self):
+        with patch.dict(
+            SAMPLE_LLM_RESULT,
+            {"kycPolicyNotesMd": "ID is asked **only on risk flags**."},
+            clear=False,
+        ):
+            kyc = self._build()["kycPolicy"]
+
+        self.assertEqual(kyc["notesMd"], "ID is asked **only on risk flags**.")
 
     def test_a_proposal_without_a_real_quote_is_dropped(self):
         # Attribute 21 quotes a clause that is not in the corpus.

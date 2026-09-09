@@ -27,7 +27,17 @@ Produce a single JSON object with all of the following fields:
    - A service may use a legal template naming a different jurisdiction than where it is registered. Report what the clause says and let the reviewer weigh it. Do not assert which is correct.
    - Empty list when nothing plainly disagrees. That is the normal result.
 
-6. **kycPolicyNotesMd** (markdown, may be empty string). Three things, in this order: what sets KYC off here, what it asks you to hand over, and what happens to your money if you refuse or they suspect you. Two or three short sentences. Do not repeat the `summary`. Empty string if the corpus says nothing concrete.
+6. **kycPolicyNotesMd**: what a reader should know about identity checks before signing up. It is shown under the KYC verdict on the service page, so it must be easy to read at a glance, including for readers whose first language is not English.
+
+   - **Two or three short sentences, 60 words at most.** In this order: what sets KYC off, what they ask you for, and what happens to your money or account if you refuse or they suspect you.
+   - **Plain words.** Say "ask for ID" rather than "mandate identity verification", "hold your money" rather than "suspend the transaction pending review". Write KYC and AML as plain acronyms; no other legal or compliance jargon. Treat the reader as an intelligent adult who is in a hurry.
+   - **When the corpus never mentions KYC, AML or identity checks**, say so in the first sentence, then give the identity-relevant facts it does state: what sign-up asks for, which payment methods are accepted, and any clause about legal requests, sanctions or prohibited users. Silence on KYC is a finding; describe what surrounds it rather than leaving the field empty.
+   - **Money and accounts only in relation to identity:** what they can hold, freeze or keep if you refuse or fail a check. Fees, refunds, cancellations and other terms unrelated to identity do not belong here.
+   - **Bold only the words a reader scans for:** the trigger, the data asked for, the consequence. About one bold span per sentence, never a whole sentence.
+   - Plain sentences only. No headings, links, lists, quotes or line breaks. Do not repeat the `summary`.
+   - Empty string only when the corpus is unusable.
+
+   Example of the tone, for a service with rare checks: "No registration or ID is needed for a normal swap. If a deposit is **flagged for criminal activity or high risk**, they hold the trade, ask for **proof of where the funds came from**, and may ask for **ID** before refunding you."
 
 7. **kycLevelRationale**: one short paragraph (1-3 sentences) explaining why you chose the kycLevel value, citing the specific clause types that drove the decision. Plain text, no markdown.
 

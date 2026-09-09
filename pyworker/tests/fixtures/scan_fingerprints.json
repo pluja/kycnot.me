@@ -40,5 +40,11 @@
     "kind": "kycLevel",
     "key": "3",
     "expected": "3fe90fd1f3e799438026c7d51b13f33ee23bca266f7b8537002b3f2a9bac560a"
+  },
+  {
+    "serviceId": 1,
+    "kind": "kycNotes",
+    "key": "0000000000000000000000000000000000000000000000000000000000000000",
+    "expected": "3d264db132fdffc8f31f835935966f0a0f070dc38be61a7cc50b0c5dfed41cbd"
   }
 ]

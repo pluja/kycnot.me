@@ -8,7 +8,13 @@ import { collectDeclines } from './deepScan.helpers'
 const proposed = {
   contentHash: 'corpus-hash',
   tosReview: { kycLevel: 3, summary: '', complexity: 'low', highlights: [] },
-  kycPolicy: { inferredLevel: 3, notesMd: '', rationale: '', levelFingerprint: 'open' },
+  kycPolicy: {
+    inferredLevel: 3,
+    notesMd: 'ID only on **risk flags**.',
+    rationale: '',
+    levelFingerprint: 'open',
+    notesFingerprint: 'open-notes',
+  },
   attributes: {
     add: [
       { attributeId: 12, rationale: 'a', sourceUrlKey: 'x.com/terms' },
@@ -30,7 +36,13 @@ const proposed = {
   warnings: [],
 } as unknown as PrismaJson.ProposedEdits
 
-const collect = (accepted: { add?: number[]; remove?: number[]; listing?: string[]; kycLevel?: boolean }) =>
+const collect = (accepted: {
+  add?: number[]
+  remove?: number[]
+  listing?: string[]
+  kycLevel?: boolean
+  kycNotes?: boolean
+}) =>
   collectDeclines({
     serviceId: 1,
     declinedById: 99,
@@ -43,7 +55,17 @@ const collect = (accepted: { add?: number[]; remove?: number[]; listing?: string
     acceptedAttributeRemove: accepted.remove ?? [],
     acceptedListingFields: accepted.listing ?? [],
     acceptedKycLevel: accepted.kycLevel ?? true,
+    acceptedKycNotes: accepted.kycNotes ?? true,
   })
+
+test('unticked KYC notes are declined for this corpus only', () => {
+  const rows = collect({ add: [12, 13], remove: [7], listing: ['registrationCountryCode'], kycNotes: false })
+
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0]!.kind, 'kycNotes')
+  assert.equal(rows[0]!.fingerprint, scanFingerprint(1, 'kycNotes', 'corpus-hash'))
+  assert.equal(rows[0]!.sourceUrlKey, null)
+})
 
 test('collectDeclines records everything left unticked', () => {
   const rows = collect({})
@@ -101,6 +123,7 @@ test('collectDeclines leaves the KYC level alone when no change was proposed', (
     acceptedAttributeRemove: [7],
     acceptedListingFields: ['registrationCountryCode'],
     acceptedKycLevel: false,
+    acceptedKycNotes: true,
   })
 
   assert.deepEqual(rows, [])
@@ -161,6 +184,7 @@ test('collectDeclines survives a scan that predates listing checks', () => {
     acceptedAttributeRemove: [],
     acceptedListingFields: [],
     acceptedKycLevel: true,
+    acceptedKycNotes: true,
   })
 
   assert.equal(rows.length, 3)

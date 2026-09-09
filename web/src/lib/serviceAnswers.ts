@@ -30,6 +30,8 @@ export type ServiceAnswer = {
   answer: string
   /** One sentence of why, in the reader's terms rather than the model's. */
   detail: string
+  /** The same text with its bold kept, for the page; `detail` is the plain copy. */
+  detailMd?: string
   /** Named exceptions to the headline, costliest first. */
   caveats?: Caveat[]
   /** Incidents behind the headline, worst first, each linking to its card. */
@@ -70,7 +72,7 @@ export function makeKycAnswer(
   }
   const base = baseKycAnswer(kycLevel)
   const policy = kycPolicyMd ? stripMarkdown(kycPolicyMd) : ''
-  if (policy) return { ...base, detail: policy }
+  if (policy) return { ...base, detail: policy, detailMd: kycPolicyMd ?? undefined }
   // Once the headline already says yes there is nothing left to qualify.
   if (kycCaveats.length === 0 || base.tone === 'bad') return base
   // A guarantee from the service is not a guarantee from its partners, and the

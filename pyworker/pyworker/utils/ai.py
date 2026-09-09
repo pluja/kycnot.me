@@ -183,6 +183,7 @@ def prompt_deep_scan(
     attribute_catalog_md: str,
     current_attribute_ids: list[int],
     listing_record: dict[str, str],
+    current_kyc_notes: str = "",
 ) -> DeepScanResultType:
     scope = (
         f"You are reviewing the service named exactly '{service_name}'. "
@@ -204,6 +205,10 @@ def prompt_deep_scan(
             for field, value in listing_record.items()
         )
         + "\n"
+        "## KYC policy notes currently shown to readers\n\n"
+        "Written earlier, possibly from older documents. Rewrite from the corpus; "
+        "keep a statement only if the corpus still supports it.\n\n"
+        f"{current_kyc_notes or '(none yet)'}\n\n"
         "## Legal corpus\n\n"
         f"{content}"
     )

@@ -83,6 +83,8 @@ declare global {
         /** Set while a level change is still open; null once declined or unchanged. */
         levelFingerprint?: string | null
         inferredLevel: 0 | 1 | 2 | 3 | 4
+        /** Set while the notes are still open; null once declined for this corpus or unchanged. */
+        notesFingerprint?: string | null
         notesMd: MarkdownString
         rationale: string
       }
