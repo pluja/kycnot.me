@@ -4,20 +4,29 @@ import { actions } from 'astro:actions'
 
 import { cn } from '../../../lib/cn'
 import { EVENT_CONTENT_HINT } from '../../../lib/eventKind'
-import InputSelect from '../../InputSelect.astro'
 import InputSubmitButton from '../../InputSubmitButton.astro'
 import InputText from '../../InputText.astro'
 import InputTextArea from '../../InputTextArea.astro'
+import ServicePicker from '../../ServicePicker.astro'
 import IncidentFields from '../services/edit/IncidentFields.astro'
 
 import EventTimingFields from './EventTimingFields.astro'
+
+import type { Prisma } from '@prisma/client'
+
+type PickableService = Prisma.ServiceGetPayload<{
+  select: { id: true; name: true; slug: true; imageUrl: true; _count: { select: { events: true } } }
+}>
 
 type Props = {
   /// Fixed service, for a page already scoped to one. Ignored when `services`
   /// is passed, which renders a picker instead.
   serviceId?: number
-  services?: { id: number; name: string; _count: { events: number } }[]
-  selectedServiceId?: string
+  services?: PickableService[]
+  /// Slug of the service the picker starts on.
+  selectedService?: string
+  /// Query the picker's search and no-script picks carry through the reload.
+  keepParams?: Record<string, string | undefined>
   inputErrors: Record<string, string[] | undefined>
   /// Appended to the action so the page returns to this form after a POST.
   sectionHash: string
@@ -29,14 +38,31 @@ type Props = {
 const {
   serviceId,
   services,
-  selectedServiceId,
+  selectedService,
+  keepParams = {},
   inputErrors,
   sectionHash,
   open = false,
   id = 'new-event',
   class: className,
 } = Astro.props
+
+const searchFormId = `${id}-service-search`
+const servicesByActivity = services ? [...services].sort((a, b) => b._count.events - a._count.events) : []
 ---
+
+{
+  /* The picker's search belongs to this form, kept outside the POST form below
+    because forms do not nest. Its query carries the list filters and the anchor
+    brings the reader back to the open form. */
+  services && (
+    <form id={searchFormId} method="GET" action={sectionHash}>
+      {Object.entries(keepParams).map(
+        ([key, value]) => value && <input type="hidden" name={key} value={value} />
+      )}
+    </form>
+  )
+}
 
 <details
   {id}
@@ -61,16 +87,18 @@ const {
   >
     {
       services ? (
-        <InputSelect
-          name="serviceId"
+        <ServicePicker
+          services={services}
+          suggested={servicesByActivity}
+          selected={selectedService}
+          name="newService"
           label="Service"
-          options={services.map((service) => ({
-            label: `${service.name} (${service._count.events.toString()})`,
-            value: service.id.toString(),
-          }))}
-          selectedValue={selectedServiceId}
-          selectProps={{ required: true }}
+          keep={keepParams}
+          anchor={sectionHash}
+          searchForm={searchFormId}
+          field="serviceId"
           error={inputErrors.serviceId}
+          buttonClass="border-night-500 bg-night-900 px-2.5 py-1.5 text-day-100"
         />
       ) : (
         <input type="hidden" name="serviceId" value={serviceId} />

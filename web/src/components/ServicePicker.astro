@@ -8,7 +8,7 @@ import MyPicture from './MyPicture.astro'
 import type { Prisma } from '@prisma/client'
 
 type PickableService = Prisma.ServiceGetPayload<{
-  select: { name: true; slug: true; imageUrl: true }
+  select: { id: true; name: true; slug: true; imageUrl: true }
 }>
 
 type Props = {
@@ -21,8 +21,27 @@ type Props = {
   name?: string
   /** Filters to carry through the search, since a GET form replaces the query. */
   keep?: Record<string, string | undefined>
-  clearHref: string
+  /** Fragment a pick lands on, for a picker that sits far down a page. */
+  anchor?: string
+  /**
+   * Id of a GET form rendered by the caller, outside any other form. The search
+   * input joins it through its `form` attribute instead of a form of its own,
+   * which is what lets the picker sit inside a form without nesting one.
+   */
+  searchForm?: string
+  /**
+   * Name of a hidden input the pick fills, for a picker that is a form field.
+   * With scripting a pick writes the service id there and closes the panel;
+   * without it the pick reloads the page through the query, like a filter.
+   */
+  field?: string
+  clearHref?: string
   class?: string
+  /** For a picker that sits in a row of fields styled by the page. */
+  buttonClass?: string
+  /** Visible label for a picker used as a form field. */
+  label?: string
+  error?: string[]
 }
 
 const {
@@ -31,8 +50,14 @@ const {
   selected,
   name = 'service',
   keep = {},
+  anchor = '',
+  searchForm,
+  field,
   clearHref,
   class: className,
+  buttonClass,
+  label,
+  error,
 } = Astro.props
 
 const selectedService = selected
@@ -42,7 +67,7 @@ const selectedService = selected
 const keptParams = Object.entries(keep).filter((entry): entry is [string, string] => !!entry[1])
 
 function linkParams(slug: string) {
-  return new URLSearchParams([...keptParams, [name, slug]]).toString()
+  return `${new URLSearchParams([...keptParams, [name, slug]]).toString()}${anchor}`
 }
 
 // Searching and picking are separate parameters: a search narrows the list, and
@@ -66,6 +91,10 @@ const hiddenMatches = matching.length - options.length
 const listId = `service-picker-${name}`
 const panelId = `${listId}-panel`
 const datalistId = `${listId}-datalist`
+const buttonId = `${listId}-button`
+const errorId = `${listId}-error`
+const hasError = !!error?.length
+const SearchWrapper = searchForm ? 'div' : 'form'
 // A datalist is the only native type-to-filter there is, and it cannot carry an
 // icon, so the list below repeats the same services as links that can.
 // overscroll-contain keeps a flick inside the list from scrolling the page
@@ -74,15 +103,29 @@ const datalistId = `${listId}-datalist`
 
 <div class={cn('group/picker relative', className)} data-service-picker>
   {
+    label && (
+      <label for={buttonId} class="mb-1 block text-sm font-medium text-day-200">
+        {label}
+      </label>
+    )
+  }
+  {field && <input type="hidden" name={field} value={selectedService?.id ?? ''} data-service-value />}
+  {
     /* Focus rather than a details toggle, the same mechanism DropdownButton uses,
       because focus leaves when a reader taps anything else and the panel closes
       with it. A details element has no way to notice that without scripting. */
   }
   <button
+    id={buttonId}
     type="button"
     aria-haspopup="true"
     aria-controls={panelId}
-    class="flex cursor-pointer items-center gap-2 rounded-md border border-night-400 px-2 py-1 text-sm text-day-200 group-focus-within/picker:bg-night-700 group-hover/picker:bg-night-700 hover:bg-night-700"
+    aria-describedby={hasError ? errorId : undefined}
+    class={cn(
+      'flex cursor-pointer items-center gap-2 rounded-md border border-night-400 px-2 py-1 text-sm text-day-200 group-focus-within/picker:bg-night-700 group-hover/picker:bg-night-700 hover:bg-night-700',
+      hasError && 'border-red-500/60',
+      buttonClass
+    )}
   >
     {
       selectedService?.imageUrl && (
@@ -95,7 +138,9 @@ const datalistId = `${listId}-datalist`
         />
       )
     }
-    <span class="truncate">{selectedService?.name ?? 'All services'}</span>
+    <span class="truncate" data-service-label>
+      {selectedService?.name ?? (field ? 'Pick a service' : 'All services')}
+    </span>
     <Icon
       name="ri:arrow-down-s-line"
       class="size-4 shrink-0 transition-transform group-focus-within/picker:rotate-180 group-hover/picker:rotate-180"
@@ -113,15 +158,21 @@ const datalistId = `${listId}-datalist`
       query ? 'block' : 'hidden'
     )}
   >
-    <form method="GET" class="flex gap-1">
-      {Object.entries(keep).map(([key, value]) => value && <input type="hidden" name={key} value={value} />)}
+    <SearchWrapper method={searchForm ? undefined : 'GET'} class="flex gap-1">
+      {
+        !searchForm &&
+          Object.entries(keep).map(
+            ([key, value]) => value && <input type="hidden" name={key} value={value} />
+          )
+      }
       {/* Or searching would clear the service the reader already picked. */}
-      {selected && <input type="hidden" name={name} value={selected} />}
+      {!searchForm && selected && <input type="hidden" name={name} value={selected} />}
       <label class="sr-only" for={listId}>Search for a service</label>
       <input
         id={listId}
         type="search"
         name={queryParam}
+        form={searchForm}
         list={datalistId}
         placeholder="Search services"
         autocomplete="off"
@@ -134,16 +185,17 @@ const datalistId = `${listId}-datalist`
         class="min-w-0 flex-1 rounded-md border border-night-400 bg-night-800 px-2 py-1 text-sm text-day-100 placeholder:text-day-500"
       />
       <datalist id={datalistId}>
-        {services.map((service) => <option value={service.name} />)}
+        {services.map((service) => <option value={service.name} data-id={service.id} />)}
       </datalist>
       {/* Only reaches a reader without scripting. Typing narrows the list otherwise. */}
       <button
         type="submit"
+        form={searchForm}
         class="shrink-0 rounded-md border border-night-400 px-2 py-1 text-sm text-day-200 hover:bg-night-700 js:hidden"
       >
         Search
       </button>
-    </form>
+    </SearchWrapper>
 
     <ul class="mt-2 max-h-72 overflow-y-auto overscroll-contain">
       {
@@ -151,6 +203,8 @@ const datalistId = `${listId}-datalist`
           <li data-service-option data-name={key}>
             <a
               href={`?${linkParams(service.slug)}`}
+              data-id={service.id}
+              data-service-name={service.name}
               class={cn(
                 'flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-night-700',
                 selectedService?.slug === service.slug ? 'text-blue-400' : 'text-day-200'
@@ -183,7 +237,7 @@ const datalistId = `${listId}-datalist`
     </ul>
 
     {
-      selectedService && (
+      selectedService && clearHref && (
         <a
           href={clearHref}
           class="mt-2 block rounded-md px-2 py-1 text-sm text-day-500 hover:bg-night-700 hover:text-day-200"
@@ -193,6 +247,13 @@ const datalistId = `${listId}-datalist`
       )
     }
   </div>
+  {
+    hasError && (
+      <p id={errorId} class="mt-1 text-sm text-red-400">
+        {error.join(' ')}
+      </p>
+    )
+  }
 </div>
 
 <script>
@@ -202,19 +263,26 @@ const datalistId = `${listId}-datalist`
   // already on the page, so this needs no request and the  //
   // list can widen again when the field is cleared. With   //
   // it off the form falls back to a plain search reload.   //
+  // As a form field, a pick fills the hidden input instead //
+  // of reloading the page.                                 //
   ////////////////////////////////////////////////////////////
   document.addEventListener('astro:page-load', () => {
     document.querySelectorAll<HTMLDivElement>('[data-service-picker]').forEach((picker) => {
       const input = picker.querySelector<HTMLInputElement>('[data-service-search]')
       const options = picker.querySelectorAll<HTMLLIElement>('[data-service-option]')
       const empty = picker.querySelector<HTMLLIElement>('[data-service-empty]')
+      const more = picker.querySelector<HTMLLIElement>('[data-service-more]')
+      const value = picker.querySelector<HTMLInputElement>('[data-service-value]')
+      const label = picker.querySelector<HTMLSpanElement>('[data-service-label]')
       if (!input) return
 
       // The list below holds the same services with icons and narrows as you
       // type, so the browser's own dropdown would only sit on top of it. Taking
       // it away here rather than never rendering it means it survives for
       // readers without scripting, and for anyone this script fails to reach.
-      input.removeAttribute('list')
+      // As a form field it stays: the rows cover only the busiest services, and
+      // a reload to reach the rest would throw away the form around the picker.
+      if (!value) input.removeAttribute('list')
 
       const narrow = () => {
         const needle = input.value.trim().toLowerCase()
@@ -225,19 +293,66 @@ const datalistId = `${listId}-datalist`
           if (shown) matches += 1
         })
         if (empty) empty.hidden = matches > 0
+        // The count was taken before typing, so it stops being true once the
+        // list narrows, and the empty row already says how to reach the rest.
+        if (more) more.hidden = !!needle
       }
 
       input.addEventListener('input', narrow)
 
+      const close = () => (document.activeElement as HTMLElement | null)?.blur()
+
+      const pick = (id: string, name: string, icon: Element | null) => {
+        if (!value || !label) return
+        value.value = id
+        label.textContent = name
+        picker.querySelector<HTMLElement>('button picture, button img')?.remove()
+        if (icon) label.before(icon.cloneNode(true))
+        close()
+      }
+
+      // A typed name that matches no rendered row may still be a service: the
+      // datalist holds every one. Exact first, then the only name that starts
+      // with it, so "bis" picks Bisq and "s" picks nothing.
+      const typedService = () => {
+        const needle = input.value.trim().toLowerCase()
+        if (!needle) return null
+        const names = [...picker.querySelectorAll<HTMLOptionElement>('datalist option')]
+        const exact = names.find((option) => option.value.toLowerCase() === needle)
+        const starting = names.filter((option) => option.value.toLowerCase().startsWith(needle))
+        return exact ?? (starting.length === 1 ? starting[0] : null) ?? null
+      }
+
       // Enter picks the first service still standing. When nothing is standing
       // the form is left alone, so the reader reaches the services further down
-      // the list than this panel renders instead of pressing a dead key.
-      picker.querySelector('form')?.addEventListener('submit', (event) => {
+      // the list than this panel renders instead of pressing a dead key. As a
+      // form field the reload would lose the form, so the name is resolved here
+      // and an unknown one is left in the field with the empty row showing.
+      input.form?.addEventListener('submit', (event) => {
         const first = picker.querySelector<HTMLAnchorElement>('[data-service-option]:not([hidden]) a')
-        if (!first) return
+        if (first) {
+          event.preventDefault()
+          first.click()
+          return
+        }
+        if (!value) return
         event.preventDefault()
-        first.click()
+        const typed = typedService()
+        if (typed) pick(typed.dataset.id ?? '', typed.value, null)
       })
+
+      if (value && label) {
+        picker.addEventListener('click', (event) => {
+          const option = (event.target as HTMLElement).closest<HTMLAnchorElement>('[data-service-option] a')
+          if (!option) return
+          event.preventDefault()
+          pick(
+            option.dataset.id ?? '',
+            option.dataset.serviceName ?? '',
+            option.querySelector('picture, img')
+          )
+        })
+      }
 
       // Focus is what holds the panel open, so letting go of it is what closes
       // it. Focus cannot be handed back to the button that opens it, since the
@@ -245,7 +360,7 @@ const datalistId = `${listId}-datalist`
       picker.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return
         event.preventDefault()
-        ;(document.activeElement as HTMLElement | null)?.blur()
+        close()
       })
 
       narrow()

@@ -6,6 +6,7 @@ import { actions, isInputError } from 'astro:actions'
 import AdminEventRow from '../../../components/admin/events/AdminEventRow.astro'
 import EventCreateForm from '../../../components/admin/events/EventCreateForm.astro'
 import Button from '../../../components/Button.astro'
+import ServicePicker from '../../../components/ServicePicker.astro'
 import { eventClassFilterFor, eventViews, eventViewsZodEnum } from '../../../constants/eventViews'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { cn } from '../../../lib/cn'
@@ -42,10 +43,13 @@ const { data: filters, hasDefaultData } = zodParseQueryParamsStoringErrors(
     view: eventViewsZodEnum.default('curated'),
     state: z.enum(['live', 'ongoing', 'ended', 'hidden', 'deleted']).default('live'),
     service: z.string().optional(),
+    // The service a no-script pick in the new event form lands on.
+    newService: z.string().optional(),
     q: z.string().optional(),
     page: z.coerce.number().int().min(1).default(1),
   },
-  Astro
+  Astro,
+  { ignoredKeysForDefaultData: ['newService'] }
 )
 
 const now = new Date()
@@ -145,6 +149,7 @@ const [openIncidents, openWarnings, hiddenCount, deletedCount, services] = await
             id: true,
             name: true,
             slug: true,
+            imageUrl: true,
             _count: { select: { events: { where: { deletedAt: null } } } },
           },
           orderBy: { name: 'asc' },
@@ -155,6 +160,17 @@ const [openIncidents, openWarnings, hiddenCount, deletedCount, services] = await
 )
 
 const selectedService = services.find((service) => service.slug === filters.service)
+const servicesByActivity = [...services].sort((a, b) => b._count.events - a._count.events)
+// Filters a picker carries through its search reload, with the page dropped
+// since a new service means a new first page.
+const keptFilters = {
+  view: filters.view === 'curated' ? undefined : filters.view,
+  state: filters.state === 'live' ? undefined : filters.state,
+  q: filters.q,
+}
+const filterSearchFormId = 'event-filters-service-search'
+// A shortcut or a cleared filter should not carry a half-typed search along.
+const pickerParamsReset = { serviceQuery: undefined, newService: undefined, newServiceQuery: undefined }
 const totalPages = Math.max(1, Math.ceil(totalEvents / PAGE_SIZE))
 const rangeStart = totalEvents === 0 ? 0 : (filters.page - 1) * PAGE_SIZE + 1
 const rangeEnd = Math.min(filters.page * PAGE_SIZE, totalEvents)
@@ -165,28 +181,56 @@ const shortcuts = [
     count: openIncidents,
     icon: 'ri:alarm-warning-line',
     color: 'text-red-300',
-    params: { view: 'incidents', state: 'ongoing', service: undefined, q: undefined, page: undefined },
+    params: {
+      view: 'incidents',
+      state: 'ongoing',
+      service: undefined,
+      q: undefined,
+      page: undefined,
+      ...pickerParamsReset,
+    },
   },
   {
     label: 'Active warnings',
     count: openWarnings,
     icon: 'ri:alert-line',
     color: 'text-amber-300',
-    params: { view: 'curated', state: 'ongoing', service: undefined, q: undefined, page: undefined },
+    params: {
+      view: 'curated',
+      state: 'ongoing',
+      service: undefined,
+      q: undefined,
+      page: undefined,
+      ...pickerParamsReset,
+    },
   },
   {
     label: 'Hidden',
     count: hiddenCount,
     icon: 'ri:eye-off-line',
     color: 'text-day-300',
-    params: { view: 'all', state: 'hidden', service: undefined, q: undefined, page: undefined },
+    params: {
+      view: 'all',
+      state: 'hidden',
+      service: undefined,
+      q: undefined,
+      page: undefined,
+      ...pickerParamsReset,
+    },
   },
   {
     label: 'Deleted',
     count: deletedCount,
     icon: 'ri:delete-bin-line',
     color: 'text-day-400',
-    params: { view: 'all', state: 'deleted', service: undefined, q: undefined, page: undefined },
+    params: {
+      view: 'all',
+      state: 'deleted',
+      service: undefined,
+      q: undefined,
+      page: undefined,
+      ...pickerParamsReset,
+    },
   },
 ]
 
@@ -222,10 +266,15 @@ const hasCreateErrors = Object.keys(createInputErrors).length > 0
 
   <EventCreateForm
     services={services}
-    selectedServiceId={selectedService?.id.toString()}
+    selectedService={filters.newService ?? filters.service}
+    keepParams={{
+      ...keptFilters,
+      service: filters.service,
+      page: filters.page > 1 ? String(filters.page) : undefined,
+    }}
     inputErrors={createInputErrors}
     sectionHash="#new-event"
-    open={hasCreateErrors}
+    open={hasCreateErrors || !!filters.newService || !!Astro.url.searchParams.get('newServiceQuery')?.trim()}
     class="mb-5"
   />
 
@@ -247,6 +296,16 @@ const hasCreateErrors = Object.keys(createInputErrors).length > 0
       ))
     }
   </div>
+
+  {/* The service picker's search form, outside the filter form because forms do not nest. */}
+  <form id={filterSearchFormId} method="GET">
+    {
+      Object.entries(keptFilters).map(
+        ([key, value]) => value && <input type="hidden" name={key} value={value} />
+      )
+    }
+    {filters.service && <input type="hidden" name="service" value={filters.service} />}
+  </form>
 
   <form method="GET" class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto]">
     <div>
@@ -287,19 +346,17 @@ const hasCreateErrors = Object.keys(createInputErrors).length > 0
       </select>
     </div>
 
-    <div>
-      <label for="service" class="sr-only">Service</label>
-      <select id="service" name="service" class={fieldClass}>
-        <option value="">All services</option>
-        {
-          services.map((service) => (
-            <option value={service.slug} selected={filters.service === service.slug}>
-              {service.name} ({service._count.events})
-            </option>
-          ))
-        }
-      </select>
-    </div>
+    {/* Apply keeps the picked service; the picker itself navigates on a pick. */}
+    {filters.service && <input type="hidden" name="service" value={filters.service} />}
+    <ServicePicker
+      services={services}
+      suggested={servicesByActivity}
+      selected={filters.service}
+      keep={keptFilters}
+      searchForm={filterSearchFormId}
+      clearHref={urlWithParams(Astro.url, { service: undefined, page: undefined, ...pickerParamsReset })}
+      buttonClass="w-full border-night-500 bg-night-900 px-2.5 py-1.5 text-day-100"
+    />
 
     <div class="flex gap-2 sm:col-span-2 lg:col-span-4">
       <Button type="submit" label="Apply filters" icon="ri:filter-3-line" size="sm" color="success" />

@@ -92,7 +92,7 @@ export const adminEventActions = {
     accept: 'form',
     permissions: cap('events:manage'),
     input: z
-      .object({ serviceId: z.coerce.number().int().positive(), ...eventFields })
+      .object({ serviceId: z.coerce.number().int().positive({ message: 'Pick a service' }), ...eventFields })
       .superRefine(refineEvent),
     handler: async (input, context) => {
       const { class: eventClass, sentiment, type } = eventKindToFields(input.kind)

@@ -57,6 +57,7 @@ const [services, [comments, totalComments]] = await Astro.locals.banners.tryMany
     () =>
       prisma.service.findMany({
         select: {
+          id: true,
           name: true,
           slug: true,
           imageUrl: true,
@@ -68,7 +69,7 @@ const [services, [comments, totalComments]] = await Astro.locals.banners.tryMany
         },
         orderBy: { name: 'asc' },
       }),
-    [] as { name: string; slug: string; imageUrl: string | null; _count: { comments: number } }[],
+    [] as { id: number; name: string; slug: string; imageUrl: string | null; _count: { comments: number } }[],
   ],
   [
     'Error fetching comments',
