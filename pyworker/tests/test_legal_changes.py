@@ -274,8 +274,11 @@ class TestRecordRemovedDocuments(unittest.TestCase):
         mock_clear.assert_not_called()
         mock_unreachable.assert_called_once_with(7)
 
+    @patch("pyworker.utils.legal_changes.mark_legal_document_unreachable")
     @patch("pyworker.utils.legal_changes.create_legal_revision")
-    def test_a_server_error_is_not_a_removal(self, mock_revision: MagicMock):
+    def test_a_server_error_is_not_a_removal(
+        self, mock_revision: MagicMock, _mock_unreachable: MagicMock
+    ):
         record_removed_documents(1, self._corpus({"x.com/terms": 503}), self.stored)
 
         mock_revision.assert_not_called()

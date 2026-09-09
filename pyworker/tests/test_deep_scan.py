@@ -285,8 +285,28 @@ class TestSaveDeepScanProposedEdits(unittest.TestCase):
         self.assertEqual(withdraw_params[2:], (42, 999))
 
 
+# run() also touches scan bookkeeping and change tracking; without a database
+# each of those waits out the pool timeout before the code path under test.
+DB_SIDE_EFFECTS = {
+    "mark_service_scan_attempted": None,
+    "mark_service_scanned": None,
+    "tracked_document_urls": [],
+    "record_document_changes": None,
+    "fetch_scan_declines": set(),
+    "fetch_service_listing_record": {},
+}
+
+
+def patch_db_side_effects(test: unittest.TestCase) -> None:
+    for name, value in DB_SIDE_EFFECTS.items():
+        patcher = patch(f"pyworker.tasks.deep_scan.{name}", return_value=value)
+        patcher.start()
+        test.addCleanup(patcher.stop)
+
+
 class TestDeepScanTaskRun(unittest.TestCase):
     def setUp(self):
+        patch_db_side_effects(self)
         self.task = DeepScanTask()
 
     @patch("pyworker.tasks.deep_scan.fetch_service_for_deep_scan")
@@ -363,6 +383,7 @@ class TestDeepScanRecordsLegalDocuments(unittest.TestCase):
     """The admin panel is populated by the scan, not only by the nightly review."""
 
     def setUp(self):
+        patch_db_side_effects(self)
         self.task = DeepScanTask()
         self.service = {
             "id": 42,
