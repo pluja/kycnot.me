@@ -18,7 +18,7 @@ env:
 
 jobs:
   build:
-    if: github.repository == 'pluja/kycnotme'
+    if: forgejo.repository == 'pluja/kycnotme'
     runs-on: preprod
     outputs:
       image_tag: ${{ steps.images.outputs.image_tag }}
@@ -106,7 +106,7 @@ jobs:
           echo "image_tag=${image_tag}" >> "$FORGEJO_OUTPUT"
 
   deploy:
-    if: github.repository == 'pluja/kycnotme'
+    if: forgejo.repository == 'pluja/kycnotme'
     needs: build
     runs-on: prod
     steps:
