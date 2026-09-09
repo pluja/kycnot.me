@@ -54,7 +54,7 @@ void test('an open incident is ongoing, a resolved one that still costs trust is
   )
   assert.ok(tiers.recent[0]?.penalty && tiers.recent[0].penalty.points < 0)
   assert.equal(tiers.ongoing[0]?.isResolved, false)
-  assert.equal(tiers.recent[0]?.isResolved, true)
+  assert.equal(tiers.recent[0].isResolved, true)
 })
 
 void test('an incident whose penalty has faded is older, however recent the date', () => {

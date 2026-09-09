@@ -24,7 +24,7 @@ type Props = {
   /** Fragment a pick lands on, for a picker that sits far down a page. */
   anchor?: string
   /**
-   * Id of a GET form rendered by the caller, outside any other form. The search
+   * Id of a GET form that sits outside any other form. The search
    * input joins it through its `form` attribute instead of a form of its own,
    * which is what lets the picker sit inside a form without nesting one.
    */
@@ -37,7 +37,7 @@ type Props = {
   field?: string
   clearHref?: string
   class?: string
-  /** For a picker that sits in a row of fields styled by the page. */
+  /** Extra classes for the trigger, to match a row of fields around it. */
   buttonClass?: string
   /** Visible label for a picker used as a form field. */
   label?: string

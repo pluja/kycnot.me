@@ -1,7 +1,8 @@
 name: Rollback production
 
 # Puts production back on an earlier image without touching the database.
-# Safe because migrations only ever add; see scripts/ci/check-commits.sh.
+# Safe only while every migration since that image added columns or tables;
+# scripts/ci/check-commits.sh flags drops, not renames or type changes.
 on:
   workflow_dispatch:
     inputs:

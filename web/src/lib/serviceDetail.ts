@@ -94,7 +94,6 @@ export function serviceDetailSelect(viewerId: number) {
         icon: true,
         name: true,
         slug: true,
-        holdsFunds: true,
       },
     },
     events: {

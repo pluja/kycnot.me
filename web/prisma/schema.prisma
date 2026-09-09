@@ -1144,7 +1144,7 @@ model Category {
   icon           String
   slug           String  @unique
   /// True when the service takes custody of the visitor's money at some point
-  /// in the flow, even briefly. Picks the wording of the trust question.
+  /// in the flow, even briefly.
   holdsFunds     Boolean @default(false)
 
   createdAt DateTime  @default(now())
