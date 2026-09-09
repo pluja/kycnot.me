@@ -1,3 +1,5 @@
+import { latestReviewedAt } from './serviceReviewedAt'
+
 import type { VerificationStatus, VerificationStepStatus } from '@prisma/client'
 
 type VerificationStepLike = {
@@ -9,6 +11,8 @@ type ServiceVerificationLike = {
   verificationStatus: VerificationStatus
   approvedAt: Date | null
   verifiedAt: Date | null
+  tosReviewAt: Date | null
+  events: { updatedAt: Date }[]
   verificationSteps: VerificationStepLike[]
 }
 
@@ -21,19 +25,12 @@ export function getServiceVerificationOverview(service: ServiceVerificationLike)
     WARNING: 0,
   }
 
-  let latestStepUpdate: Date | null = null
-
   for (const step of service.verificationSteps) {
     counts[step.status] += 1
-    if (!latestStepUpdate || step.updatedAt > latestStepUpdate) {
-      latestStepUpdate = step.updatedAt
-    }
   }
 
   const totalChecks = service.verificationSteps.length
   const completedChecks = counts.PASSED + counts.WARNING + counts.FAILED
-  const statusRecordedAt =
-    service.verificationStatus === 'VERIFICATION_SUCCESS' ? service.verifiedAt : service.approvedAt
 
   const checksSummary =
     totalChecks === 0
@@ -55,6 +52,6 @@ export function getServiceVerificationOverview(service: ServiceVerificationLike)
     totalChecks,
     completedChecks,
     checksSummary,
-    lastReviewAt: latestStepUpdate ?? statusRecordedAt,
+    lastReviewAt: latestReviewedAt(service),
   }
 }

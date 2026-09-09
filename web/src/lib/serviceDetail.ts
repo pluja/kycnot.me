@@ -110,6 +110,7 @@ export function serviceDetailSelect(viewerId: number) {
         type: true,
         class: true,
         sentiment: true,
+        updatedAt: true,
         origin: true,
         startedAt: true,
         endedAt: true,

@@ -1,16 +1,12 @@
 ---
-import { Schema } from 'astro-seo-schema'
 import { tv, type VariantProps } from 'tailwind-variants'
 
 import { cn } from '../lib/cn'
-import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
 import { makeScoreGaugeInfo } from '../lib/scoreGauge'
-import { transformCase } from '../lib/strings'
 
 import ScoreGaugeArch from './ScoreGaugeArch.astro'
 
 import type { HTMLTag, Polymorphic } from 'astro/types'
-import type { Review, WithContext } from 'schema-dts'
 
 const gauge = tv({
   slots: {
@@ -85,7 +81,6 @@ type Props = Polymorphic<
     score: number
     label: string
     total?: number
-    itemReviewedId?: string
     showInfo?: boolean
     /** Defaults to the theme: vivid glows, muted does not. */
     glow?: boolean
@@ -101,7 +96,6 @@ const {
   size,
   theme,
   class: className,
-  itemReviewedId,
   showInfo = false,
   glow,
   ...htmlProps
@@ -122,35 +116,14 @@ const numberColors = {
   muted: ['text-score-1', 'text-score-2', 'text-score-3', 'text-score-4', 'text-score-5'],
 }
 const palette = muted ? numberColors.muted : numberColors.vivid
-const infoScale = { lg: 1, md: 1.4, sm: 1.8 }[size ?? 'lg']
+const INFO_SCALE_BY_SIZE = { lg: 1, md: 1.4, sm: 1.8 } as const
+const sizeKey: keyof typeof INFO_SCALE_BY_SIZE = size ?? 'lg'
+const infoScale = INFO_SCALE_BY_SIZE[sizeKey]
 const numberColor = step ? cn(palette[step - 1], glows && 'text-shadow-glow') : ''
 const longNumber = formattedScore.length > 2
 
 const { base, score: scoreSlot, label: labelSlot, text: textSlot } = gauge({ size, theme, long: longNumber })
 ---
-
-{
-  !!itemReviewedId && (
-    <Schema
-      item={
-        {
-          '@context': 'https://schema.org',
-          '@type': 'Review',
-          reviewAspect: label,
-          name: `${text} ${transformCase(label, 'lower')}`,
-          itemReviewed: { '@id': itemReviewedId },
-          reviewRating: {
-            '@type': 'Rating',
-            ratingValue: score,
-            worstRating: 0,
-            bestRating: total,
-          },
-          author: KYCNOTME_SCHEMA_MINI,
-        } satisfies WithContext<Review>
-      }
-    />
-  )
-}
 
 <Tag {...htmlProps} class={base({ class: className })} role={htmlProps.role ?? 'group'}>
   <ScoreGaugeArch

@@ -297,7 +297,10 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
 
     {
       attributesWithInfo.map((attribute) => (
-        <div class="group col-span-full grid grid-cols-subgrid hover:bg-zinc-800">
+        <div
+          id={attribute.slug}
+          class="group col-span-full grid scroll-mt-24 grid-cols-subgrid hover:bg-zinc-800"
+        >
           <input type="checkbox" id={`show-services-${attribute.id}`} class="peer/show-services hidden" />
 
           <label

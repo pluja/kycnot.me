@@ -24,10 +24,10 @@ const highlightCounts = countTosHighlightRatings(service.tosReview?.highlights ?
       aria-label="Terms of service summary"
       class="rounded-lg border border-night-600 bg-night-800 p-4"
     >
-      <h2 class="flex items-center gap-1.5 font-title text-xs font-bold tracking-wider text-day-300 uppercase">
+      <p class="flex items-center gap-1.5 font-title text-xs font-bold tracking-wider text-day-300 uppercase">
         <Icon name="ri:file-list-3-line" class="size-4" />
         Terms of service
-      </h2>
+      </p>
       <div class="prose prose-sm mt-1.5 max-w-none text-sm text-pretty text-day-300 prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0">
         <Markdown content={summary} />
       </div>

@@ -1,0 +1,11 @@
+---
+import { serializeJsonLd, type JsonLdItem } from '../lib/jsonLd'
+
+type Props = {
+  item: JsonLdItem
+}
+
+const { item } = Astro.props
+---
+
+<script type="application/ld+json" set:html={serializeJsonLd(item)} />

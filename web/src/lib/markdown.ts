@@ -8,8 +8,9 @@ import { visit, EXIT } from 'unist-util-visit'
 
 import { DEPLOYMENT_MODE } from '../lib/client/envVariables'
 
-import type { Options as SanitizeSchema } from 'rehype-sanitize'
+import { siteOrigin } from './urls'
 
+import type { Options as SanitizeSchema } from 'rehype-sanitize'
 
 /** A string containing Markdown. */
 export type MarkdownString = string
@@ -17,39 +18,53 @@ export type MarkdownString = string
 /** A string containing HTML. */
 export type HtmlString = string
 
-function rehypeLinkRelPlugin(linkRel: string[]) {
-  return () => (tree: {
-    type: string
-    tagName?: string
-    properties?: Record<string, unknown>
-    children?: unknown[]
-  }) => {
-    if (linkRel.length === 0) return
-
-    visit(tree, 'element', (node: { tagName?: string; properties?: Record<string, unknown> }) => {
-      if (node.tagName !== 'a') return
-
-      // Preserve `rel="sponsored"` when authored explicitly (e.g. raw HTML in
-      // a sponsored review post). Trusted markdown sources (like the blog
-      // content collection) can opt into this; user-generated comments are
-      // already sanitized of attributes before reaching this plugin, so they
-      // cannot inject `sponsored` here.
-      const existingRel = node.properties?.rel
-      const existingArray = Array.isArray(existingRel)
-        ? existingRel.map(String)
-        : typeof existingRel === 'string'
-          ? existingRel.split(/\s+/)
-          : []
-      const rel = existingArray.includes('sponsored')
-        ? ['sponsored', 'noopener', 'noreferrer'].join(' ')
-        : linkRel.join(' ')
-
-      node.properties = {
-        ...node.properties,
-        rel,
-      }
-    })
+const isSiteLink = (href: string) => {
+  try {
+    return new URL(href, siteOrigin).origin === siteOrigin
+  } catch {
+    return false
   }
+}
+
+function rehypeLinkRelPlugin(linkRel: string[]) {
+  return () =>
+    (tree: {
+      type: string
+      tagName?: string
+      properties?: Record<string, unknown>
+      children?: unknown[]
+    }) => {
+      if (linkRel.length === 0) return
+
+      visit(tree, 'element', (node: { tagName?: string; properties?: Record<string, unknown> }) => {
+        if (node.tagName !== 'a') return
+        // A nofollow on our own pages would only tell crawlers to ignore them.
+        // Resolving against the site origin also catches protocol-relative
+        // links, which have no scheme but still leave the site.
+        const href = node.properties?.href
+        if (typeof href !== 'string' || isSiteLink(href)) return
+
+        // Preserve `rel="sponsored"` when authored explicitly (e.g. raw HTML in
+        // a sponsored review post). Trusted markdown sources (like the blog
+        // content collection) can opt into this; user-generated comments are
+        // already sanitized of attributes before reaching this plugin, so they
+        // cannot inject `sponsored` here.
+        const existingRel = node.properties?.rel
+        const existingArray = Array.isArray(existingRel)
+          ? existingRel.map(String)
+          : typeof existingRel === 'string'
+            ? existingRel.split(/\s+/)
+            : []
+        const rel = existingArray.includes('sponsored')
+          ? ['sponsored', 'noopener', 'noreferrer'].join(' ')
+          : linkRel.join(' ')
+
+        node.properties = {
+          ...node.properties,
+          rel,
+        }
+      })
+    }
 }
 
 export async function markdownToHtml(
@@ -84,10 +99,7 @@ export async function markdownToHtml(
           .use(remarkRehype, { allowDangerousHtml: true })
           .use(rehypeRaw)
           .use(rehypeSanitize, sanitizeSchema)
-      : remark()
-          .use(remarkGfm)
-          .use(remarkRehype)
-          .use(rehypeSanitize, sanitizeSchema)
+      : remark().use(remarkGfm).use(remarkRehype).use(rehypeSanitize, sanitizeSchema)
 
     return String(
       await processor

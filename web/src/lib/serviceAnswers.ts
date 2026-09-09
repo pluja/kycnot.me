@@ -179,8 +179,9 @@ const count = (n: number, noun: string) => `${String(n)} ${noun}${n === 1 ? '' :
 
 /** "Ongoing incident", "2 ongoing incidents", "Ongoing warning", "1 incident and 2 warnings ongoing". */
 function ongoingHeadline(incidents: number, warnings: number, tone: 'bad' | 'caution'): string {
-  if (incidents > 0 && warnings > 0)
-    {return `${count(incidents, 'incident')} and ${count(warnings, 'warning')} ongoing`}
+  if (incidents > 0 && warnings > 0) {
+    return `${count(incidents, 'incident')} and ${count(warnings, 'warning')} ongoing`
+  }
   if (incidents > 0) {
     if (tone === 'caution') return 'Open incident'
     return incidents === 1 ? 'Ongoing incident' : `${String(incidents)} ongoing incidents`
@@ -401,20 +402,6 @@ export function answerText({ answer, detail, caveats = [], incidents = [] }: Ser
   return [`${answer}.`, detail, incidentText && `${incidentText}.`, caveatText && `${caveatText}.`]
     .filter(Boolean)
     .join(' ')
-}
-
-/**
- * The two questions, with the service named so they read the way people ask
- * them. The trust one is worded for what the visitor stands to lose: "Is your
- * money safe" is the wrong question for a VPN, where you pay a few euros and
- * the real exposure is your traffic.
- */
-export function makeQuestions(serviceName: string, categories: { holdsFunds: boolean }[]) {
-  const holdsFunds = categories.some((category) => category.holdsFunds)
-  return {
-    kyc: `Will ${serviceName} ask for your ID?`,
-    trust: holdsFunds ? `Is your money safe on ${serviceName}?` : `Can you trust ${serviceName}?`,
-  }
 }
 
 /** Verification states that mean a person has actually looked at the listing. */

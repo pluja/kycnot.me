@@ -1,6 +1,4 @@
 ---
-import { omit } from 'lodash-es'
-
 import { formatDateShort, type FormatDateShortOptions } from '../lib/timeAgo'
 
 import type { HTMLAttributes } from 'astro/types'
@@ -10,7 +8,8 @@ type Props = FormatDateShortOptions &
     date: Date
   }
 
-const { date, ...props } = Astro.props
+const { date, prefix, hourPrecision, daysUntilDate, caseType, hoursShort, ...htmlProps } = Astro.props
+const options = { prefix, hourPrecision, daysUntilDate, caseType, hoursShort }
 ---
 
-<time datetime={date.toISOString()} {...omit(props, 'prefix')}>{formatDateShort(date, props)}</time>
+<time datetime={date.toISOString()} {...htmlProps}>{formatDateShort(date, options)}</time>

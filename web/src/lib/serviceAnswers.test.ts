@@ -1,14 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import {
-  hasBeenReviewed,
-  makeKycAnswer,
-  makeSafetyAnswer,
-  answerText,
-  makeQuestions,
-  pickCaveats,
-} from './serviceAnswers'
+import { hasBeenReviewed, makeKycAnswer, makeSafetyAnswer, answerText, pickCaveats } from './serviceAnswers'
 
 void test('KYC levels map to distinct answers, and 0 is not the same as 1', () => {
   const guaranteed = makeKycAnswer(0)
@@ -160,17 +153,6 @@ void test('hasBeenReviewed only counts states where a person looked', () => {
   assert.equal(hasBeenReviewed('VERIFICATION_SUCCESS'), true)
   assert.equal(hasBeenReviewed('APPROVED'), true)
   assert.equal(hasBeenReviewed('COMMUNITY_CONTRIBUTED'), false)
-})
-
-void test('the questions name the service and fit what the visitor stands to lose', () => {
-  const exchange = { holdsFunds: true }
-  const vpn = { holdsFunds: false }
-  assert.equal(makeQuestions('Kraken', [exchange]).trust, 'Is your money safe on Kraken?')
-  assert.equal(makeQuestions('Mullvad', [vpn]).trust, 'Can you trust Mullvad?')
-  assert.equal(makeQuestions('Mullvad', [vpn]).kyc, 'Will Mullvad ask for your ID?')
-  assert.equal(makeQuestions('X', []).trust, 'Can you trust X?')
-  // A service in both buckets keeps the sharper question.
-  assert.equal(makeQuestions('X', [vpn, exchange]).trust, 'Is your money safe on X?')
 })
 
 void test('a guaranteed service with a KYC caveat reads "by them", caveats listed', () => {

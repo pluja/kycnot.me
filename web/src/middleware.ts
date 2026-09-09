@@ -13,7 +13,6 @@ import { getRedisActionsSessions } from './lib/redis/redisActionsSessions'
 import { browserOriginForUrl, cookieSecureForUrl } from './lib/urls'
 import { getUserFromCookies } from './lib/userCookies'
 
-
 const ACTION_SESSION_COOKIE = 'action-session-id'
 
 function addActionBannerIfNeeded(
@@ -178,9 +177,11 @@ const apiKeyAuth = defineMiddleware(async (context, next) => {
   context.locals.apiKeyAuthenticated = true
 
   // Fire-and-forget lastUsedAt update
-  prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } }).catch((error: unknown) => {
-    void error
-  })
+  prisma.apiKey
+    .update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } })
+    .catch((error: unknown) => {
+      void error
+    })
 
   return next()
 })
@@ -265,7 +266,17 @@ const errors = defineMiddleware(async (context, next) => {
   return next()
 })
 
+// Slugs are stored lowercase, so a mixed-case service URL can only be a typo
+// or a link someone capitalised. Send it to the page it meant instead of a 404.
+const lowercaseServiceSlug = defineMiddleware(async (context, next) => {
+  if (context.request.method !== 'GET' && context.request.method !== 'HEAD') return next()
+  const [, slug, rest = ''] = /^\/service\/([^/]+)(\/.*)?$/.exec(context.url.pathname) ?? []
+  if (!slug || slug === slug.toLowerCase()) return next()
+  return context.redirect(`/service/${slug.toLowerCase()}${rest}${context.url.search}`, 301)
+})
+
 export const onRequest = sequence(
+  lowercaseServiceSlug,
   errors,
   authenticate,
   apiKeyAuth,

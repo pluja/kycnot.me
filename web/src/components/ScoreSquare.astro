@@ -1,20 +1,15 @@
 ---
-import { Schema } from 'astro-seo-schema'
-
 import { cn } from '../lib/cn'
 import { makeOverallScoreInfo } from '../lib/overallScore'
-import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
 import { transformCase } from '../lib/strings'
 
 import type { HTMLTag, Polymorphic } from 'astro/types'
-import type { Review, WithContext } from 'schema-dts'
 
 type Props = Polymorphic<{
   as: HTMLTag
   score: number
   label: string
   total?: number
-  itemReviewedId?: string
   showInfo?: boolean
   /** `badge` is only the coloured square with the number, sized by the caller. */
   size?: 'badge' | 'lg'
@@ -28,29 +23,11 @@ const {
   total = 10,
   size = 'lg',
   class: className,
-  itemReviewedId,
   showInfo = false,
   ...htmlProps
 } = Astro.props
 
 const { text, classNameBg, formattedScore } = makeOverallScoreInfo(score, total)
-
-const schema = itemReviewedId
-  ? ({
-      '@context': 'https://schema.org',
-      '@type': 'Review',
-      reviewAspect: label,
-      name: `${text} ${transformCase(label, 'lower')}`,
-      itemReviewed: { '@id': itemReviewedId },
-      reviewRating: {
-        '@type': 'Rating',
-        ratingValue: score,
-        worstRating: 0,
-        bestRating: total,
-      },
-      author: KYCNOTME_SCHEMA_MINI,
-    } satisfies WithContext<Review>)
-  : null
 ---
 
 {
@@ -65,7 +42,6 @@ const schema = itemReviewedId
       role={htmlProps.role ?? 'group'}
       title={`${text} ${transformCase(label, 'lower')}`}
     >
-      {schema && <Schema item={schema} />}
       {formattedScore}
     </Tag>
   )
@@ -81,7 +57,6 @@ const schema = itemReviewedId
       )}
       role={htmlProps.role ?? 'group'}
     >
-      {schema && <Schema item={schema} />}
       {showInfo && (
         <svg
           class="absolute top-0.5 left-[calc(50%+48px/2+2px)] size-3 text-current/60"

@@ -1,7 +1,6 @@
 ---
 import { VerificationStepStatus } from '@prisma/client'
 import { Icon } from 'astro-icon/components'
-import { Schema } from 'astro-seo-schema'
 import { actions } from 'astro:actions'
 import { formatDistanceToNowStrict } from 'date-fns'
 import { orderBy, pick } from 'lodash-es'
@@ -38,6 +37,7 @@ import { baseScoreType, getAttributeTypeInfo } from '../../constants/attributeTy
 import { formatContactMethod } from '../../constants/contactMethods'
 import { getCountryInfo } from '../../constants/countries'
 import { currencies, getCurrencyInfo } from '../../constants/currencies'
+import { MIN_TRUSTED_RATING_WEIGHT } from '../../constants/karmaUnlocks'
 import { getKycLevelInfo } from '../../constants/kycLevels'
 import { getServiceVisibilityInfo } from '../../constants/serviceVisibility'
 import { getUserSentimentInfo } from '../../constants/userSentiment'
@@ -50,6 +50,7 @@ import { cn } from '../../lib/cn'
 import { eventToDisplayKind, getEventDisplay, isEventOpen, pickPrimaryEvent } from '../../lib/eventKind'
 import { getSupportedProviderSlugs } from '../../lib/exchange/supportedProviders'
 import { computeIncidentTrustPenalty, totalIncidentTrustPenalty } from '../../lib/incidentPenalty'
+import { fitSentences } from '../../lib/metaDescription'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
 import { formatNumber } from '../../lib/numbers'
 import { makeOgImageUrl } from '../../lib/ogImageUrl'
@@ -64,22 +65,21 @@ import {
   hasBeenReviewed,
   makeKycAnswer,
   makeSafetyAnswer,
-  makeQuestions,
   pickCaveats,
 } from '../../lib/serviceAnswers'
 import { isEmbeddableBadgeStatus } from '../../lib/serviceBadges'
 import { serviceDetailSelect } from '../../lib/serviceDetail'
-import { makeServiceFaq } from '../../lib/serviceFaq'
+import { makeServiceReview, makeUserAggregateRating } from '../../lib/serviceSchema'
 import { getServiceVerificationOverview } from '../../lib/serviceVerification'
 import { transformCase } from '../../lib/strings'
 import { formatDateShort } from '../../lib/timeAgo'
-import { absoluteSiteUrl, siteOrigin, urlDomain, urlWithParams } from '../../lib/urls'
+import { isTosReviewable } from '../../lib/tosHighlights'
+import { absoluteSiteUrl, siteOrigin, urlWithParams } from '../../lib/urls'
 
-import type { BreadcrumArray } from '../../components/BaseHead.astro'
 import type { TailwindColor } from '../../lib/colors'
 import type { OgImagePublicTemplateWithProps } from '../../lib/ogImageProps'
 import type { Prisma, ServiceVisibility } from '@prisma/client'
-import type { ContactPoint, FAQPage, ListItem, Organization, Review, WebPage, WithContext } from 'schema-dts'
+import type { ContactPoint, Organization, WebPage, WithContext } from 'schema-dts'
 
 const { slug } = Astro.params
 
@@ -201,6 +201,8 @@ const watchingDetails = makeWatchingDetails(dbNotificationPreferences, service.i
 
 // Clearnet first, then the private networks, each in the order the listing has them.
 const serviceLinks = [...service.serviceUrls, ...service.onionUrls, ...service.i2pUrls]
+// One breadcrumb trail: search engines show a single path, and six competing ones read as noise.
+const primaryCategory = service.categories[0]
 
 const kycLevelInfo = getKycLevelInfo(`${service.kycLevel}`)
 
@@ -283,7 +285,11 @@ const pageUrl = absoluteSiteUrl(`/service/${service.slug}`)
 const webPageId = `${pageUrl}#webpage`
 const itemReviewedId = `${pageUrl}#service`
 
-const primaryCategoryName = service.categories[0]?.name
+// "Other services" is a catch-all, so it names nothing in a title or sentence.
+const describingCategories = service.categories.filter(
+  (category) => category.name.toLowerCase() !== 'other services'
+)
+const primaryCategoryName = describingCategories[0]?.name
 const kycTitlePhrase = kycLevelInfo.value === 0 ? 'No-KYC' : `KYC Level ${kycLevelInfo.value}`
 const categoryTitlePhrase = primaryCategoryName ? ` ${primaryCategoryName}` : ''
 // Ordered most to least descriptive. The `${kycTitlePhrase}`-only rung matters
@@ -299,6 +305,15 @@ const sentenceListFormatter = new Intl.ListFormat('en', { style: 'long', type: '
 const formatRating = (rating: number) => {
   const rounded = Math.round(rating * 10) / 10
   return Number.isInteger(rounded) ? rounded.toLocaleString() : rounded.toFixed(1)
+}
+// Starts with the badge's visible text ("4 (22)") so the accessible name
+// contains the label, as WCAG 2.5.3 requires for voice control.
+const formatRatingLabel = ({ value, count }: { value: number | null; count: number }) => {
+  const visible = `${value !== null ? formatRating(value) : '-'} (${count.toLocaleString()})`
+  const ratings = `${count.toLocaleString()} ${pluralize('rating', count)}`
+  return value === null
+    ? `${visible}: ${ratings}`
+    : `${visible}: average ${formatRating(value)} out of 5 from ${ratings}`
 }
 const formatLimitedList = (values: string[], maxVisible = 4) => {
   if (values.length <= maxVisible) return sentenceListFormatter.format(values)
@@ -326,44 +341,46 @@ const getKycPolicySummary = (kycLevel: number) => {
   }
 }
 
+// The users' number is the trust-weighted one shown under the stars, so the
+// description, the schema and the page agree.
+const userAggregateRating = makeUserAggregateRating({
+  trustWeightedUserRating: service.trustWeightedUserRating,
+  userRatingCount: service.userRatingCount,
+  userRatingWeight: service.userRatingWeight,
+  minTrustedWeight: MIN_TRUSTED_RATING_WEIGHT,
+})
+
 // Acronym category names (VPN, VPS, SMS, DEX) must survive the lowercasing
 // that makes the rest read as prose.
 const asProseCategory = (name: string) => (name === name.toUpperCase() ? name : name.toLowerCase())
-const categorySummary = service.categories.length
-  ? `${sentenceListFormatter.format(service.categories.map((category) => asProseCategory(category.name)))} service`
+const categorySummary = describingCategories.length
+  ? `${sentenceListFormatter.format(describingCategories.map((category) => asProseCategory(category.name)))} service`
   : 'service'
 const acceptedCurrencyNames = service.acceptedCurrencies.map((currency) => getCurrencyInfo(currency).name)
 // A flagged service leads with the verdict. The neutral facts below otherwise
 // read as a feature list, and this string is also the meta description, so a
 // scam would advertise its own no-KYC policy in search results.
-const serviceFactsSummary = [
-  isFlaggedScam ? `${service.name} is flagged as a scam on KYCnot.me. ${statusInfo.headline}.` : null,
-  `${service.name} is ${getArticle(categorySummary)} ${categorySummary}${acceptedCurrencyNames.length > 0 ? ` that accepts ${formatLimitedList(acceptedCurrencyNames)}` : ''}.`,
-  isFlaggedScam
-    ? `It has a score of ${formatRating(service.overallScore)}/10.`
-    : `It ${getKycPolicySummary(kycLevelInfo.value)} and has a score of ${formatRating(service.overallScore)}/10.`,
-  service.userRatingCount > 0 &&
-    service.averageUserRating !== null &&
-    `There ${service.userRatingCount === 1 ? 'is' : 'are'} ${service.userRatingCount.toLocaleString()} user ${pluralize('rating', service.userRatingCount)} averaging ${formatRating(service.averageUserRating)}/5.`,
+const scamVerdict = isFlaggedScam
+  ? `${service.name} is flagged as a scam on KYCnot.me. ${statusInfo.headline}.`
+  : null
+const serviceIntro = `${service.name} is ${getArticle(categorySummary)} ${categorySummary}`
+const serviceIntroVariants = [
+  ...(acceptedCurrencyNames.length > 0 ? [4, 3, 2, 1] : []).map(
+    (maxVisible) => `${serviceIntro} that accepts ${formatLimitedList(acceptedCurrencyNames, maxVisible)}.`
+  ),
+  `${serviceIntro}.`,
 ]
-  .filter((sentence): sentence is string => !!sentence)
-  .join(' ')
-const serviceSummary = transformCase(serviceFactsSummary, 'first-upper')
-
-// The shorter fallbacks stay scam-led too: the meta description is what search
-// results show, so a flagged service must never fall back to a neutral blurb.
-const scamDescription = `${service.name} is flagged as a scam on KYCnot.me. ${statusInfo.headline}.`
-const pageDescription = isFlaggedScam
-  ? ([serviceSummary, `${scamDescription} See the scores, review history, and user reports.`].find(
-      (description) => description.length <= 200
-    ) ?? scamDescription)
-  : ([
-      serviceSummary,
-      `${service.name} review: ${kycTitlePhrase}${categoryTitlePhrase}, KYC policy notes, ${Math.round(service.privacyScore).toLocaleString()}% privacy score, ${Math.round(service.trustScore).toLocaleString()}% trust score, supported currencies, and user feedback.`,
-      `${service.name} review: ${kycTitlePhrase}${categoryTitlePhrase}, KYC policy notes, privacy score, trust score, supported currencies, and user feedback.`,
-      `Review ${service.name} on KYCnot.me. Check KYC policy notes, privacy score, trust score, supported currencies, and user feedback.`,
-    ].find((description) => description.length <= 200) ??
-    `Review ${service.name} on KYCnot.me. Check KYC policy, privacy score, trust score, supported currencies, and user feedback.`)
+const scoreSummary = isFlaggedScam
+  ? `It has a score of ${formatRating(service.overallScore)}/10.`
+  : `It ${getKycPolicySummary(kycLevelInfo.value)} and has a score of ${formatRating(service.overallScore)}/10.`
+const ratingsSummary = userAggregateRating
+  ? `There ${service.userRatingCount === 1 ? 'is' : 'are'} ${service.userRatingCount.toLocaleString()} user ${pluralize('rating', service.userRatingCount)} averaging ${formatRating(userAggregateRating.ratingValue as number)}/5.`
+  : null
+const pageDescription = transformCase(
+  fitSentences([scamVerdict, serviceIntroVariants, scoreSummary, ratingsSummary]) ||
+    `${service.name} review on KYCnot.me.`,
+  'first-upper'
+)
 
 const ogImageTemplateData = {
   template: 'service',
@@ -535,24 +552,25 @@ const safetyAnswer = makeSafetyAnswer({
   checks: flaggedChecks,
   recentlyApprovedAt: service.isRecentlyApproved ? service.approvedAt : null,
 })
-const questions = makeQuestions(service.name, service.categories)
-const serviceFaq = makeServiceFaq({
-  name: service.name,
-  description: service.description,
-  summary: serviceSummary,
-  questions,
-  kyc: kycAnswer,
-  safety: safetyAnswer,
-  isFlaggedScam,
-  statusLabel: statusInfo.label,
-  statusDescription: statusInfo.description,
-  currencyNames: acceptedCurrencyNames,
-  onionHosts: service.onionUrls.map(urlDomain),
-  i2pHosts: service.i2pUrls.map(urlDomain),
-  ratingCount: service.userRatingCount,
-  averageRating: service.averageUserRating,
-  tosSummary: service.tosReview?.summary ?? null,
-})
+// One Review from us and one AggregateRating from users, on the Organization
+// itself. An unreviewed listing gets no Review: nobody has looked at it yet.
+const serviceReview = hasBeenReviewed(service.verificationStatus)
+  ? makeServiceReview({
+      name: service.name,
+      overallScore: service.overallScore,
+      privacyScore: service.privacyScore,
+      trustScore: service.trustScore,
+      kycVerdict: { name: kycLevelInfo.name, description: kycLevelInfo.description },
+      tosSummary: isTosReviewable(service.verificationStatus) ? (service.tosReview?.summary ?? null) : null,
+      highlights: isTosReviewable(service.verificationStatus) ? (service.tosReview?.highlights ?? []) : [],
+      isFlaggedScam,
+      scamHeadline: statusInfo.headline,
+      listedAt: service.listedAt,
+      reviewedAt: verificationOverview.lastReviewAt,
+      author: KYCNOTME_SCHEMA_MINI,
+    })
+  : undefined
+
 const registrationCountry = service.registrationCountryCode
   ? getCountryInfo(service.registrationCountryCode)
   : null
@@ -651,10 +669,14 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
       '@type': 'Organization',
       '@id': itemReviewedId,
       name: service.name,
+      url: service.serviceUrls[0],
       sameAs: undefinedIfEmpty([...service.serviceUrls, ...service.onionUrls, ...service.i2pUrls]),
       description: service.description || undefined,
-      image: service.imageUrl ?? undefined,
+      image: service.imageUrl ? absoluteSiteUrl(service.imageUrl) : undefined,
+      logo: service.imageUrl ? absoluteSiteUrl(service.imageUrl) : undefined,
       mainEntityOfPage: pageUrl,
+      review: serviceReview,
+      aggregateRating: userAggregateRating,
       contactPoint: undefinedIfEmpty(
         service.contactMethods
           .map((method) => ({
@@ -696,45 +718,14 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
         '@id': itemReviewedId,
       },
       datePublished: service.listedAt?.toISOString(),
-      dateCreated: service.createdAt.toISOString(),
+      dateModified: verificationOverview.lastReviewAt?.toISOString(),
       image: makeOgImageUrl(ogImageTemplateData, siteOrigin),
     } satisfies WithContext<WebPage>,
   ]}
   breadcrumbs={[
-    ...service.categories.map(
-      (category) =>
-        [
-          {
-            name: 'Services',
-            url: '/',
-          },
-          {
-            name: category.name,
-            url: `/?categories=${category.slug}`,
-          },
-          {
-            name: service.name,
-            url: `/service/${service.slug}`,
-          },
-        ] satisfies BreadcrumArray
-    ),
-    ...service.acceptedCurrencies.map((currency) => {
-      const currencyInfo = getCurrencyInfo(currency)
-      return [
-        {
-          name: 'Services',
-          url: '/',
-        },
-        {
-          name: currencyInfo.name,
-          url: `/?currencies=${currencyInfo.slug}`,
-        },
-        {
-          name: service.name,
-          url: `/service/${service.slug}`,
-        },
-      ] satisfies BreadcrumArray
-    }),
+    { name: 'Services', url: '/' },
+    ...(primaryCategory ? [{ name: primaryCategory.name, url: `/?categories=${primaryCategory.slug}` }] : []),
+    { name: service.name, url: `/service/${service.slug}` },
   ]}
 >
   {
@@ -780,10 +771,12 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
       !!service.imageUrl && (
         <MyPicture
           src={service.imageUrl}
-          alt={service.name || "Service's logo"}
+          alt={`${service.name} logo`}
           class="size-14 shrink-0 rounded-sm object-contain sm:size-16"
           width={64}
           height={64}
+          loading="eager"
+          fetchpriority="high"
         />
       )
     }
@@ -798,7 +791,6 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
           aria-label={`Overall score ${formatRating(service.overallScore)} out of 10. See the attributes behind it.`}
           score={service.overallScore}
           label="Overall"
-          itemReviewedId={itemReviewedId}
           class="size-6 text-base sm:size-7 sm:text-lg"
         />
         <h1
@@ -1009,11 +1001,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
             <li class={cn('flex shrink-0 items-center gap-1.5', fact.optional && 'max-sm:order-last')}>
               {fact.icon && <Icon name={fact.icon} class="size-4 shrink-0 text-day-500" />}
               {fact.rating ? (
-                <a
-                  href={fact.href}
-                  class="hover:text-day-200"
-                  aria-label={`${fact.rating.value !== null ? fact.rating.value.toFixed(1) : '-'} out of 5 from ${fact.rating.count.toLocaleString()} ${pluralize('rating', fact.rating.count)}`}
-                >
+                <a href={fact.href} class="hover:text-day-200" aria-label={formatRatingLabel(fact.rating)}>
                   <RatingBadge rating={fact.rating.value} count={fact.rating.count} />
                 </a>
               ) : fact.href ? (
@@ -1084,7 +1072,6 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
       kycLevel={kycLevelInfo}
       privacyScore={service.privacyScore}
       trustScore={service.trustScore}
-      itemReviewedId={itemReviewedId}
       serviceName={service.name}
     />
 
@@ -1103,18 +1090,6 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
       )
     }
   </div>
-
-  <Schema
-    item={{
-      '@context': 'https://schema.org',
-      '@type': 'FAQPage',
-      mainEntity: serviceFaq.map(({ question, answer }) => ({
-        '@type': 'Question',
-        name: question,
-        acceptedAnswer: { '@type': 'Answer', text: answer },
-      })),
-    } satisfies WithContext<FAQPage>}
-  />
 
   <AdminOnly>
     <SectionHeading
@@ -1165,20 +1140,6 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
     </form>
   </AdminOnly>
 
-  <Schema
-    item={{
-      '@context': 'https://schema.org',
-      '@type': 'Review',
-      itemReviewed: { '@id': itemReviewedId },
-      reviewAspect: 'KYC Level',
-      name: kycLevelInfo.name,
-      // No numeric rating here: on our scale 0 is the best level, which
-      // schema.org would read as the worst. The privacy score carries the number.
-      reviewBody: kycLevelInfo.description,
-      author: KYCNOTME_SCHEMA_MINI,
-    } satisfies WithContext<Review>}
-  />
-
   <section id="scores" class="mt-8">
     <SectionHeading
       title="Attributes"
@@ -1187,14 +1148,28 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
       class="mt-0"
     />
 
-    <p class="mb-4 text-sm text-day-400">
-      Each attribute is a fact we found, good or bad, and moves the privacy or trust score. We assign the
-      attributes, never the scores: those are the sum of the attributes. Wrong or missing?{' '}
+    <p class="text-sm text-day-400">
+      Attributes are facts about the service, each worth some points. Scores are the sum of them. You can{' '}
       <a
         href={`/service-suggestion/edit?serviceId=${service.id}`}
         class="underline decoration-day-700 decoration-[0.5px] underline-offset-4 hover:text-day-200 hover:decoration-day-400"
-        >Send an edit suggestion</a
+        >report a mistake</a
       >.
+    </p>
+
+    <p class="mt-3 mb-5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-day-400">
+      <span>
+        Privacy <span class="font-semibold text-day-200">{service.privacyScore}</span> × 60%
+      </span>
+      <span class="text-day-500">+</span>
+      <span>
+        Trust <span class="font-semibold text-day-200">{service.trustScore}</span> × 40%
+      </span>
+      <span class="text-day-500">=</span>
+      <span>
+        Overall <span class="font-semibold text-day-200">{service.overallScore}</span>/10
+      </span>
+      {isFlaggedScam && <span class="text-red-400">capped at 3</span>}
     </p>
 
     <div id="attributes" class="space-y-4">
@@ -1229,24 +1204,9 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
         ))
       }
     </div>
-
-    <p class="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-day-400">
-      <span>
-        Privacy <span class="font-semibold text-day-200">{service.privacyScore}</span> × 60%
-      </span>
-      <span class="text-day-500">+</span>
-      <span>
-        Trust <span class="font-semibold text-day-200">{service.trustScore}</span> × 40%
-      </span>
-      <span class="text-day-500">=</span>
-      <span>
-        Overall <span class="font-semibold text-day-200">{service.overallScore}</span>/10
-      </span>
-      {isFlaggedScam && <span class="text-red-400">capped at 3</span>}
-    </p>
   </section>
 
-  <TosReviewSection service={service} itemReviewedId={itemReviewedId} statusLabel={statusInfo.label} />
+  <TosReviewSection service={service} statusLabel={statusInfo.label} />
 
   <ServiceTimeline events={service.events} serviceSlug={service.slug} now={now} />
 
@@ -1306,15 +1266,20 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
         </li>
         <li class="inline-flex items-center gap-1.5">
           <Icon name="ri:history-line" class="size-3.5 text-day-500" />
-          <span class="text-day-500">Last review</span>
+          <span class="text-day-500"
+            >{hasBeenReviewed(service.verificationStatus) ? 'Last review' : 'Last updated'}</span
+          >
           <span class="text-day-200">
             {
-              verificationOverview.lastReviewAt
-                ? formatDateShort(verificationOverview.lastReviewAt, {
-                    prefix: false,
-                    hourPrecision: false,
-                  })
-                : 'Unknown'
+              verificationOverview.lastReviewAt ? (
+                <TimeFormatted
+                  date={verificationOverview.lastReviewAt}
+                  prefix={false}
+                  hourPrecision={false}
+                />
+              ) : (
+                'Unknown'
+              )
             }
           </span>
         </li>
@@ -1390,7 +1355,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
           Verification proof
         </h3>
         <div class="prose prose-sm max-w-none prose-invert">
-          <Markdown content={service.verificationProofMd} />
+          <Markdown content={service.verificationProofMd} linkRel={['nofollow', 'noopener']} />
         </div>
       </>
     )
@@ -1430,7 +1395,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
                 <p class="mt-0.5 text-sm text-day-300">{step.description}</p>
                 {step.evidenceMd && (
                   <div class="prose prose-sm mt-1.5 max-w-none text-xs/relaxed prose-invert">
-                    <Markdown content={step.evidenceMd} />
+                    <Markdown content={step.evidenceMd} linkRel={['nofollow', 'noopener']} />
                   </div>
                 )}
               </li>
@@ -1482,52 +1447,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
       trustedUserRatingCount={service.trustedUserRatingCount}
       userRatingWeight={service.userRatingWeight}
       class="grow [grid-area:rating]"
-      itemReviewedId={itemReviewedId}
     />
-
-    {
-      userSentiment && service.trustWeightedUserRating !== null && (
-        <Schema
-          item={
-            {
-              '@context': 'https://schema.org',
-              '@type': 'Review',
-              itemReviewed: { '@id': itemReviewedId },
-              reviewAspect: 'AI Summary',
-              name: 'AI Summary',
-              reviewBody: userSentiment.summary,
-              datePublished: service.userSentimentAt?.toISOString(),
-              author: {
-                '@type': 'Organization',
-                name: 'KYCnot.me Community',
-              },
-              reviewRating: {
-                '@type': 'Rating',
-                ratingValue: service.trustWeightedUserRating,
-                worstRating: 1,
-                bestRating: 5,
-              },
-              positiveNotes: userSentiment.whatUsersLike.map(
-                (item, index) =>
-                  ({
-                    '@type': 'ListItem',
-                    position: index + 1,
-                    name: item,
-                  }) satisfies ListItem
-              ),
-              negativeNotes: userSentiment.whatUsersDislike.map(
-                (item, index) =>
-                  ({
-                    '@type': 'ListItem',
-                    position: index + 1,
-                    name: item,
-                  }) satisfies ListItem
-              ),
-            } satisfies WithContext<Review>
-          }
-        />
-      )
-    }
 
     <div class="flex flex-1 grow-3 basis-64 flex-col gap-2 rounded-lg bg-night-800 p-3 [grid-area:ai]">
       <div class="flex flex-row justify-between">

@@ -1,6 +1,5 @@
 ---
 import { Icon } from 'astro-icon/components'
-import { Schema } from 'astro-seo-schema'
 import { sortBy } from 'lodash-es'
 
 import { getLegalDocumentKindInfo } from '../../constants/legalDocumentKind'
@@ -8,7 +7,6 @@ import { getTosHighlightRatingInfo } from '../../constants/tosHighlightRating'
 import { getTosHighlightTopicInfo } from '../../constants/tosHighlightTopic'
 import { cn } from '../../lib/cn'
 import { safeHttpUrl } from '../../lib/exchange/safeUrl'
-import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
 import { transformCase } from '../../lib/strings'
 import { isTosReviewable, normalizeTosHighlightRating, TOS_REVIEW_ANCHOR } from '../../lib/tosHighlights'
 import Markdown from '../Markdown.astro'
@@ -19,18 +17,16 @@ import TimeFormatted from '../TimeFormatted.astro'
 import TosSourceLinks from './TosSourceLinks.astro'
 
 import type { ServiceDetail } from '../../lib/serviceDetail'
-import type { ListItem, Review, WithContext } from 'schema-dts'
 
 type Props = {
   service: Pick<
     ServiceDetail,
     'legalRevisions' | 'tosChangedAt' | 'tosReview' | 'tosReviewAt' | 'tosUrls' | 'verificationStatus'
   >
-  itemReviewedId: string
   statusLabel: string
 }
 
-const { service, itemReviewedId, statusLabel } = Astro.props
+const { service, statusLabel } = Astro.props
 
 const isReviewable = isTosReviewable(service.verificationStatus)
 
@@ -79,43 +75,6 @@ const highlights = sortBy(
     </div>
   ) : (
     <>
-      <Schema
-        item={
-          {
-            '@context': 'https://schema.org',
-            '@type': 'Review',
-            itemReviewed: { '@id': itemReviewedId },
-            reviewAspect: 'Terms of Service',
-            name: 'Terms of Service Review',
-            reviewBody: service.tosReview.summary,
-            datePublished: service.tosReviewAt.toISOString(),
-            author: KYCNOTME_SCHEMA_MINI,
-            positiveNotes: highlights
-              .filter((highlight) => highlight.ratingInfo.id === 'positive')
-              .map(
-                (highlight, i) =>
-                  ({
-                    '@type': 'ListItem',
-                    position: i + 1,
-                    name: highlight.title,
-                    description: highlight.content,
-                  }) satisfies ListItem
-              ),
-            negativeNotes: highlights
-              .filter((highlight) => highlight.ratingInfo.id === 'negative')
-              .map(
-                (highlight, i) =>
-                  ({
-                    '@type': 'ListItem',
-                    position: i + 1,
-                    name: highlight.title,
-                    description: highlight.content,
-                  }) satisfies ListItem
-              ),
-          } satisfies WithContext<Review>
-        }
-      />
-
       {/* The summary and the counts already sit in the card under the verdict panel. */}
       <div class="grid gap-x-6 gap-y-4 sm:grid-cols-2">
         {highlights.map((highlight) => (
