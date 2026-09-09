@@ -52,8 +52,10 @@ REVIEWABLE_STATUSES = ("VERIFICATION_SUCCESS", "APPROVED")
 MAX_EVIDENCE_CHARS = 600
 # Three sentences with a few bold spans; the prompt asks for 60 words.
 MAX_KYC_NOTES_CHARS = 600
-# Headings, links, images, list markers and block quotes have no place under a verdict.
-KYC_NOTES_STRUCTURE = re.compile(r"(^|\s)(#{1,6}\s|[-*+]\s|\d+\.\s|>\s)|\]\(|!\[")
+# Block markers only count at a line start, so "over 18. They" and "> 5 BTC"
+# inside a sentence stay prose. Links and images are structure anywhere.
+KYC_NOTES_BLOCK_MARKER = re.compile(r"^\s*(#{1,6}\s|[-*+]\s|\d+\.\s|>\s)", re.MULTILINE)
+KYC_NOTES_INLINE_MARKUP = re.compile(r"\]\(|!\[")
 
 
 def _format_attribute_catalog(catalog: List[Dict[str, Any]]) -> str:
@@ -211,6 +213,7 @@ class DeepScanTask(Task):
         current_attribute_ids = [int(a["id"]) for a in current_attributes]
         listing_record = fetch_service_listing_record(service_id)
         current_kyc_level = service.get("kycLevel")
+        current_kyc_notes = service.get("kycPolicyMd") or ""
 
         result: DeepScanResultType = prompt_deep_scan(
             content=filtered_corpus,
@@ -218,7 +221,7 @@ class DeepScanTask(Task):
             attribute_catalog_md=_format_attribute_catalog(catalog),
             current_attribute_ids=current_attribute_ids,
             listing_record=listing_record,
-            current_kyc_notes=service.get("kycPolicyMd") or "",
+            current_kyc_notes=current_kyc_notes,
         )
 
         self.keep_supported_highlights(result, corpus)
@@ -232,7 +235,7 @@ class DeepScanTask(Task):
             listing_record=listing_record,
             declined=fetch_scan_declines(service_id),
             current_kyc_level=current_kyc_level,
-            current_kyc_notes=service.get("kycPolicyMd") or "",
+            current_kyc_notes=current_kyc_notes,
             corpus=filtered_corpus,
             crawled_keys={page.url_key for page in corpus.pages},
         )
@@ -398,7 +401,9 @@ class DeepScanTask(Task):
 
             listing_checks.append({**check, "found": found})
 
-        kyc_notes = self._usable_kyc_notes(result["kycPolicyNotesMd"])
+        kyc_notes = self._usable_kyc_notes(
+            result["kycPolicyNotesMd"], result["warnings"]
+        )
         proposals = self._fingerprint_proposals(
             service_id=service_id,
             attributes_add=attributes_add,
@@ -496,26 +501,40 @@ class DeepScanTask(Task):
             "warnings": result["warnings"],
         }
 
-    def _usable_kyc_notes(self, notes: str) -> str:
+    def _usable_kyc_notes(self, notes: str, warnings: List[Dict[str, Any]]) -> str:
         """The notes as one line, or nothing when they break the format.
 
         The prompt caps them at three plain sentences because they sit under the
         verdict on the service page. Text past the cap, or carrying structure,
         is not shortened here: a reviewer cannot tell a trimmed proposal from a
-        complete one, so it is dropped and the scan says why.
+        complete one, so it is dropped and the reviewer is told in the warnings.
         """
         collapsed = " ".join(notes.split())
         if not collapsed:
             return ""
+        reason = None
         if len(collapsed) > MAX_KYC_NOTES_CHARS:
-            self.logger.warning(
-                f"Dropping KYC notes of {len(collapsed)} chars, over {MAX_KYC_NOTES_CHARS}"
+            reason = (
+                f"{len(collapsed)} characters, over the {MAX_KYC_NOTES_CHARS} limit"
             )
-            return ""
-        if KYC_NOTES_STRUCTURE.search(collapsed):
-            self.logger.warning("Dropping KYC notes carrying markdown structure")
-            return ""
-        return collapsed
+        elif KYC_NOTES_BLOCK_MARKER.search(notes) or KYC_NOTES_INLINE_MARKUP.search(
+            collapsed
+        ):
+            reason = (
+                "headings, lists, quotes or links are not allowed under the verdict"
+            )
+        if reason is None:
+            return collapsed
+        self.logger.warning(f"Dropping KYC notes: {reason}")
+        warnings.append(
+            {
+                "title": "KYC notes dropped",
+                "bodyMd": f"The scan wrote KYC policy notes that broke the format ({reason}). "
+                "Rescan, or edit the notes on the service.",
+                "severity": "info",
+            }
+        )
+        return ""
 
     def _fingerprint_proposals(
         self,

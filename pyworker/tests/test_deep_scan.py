@@ -441,7 +441,7 @@ class TestScanProposalGates(unittest.TestCase):
         self.assertIsNone(same_corpus["notesFingerprint"])
         self.assertEqual(same_corpus["notesMd"], "")
 
-    def test_notes_with_markdown_structure_are_dropped(self):
+    def test_notes_with_markdown_structure_are_dropped_and_flagged(self):
         for notes in (
             "## KYC\nNever asked.",
             "Details [here](https://x.com/terms).",
@@ -449,11 +449,22 @@ class TestScanProposalGates(unittest.TestCase):
             "x" * 601,
         ):
             with patch.dict(
-                SAMPLE_LLM_RESULT, {"kycPolicyNotesMd": notes}, clear=False
+                SAMPLE_LLM_RESULT,
+                {"kycPolicyNotesMd": notes, "warnings": []},
+                clear=False,
             ):
-                kyc = self._build()["kycPolicy"]
-            self.assertIsNone(kyc["notesFingerprint"], notes[:20])
-            self.assertEqual(kyc["notesMd"], "")
+                edits = self._build()
+            self.assertIsNone(edits["kycPolicy"]["notesFingerprint"], notes[:20])
+            self.assertEqual(edits["kycPolicy"]["notesMd"], "")
+            self.assertEqual(edits["warnings"][0]["title"], "KYC notes dropped")
+
+    def test_numbers_and_symbols_inside_sentences_are_prose(self):
+        prose = "You must be over 18. Amounts > 5 BTC need **ID** - no exceptions."
+        with patch.dict(SAMPLE_LLM_RESULT, {"kycPolicyNotesMd": prose}, clear=False):
+            kyc = self._build()["kycPolicy"]
+
+        self.assertEqual(kyc["notesMd"], prose)
+        self.assertIsNotNone(kyc["notesFingerprint"])
 
     def test_bold_in_notes_is_kept(self):
         with patch.dict(

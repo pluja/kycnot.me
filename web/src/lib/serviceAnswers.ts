@@ -72,7 +72,7 @@ export function makeKycAnswer(
   }
   const base = baseKycAnswer(kycLevel)
   const policy = kycPolicyMd ? stripMarkdown(kycPolicyMd) : ''
-  if (policy) return { ...base, detail: policy, detailMd: kycPolicyMd ?? undefined }
+  if (policy && kycPolicyMd) return { ...base, detail: policy, detailMd: kycPolicyMd }
   // Once the headline already says yes there is nothing left to qualify.
   if (kycCaveats.length === 0 || base.tone === 'bad') return base
   // A guarantee from the service is not a guarantee from its partners, and the
