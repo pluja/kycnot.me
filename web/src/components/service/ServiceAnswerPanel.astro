@@ -3,6 +3,7 @@ import { Icon } from 'astro-icon/components'
 
 import { kycLevels, type getKycLevelInfo } from '../../constants/kycLevels'
 import { cn } from '../../lib/cn'
+import { markdownToInlineHtml } from '../../lib/markdown'
 import ScoreGauge from '../ScoreGauge.astro'
 import Tooltip from '../Tooltip.astro'
 
@@ -38,6 +39,7 @@ const questions = [
     score: privacyScore,
     scoreLabel: 'Privacy',
     ...kyc,
+    detailHtml: kyc.detailMd ? await markdownToInlineHtml(kyc.detailMd) : null,
   },
   {
     label: `Is ${serviceName} safe?`,
@@ -46,6 +48,7 @@ const questions = [
     score: trustScore,
     scoreLabel: 'Trust',
     ...safety,
+    detailHtml: null,
   },
 ]
 ---
@@ -100,7 +103,14 @@ const questions = [
               class="-mt-1.5 -mb-6 shrink-0"
             />
           </div>
-          {question.detail && <p class="mt-1.5 text-sm text-day-300">{question.detail}</p>}
+          {question.detailHtml ? (
+            <p
+              class="mt-1.5 text-sm text-day-300 [&_strong]:font-semibold [&_strong]:text-day-100"
+              set:html={question.detailHtml}
+            />
+          ) : (
+            question.detail && <p class="mt-1.5 text-sm text-day-300">{question.detail}</p>
+          )}
           {question.incidents && question.incidents.length > 0 && (
             <ul class="mt-2 space-y-1.5 text-sm text-day-300">
               {question.incidents.map((incident) => (

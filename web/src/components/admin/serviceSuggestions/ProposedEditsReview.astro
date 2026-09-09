@@ -71,8 +71,13 @@ const kycLevelFingerprint = proposedEdits?.kycPolicy.levelFingerprint ?? null
 const kycLevelChanged = !!kycLevelFingerprint
 const kycLevelDeclined =
   !!proposedEdits && !kycLevelFingerprint && proposedEdits.kycPolicy.inferredLevel !== service.kycLevel
+// An empty text is never offered: clearing the notes is an edit-form job, not
+// a box a reviewer can tick through.
+const kycNotesFingerprint = proposedEdits?.kycPolicy.notesFingerprint ?? null
 const kycPolicyChanged =
-  !!proposedEdits && (proposedEdits.kycPolicy.notesMd ?? '') !== (service.kycPolicyMd ?? '')
+  !!kycNotesFingerprint &&
+  !!proposedEdits?.kycPolicy.notesMd &&
+  proposedEdits.kycPolicy.notesMd !== (service.kycPolicyMd ?? '')
 const addCount = proposedEdits?.attributes.add.length ?? 0
 const listingCheckCount = proposedEdits?.listingChecks?.length ?? 0
 const removeCount = proposedEdits?.attributes.remove.length ?? 0
@@ -225,23 +230,29 @@ const acceptTosReviewInputId = `accept-tos-review-${suggestion.id}`
               </div>
             </label>
 
-            <label
+            <div
               class={cn(
-                'grid gap-3 p-4 sm:grid-cols-[auto_1fr] sm:items-start',
-                isActionable && kycPolicyChanged
-                  ? 'cursor-pointer bg-orange-500/5 hover:bg-orange-500/10'
-                  : 'bg-night-800'
+                'p-4',
+                isActionable && kycPolicyChanged ? 'bg-orange-500/5 hover:bg-orange-500/10' : 'bg-night-800'
               )}
             >
-              <input
-                type="checkbox"
-                name="acceptKycPolicy"
-                value="on"
-                checked={kycPolicyChanged}
-                disabled={!isActionable || !kycPolicyChanged}
-                class="mt-1"
-              />
-              <div class="min-w-0">
+              <label
+                class={cn(
+                  'grid gap-3 sm:grid-cols-[auto_1fr] sm:items-start',
+                  isActionable && kycPolicyChanged && 'cursor-pointer'
+                )}
+              >
+                <input
+                  type="checkbox"
+                  name="acceptKycPolicy"
+                  value="on"
+                  checked={kycPolicyChanged}
+                  disabled={!isActionable || !kycPolicyChanged}
+                  class="mt-1"
+                />
+                {isActionable && kycPolicyChanged && (
+                  <input type="hidden" name="kycNotesFingerprint" value={kycNotesFingerprint} />
+                )}
                 <div class="flex flex-wrap items-center gap-2">
                   <span class="font-title text-sm font-semibold text-day-100">Apply KYC policy notes</span>
                   {kycPolicyChanged ? (
@@ -250,37 +261,35 @@ const acceptTosReviewInputId = `accept-tos-review-${suggestion.id}`
                     <BadgeSmall color="gray" text="No change" icon="ri:checkbox-circle-line" />
                   )}
                 </div>
-                {kycPolicyChanged && (
-                  <details class="mt-3 rounded-md border border-night-600 bg-night-900 p-3">
-                    <summary class="cursor-pointer text-sm font-medium text-day-200">
-                      Compare current and proposed notes
-                    </summary>
-                    <div class="mt-3 grid gap-3 lg:grid-cols-2">
-                      <div>
-                        <p class="text-xs font-bold tracking-wider text-day-500 uppercase">Current</p>
-                        <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-400 prose-invert">
-                          {service.kycPolicyMd ? (
-                            <Markdown content={service.kycPolicyMd} />
-                          ) : (
-                            <p class="text-day-500 italic">(empty)</p>
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <p class="text-xs font-bold tracking-wider text-orange-300 uppercase">Proposed</p>
-                        <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-200 prose-invert">
-                          {proposedEdits.kycPolicy.notesMd ? (
-                            <Markdown content={proposedEdits.kycPolicy.notesMd} />
-                          ) : (
-                            <p class="text-day-500 italic">(empty)</p>
-                          )}
-                        </div>
+              </label>
+              {/* Outside the label on purpose: a click that opens the comparison
+                  must not toggle the decision. */}
+              {kycPolicyChanged && (
+                <details class="mt-3 rounded-md border border-night-600 bg-night-900 p-3">
+                  <summary class="cursor-pointer text-sm font-medium text-day-200">
+                    Compare current and proposed notes
+                  </summary>
+                  <div class="mt-3 grid gap-3 lg:grid-cols-2">
+                    <div>
+                      <p class="text-xs font-bold tracking-wider text-day-500 uppercase">Current</p>
+                      <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-400 prose-invert">
+                        {service.kycPolicyMd ? (
+                          <Markdown content={service.kycPolicyMd} />
+                        ) : (
+                          <p class="text-day-500 italic">(empty)</p>
+                        )}
                       </div>
                     </div>
-                  </details>
-                )}
-              </div>
-            </label>
+                    <div>
+                      <p class="text-xs font-bold tracking-wider text-orange-300 uppercase">Proposed</p>
+                      <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-200 prose-invert">
+                        <Markdown content={proposedEdits.kycPolicy.notesMd} />
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              )}
+            </div>
 
             <ListingChecksSection checks={proposedEdits.listingChecks ?? []} isActionable={isActionable} />
 

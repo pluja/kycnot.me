@@ -67,6 +67,7 @@ type DeclineInputs = {
   acceptedAttributeRemove: number[]
   acceptedListingFields: string[]
   acceptedKycLevel: boolean
+  acceptedKycNotes: boolean
 }
 
 /**
@@ -87,6 +88,7 @@ export function collectDeclines({
   acceptedAttributeRemove,
   acceptedListingFields,
   acceptedKycLevel,
+  acceptedKycNotes,
 }: DeclineInputs) {
   const accepted = {
     'attribute:add': new Set(acceptedAttributeAdd.map(String)),
@@ -148,6 +150,20 @@ export function collectDeclines({
       fingerprint: scanFingerprint(serviceId, 'kycLevel', proposed.kycPolicy.inferredLevel),
       kind: 'kycLevel',
       label: `Keep the KYC level rather than moving it to ${String(proposed.kycPolicy.inferredLevel)}`,
+    })
+  }
+
+  // Keyed on the corpus, since the wording changes every run. Final for these
+  // documents; edited terms carry a new hash and are asked about afresh.
+  if (proposed.kycPolicy.notesFingerprint && !acceptedKycNotes) {
+    rows.push({
+      serviceId,
+      declinedById,
+      sourceUrlKey: null,
+      sourceContentHash: null,
+      fingerprint: scanFingerprint(serviceId, 'kycNotes', proposed.contentHash),
+      kind: 'kycNotes',
+      label: 'Keep the KYC policy notes as they are',
     })
   }
 

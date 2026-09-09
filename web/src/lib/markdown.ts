@@ -117,6 +117,20 @@ export async function markdownToHtml(
   }
 }
 
+/**
+ * Bold and italics only, for a sentence shown inside the page's own markup.
+ * Every other element is unwrapped to its text, so a link or heading in the
+ * source cannot break out of the line it sits in.
+ */
+export async function markdownToInlineHtml(md: string) {
+  const html = await remark()
+    .use(remarkRehype)
+    .use(rehypeSanitize, { tagNames: ['strong', 'em'], attributes: {} })
+    .use(rehypeStringify)
+    .process(md)
+  return String(html).trim()
+}
+
 export function hasLikelyXss(markdown: string): boolean {
   if (!markdown) return false
 
