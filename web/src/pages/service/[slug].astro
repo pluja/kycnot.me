@@ -1094,7 +1094,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
   <AdminOnly>
     <SectionHeading
       title="Internal Notes"
-      link={{ href: `/admin/services/${service.slug}/edit#internal-notes`, text: 'Manage' }}
+      links={[{ href: `/admin/services/${service.slug}/edit#internal-notes`, text: 'Manage' }]}
     />
 
     {
@@ -1143,8 +1143,10 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
   <section id="scores" class="mt-8">
     <SectionHeading
       title="Attributes"
-      info={{ href: '/about#service-scores', text: 'How scores work' }}
-      link={{ href: '/attributes', text: 'All attributes' }}
+      links={[
+        { href: '/about#service-scores', text: 'Scores' },
+        { href: '/attributes', text: 'All attributes' },
+      ]}
       class="mt-0"
     />
 
@@ -1212,9 +1214,11 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
 
   <SectionHeading
     id="verification"
-    title="Evidence and Review History"
-    info={{ href: '/about#listing-statuses', text: 'How statuses work' }}
-    link={{ href: '/about#suggestion-review-process', text: 'Our review process' }}
+    title="Evidence"
+    links={[
+      { href: '/about#listing-statuses', text: 'Statuses' },
+      { href: '/about#suggestion-review-process', text: 'Review process' },
+    ]}
   />
 
   <div
@@ -1408,7 +1412,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
   <SectionHeading
     id="comments"
     title="Comments"
-    link={{ href: `/comments?service=${service.slug}`, text: 'In the feed' }}
+    links={[{ href: `/comments?service=${service.slug}`, text: 'In the feed' }]}
   />
   <div
     id="discuss"

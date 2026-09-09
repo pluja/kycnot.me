@@ -65,7 +65,7 @@ const foldClass =
         id="incidents"
         headingId="incidents-heading"
         title="Security incidents"
-        info={{ href: '/about#service-scores', text: 'How trust is affected' }}
+        links={[{ href: '/about#service-scores', text: 'How trust is affected' }]}
       />
 
       {activeIncidents.length > 0 && (
@@ -157,8 +157,10 @@ const foldClass =
     id="events"
     headingId="events-heading"
     title="Events"
-    info={{ href: '/about#events', text: 'About events' }}
-    link={{ href: '/events', text: 'All events' }}
+    links={[
+      { href: '/about#events', text: 'About events' },
+      { href: '/events', text: 'All events' },
+    ]}
   />
 
   {!hasEvents && <p class="my-10 text-center text-day-400">No events reported</p>}

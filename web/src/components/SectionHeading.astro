@@ -3,51 +3,57 @@ import { Icon } from 'astro-icon/components'
 
 import { cn } from '../lib/cn'
 
-type SectionLink = { href: string; text: string }
+type SectionLink = {
+  href: string
+  text: string
+  /** Rendered as an info pill. Defaults to true for links into /about. */
+  info?: boolean
+}
 
 type Props = {
   title: string
   /** Anchor for the whole header row. */
   id?: string
   headingId?: string
-  /** Pill on the right for an explainer, such as "How scores work". */
-  info?: SectionLink
-  /** Plain link on the far right, such as "All events". */
-  link?: SectionLink
+  /** Right-hand links, in order. Explainers into /about get the info pill, the rest a plain arrow link. */
+  links?: SectionLink[]
   class?: string
 }
 
-const { title, id, headingId, info, link, class: className } = Astro.props
+const { title, id, headingId, links = [], class: className } = Astro.props
+
+const isInfo = (link: SectionLink) => link.info ?? link.href.startsWith('/about')
 ---
 
 <div
   id={id}
   class={cn(
-    'mt-6 mb-3 flex scroll-mt-4 items-center justify-between gap-3 border-b border-day-500 pb-1',
+    'mt-6 mb-3 flex scroll-mt-4 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-day-500 pb-1',
     className
   )}
 >
   <h2 id={headingId} class="font-title text-lg font-bold text-day-100">{title}</h2>
   {
-    (info ?? link) && (
-      <div class="flex shrink-0 items-center gap-2 text-xs leading-none">
-        {info && (
-          <a
-            href={info.href}
-            class="inline-flex items-center gap-1 rounded-full border border-day-500/20 px-2 py-1 text-day-400 transition-colors hover:border-day-500/40 hover:text-day-100"
-          >
-            <Icon name="ri:information-line" class="size-3.5" />
-            {info.text}
-          </a>
-        )}
-        {link && (
-          <a
-            href={link.href}
-            class="inline-flex items-center gap-0.5 text-day-500 transition-colors hover:text-day-200 hover:underline"
-          >
-            {link.text}
-            <Icon name="ri:arrow-right-s-line" class="size-4" />
-          </a>
+    links.length > 0 && (
+      <div class="ml-auto flex shrink-0 items-center gap-2 text-xs leading-none">
+        {links.map((link) =>
+          isInfo(link) ? (
+            <a
+              href={link.href}
+              class="inline-flex items-center gap-1 rounded-full border border-day-500/20 px-2 py-1 text-day-400 transition-colors hover:border-day-500/40 hover:text-day-100"
+            >
+              <Icon name="ri:information-line" class="size-3.5" />
+              {link.text}
+            </a>
+          ) : (
+            <a
+              href={link.href}
+              class="inline-flex items-center gap-0.5 text-day-500 transition-colors hover:text-day-200 hover:underline"
+            >
+              {link.text}
+              <Icon name="ri:arrow-right-s-line" class="size-4" />
+            </a>
+          )
         )}
       </div>
     )
