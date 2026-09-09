@@ -384,8 +384,9 @@ def fetch_service_for_deep_scan(service_id: int) -> Optional[Dict[str, Any]]:
             with conn.cursor(row_factory=dict_row) as cursor:
                 cursor.execute(
                     """
-                    SELECT id, name, slug, "kycLevel", "verificationStatus",
-                           "serviceVisibility", "tosUrls", "tosReview"
+                    SELECT id, name, slug, "kycLevel", "kycPolicyMd",
+                           "verificationStatus", "serviceVisibility", "tosUrls",
+                           "tosReview"
                     FROM "Service"
                     WHERE id = %s
                     """,

@@ -243,7 +243,7 @@ DEEP_SCAN = PromptSchema(
         quote: string
         sourceUrl: string
     }[]
-    /** Concise plain-English markdown notes describing the service's KYC policy. At most 2 short lines when possible. May be empty string. */
+    /** Two or three plain sentences on identity checks, bold on the scan words only. Empty only when the corpus is unusable. */
     kycPolicyNotesMd: MarkdownString
     /** One short paragraph explaining why kycLevel was chosen. */
     kycLevelRationale: string

@@ -27,7 +27,13 @@ Produce a single JSON object with all of the following fields:
    - A service may use a legal template naming a different jurisdiction than where it is registered. Report what the clause says and let the reviewer weigh it. Do not assert which is correct.
    - Empty list when nothing plainly disagrees. That is the normal result.
 
-6. **kycPolicyNotesMd** (markdown, may be empty string). Three things, in this order: what sets KYC off here, what it asks you to hand over, and what happens to your money if you refuse or they suspect you. Two or three short sentences. Do not repeat the `summary`. Empty string if the corpus says nothing concrete.
+6. **kycPolicyNotesMd**: what a reader should know about identity checks before signing up. This is the text shown under the KYC verdict on the service page, so it must be short, plain and scannable.
+
+   - **Two or three sentences, 60 words at most.** In this order: what sets KYC off, what they ask you to hand over, and what happens to your money or account if you refuse or they suspect you.
+   - **When the corpus never mentions KYC, AML or identity checks**, say so in the first sentence, then give the identity-relevant facts it does state: what sign-up asks for, which payment methods are accepted, whether they hold a balance or funds they could freeze, and any clause about legal requests, sanctions or prohibited users. Silence on KYC is a finding; describe what surrounds it rather than leaving the field empty.
+   - **Bold only the words a reader scans for:** the trigger, the data asked for, the consequence. About one bold span per sentence, never a whole sentence.
+   - Plain sentences only. No headings, links, lists, quotes or line breaks. Do not repeat the `summary`.
+   - Empty string only when the corpus is unusable.
 
 7. **kycLevelRationale**: one short paragraph (1-3 sentences) explaining why you chose the kycLevel value, citing the specific clause types that drove the decision. Plain text, no markdown.
 
