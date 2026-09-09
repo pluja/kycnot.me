@@ -68,24 +68,23 @@ jobs:
         working-directory: ${{ forgejo.workspace }}
         run: |
           set -euo pipefail
-          # Same image the worker ships in. The source is mounted read-only, so
-          # the project is not installed and PYTHONPATH stands in for it. The uv
-          # caches persist on named volumes, so after the first run this takes
-          # seconds. The tests mock every model call; the key only satisfies the
-          # client constructor.
-          docker run --rm \
-            -v "$PWD/pyworker:/app:ro" \
-            -v kycnot-ci-uv-cache:/root/.cache/uv \
-            -v kycnot-ci-uv-python:/root/.local/share/uv/python \
-            -e UV_PROJECT_ENVIRONMENT=/venv \
-            -e PYTHONPATH=/app \
-            -e PYTHONDONTWRITEBYTECODE=1 \
-            -e OPENAI_API_KEY=ci \
-            -w /app \
-            ghcr.io/astral-sh/uv:alpine \
-            sh -c 'uv sync --frozen --group dev --no-install-project -q \
-              && /venv/bin/ruff check --no-cache pyworker tests \
-              && /venv/bin/pytest -q -p no:cacheprovider'
+          # Same image the worker ships in. The source is streamed in over stdin
+          # like a build context, since the daemon cannot see this workspace for
+          # a bind mount. The uv caches persist on named volumes, so after the
+          # first run this takes seconds. The tests mock every model call; the
+          # key only satisfies the client constructor.
+          tar -C pyworker --exclude=.venv --exclude='__pycache__' -cf - . \
+            | docker run --rm -i \
+                -v kycnot-ci-uv-cache:/root/.cache/uv \
+                -v kycnot-ci-uv-python:/root/.local/share/uv/python \
+                -e UV_PROJECT_ENVIRONMENT=/venv \
+                -e PYTHONDONTWRITEBYTECODE=1 \
+                -e OPENAI_API_KEY=ci \
+                ghcr.io/astral-sh/uv:alpine \
+                sh -c 'mkdir /app && cd /app && tar -xf - \
+                  && uv sync --frozen --group dev -q \
+                  && /venv/bin/ruff check --no-cache pyworker tests \
+                  && /venv/bin/pytest -q -p no:cacheprovider'
 
       - name: Promote to master and tag
         id: promote
