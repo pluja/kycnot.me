@@ -4,7 +4,7 @@ The rule for a description:
 
 - One or two sentences, under 200 characters. Third person, present tense.
 - Says what the service is and what it does. That is all.
-- A label that describes the service as a whole is fine when the listing supports it: "anonymous VPN", "no-KYC exchange", "privacy-first email". The listing supports "no-KYC" only when the KYC level given below is 0 or 1.
+- A label that describes the service as a whole is fine when the listing supports it: "anonymous VPN", "no-KYC exchange", "privacy-first email". The listing supports "no-KYC" only when the KYC level given below is 0; at level 1 the terms are silent, which is not the same thing.
 - Nothing about policy or conditions: not when or why ID is asked, not what happens to funds, not restrictions, not anything from the terms. Those have their own place on the page.
 - No currencies or payment methods. Those are shown next to the description already.
 - No marketing, promotional or buzz words. Nothing that sells, ranks or praises: no superlatives, no "best", "fastest", "leading", "trusted", "seamless", "secure and reliable", no calls to action.

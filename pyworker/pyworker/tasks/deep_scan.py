@@ -39,7 +39,7 @@ from pyworker.utils.legal_crawl import document_key, fetch_legal_corpus
 from pyworker.utils.legal_text import is_grounded
 from pyworker.utils.listing_values import storable_value, values_disagree
 from pyworker.utils.description_rules import check_description
-from pyworker.utils.homepage import fetch_homepage
+from pyworker.utils.homepage import fetch_homepage, homepage_hash
 from pyworker.utils.scan_fingerprint import scan_fingerprint
 
 
@@ -162,6 +162,48 @@ class DeepScanTask(Task):
         if read_the_documents:
             mark_service_scanned(service_id)
         return suggestion_id
+
+    def run_description(self, service_id: int) -> Optional[int]:
+        """Propose a description alone, from the front page, as a suggestion.
+
+        No terms are read, so this covers listings without any, and it costs
+        one crawl and one model call. The front page stands in for the corpus
+        as the decline key, since it is the only input the proposal has.
+        """
+        service = fetch_service_for_deep_scan(service_id)
+        if service is None:
+            self.logger.error(f"Service {service_id} not found, skipping description")
+            return None
+        warnings: List[Dict[str, Any]] = []
+        description = self._propose_description(service, warnings)
+        if description is None:
+            self.logger.info(f"Description of {service['name']} stands, no suggestion")
+            return None
+        page_hash = description["sourceHash"]
+        fingerprint = scan_fingerprint(service_id, "description", page_hash)
+        if fingerprint in fetch_scan_declines(service_id):
+            self.logger.info("Description rewrite already declined for this front page")
+            return None
+        proposed_edits = {
+            "contentHash": page_hash,
+            "description": {
+                "fingerprint": fingerprint,
+                "text": description["text"],
+                "reasons": description["reasons"],
+            },
+            "warnings": warnings,
+        }
+        notes = "\n".join(
+            [
+                "AI-Generated Description Review: Requires human review",
+                "",
+                f"Current: {service.get('description') or '(empty)'}",
+                f"Proposed: {description['text']}",
+            ]
+        )
+        return save_deep_scan_proposed_edits(
+            service_id=service_id, proposed_edits=proposed_edits, summary_notes=notes
+        )
 
     def _run(self, service_id: int) -> tuple[Optional[int], bool]:
         """The scan itself, and whether it read the documents through to an answer."""
@@ -568,7 +610,12 @@ class DeepScanTask(Task):
                 }
             )
             return None
-        return {"text": text, "reasons": list(result["reasons"])}
+        reasons = list(result["reasons"])
+        if homepage is None:
+            reasons.append(
+                "the front page could not be read; written from the listing alone"
+            )
+        return {"text": text, "reasons": reasons, "sourceHash": homepage_hash(homepage)}
 
     def _usable_kyc_notes(self, notes: str, warnings: List[Dict[str, Any]]) -> str:
         """The notes as one line, or nothing when they break the format.

@@ -6,6 +6,7 @@ which has already dropped the head. The visible text comes from the crawl, so
 a page that renders through scripts still yields something.
 """
 
+import hashlib
 import logging
 import re
 from html import unescape
@@ -69,6 +70,24 @@ def parse_homepage(url: str, html: str, markdown: str) -> Homepage:
         "heading": _clean(heading.group(1)) if heading else "",
         "visibleText": " ".join(markdown.split())[:VISIBLE_TEXT_CHARS],
     }
+
+
+def homepage_hash(homepage: Optional[Homepage]) -> str:
+    """Identity of what was read, so a decision can be tied to this front page."""
+    if homepage is None:
+        return "0" * 64
+    words = " ".join(
+        " ".join(str(homepage[key]).split())
+        for key in (
+            "title",
+            "metaDescription",
+            "ogTitle",
+            "ogDescription",
+            "heading",
+            "visibleText",
+        )
+    )
+    return hashlib.sha256(words.encode("utf-8")).hexdigest()
 
 
 def fetch_homepage(url: str) -> Optional[Homepage]:

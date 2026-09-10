@@ -908,13 +908,16 @@ class TestDescriptionProposal(unittest.TestCase):
             "rewrite", "No-KYC exchange for bitcoin and monero."
         )
 
+        self.assertEqual(result["text"], "No-KYC exchange for bitcoin and monero.")
+        # The front page was not readable in this test, and the reviewer is told.
         self.assertEqual(
-            result,
-            {
-                "text": "No-KYC exchange for bitcoin and monero.",
-                "reasons": ["marketing"],
-            },
+            result["reasons"],
+            [
+                "marketing",
+                "the front page could not be read; written from the listing alone",
+            ],
         )
+        self.assertEqual(result["sourceHash"], "0" * 64)
         self.assertEqual(warnings, [])
 
     def test_a_keep_verdict_proposes_nothing(self):
