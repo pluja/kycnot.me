@@ -6,7 +6,12 @@ import slugify from 'slugify'
 
 import { countriesZodEnumByCode } from '../../constants/countries'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
-import { descriptionOpeningRefinement, descriptionSchema } from '../../lib/descriptionRules'
+import {
+  checkDescription,
+  describeViolations,
+  descriptionOpeningRefinement,
+  descriptionSchema,
+} from '../../lib/descriptionRules'
 import { saveFileLocally, deleteFileLocally } from '../../lib/fileStorage'
 import { cap, userCan } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
@@ -47,7 +52,7 @@ const serviceSchemaBase = z.object({
     .regex(/^[a-z0-9-]+$/, 'Allowed characters: lowercase letters, numbers, and hyphens')
     .optional(),
   name: z.string().min(1).max(40),
-  description: descriptionSchema,
+  description: z.string().trim().min(1),
   allServiceUrls: stringListOfUrlsSchemaRequired,
   tosUrls: stringListOfUrlsSchemaRequired,
   contactMethods: stringListOfContactMethodsSchema,
@@ -88,15 +93,18 @@ const serviceSchemaBase = z.object({
 // Define schema for the create action input
 const createServiceInputSchema = serviceSchemaBase
   .omit({ id: true })
+  .extend({ description: descriptionSchema })
   .superRefine(descriptionOpeningRefinement)
   .transform(addSlugIfMissing)
 
 // Define schema for the update action input
+// The rule applies to text being written, not to text on record: an admin
+// fixing a URL must not be blocked by a description nobody touched. The
+// update handler checks the description only when it changed.
 const updateServiceInputSchema = serviceSchemaBase
   .extend({
     removeImage: z.boolean().optional(),
   })
-  .superRefine(descriptionOpeningRefinement)
   .transform(addSlugIfMissing)
 
 const evidenceImageAddSchema = z.object({
@@ -226,6 +234,7 @@ export const adminServiceActions = {
         where: { id: input.id },
         select: {
           slug: true,
+          description: true,
           previousSlugs: true,
           categories: {
             select: {
@@ -252,6 +261,12 @@ export const adminServiceActions = {
         })
       }
 
+      if (input.description !== existingService.description) {
+        const broken = describeViolations(checkDescription(input.description, input.name))
+        if (broken.length > 0) {
+          throw new ActionError({ code: 'BAD_REQUEST', message: `Description: ${broken.join(' ')}` })
+        }
+      }
       const existingCategoryIds = existingService.categories.map((c) => c.id)
       const categoriesToAdd = input.categories.filter((cId) => !existingCategoryIds.includes(cId))
       const categoriesToRemove = existingCategoryIds.filter((cId) => !input.categories.includes(cId))
