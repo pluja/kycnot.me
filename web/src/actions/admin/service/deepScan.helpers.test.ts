@@ -19,6 +19,7 @@ const proposed = {
     fingerprint: 'open-description',
     text: 'Instant exchange with a Tor mirror.',
     reasons: ['marketing'],
+    sourceHash: 'front-page-hash',
   },
   attributes: {
     add: [
@@ -75,7 +76,7 @@ test('an unticked description rewrite is declined for this corpus only', () => {
 
   assert.equal(rows.length, 1)
   assert.equal(rows[0]?.kind, 'description')
-  assert.equal(rows[0]?.fingerprint, scanFingerprint(1, 'description', 'corpus-hash'))
+  assert.equal(rows[0]?.fingerprint, scanFingerprint(1, 'description', 'front-page-hash'))
 })
 
 test('unticked KYC notes are declined for this corpus only', () => {

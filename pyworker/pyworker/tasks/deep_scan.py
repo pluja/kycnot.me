@@ -190,6 +190,7 @@ class DeepScanTask(Task):
                 "fingerprint": fingerprint,
                 "text": description["text"],
                 "reasons": description["reasons"],
+                "sourceHash": page_hash,
             },
             "warnings": warnings,
         }
@@ -470,7 +471,7 @@ class DeepScanTask(Task):
                 if kyc_notes and kyc_notes != " ".join(current_kyc_notes.split())
                 else None
             ),
-            description_corpus_hash=corpus_hash if description else None,
+            description_source_hash=description["sourceHash"] if description else None,
         )
         kept = [item for item in proposals if item["fingerprint"] not in declined]
         dropped = len(proposals) - len(kept)
@@ -568,6 +569,9 @@ class DeepScanTask(Task):
                 "reasons": description["reasons"]
                 if description_proposal and description
                 else [],
+                "sourceHash": description["sourceHash"]
+                if description_proposal and description
+                else None,
             },
             "warnings": result["warnings"],
         }
@@ -660,7 +664,7 @@ class DeepScanTask(Task):
         listing_checks: List[Dict[str, Any]],
         proposed_kyc_level: Optional[int],
         kyc_notes_corpus_hash: Optional[str] = None,
-        description_corpus_hash: Optional[str] = None,
+        description_source_hash: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """One identity per discrete proposal a reviewer can turn down."""
         proposals: List[Dict[str, Any]] = []
@@ -718,15 +722,15 @@ class DeepScanTask(Task):
                 }
             )
 
-        # The description is not read from the corpus, but the corpus is the
-        # only change signal a scan has, so a decline holds until the next one.
-        if description_corpus_hash is not None:
+        # Keyed on the front page it was written from, whichever job proposed it,
+        # so a decline holds until that page changes.
+        if description_source_hash is not None:
             proposals.append(
                 {
                     "kind": "description",
-                    "key": description_corpus_hash,
+                    "key": description_source_hash,
                     "fingerprint": scan_fingerprint(
-                        service_id, "description", description_corpus_hash
+                        service_id, "description", description_source_hash
                     ),
                 }
             )

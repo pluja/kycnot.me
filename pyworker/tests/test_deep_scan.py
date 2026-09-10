@@ -465,18 +465,21 @@ class TestScanProposalGates(unittest.TestCase):
             description=description,
         )
 
-    def test_a_description_rewrite_is_a_decision_keyed_on_the_corpus(self):
+    def test_a_description_rewrite_is_a_decision_keyed_on_the_front_page(self):
         rewrite = {
             "text": "Instant exchange with a Tor mirror.",
             "reasons": ["marketing"],
+            "sourceHash": "front-page-hash",
         }
 
         edits = self._build(description=rewrite)["description"]
 
         self.assertEqual(edits["text"], rewrite["text"])
         self.assertEqual(edits["reasons"], ["marketing"])
+        self.assertEqual(edits["sourceHash"], "front-page-hash")
         self.assertEqual(
-            edits["fingerprint"], scan_fingerprint(1, "description", "0" * 64)
+            edits["fingerprint"],
+            scan_fingerprint(1, "description", "front-page-hash"),
         )
 
     def test_no_description_rewrite_means_nothing_to_decide(self):
@@ -485,8 +488,14 @@ class TestScanProposalGates(unittest.TestCase):
         self.assertIsNone(edits["fingerprint"])
         self.assertEqual(edits["text"], "")
 
-    def test_a_declined_description_stays_declined_until_the_corpus_changes(self):
-        rewrite = {"text": "Instant exchange with a Tor mirror.", "reasons": []}
+    def test_a_declined_description_stays_declined_until_the_front_page_changes(
+        self,
+    ):
+        rewrite = {
+            "text": "Instant exchange with a Tor mirror.",
+            "reasons": [],
+            "sourceHash": "front-page-hash",
+        }
         declined = {self._build(description=rewrite)["description"]["fingerprint"]}
 
         edits = self._build(description=rewrite, declined=declined)["description"]

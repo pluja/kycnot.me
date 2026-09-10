@@ -114,6 +114,8 @@ declare global {
         text: string
         /** Each rule the current text breaks, in a few words. */
         reasons: string[]
+        /** Hash of the front page the text was written from; the decline key. */
+        sourceHash?: string | null
       }
       warnings: {
         title: string

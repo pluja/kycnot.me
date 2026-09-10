@@ -174,13 +174,13 @@ export function collectDeclines({
     })
   }
 
-  if (proposed.description?.fingerprint && !acceptedDescription) {
+  if (proposed.description?.fingerprint && proposed.description.sourceHash && !acceptedDescription) {
     rows.push({
       serviceId,
       declinedById,
       sourceUrlKey: null,
       sourceContentHash: null,
-      fingerprint: scanFingerprint(serviceId, 'description', proposed.contentHash),
+      fingerprint: scanFingerprint(serviceId, 'description', proposed.description.sourceHash),
       kind: 'description',
       label: 'Keep the description as it is',
     })

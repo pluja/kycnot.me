@@ -8,10 +8,10 @@ import {
   listingCheckFieldLabels,
   listingCheckFieldSchemas,
 } from '../../../constants/listingCheckFields'
-import { recordAuditLog } from '../../../lib/auditLog'
-import { checkDescription } from '../../../lib/descriptionRules'
 import { SCAN_CLAIM_TIMEOUT_MS } from '../../../constants/scanJobs'
+import { recordAuditLog } from '../../../lib/auditLog'
 import { defineProtectedAction } from '../../../lib/defineProtectedAction'
+import { checkDescription } from '../../../lib/descriptionRules'
 import { cap } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
 
@@ -115,6 +115,7 @@ export const deepScanActions = {
           id: true,
           status: true,
           serviceId: true,
+          service: { select: { name: true } },
           proposedEdits: true,
           notes: true,
         },
@@ -159,7 +160,7 @@ export const deepScanActions = {
       if (
         acceptDescription &&
         proposed.description &&
-        checkDescription(proposed.description.text).length > 0
+        checkDescription(proposed.description.text, suggestion.service.name).length > 0
       ) {
         throw new ActionError({
           code: 'BAD_REQUEST',
