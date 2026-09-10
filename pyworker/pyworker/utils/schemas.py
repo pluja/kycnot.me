@@ -218,10 +218,13 @@ def _validate_description(data: dict[str, Any]) -> None:
         raise ValueError(f"verdict must be keep|rewrite, got {data.get('verdict')!r}")
     if not isinstance(data.get("description"), str):
         raise ValueError("description must be a string")
-    if not isinstance(data.get("reasons"), list) or not all(
-        isinstance(r, str) for r in data["reasons"]
-    ):
+    reasons = data.get("reasons")
+    if not isinstance(reasons, list) or not all(isinstance(r, str) for r in reasons):
         raise ValueError("reasons must be a list of strings")
+    # A front page can steer the model into dumping paragraphs here; the review
+    # card has room for a few short phrases.
+    if len(reasons) > 8 or any(len(r) > 200 for r in reasons):
+        raise ValueError("reasons must be at most 8 entries of at most 200 characters")
 
 
 DESCRIPTION = PromptSchema(

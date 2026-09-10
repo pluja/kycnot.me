@@ -643,6 +643,7 @@ def save_deep_scan_proposed_edits(
                           AND id <> %s
                           AND "proposedEdits" IS NOT NULL
                           AND status IN ('PENDING', 'UNDER_REVIEW')
+                          AND (%s OR NOT ("proposedEdits" ? 'tosReview'))
                         RETURNING id
                         """,
                         (
@@ -650,6 +651,7 @@ def save_deep_scan_proposed_edits(
                             f"Withdrawn automatically: newer deep scan suggestion #{suggestion_id} created.",
                             service_id,
                             suggestion_id,
+                            "tosReview" in proposed_edits,
                         ),
                     )
                     withdrawn_rows = cursor.fetchall()

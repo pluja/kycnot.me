@@ -554,9 +554,7 @@ def run_deep_scan_task(
                     else:
                         suggestion_id = task.run(job_service_id)  # type: ignore
                     error_msg: Optional[str] = None
-                    if suggestion_id is None and job_kind == "DESCRIPTION":
-                        error_msg = "The description stands; nothing to propose"
-                    elif suggestion_id is None:
+                    if suggestion_id is None and job_kind != "DESCRIPTION":
                         error_msg = (
                             "Deep scan produced no suggestion (empty corpus, "
                             "filtered pages, or LLM rejection)"

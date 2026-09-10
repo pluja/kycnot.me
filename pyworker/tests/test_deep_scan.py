@@ -282,7 +282,28 @@ class TestSaveDeepScanProposedEdits(unittest.TestCase):
         self.assertIn("status = 'WITHDRAWN'", withdraw_query)
         self.assertIn("status IN ('PENDING', 'UNDER_REVIEW')", withdraw_query)
         self.assertIn('"proposedEdits" IS NOT NULL', withdraw_query)
-        self.assertEqual(withdraw_params[2:], (42, 999))
+        # A payload without a terms review is a description review, which must
+        # not withdraw a full scan awaiting review.
+        self.assertEqual(withdraw_params[2:], (42, 999, False))
+
+    @patch("pyworker.database.ensure_bot_user", return_value=321)
+    @patch("pyworker.database.get_db_connection")
+    def test_a_full_scan_withdraws_everything_older(
+        self,
+        mock_connection: MagicMock,
+        _mock_bot_user: MagicMock,
+    ):
+        connection = FakeConnection()
+        mock_connection.return_value = connection
+
+        save_deep_scan_proposed_edits(
+            service_id=42,
+            proposed_edits={"contentHash": "abc", "tosReview": {"summary": ""}},
+            summary_notes="summary",
+        )
+
+        _, withdraw_params = connection.cursor_instance.executed[1]
+        self.assertEqual(withdraw_params[2:], (42, 999, True))
 
 
 # run() also touches scan bookkeeping and change tracking; without a database

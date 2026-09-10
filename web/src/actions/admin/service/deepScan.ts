@@ -9,6 +9,8 @@ import {
   listingCheckFieldSchemas,
 } from '../../../constants/listingCheckFields'
 import { recordAuditLog } from '../../../lib/auditLog'
+import { checkDescription } from '../../../lib/descriptionRules'
+import { SCAN_CLAIM_TIMEOUT_MS } from '../../../constants/scanJobs'
 import { defineProtectedAction } from '../../../lib/defineProtectedAction'
 import { cap } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
@@ -48,6 +50,20 @@ export const deepScanActions = {
           code: 'BAD_REQUEST',
           message: 'Service has no URL to read a front page from.',
         })
+      }
+
+      // A live claim is a worker mid-run; resetting it would pay for the same
+      // crawl and model call twice and let two workers write the same service.
+      const running = await prisma.serviceScanJob.findUnique({
+        where: { serviceId_kind: { serviceId: input.serviceId, kind: input.kind } },
+        select: { claimedAt: true, processedAt: true },
+      })
+      if (
+        running?.processedAt === null &&
+        running.claimedAt &&
+        Date.now() - running.claimedAt.getTime() < SCAN_CLAIM_TIMEOUT_MS
+      ) {
+        throw new ActionError({ code: 'CONFLICT', message: 'That job is running. Wait for it to finish.' })
       }
 
       await prisma.serviceScanJob.upsert({
@@ -140,6 +156,17 @@ export const deepScanActions = {
         input.descriptionFingerprint === proposed.description.fingerprint
       const acceptDescription =
         descriptionWasOffered && input.acceptDescription && !!proposed.description?.text
+      if (
+        acceptDescription &&
+        proposed.description &&
+        checkDescription(proposed.description.text).length > 0
+      ) {
+        throw new ActionError({
+          code: 'BAD_REQUEST',
+          message:
+            'The proposed description no longer passes the editorial rule. Rescan, or edit it by hand.',
+        })
+      }
       const acceptedAdd = intersectAcceptedAttributeIds(input.attributeAddIds, attributes.add)
       const acceptedRemove = intersectAcceptedAttributeIds(input.attributeRemoveIds, attributes.remove)
 

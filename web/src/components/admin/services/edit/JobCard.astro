@@ -3,6 +3,7 @@ import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 import { formatDistanceToNowStrict } from 'date-fns'
 
+import { SCAN_CLAIM_TIMEOUT_MS } from '../../../../constants/scanJobs'
 import { cn } from '../../../../lib/cn'
 import BadgeSmall from '../../../BadgeSmall.astro'
 import Button from '../../../Button.astro'
@@ -21,7 +22,6 @@ type Props = {
   title: string
   description: string
   icon: string
-  /** Verb on the button, e.g. "Run scan". */
   action: string
   /** Why the job cannot run right now, or null. */
   blocker: string | null
@@ -32,8 +32,6 @@ type Props = {
 
 const { serviceId, kind, job, title, description, icon, action, blocker, resultHref, sectionId } = Astro.props
 
-// A claim older than the worker's timeout is a worker that died mid-job.
-const CLAIM_TIMEOUT_MS = 15 * 60 * 1000
 const now = Date.now()
 
 type State = 'done' | 'failed' | 'idle' | 'queued' | 'running' | 'stalled'
@@ -45,7 +43,7 @@ const state: State = !job
       : 'done'
     : !job.claimedAt
       ? 'queued'
-      : now - job.claimedAt.getTime() > CLAIM_TIMEOUT_MS
+      : now - job.claimedAt.getTime() > SCAN_CLAIM_TIMEOUT_MS
         ? 'stalled'
         : 'running'
 
@@ -142,7 +140,7 @@ const currentUrl = `${Astro.url.pathname}${Astro.url.search}`
     <form
       method="POST"
       action={`${actions.admin.service.deepScan.request}#${sectionId}`}
-      hx-post={`${currentUrl}${actions.admin.service.deepScan.request}`}
+      hx-post={`${Astro.url.pathname}${actions.admin.service.deepScan.request}`}
       hx-target={`#${cardId}`}
       hx-select={`#${cardId}`}
       hx-swap="outerHTML"
