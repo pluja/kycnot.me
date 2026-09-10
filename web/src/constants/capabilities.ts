@@ -65,7 +65,8 @@ export const {
       value: 'events:manage',
       slug: 'events-manage',
       label: 'Manage events',
-      description: "Create, edit, show/hide and delete a service's timeline events. Nothing else on the service.",
+      description:
+        "Create, edit, show/hide and delete a service's timeline events. Nothing else on the service.",
       icon: 'ri:calendar-event-line',
     },
     {
@@ -90,10 +91,18 @@ export const {
       icon: 'ri:lightbulb-line',
     },
     {
+      value: 'audit:read',
+      slug: 'audit-read',
+      label: 'Read the audit log',
+      description: 'See who changed what across the site: services, suggestions, users, comments and cases.',
+      icon: 'ri:history-line',
+    },
+    {
       value: 'users:manage',
       slug: 'users-manage',
       label: 'Manage users',
-      description: 'Edit user profiles, service affiliations and notes. Excludes promoting users or granting capabilities.',
+      description:
+        'Edit user profiles, service affiliations and notes. Excludes promoting users or granting capabilities.',
       icon: 'ri:user-settings-line',
     },
     {
@@ -117,7 +126,7 @@ export const {
       description: 'View platform statistics.',
       icon: 'ri:bar-chart-2-line',
     },
-  ] as const,
+  ] as const
 )
 
 export type Capability = (typeof capabilities)[number]['value']

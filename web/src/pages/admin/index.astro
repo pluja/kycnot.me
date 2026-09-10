@@ -109,6 +109,14 @@ const adminLinks: AdminLink[] = [
     },
   },
   {
+    icon: 'ri:history-line',
+    title: 'Audit log',
+    href: '/admin/audit',
+    classNames: {
+      base: 'text-teal-300',
+    },
+  },
+  {
     icon: 'ri:bar-chart-2-line',
     title: 'Stats',
     href: '/admin/stats',
@@ -163,7 +171,12 @@ const grantedCapabilities = (user?.capabilities ?? []).map((capability) => getCa
   <div class="mb-8 flex flex-wrap items-center gap-2">
     {
       user?.admin ? (
-        <BadgeSmall color="green" variant="faded" icon="ri:shield-star-fill" text="Administrator: full access" />
+        <BadgeSmall
+          color="green"
+          variant="faded"
+          icon="ri:shield-star-fill"
+          text="Administrator: full access"
+        />
       ) : (
         <Fragment>
           <span class="text-sm text-day-400">Your access:</span>
@@ -179,24 +192,24 @@ const grantedCapabilities = (user?.capabilities ?? []).map((capability) => getCa
     <ol class="grid grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*40),1fr))] gap-4">
       {
         visibleLinks.map((link) => (
-            <li
-              class={cn(
-                'group transition-transform duration-250 ease-out-back hover:-translate-y-0.5 hover:scale-105',
-                link.classNames.base
-              )}
+          <li
+            class={cn(
+              'group transition-transform duration-250 ease-out-back hover:-translate-y-0.5 hover:scale-105',
+              link.classNames.base
+            )}
+          >
+            <a
+              href={link.href}
+              class="flex min-h-24 flex-col items-center justify-around rounded-lg border border-current/4 bg-current/3 py-3 text-center transition-all duration-250 group-hover:border-current/10 group-hover:bg-current/10 group-hover:shadow-xl"
             >
-              <a
-                href={link.href}
-                class="flex min-h-24 flex-col items-center justify-around rounded-lg border border-current/4 bg-current/3 py-3 text-center transition-all duration-250 group-hover:border-current/10 group-hover:bg-current/10 group-hover:shadow-xl"
-              >
-                <Icon
-                  name={link.icon}
-                  class="size-8 text-current opacity-50 transition-opacity duration-250 group-hover:opacity-100"
-                />
-                <span class="font-title text-xl leading-none font-semibold text-current">{link.title}</span>
-              </a>
-            </li>
-          ))
+              <Icon
+                name={link.icon}
+                class="size-8 text-current opacity-50 transition-opacity duration-250 group-hover:opacity-100"
+              />
+              <span class="font-title text-xl leading-none font-semibold text-current">{link.title}</span>
+            </a>
+          </li>
+        ))
       }
     </ol>
   </nav>

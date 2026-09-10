@@ -1,0 +1,288 @@
+---
+import { AuditAction } from '@prisma/client'
+import { z } from 'astro/zod'
+import { Icon } from 'astro-icon/components'
+
+import Button from '../../../components/Button.astro'
+import TimeFormatted from '../../../components/TimeFormatted.astro'
+import UserBadge from '../../../components/UserBadge.astro'
+import { auditActions, getAuditActionInfo } from '../../../constants/auditActions'
+import {
+  auditTargetTypes,
+  auditTargetTypeSlugToId,
+  auditTargetTypesZodEnumBySlug,
+  getAuditTargetTypeInfo,
+} from '../../../constants/auditTargetTypes'
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { auditLogSelect } from '../../../lib/auditLog'
+import { cn } from '../../../lib/cn'
+import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
+import { prisma } from '../../../lib/prisma'
+import { urlWithParams } from '../../../lib/urls'
+
+import type { Prisma } from '@prisma/client'
+
+const PAGE_SIZE = 50
+
+const { data: filters, hasDefaultData } = zodParseQueryParamsStoringErrors(
+  {
+    target: auditTargetTypesZodEnumBySlug.optional(),
+    action: z.nativeEnum(AuditAction).optional(),
+    actor: z.string().trim().max(60).optional(),
+    q: z.string().trim().max(100).optional(),
+    page: z.coerce.number().int().min(1).default(1),
+  },
+  Astro
+)
+
+const where: Prisma.AuditLogWhereInput = {
+  ...(filters.target ? { targetType: auditTargetTypeSlugToId(filters.target) } : {}),
+  ...(filters.action ? { action: filters.action } : {}),
+  ...(filters.actor
+    ? {
+        actor: {
+          OR: [
+            { name: { contains: filters.actor, mode: 'insensitive' } },
+            { displayName: { contains: filters.actor, mode: 'insensitive' } },
+          ],
+        },
+      }
+    : {}),
+  ...(filters.q ? { summary: { contains: filters.q, mode: 'insensitive' } } : {}),
+}
+
+const [entries, total] = await Astro.locals.banners.try(
+  'Error fetching the audit log',
+  () =>
+    prisma.auditLog.findManyAndCount({
+      where,
+      select: { ...auditLogSelect(), targetType: true, targetId: true },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: (filters.page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+  [[], 0] as [
+    Prisma.AuditLogGetPayload<{
+      select: ReturnType<typeof auditLogSelect> & { targetType: true; targetId: true }
+    }>[],
+    number,
+  ]
+)
+
+// Services are addressed by slug in the admin, so their names and links come
+// from one lookup over the page's own entries rather than a relation.
+const serviceIds = [
+  ...new Set(entries.filter((entry) => entry.targetType === 'SERVICE').map((entry) => entry.targetId)),
+]
+const services = await Astro.locals.banners.try(
+  'Error fetching services',
+  () =>
+    prisma.service.findMany({
+      where: { id: { in: serviceIds } },
+      select: { id: true, name: true, slug: true },
+    }),
+  []
+)
+const serviceById = new Map(services.map((service) => [service.id, service]))
+
+const targetOf = (entry: (typeof entries)[number]) => {
+  const info = getAuditTargetTypeInfo(entry.targetType)
+  if (entry.targetType === 'SERVICE') {
+    const service = serviceById.get(entry.targetId)
+    return {
+      icon: info.icon,
+      label: service?.name ?? `Service #${String(entry.targetId)}`,
+      href: service ? `/admin/services/${service.slug}/edit` : null,
+    }
+  }
+  return {
+    icon: info.icon,
+    label: `${info.label} #${String(entry.targetId)}`,
+    href: info.href ? info.href(entry.targetId) : null,
+  }
+}
+
+// Entries group under the day they happened, so a scan through a week reads as
+// a diary rather than a flat list.
+const dayFormatter = new Intl.DateTimeFormat('en', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+})
+const days = new Map<string, typeof entries>()
+for (const entry of entries) {
+  const key = entry.createdAt.toISOString().slice(0, 10)
+  days.set(key, [...(days.get(key) ?? []), entry])
+}
+
+const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+const rangeStart = total === 0 ? 0 : (filters.page - 1) * PAGE_SIZE + 1
+const rangeEnd = Math.min(filters.page * PAGE_SIZE, total)
+
+const fieldClass =
+  'w-full rounded-md border border-night-500 bg-night-900 px-2.5 py-1.5 text-sm text-day-100 transition-colors [color-scheme:dark] focus:border-green-500/60 focus:outline-none'
+---
+
+<BaseLayout pageTitle="Audit log" widthClassName="max-w-5xl" noindex>
+  <header class="mt-10 mb-5">
+    <h1 class="font-title text-3xl font-bold text-white">Audit log</h1>
+    <p class="mt-1 text-sm text-day-400">Every change a person or the platform made, newest first.</p>
+  </header>
+
+  <form
+    method="GET"
+    class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto_auto]"
+  >
+    <div>
+      <label for="q" class="sr-only">Search summaries</label>
+      <input
+        type="search"
+        id="q"
+        name="q"
+        value={filters.q}
+        placeholder="Search summaries..."
+        class={fieldClass}
+      />
+    </div>
+    <div>
+      <label for="actor" class="sr-only">Actor</label>
+      <input
+        type="search"
+        id="actor"
+        name="actor"
+        value={filters.actor}
+        placeholder="Actor"
+        class={fieldClass}
+      />
+    </div>
+    <div>
+      <label for="target" class="sr-only">Target</label>
+      <select id="target" name="target" class={fieldClass}>
+        <option value="">All targets</option>
+        {
+          auditTargetTypes.map((type) => (
+            <option value={type.slug} selected={filters.target === type.slug}>
+              {type.label}
+            </option>
+          ))
+        }
+      </select>
+    </div>
+    <div>
+      <label for="action" class="sr-only">Action</label>
+      <select id="action" name="action" class={fieldClass}>
+        <option value="">All actions</option>
+        {
+          auditActions.map((action) => (
+            <option value={action.id} selected={filters.action === action.id}>
+              {action.name}
+            </option>
+          ))
+        }
+      </select>
+    </div>
+    <div class="flex gap-2">
+      <Button type="submit" label="Filter" icon="ri:filter-3-line" size="sm" color="success" />
+      {
+        !hasDefaultData && (
+          <Button as="a" href="/admin/audit" label="Reset" icon="ri:close-line" size="sm" variant="faded" />
+        )
+      }
+    </div>
+  </form>
+
+  <p class="mb-4 text-xs text-day-500">
+    {
+      total === 0
+        ? 'No entries match these filters.'
+        : `Showing ${rangeStart.toLocaleString()} to ${rangeEnd.toLocaleString()} of ${total.toLocaleString()}`
+    }
+  </p>
+
+  {
+    [...days.entries()].map(([day, dayEntries]) => (
+      <section class="mb-6">
+        <h2 class="sticky top-16 z-10 -mx-2 mb-2 bg-night-900/90 px-2 py-1 font-title text-xs font-bold tracking-wider text-day-500 uppercase backdrop-blur">
+          {dayFormatter.format(new Date(`${day}T12:00:00Z`))}
+        </h2>
+        <ol class="relative ms-2 border-s border-night-600">
+          {dayEntries.map((entry) => {
+            const actionInfo = getAuditActionInfo(entry.action)
+            const target = targetOf(entry)
+            return (
+              <li class="relative ps-6 pb-4 last:pb-0">
+                <span
+                  class={cn(
+                    'absolute -start-2.5 top-1 flex size-5 items-center justify-center rounded-full border border-night-600 bg-night-800',
+                    actionInfo.classNames.icon
+                  )}
+                >
+                  <Icon name={actionInfo.icon} class="size-3" />
+                </span>
+                <div class="rounded-lg border border-night-600 bg-night-800 px-3 py-2">
+                  <p class="text-sm text-pretty text-day-100">{entry.summary}</p>
+                  <p class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-day-500">
+                    {entry.actor ? (
+                      <UserBadge user={entry.actor} size="sm" />
+                    ) : (
+                      <span class="inline-flex items-center gap-1">
+                        <Icon name="ri:robot-2-line" class="size-3.5" />
+                        the platform
+                      </span>
+                    )}
+                    <span class="inline-flex items-center gap-1">
+                      <Icon name={target.icon} class="size-3.5" />
+                      {target.href ? (
+                        <a href={target.href} class="underline underline-offset-4 hover:text-day-200">
+                          {target.label}
+                        </a>
+                      ) : (
+                        target.label
+                      )}
+                    </span>
+                    <TimeFormatted date={entry.createdAt} hourPrecision class="ms-auto" />
+                  </p>
+                </div>
+              </li>
+            )
+          })}
+        </ol>
+      </section>
+    ))
+  }
+
+  {
+    totalPages > 1 && (
+      <nav class="mt-5 flex items-center justify-between gap-3" aria-label="Pagination">
+        {filters.page > 1 ? (
+          <Button
+            as="a"
+            href={urlWithParams(Astro.url, { page: filters.page - 1 })}
+            label="Newer"
+            icon="ri:arrow-left-line"
+            size="sm"
+            variant="faded"
+          />
+        ) : (
+          <span />
+        )}
+        <span class="text-xs text-day-500">
+          Page {filters.page} of {totalPages}
+        </span>
+        {filters.page < totalPages ? (
+          <Button
+            as="a"
+            href={urlWithParams(Astro.url, { page: filters.page + 1 })}
+            label="Older"
+            icon="ri:arrow-right-line"
+            size="sm"
+            variant="faded"
+          />
+        ) : (
+          <span />
+        )}
+      </nav>
+    )
+  }
+</BaseLayout>
