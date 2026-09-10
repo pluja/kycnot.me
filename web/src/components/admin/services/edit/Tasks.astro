@@ -23,7 +23,15 @@ type Suggestion = Prisma.ServiceSuggestionGetPayload<{
 }>
 
 type ScanJob = Prisma.ServiceScanJobGetPayload<{
-  select: { id: true; kind: true; createdAt: true; claimedAt: true; processedAt: true; error: true }
+  select: {
+    id: true
+    kind: true
+    createdAt: true
+    claimedAt: true
+    processedAt: true
+    error: true
+    requestedByUserId: true
+  }
 }>
 
 type Service = Prisma.ServiceGetPayload<{
@@ -42,12 +50,22 @@ type Props = {
   service: Service
   scanJob: ScanJob | null
   descriptionJob: ScanJob | null
+  /** Display name of whoever queued a job, or null when unknown. */
+  requesterName: (job: ScanJob) => string | null
   pendingSuggestion: Suggestion | null
   attributes: Attribute[]
   id?: string
 }
 
-const { service, scanJob, descriptionJob, pendingSuggestion, attributes, id = 'tasks' } = Astro.props
+const {
+  service,
+  scanJob,
+  descriptionJob,
+  requesterName,
+  pendingSuggestion,
+  attributes,
+  id = 'tasks',
+} = Astro.props
 
 const proposedEdits = pendingSuggestion?.proposedEdits ?? null
 const sectionHash = `#${id}`
@@ -63,6 +81,7 @@ const sectionHash = `#${id}`
         serviceId={service.id}
         kind="DEEP_SCAN"
         job={scanJob}
+        requestedBy={scanJob ? requesterName(scanJob) : null}
         title="Deep scan"
         description="Reads the terms and linked legal pages. Proposes the KYC level, attributes, KYC notes and warnings."
         icon="ri:sparkling-2-line"
@@ -75,6 +94,7 @@ const sectionHash = `#${id}`
         serviceId={service.id}
         kind="DESCRIPTION"
         job={descriptionJob}
+        requestedBy={descriptionJob ? requesterName(descriptionJob) : null}
         title="Description review"
         description="Reads the front page only. Proposes a description that follows the editorial rule."
         icon="ri:quill-pen-line"

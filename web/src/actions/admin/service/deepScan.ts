@@ -65,6 +65,13 @@ export const deepScanActions = {
           error: null,
         },
       })
+      await recordAuditLog(prisma, {
+        actorId: locals.user.id,
+        action: 'UPDATED',
+        targetType: 'SERVICE',
+        targetId: input.serviceId,
+        summary: input.kind === 'DESCRIPTION' ? 'Queued a description review' : 'Queued a deep scan',
+      })
     },
   }),
 

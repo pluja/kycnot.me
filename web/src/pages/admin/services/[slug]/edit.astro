@@ -250,6 +250,7 @@ const [scanJobs, pendingDeepScanSuggestion] = await Astro.locals.banners.tryMany
           claimedAt: true,
           processedAt: true,
           error: true,
+          requestedByUserId: true,
         },
       }),
     [] as [],
@@ -290,6 +291,25 @@ const apiCalls = await Astro.locals.banners.try(
 )
 
 const isScanning = scanJobs.some((job) => job.processedAt === null)
+
+// Who pressed the button. The job keeps only the id, so the names come in one
+// small query rather than a relation nobody else needs.
+const requesterIds = scanJobs.flatMap((job) =>
+  job.requestedByUserId === null ? [] : [job.requestedByUserId]
+)
+const requesters = await Astro.locals.banners.try(
+  'Error fetching job requesters',
+  () =>
+    prisma.user.findMany({
+      where: { id: { in: requesterIds } },
+      select: { id: true, name: true, displayName: true },
+    }),
+  []
+)
+const requesterName = (job: { requestedByUserId: number | null }) => {
+  const user = requesters.find((candidate) => candidate.id === job.requestedByUserId)
+  return user ? (user.displayName ?? user.name) : null
+}
 const tasksBadge = pendingDeepScanSuggestion ? '!' : isScanning ? '...' : undefined
 
 // Events are gated by their own capability, so a services:edit-only editor
@@ -411,6 +431,7 @@ const navItems = [
           service={service}
           scanJob={scanJobs.find((job) => job.kind === 'DEEP_SCAN') ?? null}
           descriptionJob={scanJobs.find((job) => job.kind === 'DESCRIPTION') ?? null}
+          requesterName={requesterName}
           pendingSuggestion={pendingDeepScanSuggestion}
           attributes={attributes}
         />
