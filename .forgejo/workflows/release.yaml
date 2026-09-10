@@ -115,7 +115,15 @@ jobs:
             git -c user.name="Release" -c user.email="release@tig.cx" tag -a "$tag" -m "Release $tag"
           fi
 
-          git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" push -q origin \
+          # Master only takes pushes from the allowlisted account. The job token is
+          # the Actions bot, which no allowlist can name, so the push uses a token
+          # of that account.
+          release_token="${{ secrets.RELEASE_TOKEN }}"
+          if [ -z "$release_token" ]; then
+            echo "Missing RELEASE_TOKEN action secret: a token with write:repository from an account allowed to push master." >&2
+            exit 1
+          fi
+          git -c http.extraHeader="Authorization: token $release_token" push -q origin \
             "HEAD:refs/heads/master" "refs/tags/$tag"
 
           case "${{ inputs.publish }}" in
