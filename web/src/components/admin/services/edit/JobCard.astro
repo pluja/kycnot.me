@@ -1,0 +1,176 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+import { formatDistanceToNowStrict } from 'date-fns'
+
+import { cn } from '../../../../lib/cn'
+import BadgeSmall from '../../../BadgeSmall.astro'
+import Button from '../../../Button.astro'
+import TimeFormatted from '../../../TimeFormatted.astro'
+
+import type { Prisma, ServiceScanJobKind } from '@prisma/client'
+
+type ScanJob = Prisma.ServiceScanJobGetPayload<{
+  select: { id: true; kind: true; createdAt: true; claimedAt: true; processedAt: true; error: true }
+}>
+
+type Props = {
+  serviceId: number
+  kind: ServiceScanJobKind
+  job: ScanJob | null
+  title: string
+  description: string
+  icon: string
+  /** Verb on the button, e.g. "Run scan". */
+  action: string
+  /** Why the job cannot run right now, or null. */
+  blocker: string | null
+  /** Where the job's pending proposal is reviewed, once there is one. */
+  resultHref: string | null
+  sectionId: string
+}
+
+const { serviceId, kind, job, title, description, icon, action, blocker, resultHref, sectionId } = Astro.props
+
+// A claim older than the worker's timeout is a worker that died mid-job.
+const CLAIM_TIMEOUT_MS = 15 * 60 * 1000
+const now = Date.now()
+
+type State = 'done' | 'failed' | 'idle' | 'queued' | 'running' | 'stalled'
+const state: State = !job
+  ? 'idle'
+  : job.processedAt
+    ? job.error
+      ? 'failed'
+      : 'done'
+    : !job.claimedAt
+      ? 'queued'
+      : now - job.claimedAt.getTime() > CLAIM_TIMEOUT_MS
+        ? 'stalled'
+        : 'running'
+
+const isActive = state === 'queued' || state === 'running'
+
+const badge: Record<
+  State,
+  { text: string; color: 'gray' | 'green' | 'orange' | 'red' | 'yellow'; icon: string }
+> = {
+  idle: { text: 'Never run', color: 'gray', icon: 'ri:time-line' },
+  queued: { text: 'Queued', color: 'orange', icon: 'ri:hourglass-line' },
+  running: { text: 'Running', color: 'orange', icon: 'ri:loader-4-line' },
+  stalled: { text: 'Stalled', color: 'yellow', icon: 'ri:alert-line' },
+  failed: { text: 'Failed', color: 'red', icon: 'ri:close-circle-line' },
+  done: { text: 'Done', color: 'green', icon: 'ri:check-line' },
+}
+
+const elapsed = (since: Date) => formatDistanceToNowStrict(since)
+const detail =
+  job &&
+  (state === 'queued'
+    ? `waiting ${elapsed(job.createdAt)}`
+    : state === 'running' && job.claimedAt
+      ? `for ${elapsed(job.claimedAt)}`
+      : state === 'stalled' && job.claimedAt
+        ? `worker quiet for ${elapsed(job.claimedAt)}`
+        : null)
+
+const cardId = `job-${kind.toLowerCase()}`
+const currentUrl = `${Astro.url.pathname}${Astro.url.search}`
+---
+
+{
+  /* While a job is active the card polls itself and stops on its own once the
+    row is processed, since the attributes are only rendered then. Without
+    scripting the form posts and the page reloads with the new state. */
+}
+<div
+  id={cardId}
+  class={cn(
+    'flex flex-col gap-3 rounded-lg border bg-night-800 p-3 transition-colors',
+    isActive ? 'border-orange-500/40' : 'border-night-600'
+  )}
+  hx-get={isActive ? currentUrl : undefined}
+  hx-trigger={isActive ? 'every 4s' : undefined}
+  hx-select={isActive ? `#${cardId}` : undefined}
+  hx-swap={isActive ? 'outerHTML' : undefined}
+>
+  <div class="flex items-start gap-3">
+    <span class="flex size-8 shrink-0 items-center justify-center rounded-md bg-night-700 text-orange-300">
+      <Icon name={icon} class="size-4" />
+    </span>
+    <div class="min-w-0 flex-1">
+      <p class="flex flex-wrap items-center gap-2 font-title text-sm font-semibold text-day-100">
+        {title}
+        <BadgeSmall
+          text={badge[state].text}
+          color={badge[state].color}
+          icon={badge[state].icon}
+          variant="faded"
+          classNames={{ icon: cn(state === 'running' && 'animate-spin') }}
+        />
+      </p>
+      <p class="mt-0.5 text-xs text-pretty text-day-500">{description}</p>
+    </div>
+  </div>
+
+  <div
+    class="flex flex-wrap items-center justify-between gap-2 border-t border-night-600 pt-3 text-xs text-day-400"
+  >
+    <span class="inline-flex min-w-0 items-center gap-1.5">
+      {detail && <span>{detail}</span>}
+      {
+        (state === 'done' || state === 'failed') && job?.processedAt && (
+          <>
+            <Icon name="ri:history-line" class="size-3.5 shrink-0" />
+            <TimeFormatted date={job.processedAt} hourPrecision />
+          </>
+        )
+      }
+      {state === 'idle' && <span>{blocker ?? 'Ready'}</span>}
+      {
+        state === 'done' && resultHref && (
+          <a
+            href={resultHref}
+            class="ms-2 text-orange-200 underline underline-offset-4 hover:text-orange-100"
+          >
+            Review the proposal
+          </a>
+        )
+      }
+    </span>
+
+    <form
+      method="POST"
+      action={`${actions.admin.service.deepScan.request}#${sectionId}`}
+      hx-post={`${currentUrl}${actions.admin.service.deepScan.request}`}
+      hx-target={`#${cardId}`}
+      hx-select={`#${cardId}`}
+      hx-swap="outerHTML"
+      hx-disinherit="*"
+      class="shrink-0"
+    >
+      <input type="hidden" name="serviceId" value={serviceId} />
+      <input type="hidden" name="kind" value={kind} />
+      <Button
+        as="button"
+        type="submit"
+        size="sm"
+        color="warning"
+        variant="faded"
+        icon={state === 'stalled' || state === 'failed' ? 'ri:restart-line' : 'ri:play-line'}
+        label={isActive ? 'Working' : state === 'stalled' || state === 'failed' ? 'Retry' : action}
+        disabled={isActive || !!blocker}
+        title={blocker ?? undefined}
+      />
+    </form>
+  </div>
+
+  {
+    state === 'failed' && job?.error && (
+      <p class="rounded-sm bg-red-500/10 px-2 py-1.5 text-xs text-red-300">
+        <Icon name="ri:error-warning-line" class="me-1 inline-block size-3.5 align-[-0.15em]" />
+        {job.error}
+      </p>
+    )
+  }
+</div>
