@@ -416,8 +416,8 @@ def claim_next_scan_job() -> Optional[Dict[str, Any]]:
     the row, so another worker cannot pick the same scan after the lock is
     released. Jobs with very old claims can be retried if a worker died.
 
-    Returns the job row (id, serviceId, requestedByUserId) or None if the queue
-    is empty.
+    Returns the job row (id, serviceId, requestedByUserId, kind) or None if the
+    queue is empty.
     """
     try:
         with get_db_connection() as conn:
@@ -440,7 +440,7 @@ def claim_next_scan_job() -> Optional[Dict[str, Any]]:
                     SET "claimedAt" = NOW(), "error" = NULL
                     FROM next_job
                     WHERE job.id = next_job.id
-                    RETURNING job.id, job."serviceId", job."requestedByUserId"
+                    RETURNING job.id, job."serviceId", job."requestedByUserId", job.kind
                     """,
                     (config.SERVICE_SCAN_CLAIM_TIMEOUT_MINUTES,),
                 )

@@ -1182,15 +1182,24 @@ model ServiceScoreRecalculationJob {
   @@index([createdAt])
 }
 
+enum ServiceScanJobKind {
+  DEEP_SCAN
+  DESCRIPTION
+}
+
 model ServiceScanJob {
-  id                Int       @id @default(autoincrement())
-  serviceId         Int       @unique
+  id                Int                @id @default(autoincrement())
+  serviceId         Int
+  /// DESCRIPTION reads only the front page and proposes a description, so it
+  /// runs for listings without terms and costs a fraction of a scan.
+  kind              ServiceScanJobKind @default(DEEP_SCAN)
   requestedByUserId Int?
   createdAt         DateTime  @default(now())
   claimedAt         DateTime?
   processedAt       DateTime?
   error             String?
 
+  @@unique([serviceId, kind])
   @@index([claimedAt])
   @@index([processedAt])
   @@index([createdAt])

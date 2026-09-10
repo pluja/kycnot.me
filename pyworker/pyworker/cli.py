@@ -179,6 +179,11 @@ def parse_args(args: List[str]) -> argparse.Namespace:
         action="store_true",
         help="With --all, scan a service even when its legal documents have not changed",
     )
+    deep_scan_parser.add_argument(
+        "--description",
+        action="store_true",
+        help="Review only the description from the front page, without reading the terms",
+    )
 
     return parser.parse_args(args)
 
@@ -492,6 +497,7 @@ def run_deep_scan_task(
     service_id: Optional[int] = None,
     scan_all: bool = False,
     force: bool = False,
+    description_only: bool = False,
     close_pool: bool = True,
 ) -> int:
     """Run the deep scan task.
@@ -512,7 +518,11 @@ def run_deep_scan_task(
 
         if service_id is not None:
             with DeepScanTask() as task:  # type: ignore
-                suggestion_id = task.run(service_id)  # type: ignore
+                suggestion_id = (
+                    task.run_description(service_id)  # type: ignore
+                    if description_only
+                    else task.run(service_id)  # type: ignore
+                )
                 if suggestion_id:
                     logger.info(
                         f"Deep scan completed for service {service_id}, "
@@ -533,12 +543,20 @@ def run_deep_scan_task(
 
                 job_id = int(job["id"])
                 job_service_id = int(job["serviceId"])
-                logger.info(f"Claimed scan job {job_id} for service {job_service_id}")
+                job_kind = str(job.get("kind") or "DEEP_SCAN")
+                logger.info(
+                    f"Claimed {job_kind} job {job_id} for service {job_service_id}"
+                )
 
                 try:
-                    suggestion_id = task.run(job_service_id)  # type: ignore
+                    if job_kind == "DESCRIPTION":
+                        suggestion_id = task.run_description(job_service_id)  # type: ignore
+                    else:
+                        suggestion_id = task.run(job_service_id)  # type: ignore
                     error_msg: Optional[str] = None
-                    if suggestion_id is None:
+                    if suggestion_id is None and job_kind == "DESCRIPTION":
+                        error_msg = "The description stands; nothing to propose"
+                    elif suggestion_id is None:
                         error_msg = (
                             "Deep scan produced no suggestion (empty corpus, "
                             "filtered pages, or LLM rejection)"
@@ -720,7 +738,10 @@ def main() -> int:
             return run_scan_sweep_task(args.limit)
         elif args.task == "deep-scan":
             return run_deep_scan_task(
-                args.service_id, scan_all=args.all, force=args.force
+                args.service_id,
+                scan_all=args.all,
+                force=args.force,
+                description_only=args.description,
             )
         elif args.task:
             logger.error(f"Unknown task: {args.task}")
