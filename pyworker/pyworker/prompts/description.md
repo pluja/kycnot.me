@@ -4,6 +4,7 @@ The rule for a description:
 
 - One or two sentences, under 200 characters. Third person, present tense.
 - Says what the service is and what it does. That is all.
+- Opens with what it is, never with the service's name and never with "A" or "An": the name is shown right above the description wherever it appears. Write "Non-custodial exchange aggregator that compares rates across instant swap providers", not "Cyphergoat is a non-custodial..." and not "A non-custodial...". An imperative opening is fine when it fits: "Buy and sell bitcoin for fiat through a peer-to-peer network".
 - A label that describes the service as a whole is fine when the listing supports it: "anonymous VPN", "no-KYC exchange", "privacy-first email". The listing supports "no-KYC" only when the KYC level given below is 0; at level 1 the terms are silent, which is not the same thing.
 - Nothing about policy or conditions: not when or why ID is asked, not what happens to funds, not restrictions, not anything from the terms. Those have their own place on the page.
 - No currencies or payment methods. Those are shown next to the description already.

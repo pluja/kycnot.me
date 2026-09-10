@@ -6,7 +6,7 @@ import { formatDistanceStrict } from 'date-fns'
 import { countriesZodEnumByCode } from '../constants/countries'
 import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../lib/captchaValidation'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
-import { descriptionSchema } from '../lib/descriptionRules'
+import { descriptionOpeningRefinement, descriptionSchema } from '../lib/descriptionRules'
 import { saveFileLocally } from '../lib/fileStorage'
 import { findServicesBySimilarity } from '../lib/findServicesBySimilarity'
 import { prisma } from '../lib/prisma'
@@ -210,7 +210,8 @@ export const serviceSuggestionActions = {
           .transform((value) => value === 'true'),
         ...captchaFormSchemaProperties,
       })
-      .superRefine(captchaFormSchemaSuperRefine),
+      .superRefine(captchaFormSchemaSuperRefine)
+      .superRefine(descriptionOpeningRefinement),
 
     handler: async (input, context) => {
       await handleHoneypotTrap({

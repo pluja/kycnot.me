@@ -19,6 +19,7 @@ _RULES = json.loads(
 
 MAX_LENGTH: int = _RULES["maxLength"]
 MAX_SENTENCES: int = _RULES["maxSentences"]
+_LEADING_WORDS: set[str] = set(_RULES["leadingWords"])
 
 
 def _phrase_pattern(phrases: list[str]) -> re.Pattern[str]:
@@ -39,12 +40,23 @@ def count_sentences(text: str) -> int:
     return len([s for s in _SENTENCE_END.split(text) if s.strip()])
 
 
-def check_description(text: str) -> list[str]:
-    """Every rule the text breaks, as the same names the web side reports."""
+def _letters(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
+def check_description(text: str, name: str = "") -> list[str]:
+    """Every rule the text breaks, as the same names the web side reports.
+
+    The name, when given, may not open the text: it is shown right above it.
+    """
     trimmed = text.strip()
     if not trimmed:
         return ["empty"]
     violations: list[str] = []
+    opening = trimmed.split()[0].lower()
+    starts_with_name = bool(name) and _letters(trimmed).startswith(_letters(name))
+    if opening in _LEADING_WORDS or starts_with_name:
+        violations.append("opening")
     if len(trimmed) > MAX_LENGTH:
         violations.append("length")
     if count_sentences(trimmed) > MAX_SENTENCES:

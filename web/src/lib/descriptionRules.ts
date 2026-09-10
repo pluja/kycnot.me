@@ -9,6 +9,7 @@ export type DescriptionViolation =
   | 'first-person'
   | 'length'
   | 'marketing'
+  | 'opening'
   | 'policy'
   | 'sentences'
 
@@ -30,6 +31,7 @@ const violationMessages: Record<DescriptionViolation, string> = {
   'first-person': 'Third person: no "we", "our" or "us".',
   length: `At most ${String(rules.maxLength)} characters.`,
   marketing: 'No marketing or promotional words.',
+  opening: 'Open with what the service is. Do not start with its name or with "A" or "An".',
   policy:
     'Nothing about terms, policies, restrictions or identity checks. Those have their own place on the page.',
   sentences: `At most ${String(rules.maxSentences)} sentences.`,
@@ -54,12 +56,21 @@ const countSentences = (text: string) =>
 
 /**
  * The mechanical part of the description rule, shared with the worker through
- * the fixture the rules are read from. Returns every rule the text breaks.
+ * the fixture the rules are read from. Returns every rule the text breaks. The
+ * name, when given, may not open the text: it is shown right above it anyway.
  */
-export const checkDescription = (text: string): DescriptionViolation[] => {
+export const checkDescription = (text: string, name?: string): DescriptionViolation[] => {
   const trimmed = text.trim()
   if (!trimmed) return ['empty']
   const violations: DescriptionViolation[] = []
+  const opening = trimmed.split(/\s+/)[0]?.toLowerCase() ?? ''
+  const startsWithName =
+    !!name &&
+    trimmed
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .startsWith(name.toLowerCase().replace(/[^a-z0-9]/g, ''))
+  if (rules.leadingWords.includes(opening) || startsWithName) violations.push('opening')
   if (trimmed.length > rules.maxLength) violations.push('length')
   if (countSentences(trimmed) > rules.maxSentences) violations.push('sentences')
   if (/[–—]|(^|\s)-{2,}(\s|$)|\s-\s/.test(trimmed)) violations.push('dash')
@@ -79,3 +90,19 @@ export const descriptionSchema = z
       ctx.addIssue({ code: z.ZodIssueCode.custom, message })
     }
   })
+
+/**
+ * Whole-form check for the one rule that needs another field: the description
+ * may not open with the service's name.
+ */
+export const descriptionOpeningRefinement = (
+  form: { name: string; description: string },
+  ctx: z.RefinementCtx
+) => {
+  if (
+    checkDescription(form.description, form.name).includes('opening') &&
+    !checkDescription(form.description).includes('opening')
+  ) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['description'], message: violationMessages.opening })
+  }
+}

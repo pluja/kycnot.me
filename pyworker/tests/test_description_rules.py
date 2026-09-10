@@ -17,6 +17,14 @@ class TestDescriptionRules(unittest.TestCase):
                     sorted(check_description(case["text"])), sorted(case["violations"])
                 )
 
+    def test_the_service_name_may_not_open_the_description(self):
+        for case in FIXTURE["nameCases"]:
+            with self.subTest(text=case["text"]):
+                self.assertEqual(
+                    sorted(check_description(case["text"], case["name"])),
+                    sorted(case["violations"]),
+                )
+
     def test_abbreviations_and_versions_are_not_sentence_ends(self):
         self.assertEqual(
             check_description("Runs Bisq 2.1 and later, e.g. on Linux."), []

@@ -102,6 +102,7 @@
     {
       "text": "An exchange. It lists coins. It has an app. It is in Estonia.",
       "violations": [
+        "opening",
         "sentences"
       ]
     },
@@ -126,6 +127,47 @@
     {
       "text": "Instant exchange with a Tor mirror and its own liquidity. Supports Bitcoin, Monero and Litecoin.",
       "violations": []
+    },
+    {
+      "text": "A non-custodial exchange aggregator that compares rates across instant swap providers.",
+      "violations": [
+        "opening"
+      ]
+    },
+    {
+      "text": "An open-source desktop wallet for atomic swaps.",
+      "violations": [
+        "opening"
+      ]
+    },
+    {
+      "text": "Non-custodial exchange aggregator that compares rates across instant swap providers.",
+      "violations": []
+    }
+  ],
+  "leadingWords": [
+    "a",
+    "an"
+  ],
+  "nameCases": [
+    {
+      "name": "Mullvad",
+      "text": "Mullvad is a VPN service that encrypts internet traffic.",
+      "violations": [
+        "opening"
+      ]
+    },
+    {
+      "name": "Mullvad",
+      "text": "VPN service that encrypts internet traffic.",
+      "violations": []
+    },
+    {
+      "name": "Cyphergoat",
+      "text": "CypherGoat compares rates across instant swap providers.",
+      "violations": [
+        "opening"
+      ]
     }
   ]
 }

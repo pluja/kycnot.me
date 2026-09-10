@@ -598,7 +598,7 @@ class DeepScanTask(Task):
         text = " ".join(result["description"].split())
         if result["verdict"] != "rewrite" or text == " ".join(current.split()):
             return None
-        broken = check_description(text)
+        broken = check_description(text, service["name"])
         if broken:
             self.logger.warning(f"Dropping description rewrite: breaks {broken}")
             warnings.append(

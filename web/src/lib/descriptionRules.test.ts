@@ -5,7 +5,10 @@ import { test } from 'node:test'
 
 import { checkDescription } from './descriptionRules'
 
-type Fixture = { cases: { text: string; violations: string[] }[] }
+type Fixture = {
+  cases: { text: string; violations: string[] }[]
+  nameCases: { name: string; text: string; violations: string[] }[]
+}
 
 const fixture = JSON.parse(
   readFileSync(join(import.meta.dirname, '../../../pyworker/tests/fixtures/description_rules.json'), 'utf8')
@@ -14,6 +17,12 @@ const fixture = JSON.parse(
 void test('checkDescription agrees with the shared fixture', () => {
   for (const { text, violations } of fixture.cases) {
     assert.deepEqual([...checkDescription(text)].sort(), [...violations].sort(), text)
+  }
+})
+
+void test('the service name may not open the description', () => {
+  for (const { name, text, violations } of fixture.nameCases) {
+    assert.deepEqual([...checkDescription(text, name)].sort(), [...violations].sort(), text)
   }
 })
 
