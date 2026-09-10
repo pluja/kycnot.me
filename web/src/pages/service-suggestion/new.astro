@@ -4,7 +4,6 @@ import { actions, isInputError } from 'astro:actions'
 import { orderBy } from 'lodash-es'
 
 import {
-  SUGGESTION_DESCRIPTION_MAX_LENGTH,
   SUGGESTION_NAME_MAX_LENGTH,
   SUGGESTION_NOTES_MAX_LENGTH,
   SUGGESTION_SLUG_MAX_LENGTH,
@@ -27,6 +26,7 @@ import { countries } from '../../constants/countries'
 import { currencies } from '../../constants/currencies'
 import { kycLevels } from '../../constants/kycLevels'
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import { DESCRIPTION_MAX_LENGTH, DESCRIPTION_RULE } from '../../lib/descriptionRules'
 import { getFormReplay } from '../../lib/formReplay'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
@@ -214,9 +214,10 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       name="description"
       id="description"
       value={replay.text('description')}
+      description={DESCRIPTION_RULE}
       inputProps={{
         required: true,
-        maxlength: SUGGESTION_DESCRIPTION_MAX_LENGTH,
+        maxlength: DESCRIPTION_MAX_LENGTH,
       }}
       error={inputErrors.description}
     />

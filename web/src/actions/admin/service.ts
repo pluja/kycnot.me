@@ -6,6 +6,7 @@ import slugify from 'slugify'
 
 import { countriesZodEnumByCode } from '../../constants/countries'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
+import { descriptionSchema } from '../../lib/descriptionRules'
 import { saveFileLocally, deleteFileLocally } from '../../lib/fileStorage'
 import { cap, userCan } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
@@ -46,7 +47,7 @@ const serviceSchemaBase = z.object({
     .regex(/^[a-z0-9-]+$/, 'Allowed characters: lowercase letters, numbers, and hyphens')
     .optional(),
   name: z.string().min(1).max(40),
-  description: z.string().min(1),
+  description: descriptionSchema,
   allServiceUrls: stringListOfUrlsSchemaRequired,
   tosUrls: stringListOfUrlsSchemaRequired,
   contactMethods: stringListOfContactMethodsSchema,

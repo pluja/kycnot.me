@@ -11,6 +11,7 @@ import { kycLevels } from '../../../../constants/kycLevels'
 import { serviceVisibilities } from '../../../../constants/serviceVisibility'
 import { verificationStatuses } from '../../../../constants/verificationStatus'
 import { cn } from '../../../../lib/cn'
+import { DESCRIPTION_MAX_LENGTH, DESCRIPTION_RULE } from '../../../../lib/descriptionRules'
 import FormSection from '../../../FormSection.astro'
 import InputCardGroup from '../../../InputCardGroup.astro'
 import InputCheckbox from '../../../InputCheckbox.astro'
@@ -98,9 +99,11 @@ const notedCount = noteFields.filter(({ note }) => note).length
     <InputTextArea
       label="Description"
       name="description"
+      description={DESCRIPTION_RULE}
       inputProps={{
         required: true,
         rows: 4,
+        maxlength: DESCRIPTION_MAX_LENGTH,
       }}
       value={service.description}
       error={inputErrors.description}

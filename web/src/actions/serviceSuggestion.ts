@@ -6,6 +6,7 @@ import { formatDistanceStrict } from 'date-fns'
 import { countriesZodEnumByCode } from '../constants/countries'
 import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../lib/captchaValidation'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
+import { descriptionSchema } from '../lib/descriptionRules'
 import { saveFileLocally } from '../lib/fileStorage'
 import { findServicesBySimilarity } from '../lib/findServicesBySimilarity'
 import { prisma } from '../lib/prisma'
@@ -28,7 +29,6 @@ export const SUGGESTION_NOTES_MAX_LENGTH = 1000
 export const SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH = 50
 export const SUGGESTION_NAME_MAX_LENGTH = 20
 export const SUGGESTION_SLUG_MAX_LENGTH = 20
-export const SUGGESTION_DESCRIPTION_MAX_LENGTH = 100
 export const SUGGESTION_MESSAGE_CONTENT_MAX_LENGTH = 1000
 
 const findPossibleDuplicates = async (input: { name: string }) => {
@@ -178,7 +178,7 @@ export const serviceSuggestionActions = {
           .regex(/^[a-z0-9-]+$/, {
             message: 'Slug must contain only lowercase letters, numbers, and hyphens',
           }),
-        description: z.string().min(1).max(SUGGESTION_DESCRIPTION_MAX_LENGTH),
+        description: descriptionSchema,
         allServiceUrls: stringListOfUrlsSchemaRequired,
         tosUrls: stringListOfUrlsSchemaRequired,
         contactMethods: stringListOfContactMethodsSchema,
