@@ -174,9 +174,10 @@ const kycLevelInfo = getKycLevelInfo(`${kycLevel}`)
       <Tooltip
         class={cn(
           'inline-flex size-6 items-center justify-center rounded-sm text-lg font-bold',
-          overallScoreInfo.classNameBg
+          overallScoreInfo.classNameBg,
+          verificationStatus === 'COMMUNITY_CONTRIBUTED' && 'opacity-60 saturate-50'
         )}
-        text={`${Math.round(privacyScore).toLocaleString()}% Privacy | ${Math.round(trustScore).toLocaleString()}% Trust`}
+        text={`${Math.round(privacyScore).toLocaleString()}% Privacy | ${Math.round(trustScore).toLocaleString()}% Trust${verificationStatus === 'COMMUNITY_CONTRIBUTED' ? '. Unverified: nobody has reviewed this listing.' : ''}`}
       >
         {overallScoreInfo.formattedScore}
       </Tooltip>

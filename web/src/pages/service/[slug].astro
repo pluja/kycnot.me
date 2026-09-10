@@ -24,6 +24,7 @@ import SectionHeading from '../../components/SectionHeading.astro'
 import AcceptedCurrencies from '../../components/service/AcceptedCurrencies.astro'
 import ServiceAnswerPanel from '../../components/service/ServiceAnswerPanel.astro'
 import ServiceRiskAlert from '../../components/service/ServiceRiskAlert.astro'
+import UnreviewedNotice from '../../components/service/UnreviewedNotice.astro'
 import ServiceTimeline from '../../components/service/ServiceTimeline.astro'
 import TosReviewSection from '../../components/service/TosReviewSection.astro'
 import TosSummaryCard from '../../components/service/TosSummaryCard.astro'
@@ -269,6 +270,7 @@ const subtotalOf = (rows: { privacyPoints: number; trustPoints: number }[]) => [
 ]
 
 const isFlaggedScam = service.verificationStatus === 'VERIFICATION_FAILED'
+const isReviewed = hasBeenReviewed(service.verificationStatus)
 
 const statusInfo = getVerificationStatusInfo(service.verificationStatus)
 
@@ -547,14 +549,14 @@ const safetyAnswer = makeSafetyAnswer({
     ...pick(entry.incident, ['severity', 'state', 'occurredAt', 'resolvedAt']),
   })),
   warnings: openWarnings.map((event) => ({ id: event.id, title: event.title, startedAt: event.startedAt })),
-  hasBeenReviewed: hasBeenReviewed(service.verificationStatus),
+  hasBeenReviewed: isReviewed,
   caveats: caveats.trust,
   checks: flaggedChecks,
   recentlyApprovedAt: service.isRecentlyApproved ? service.approvedAt : null,
 })
 // One Review from us and one AggregateRating from users, on the Organization
 // itself. An unreviewed listing gets no Review: nobody has looked at it yet.
-const serviceReview = hasBeenReviewed(service.verificationStatus)
+const serviceReview = isReviewed
   ? makeServiceReview({
       name: service.name,
       overallScore: service.overallScore,
@@ -744,8 +746,9 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
     )
   }
 
+  {/* An open incident outranks the review status: one banner, the worse one. */}
   {
-    !!activeEventToShow && (
+    activeEventToShow ? (
       <div class="mb-4">
         <ServiceRiskAlert
           event={activeEventToShow}
@@ -753,6 +756,12 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
           moreWarnings={moreActiveWarnings}
         />
       </div>
+    ) : (
+      !isReviewed && (
+        <div class="mb-4">
+          <UnreviewedNotice serviceName={service.name} />
+        </div>
+      )
     )
   }
 
@@ -1073,6 +1082,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
       privacyScore={service.privacyScore}
       trustScore={service.trustScore}
       serviceName={service.name}
+      unverified={!isReviewed}
     />
 
     <TosSummaryCard service={service} />
@@ -1270,9 +1280,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
         </li>
         <li class="inline-flex items-center gap-1.5">
           <Icon name="ri:history-line" class="size-3.5 text-day-500" />
-          <span class="text-day-500"
-            >{hasBeenReviewed(service.verificationStatus) ? 'Last review' : 'Last updated'}</span
-          >
+          <span class="text-day-500">{isReviewed ? 'Last review' : 'Last updated'}</span>
           <span class="text-day-200">
             {
               verificationOverview.lastReviewAt ? (

@@ -1,0 +1,22 @@
+---
+import { Icon } from 'astro-icon/components'
+
+type Props = {
+  serviceName: string
+}
+
+const { serviceName } = Astro.props
+---
+
+<p
+  class="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-3 py-2 text-sm text-day-300"
+  aria-label={`Community listing: ${serviceName} has not been reviewed`}
+>
+  <Icon name="ri:question-line" class="mt-0.5 size-4 shrink-0 text-yellow-300" />
+  <span>
+    <span class="me-2 font-title text-xs font-bold tracking-wider text-yellow-300 uppercase"
+      >Community listing</span
+    >
+    Submitted by a user and not yet checked by KYCnot.me.
+  </span>
+</p>

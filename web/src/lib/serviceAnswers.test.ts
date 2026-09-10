@@ -124,7 +124,7 @@ void test('an unreviewed listing reads as unknown, not as bad', () => {
     hasBeenReviewed: false,
   })
   assert.equal(answer.tone, 'unknown')
-  assert.equal(answer.answer, 'Not reviewed yet')
+  assert.equal(answer.answer, 'Nothing on record')
 })
 
 void test('a clean record reads as clean regardless of the score', () => {
@@ -274,7 +274,7 @@ void test('an unreviewed listing keeps its verdict and lists its flagged checks 
     hasBeenReviewed: false,
     checks: [{ title: 'Due Diligence Notice', href: '#check-3', failed: false }],
   })
-  assert.equal(answer.answer, 'Not reviewed yet')
+  assert.equal(answer.answer, 'Nothing on record')
   assert.deepEqual(answer.caveats, [{ title: 'Due Diligence Notice', href: '#check-3' }])
 })
 

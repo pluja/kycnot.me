@@ -297,8 +297,8 @@ export function makeSafetyAnswer({
   if (!hasBeenReviewed) {
     return {
       tone: 'unknown',
-      answer: 'Not reviewed yet',
-      detail: 'Nobody has checked this listing yet. Everything on it comes from whoever submitted it.',
+      answer: 'Nothing on record',
+      detail: 'No incidents or warnings so far. Nobody from the team has looked yet.',
       caveats: flaggedChecks,
     }
   }

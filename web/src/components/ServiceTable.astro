@@ -146,7 +146,10 @@ const headers = {
           return (
             <tr
               data-hx-search-results-card
-              class={cn('group/tr', (isScam || isArchived) && 'opacity-75 transition-opacity hover:opacity-100')}
+              class={cn(
+                'group/tr',
+                (isScam || isArchived) && 'opacity-75 transition-opacity hover:opacity-100'
+              )}
               {...(i === services.length - 1 && currentPage < totalPages
                 ? {
                     'hx-get': createPageUrl(currentPage + 1, Astro.url, { 'sort-seed': sortSeed }),
@@ -200,8 +203,12 @@ const headers = {
 
               <td class={cn(bodyCellClass, 'text-center')}>
                 <Tooltip
-                  class={cn(scoreBadgeClass, overallScoreInfo.classNameBg)}
-                  text={`Overall score: ${overallScoreInfo.formattedScore}/10`}
+                  class={cn(
+                    scoreBadgeClass,
+                    overallScoreInfo.classNameBg,
+                    service.verificationStatus === 'COMMUNITY_CONTRIBUTED' && 'opacity-60 saturate-50'
+                  )}
+                  text={`Overall score: ${overallScoreInfo.formattedScore}/10${service.verificationStatus === 'COMMUNITY_CONTRIBUTED' ? '. Unverified: nobody has reviewed this listing.' : ''}`}
                 >
                   {overallScoreInfo.formattedScore}
                 </Tooltip>

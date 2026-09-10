@@ -82,8 +82,7 @@ export const {
         'This service passed repeated checks across time. That is stronger than approval, but it is still not a guarantee against future failure or exit scams.',
       icon: 'ri:verified-badge-fill',
       default: true,
-      description:
-        'Passed repeated checks over time and showed consistent behavior.',
+      description: 'Passed repeated checks over time and showed consistent behavior.',
       privacyPoints: 0,
       trustPoints: 10,
       classNames: {
@@ -108,8 +107,7 @@ export const {
         'This service passed a limited set of recent checks. That means the checks below passed on specific dates, not that the service is permanently safe.',
       icon: 'ri:check-line',
       default: true,
-      description:
-        'Passed limited recent checks and met our approval threshold.',
+      description: 'Passed limited recent checks and met our approval threshold.',
       privacyPoints: 0,
       trustPoints: 5,
       classNames: {
@@ -134,7 +132,8 @@ export const {
         'This service has not gone through the team review process yet. Treat all information as unverified until evidence is added.',
       icon: 'ri:question-line',
       default: false,
-      description: 'Listed, but not yet reviewed by the team.',
+      description:
+        'Nobody from the team has checked this listing. The attributes are as submitted, so the scores are unverified claims until a review is published.',
       privacyPoints: 0,
       trustPoints: 0,
       classNames: {

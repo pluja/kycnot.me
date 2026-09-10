@@ -17,9 +17,11 @@ type Props = {
   privacyScore: number
   trustScore: number
   serviceName: string
+  /** Nobody has reviewed the listing: the scores are shown, but not vouched for. */
+  unverified?: boolean
 }
 
-const { kyc, safety, kycLevel, privacyScore, trustScore, serviceName } = Astro.props
+const { kyc, safety, kycLevel, privacyScore, trustScore, serviceName, unverified = false } = Astro.props
 
 const toneClass = {
   good: 'text-green-400',
@@ -38,6 +40,8 @@ const questions = [
     level: kycLevel,
     score: privacyScore,
     scoreLabel: 'Privacy',
+    dim: unverified,
+    unreviewedBadge: false,
     ...kyc,
     detailHtml: kyc.detailMd ? await markdownToInlineHtml(kyc.detailMd) : null,
   },
@@ -47,6 +51,8 @@ const questions = [
     level: null,
     score: trustScore,
     scoreLabel: 'Trust',
+    dim: unverified,
+    unreviewedBadge: unverified,
     ...safety,
     detailHtml: null,
   },
@@ -84,6 +90,26 @@ const questions = [
                     </Tooltip>
                   </>
                 )}
+                {question.unreviewedBadge && (
+                  <>
+                    <span class="text-day-600" aria-hidden="true">
+                      ·
+                    </span>
+                    <Tooltip
+                      text="Submitted by a user. The attributes and the score are as submitted; nobody from KYCnot.me has checked them yet."
+                      position="top"
+                      class="inline-flex"
+                    >
+                      <a
+                        href="/about#listing-statuses"
+                        class="inline-flex items-center gap-1 text-yellow-300"
+                      >
+                        <Icon name="ri:question-line" class="size-3.5" />
+                        Not reviewed
+                      </a>
+                    </Tooltip>
+                  </>
+                )}
               </div>
               <p class={cn('mt-1.5 font-title text-sm font-bold sm:text-base', toneClass[question.tone])}>
                 {question.answer}
@@ -93,14 +119,14 @@ const questions = [
               as="a"
               href="#scores"
               role="link"
-              aria-label={`${String(Math.round(question.score))} ${question.scoreLabel} score out of 100. See the attributes behind it.`}
+              aria-label={`${String(Math.round(question.score))} ${question.scoreLabel} score out of 100${question.dim ? ', unverified' : ''}. See the attributes behind it.`}
               score={question.score}
               label={question.scoreLabel}
               size="md"
               theme="muted"
-              glow
+              glow={!question.dim}
               showInfo
-              class="-mt-1.5 -mb-6 shrink-0"
+              class={cn('-mt-1.5 -mb-6 shrink-0', question.dim && 'opacity-60 saturate-50')}
             />
           </div>
           {question.detailHtml ? (
