@@ -4,7 +4,7 @@ import re
 import time
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List, Literal, TypedDict, cast
+from typing import Any, Dict, List, Literal, Optional, TypedDict, cast
 
 from json_repair import repair_json
 from openai import OpenAI, OpenAIError
@@ -14,6 +14,7 @@ from pyworker.database import (
     CommentModerationType,
     CommentSentimentSummaryType,
     DeepScanResultType,
+    DescriptionResultType,
 )
 from pyworker.utils import schemas
 
@@ -54,6 +55,7 @@ _PROMPT_LEGAL_CHANGE_SUMMARY = _load_prompt(
 _PROMPT_DEEP_SCAN = _load_prompt(
     "deep_scan.md", schema=schemas.DEEP_SCAN.ts_type, fields=_LEGAL_REVIEW_FIELDS
 )
+_PROMPT_DESCRIPTION = _load_prompt("description.md", schema=schemas.DESCRIPTION.ts_type)
 PROMPT_COMMENT_SENTIMENT_SUMMARY = _load_prompt(
     "comment_sentiment.md", schema=schemas.COMMENT_SEN.ts_type
 )
@@ -222,6 +224,44 @@ def prompt_deep_scan(
 
     schemas.DEEP_SCAN.validate(result_dict)
     return cast(DeepScanResultType, result_dict)
+
+
+def prompt_description(
+    service_name: str,
+    current_description: str,
+    categories: list[str],
+    kyc_level: Optional[int],
+    homepage: Optional[dict[str, str]],
+) -> DescriptionResultType:
+    front_page = (
+        "\n".join(
+            f"- {label}: {homepage.get(key) or '(none)'}"
+            for key, label in (
+                ("url", "URL"),
+                ("title", "Title"),
+                ("metaDescription", "Meta description"),
+                ("ogTitle", "Open Graph title"),
+                ("ogDescription", "Open Graph description"),
+                ("heading", "First heading"),
+                ("visibleText", "First screen of text"),
+            )
+        )
+        if homepage
+        else "(the front page could not be read; judge from the listing alone)"
+    )
+    user_payload = (
+        f"## Listing\n\n- Name: {service_name}\n- Categories: {', '.join(categories) or '(none)'}\n"
+        f"- KYC level: {kyc_level if kyc_level is not None else '(unknown)'}\n\n"
+        f"## Current description\n\n{current_description or '(empty)'}\n\n"
+        f"## Front page\n\n{front_page}"
+    )
+    messages: List[ChatCompletionMessageParam] = [
+        {"role": "system", "content": _PROMPT_DESCRIPTION},
+        {"role": "user", "content": user_payload},
+    ]
+    result_dict = query_openai_json(messages)
+    schemas.DESCRIPTION.validate(result_dict)
+    return cast(DescriptionResultType, result_dict)
 
 
 def prompt_comment_sentiment_summary(content: str) -> CommentSentimentSummaryType:

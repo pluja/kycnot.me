@@ -78,6 +78,12 @@ class DeepScanWarningType(TypedDict):
     severity: TypeLiteral["info", "warning", "alert"]
 
 
+class DescriptionResultType(TypedDict):
+    verdict: str
+    description: str
+    reasons: List[str]
+
+
 class DeepScanResultType(TypedDict):
     """Raw structured output from the deep scan LLM call."""
 
@@ -384,11 +390,16 @@ def fetch_service_for_deep_scan(service_id: int) -> Optional[Dict[str, Any]]:
             with conn.cursor(row_factory=dict_row) as cursor:
                 cursor.execute(
                     """
-                    SELECT id, name, slug, "kycLevel", "kycPolicyMd",
-                           "verificationStatus", "serviceVisibility", "tosUrls",
-                           "tosReview"
-                    FROM "Service"
-                    WHERE id = %s
+                    SELECT s.id, s.name, s.slug, s.description, s."kycLevel",
+                           s."kycPolicyMd", s."verificationStatus",
+                           s."serviceVisibility", s."tosUrls", s."serviceUrls",
+                           s."tosReview",
+                           (SELECT array_agg(c.name ORDER BY c.name)
+                              FROM "_ServiceToCategory" cs
+                              JOIN "Category" c ON c.id = cs."A"
+                             WHERE cs."B" = s.id) AS categories
+                    FROM "Service" s
+                    WHERE s.id = %s
                     """,
                     (service_id,),
                 )

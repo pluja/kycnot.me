@@ -213,6 +213,29 @@ LEGAL_CHANGE_SUMMARY = PromptSchema(
 )
 
 
+def _validate_description(data: dict[str, Any]) -> None:
+    if data.get("verdict") not in ("keep", "rewrite"):
+        raise ValueError(f"verdict must be keep|rewrite, got {data.get('verdict')!r}")
+    if not isinstance(data.get("description"), str):
+        raise ValueError("description must be a string")
+    if not isinstance(data.get("reasons"), list) or not all(
+        isinstance(r, str) for r in data["reasons"]
+    ):
+        raise ValueError("reasons must be a list of strings")
+
+
+DESCRIPTION = PromptSchema(
+    ts_type="""type Description = {
+    verdict: 'keep' | 'rewrite'
+    /** The description to show. With keep, the current one unchanged. */
+    description: string
+    /** Each rule the current text breaks, or the mismatch with the front page. Empty with keep. */
+    reasons: string[]
+}""",
+    validate=_validate_description,
+)
+
+
 DEEP_SCAN = PromptSchema(
     ts_type="""type DeepScan = {
     /** 0=Guaranteed no KYC, 1=No KYC mention, 2=KYC on authorities request, 3=Shotgun KYC, 4=Mandatory KYC */

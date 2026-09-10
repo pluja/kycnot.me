@@ -29,6 +29,7 @@ from pyworker.tasks.base import Task
 from pyworker.utils.ai import (
     prompt_check_tos_review,
     prompt_deep_scan,
+    prompt_description,
 )
 from pyworker.utils.legal_changes import (
     record_document_changes,
@@ -37,6 +38,8 @@ from pyworker.utils.legal_changes import (
 from pyworker.utils.legal_crawl import document_key, fetch_legal_corpus
 from pyworker.utils.legal_text import is_grounded
 from pyworker.utils.listing_values import storable_value, values_disagree
+from pyworker.utils.description_rules import check_description
+from pyworker.utils.homepage import fetch_homepage
 from pyworker.utils.scan_fingerprint import scan_fingerprint
 
 
@@ -226,6 +229,8 @@ class DeepScanTask(Task):
 
         self.keep_supported_highlights(result, corpus)
 
+        description = self._propose_description(service, result["warnings"])
+
         proposed_edits = self._build_proposed_edits(
             result=result,
             corpus_hash=corpus_hash,
@@ -238,16 +243,21 @@ class DeepScanTask(Task):
             current_kyc_notes=current_kyc_notes,
             corpus=filtered_corpus,
             crawled_keys={page.url_key for page in corpus.pages},
+            description=description,
         )
 
         # A level a reviewer already turned down is not something to decide again.
         kyc_level_changed = bool(proposed_edits["kycPolicy"]["levelFingerprint"])
         kyc_notes_changed = bool(proposed_edits["kycPolicy"]["notesFingerprint"])
+        description_changed = bool(proposed_edits["description"]["fingerprint"])
         review_changed = _review_differs(
             proposed_edits["tosReview"], service.get("tosReview")
         )
         if self.only_when_actionable and not _has_actionable_items(
-            proposed_edits, kyc_level_changed, review_changed, kyc_notes_changed
+            proposed_edits,
+            kyc_level_changed,
+            review_changed,
+            kyc_notes_changed or description_changed,
         ):
             self.logger.info(
                 f"Nothing to propose for service {service_id}, no suggestion created"
@@ -344,6 +354,7 @@ class DeepScanTask(Task):
         current_kyc_level: Optional[int],
         crawled_keys: set,
         current_kyc_notes: str = "",
+        description: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Sanitize the LLM output and shape it into the proposedEdits payload.
 
@@ -417,6 +428,7 @@ class DeepScanTask(Task):
                 if kyc_notes and kyc_notes != " ".join(current_kyc_notes.split())
                 else None
             ),
+            description_corpus_hash=corpus_hash if description else None,
         )
         kept = [item for item in proposals if item["fingerprint"] not in declined]
         dropped = len(proposals) - len(kept)
@@ -431,6 +443,9 @@ class DeepScanTask(Task):
         )
         kyc_notes_proposal = next(
             (item for item in kept if item["kind"] == "kycNotes"), None
+        )
+        description_proposal = next(
+            (item for item in kept if item["kind"] == "description"), None
         )
         by_fingerprint = {
             (item["kind"], item["key"]): item["fingerprint"] for item in kept
@@ -498,8 +513,62 @@ class DeepScanTask(Task):
                 "remove": attributes_remove,
             },
             "listingChecks": listing_checks,
+            "description": {
+                # Same contract as the notes: set while the rewrite is open.
+                "fingerprint": (
+                    description_proposal["fingerprint"]
+                    if description_proposal
+                    else None
+                ),
+                "text": description["text"]
+                if description_proposal and description
+                else "",
+                "reasons": description["reasons"]
+                if description_proposal and description
+                else [],
+            },
             "warnings": result["warnings"],
         }
+
+    def _propose_description(
+        self, service: Dict[str, Any], warnings: List[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        """A rewrite of the description, or None when the current one stands.
+
+        The description is written from the front page and the listing, never
+        from the legal corpus, so it is a second call with its own inputs. A
+        rewrite that breaks the rule itself is dropped and the reviewer told.
+        """
+        current = service.get("description") or ""
+        urls = list(service.get("serviceUrls") or [])
+        homepage = fetch_homepage(urls[0]) if urls else None
+        if homepage is None:
+            self.logger.info(
+                "Front page unreadable; judging the description from the listing"
+            )
+        result = prompt_description(
+            service_name=service["name"],
+            current_description=current,
+            categories=list(service.get("categories") or []),
+            kyc_level=service.get("kycLevel"),
+            homepage=dict(homepage) if homepage else None,
+        )
+        text = " ".join(result["description"].split())
+        if result["verdict"] != "rewrite" or text == " ".join(current.split()):
+            return None
+        broken = check_description(text)
+        if broken:
+            self.logger.warning(f"Dropping description rewrite: breaks {broken}")
+            warnings.append(
+                {
+                    "title": "Description dropped",
+                    "bodyMd": "The scan proposed a description that broke the rule it was "
+                    f"asked to follow ({', '.join(broken)}). Rescan, or edit it by hand.",
+                    "severity": "info",
+                }
+            )
+            return None
+        return {"text": text, "reasons": list(result["reasons"])}
 
     def _usable_kyc_notes(self, notes: str, warnings: List[Dict[str, Any]]) -> str:
         """The notes as one line, or nothing when they break the format.
@@ -544,6 +613,7 @@ class DeepScanTask(Task):
         listing_checks: List[Dict[str, Any]],
         proposed_kyc_level: Optional[int],
         kyc_notes_corpus_hash: Optional[str] = None,
+        description_corpus_hash: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """One identity per discrete proposal a reviewer can turn down."""
         proposals: List[Dict[str, Any]] = []
@@ -597,6 +667,19 @@ class DeepScanTask(Task):
                     "key": kyc_notes_corpus_hash,
                     "fingerprint": scan_fingerprint(
                         service_id, "kycNotes", kyc_notes_corpus_hash
+                    ),
+                }
+            )
+
+        # The description is not read from the corpus, but the corpus is the
+        # only change signal a scan has, so a decline holds until the next one.
+        if description_corpus_hash is not None:
+            proposals.append(
+                {
+                    "kind": "description",
+                    "key": description_corpus_hash,
+                    "fingerprint": scan_fingerprint(
+                        service_id, "description", description_corpus_hash
                     ),
                 }
             )

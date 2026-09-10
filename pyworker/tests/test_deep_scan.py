@@ -294,6 +294,8 @@ DB_SIDE_EFFECTS = {
     "record_document_changes": None,
     "fetch_scan_declines": set(),
     "fetch_service_listing_record": {},
+    "fetch_homepage": None,
+    "prompt_description": {"verdict": "keep", "description": "", "reasons": []},
 }
 
 
@@ -424,7 +426,9 @@ class TestScanProposalGates(unittest.TestCase):
 
     LISTING = {"registrationCountryCode": "SC", "registeredCompanyName": "Acme Ltd"}
 
-    def _build(self, declined=frozenset(), corpus=None, current_kyc_notes=""):
+    def _build(
+        self, declined=frozenset(), corpus=None, current_kyc_notes="", description=None
+    ):
         return DeepScanTask()._build_proposed_edits(
             result=cast(Any, SAMPLE_LLM_RESULT),
             corpus_hash="0" * 64,
@@ -437,7 +441,37 @@ class TestScanProposalGates(unittest.TestCase):
             crawled_keys=CRAWLED_KEYS,
             current_kyc_level=2,
             current_kyc_notes=current_kyc_notes,
+            description=description,
         )
+
+    def test_a_description_rewrite_is_a_decision_keyed_on_the_corpus(self):
+        rewrite = {
+            "text": "Instant exchange with a Tor mirror.",
+            "reasons": ["marketing"],
+        }
+
+        edits = self._build(description=rewrite)["description"]
+
+        self.assertEqual(edits["text"], rewrite["text"])
+        self.assertEqual(edits["reasons"], ["marketing"])
+        self.assertEqual(
+            edits["fingerprint"], scan_fingerprint(1, "description", "0" * 64)
+        )
+
+    def test_no_description_rewrite_means_nothing_to_decide(self):
+        edits = self._build()["description"]
+
+        self.assertIsNone(edits["fingerprint"])
+        self.assertEqual(edits["text"], "")
+
+    def test_a_declined_description_stays_declined_until_the_corpus_changes(self):
+        rewrite = {"text": "Instant exchange with a Tor mirror.", "reasons": []}
+        declined = {self._build(description=rewrite)["description"]["fingerprint"]}
+
+        edits = self._build(description=rewrite, declined=declined)["description"]
+
+        self.assertIsNone(edits["fingerprint"])
+        self.assertEqual(edits["text"], "")
 
     def test_new_kyc_notes_are_a_decision_keyed_on_the_corpus(self):
         kyc = self._build()["kycPolicy"]
@@ -839,3 +873,75 @@ class SupportedHighlightsTests(unittest.TestCase):
         kept = self._review()
 
         self.assertEqual(kept, [])
+
+
+class TestDescriptionProposal(unittest.TestCase):
+    """The rewrite is asked for separately and held to the rule it was given."""
+
+    SERVICE = {
+        "id": 1,
+        "name": "Acme",
+        "description": "The best exchange on the market!",
+        "serviceUrls": ["https://acme.example"],
+        "categories": ["Exchange"],
+        "kycLevel": 1,
+    }
+
+    def _propose(self, verdict, text, reasons=("marketing",), homepage=None):
+        warnings: list = []
+        with (
+            patch("pyworker.tasks.deep_scan.fetch_homepage", return_value=homepage),
+            patch(
+                "pyworker.tasks.deep_scan.prompt_description",
+                return_value={
+                    "verdict": verdict,
+                    "description": text,
+                    "reasons": list(reasons),
+                },
+            ) as prompt,
+        ):
+            result = DeepScanTask()._propose_description(self.SERVICE, warnings)
+        return result, warnings, prompt
+
+    def test_a_compliant_rewrite_is_proposed_with_its_reasons(self):
+        result, warnings, _ = self._propose(
+            "rewrite", "No-KYC exchange for bitcoin and monero."
+        )
+
+        self.assertEqual(
+            result,
+            {
+                "text": "No-KYC exchange for bitcoin and monero.",
+                "reasons": ["marketing"],
+            },
+        )
+        self.assertEqual(warnings, [])
+
+    def test_a_keep_verdict_proposes_nothing(self):
+        result, warnings, _ = self._propose(
+            "keep", self.SERVICE["description"], reasons=()
+        )
+
+        self.assertIsNone(result)
+        self.assertEqual(warnings, [])
+
+    def test_a_rewrite_that_breaks_the_rule_is_dropped_and_flagged(self):
+        result, warnings, _ = self._propose(
+            "rewrite", "The fastest exchange around. Sign up today!"
+        )
+
+        self.assertIsNone(result)
+        self.assertEqual(warnings[0]["title"], "Description dropped")
+
+    def test_the_front_page_is_handed_to_the_model_when_readable(self):
+        homepage = {
+            "url": "https://acme.example",
+            "title": "Acme",
+            "metaDescription": "Swap coins.",
+        }
+
+        _, _, prompt = self._propose(
+            "keep", self.SERVICE["description"], reasons=(), homepage=homepage
+        )
+
+        self.assertEqual(prompt.call_args.kwargs["homepage"], homepage)
