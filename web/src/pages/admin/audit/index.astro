@@ -203,7 +203,7 @@ const fieldClass =
   {
     [...days.entries()].map(([day, dayEntries]) => (
       <section class="mb-6">
-        <h2 class="sticky top-16 z-10 -mx-2 mb-2 bg-night-900/90 px-2 py-1 font-title text-xs font-bold tracking-wider text-day-500 uppercase backdrop-blur">
+        <h2 class="sticky top-16 z-10 -mx-2 mb-2 bg-night-900/90 px-2 py-1 font-title text-xs font-bold tracking-wider text-day-500 uppercase backdrop-blur-sm">
           {dayFormatter.format(new Date(`${day}T12:00:00Z`))}
         </h2>
         <ol class="relative ms-2 border-s border-night-600">
