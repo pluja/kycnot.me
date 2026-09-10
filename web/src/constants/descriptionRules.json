@@ -1,0 +1,173 @@
+{
+  "maxLength": 200,
+  "maxSentences": 2,
+  "marketingWords": [
+    "best",
+    "fastest",
+    "cheapest",
+    "leading",
+    "trusted",
+    "seamless",
+    "reliable",
+    "cutting-edge",
+    "state-of-the-art",
+    "world-class",
+    "top-rated",
+    "premium",
+    "revolutionary",
+    "innovative",
+    "unparalleled",
+    "ultimate",
+    "next-generation",
+    "next-gen",
+    "game-changing",
+    "hassle-free",
+    "effortless",
+    "lightning-fast",
+    "powerful",
+    "robust",
+    "empower",
+    "empowers",
+    "unlock",
+    "elevate",
+    "sign up",
+    "join now",
+    "get started",
+    "try it",
+    "today"
+  ],
+  "policyWords": [
+    "court order",
+    "legal order",
+    "law enforcement",
+    "may require",
+    "may ask",
+    "may request",
+    "reserves the right",
+    "unless",
+    "restricted",
+    "prohibited",
+    "sanctioned",
+    "terms of service",
+    "privacy policy",
+    "aml",
+    "identity verification",
+    "verification may",
+    "frozen",
+    "freeze",
+    "seize",
+    "refund"
+  ],
+  "cases": [
+    {
+      "text": "Buy and sell bitcoin for fiat privately using a peer-to-peer network and open-source desktop software.",
+      "violations": []
+    },
+    {
+      "text": "Anonymous VPN with servers in 40 countries. No account or email is needed to use it.",
+      "violations": []
+    },
+    {
+      "text": "Swap your crypto at the best rate on the market! Fast and private. Open source!",
+      "violations": [
+        "exclamation",
+        "marketing",
+        "sentences"
+      ]
+    },
+    {
+      "text": "We do not require any personal information. Pay with Bitcoin and Monero.",
+      "violations": [
+        "first-person"
+      ]
+    },
+    {
+      "text": "Private, non-custodial P2P exchange for seamless crypto and fiat trading.",
+      "violations": [
+        "marketing"
+      ]
+    },
+    {
+      "text": "VPN and eSIM provider. They do not ask for ID unless a court order arrives.",
+      "violations": [
+        "policy"
+      ]
+    },
+    {
+      "text": "Secure VPN connections and disposable phone numbers \u2014 all without accounts or logs.",
+      "violations": [
+        "dash"
+      ]
+    },
+    {
+      "text": "An exchange. It lists coins. It has an app. It is in Estonia.",
+      "violations": [
+        "opening",
+        "sentences"
+      ]
+    },
+    {
+      "text": "",
+      "violations": [
+        "empty"
+      ]
+    },
+    {
+      "text": "Some services in some countries may be restricted by local regulation.",
+      "violations": [
+        "policy"
+      ]
+    },
+    {
+      "text": "Hosting provider that accepts crypto. Sign up today and get started in minutes.",
+      "violations": [
+        "marketing"
+      ]
+    },
+    {
+      "text": "Instant exchange with a Tor mirror and its own liquidity. Supports Bitcoin, Monero and Litecoin.",
+      "violations": []
+    },
+    {
+      "text": "A non-custodial exchange aggregator that compares rates across instant swap providers.",
+      "violations": [
+        "opening"
+      ]
+    },
+    {
+      "text": "An open-source desktop wallet for atomic swaps.",
+      "violations": [
+        "opening"
+      ]
+    },
+    {
+      "text": "Non-custodial exchange aggregator that compares rates across instant swap providers.",
+      "violations": []
+    }
+  ],
+  "leadingWords": [
+    "a",
+    "an"
+  ],
+  "nameCases": [
+    {
+      "name": "Mullvad",
+      "text": "Mullvad is a VPN service that encrypts internet traffic.",
+      "violations": [
+        "opening"
+      ]
+    },
+    {
+      "name": "Mullvad",
+      "text": "VPN service that encrypts internet traffic.",
+      "violations": []
+    },
+    {
+      "name": "Cyphergoat",
+      "text": "CypherGoat compares rates across instant swap providers.",
+      "violations": [
+        "opening"
+      ]
+    }
+  ]
+}

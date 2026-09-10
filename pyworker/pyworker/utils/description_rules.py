@@ -1,10 +1,10 @@
 """
 The mechanical half of the service description rule.
 
-The rule is one fixture read by this module and by web/src/lib/descriptionRules.ts,
-and tests/fixtures/description_rules.json holds the cases both sides must agree
-on. The judgement half, such as when "no-KYC exchange" is a fair label, lives in
-the scan prompt and with the reviewer.
+The rule file next to this module is a copy of the web app's, since each image
+is built from its own directory; a test on each side checks the copies match.
+The judgement half, such as when "no-KYC exchange" is a fair label, lives in the
+scan prompt and with the reviewer.
 """
 
 import json
@@ -12,9 +12,7 @@ import re
 from pathlib import Path
 
 _RULES = json.loads(
-    (
-        Path(__file__).resolve().parents[2] / "tests/fixtures/description_rules.json"
-    ).read_text()
+    (Path(__file__).resolve().parents[1] / "description_rules.json").read_text()
 )
 
 MAX_LENGTH: int = _RULES["maxLength"]
@@ -30,7 +28,7 @@ def _phrase_pattern(phrases: list[str]) -> re.Pattern[str]:
 _MARKETING = _phrase_pattern(_RULES["marketingWords"])
 _POLICY = _phrase_pattern(_RULES["policyWords"])
 _FIRST_PERSON = re.compile(r"(^|[^a-z])(we|our|ours|us)(?=$|[^a-z])", re.IGNORECASE)
-_DASH = re.compile(r"[–—]|(^|\s)-{2,}(\s|$)|\s-\s")
+_DASH = re.compile(r"[\u2013\u2014]|(^|\s)-{2,}(\s|$)|\s-\s")
 # A terminator followed by a space and a capital, or the end. A dot inside
 # "e.g." or a version number is not followed by a capital letter.
 _SENTENCE_END = re.compile(r"[.!?]+(?:\s+(?=[A-Z0-9\"'(])|$)")

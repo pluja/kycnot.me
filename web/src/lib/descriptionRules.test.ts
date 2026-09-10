@@ -11,7 +11,7 @@ type Fixture = {
 }
 
 const fixture = JSON.parse(
-  readFileSync(join(import.meta.dirname, '../../../pyworker/tests/fixtures/description_rules.json'), 'utf8')
+  readFileSync(join(import.meta.dirname, '../constants/descriptionRules.json'), 'utf8')
 ) as Fixture
 
 void test('checkDescription agrees with the shared fixture', () => {
@@ -28,4 +28,13 @@ void test('the service name may not open the description', () => {
 
 void test('a dot inside an abbreviation or a version is not a sentence end', () => {
   assert.deepEqual(checkDescription('Runs Bisq 2.1 and later, e.g. on Linux.'), [])
+})
+
+void test('the worker ships the same rule file', () => {
+  const ours = readFileSync(join(import.meta.dirname, '../constants/descriptionRules.json'), 'utf8')
+  const theirs = readFileSync(
+    join(import.meta.dirname, '../../../pyworker/pyworker/description_rules.json'),
+    'utf8'
+  )
+  assert.equal(theirs, ours)
 })

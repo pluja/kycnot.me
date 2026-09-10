@@ -4,9 +4,8 @@ from pathlib import Path
 
 from pyworker.utils.description_rules import check_description
 
-FIXTURE = json.loads(
-    (Path(__file__).parent / "fixtures/description_rules.json").read_text()
-)
+RULE_FILE = Path(__file__).resolve().parents[1] / "pyworker/description_rules.json"
+FIXTURE = json.loads(RULE_FILE.read_text())
 
 
 class TestDescriptionRules(unittest.TestCase):
@@ -24,6 +23,12 @@ class TestDescriptionRules(unittest.TestCase):
                     sorted(check_description(case["text"], case["name"])),
                     sorted(case["violations"]),
                 )
+
+    def test_the_web_app_ships_the_same_rule_file(self):
+        web_copy = RULE_FILE.parents[2] / "web/src/constants/descriptionRules.json"
+        if not web_copy.exists():
+            self.skipTest("web checkout not present")
+        self.assertEqual(web_copy.read_text(), RULE_FILE.read_text())
 
     def test_abbreviations_and_versions_are_not_sentence_ends(self):
         self.assertEqual(

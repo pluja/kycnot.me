@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import rules from '../../../pyworker/tests/fixtures/description_rules.json'
+import rules from '../constants/descriptionRules.json'
 
 export type DescriptionViolation =
   | 'dash'
@@ -21,8 +21,7 @@ export const DESCRIPTION_MAX_LENGTH: number = rules.maxLength
  * (a label like "no-KYC exchange" only when the listing supports it) is what
  * the reviewer and the scan prompt carry.
  */
-export const DESCRIPTION_RULE =
-  'One or two sentences, under 200 characters, that say what the service is and does. Third person, no marketing words, no exclamation marks, no dashes, nothing about terms, policies or restrictions.'
+export const DESCRIPTION_RULE = `One or two sentences, at most ${String(rules.maxLength)} characters, that say what the service is and does. Third person, no marketing words, no exclamation marks, no dashes, nothing about terms, policies or restrictions.`
 
 const violationMessages: Record<DescriptionViolation, string> = {
   dash: 'No dashes. Use a comma or a full stop.',
@@ -73,7 +72,7 @@ export const checkDescription = (text: string, name?: string): DescriptionViolat
   if (rules.leadingWords.includes(opening) || startsWithName) violations.push('opening')
   if (trimmed.length > rules.maxLength) violations.push('length')
   if (countSentences(trimmed) > rules.maxSentences) violations.push('sentences')
-  if (/[–—]|(^|\s)-{2,}(\s|$)|\s-\s/.test(trimmed)) violations.push('dash')
+  if (/[\u2013\u2014]|(^|\s)-{2,}(\s|$)|\s-\s/.test(trimmed)) violations.push('dash')
   if (trimmed.includes('!')) violations.push('exclamation')
   if (/(^|[^a-z])(we|our|ours|us)(?=$|[^a-z])/i.test(trimmed)) violations.push('first-person')
   if (marketingPattern.test(trimmed)) violations.push('marketing')
@@ -81,7 +80,7 @@ export const checkDescription = (text: string, name?: string): DescriptionViolat
   return violations
 }
 
-/** The field schema both service forms share, reporting every broken rule at once. */
+/** Reports every broken rule at once rather than the first. */
 export const descriptionSchema = z
   .string()
   .trim()
