@@ -47,6 +47,7 @@ export const {
       icon: 'ri:scales-3-line',
       href: (id) => `/admin/cases/${String(id)}`,
     },
+    { id: 'EVENT', slug: 'event', label: 'Event', icon: 'ri:calendar-event-line', href: null },
   ] as const satisfies AuditTargetTypeInfo<AuditTargetType>[]
 )
 

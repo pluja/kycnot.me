@@ -2,6 +2,7 @@ import { IncidentOutcome, IncidentSeverity, IncidentState, IncidentType } from '
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
+import { recordAuditLog } from '../../lib/auditLog'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { EVENT_KINDS, eventKindToFields, type EventKind } from '../../lib/eventKind'
 import { cap } from '../../lib/permissions'
@@ -121,6 +122,13 @@ export const adminEventActions = {
           data: { eventId: event.id, ...incidentDataFrom(input, input.severity) },
         })
       }
+      await recordAuditLog(prisma, {
+        actorId: context.locals.user.id,
+        action: 'CREATED',
+        targetType: 'EVENT',
+        targetId: event.id,
+        summary: `Created ${input.kind.toLowerCase()} "${input.title}"`,
+      })
       return { event }
     },
   }),
@@ -157,6 +165,13 @@ export const adminEventActions = {
         select: {
           id: true,
         },
+      })
+      await recordAuditLog(prisma, {
+        actorId: context.locals.user.id,
+        action: 'STATUS_CHANGED',
+        targetType: 'EVENT',
+        targetId: event.id,
+        summary: `${existingEvent.visible ? 'Hid' : 'Showed'} event "${existingEvent.title}"`,
       })
       return { event }
     },
@@ -207,6 +222,13 @@ export const adminEventActions = {
         await prisma.incident.deleteMany({ where: { eventId: input.eventId } })
       }
 
+      await recordAuditLog(prisma, {
+        actorId: context.locals.user.id,
+        action: 'UPDATED',
+        targetType: 'EVENT',
+        targetId: input.eventId,
+        summary: `Edited event "${input.title}"`,
+      })
       return { event: { id: input.eventId } }
     },
   }),
@@ -236,6 +258,13 @@ export const adminEventActions = {
         where: { id: input.eventId },
         data: { endedAt: resolvedAt, updatedById: context.locals.user.id },
       })
+      await recordAuditLog(prisma, {
+        actorId: context.locals.user.id,
+        action: 'STATUS_CHANGED',
+        targetType: 'EVENT',
+        targetId: input.eventId,
+        summary: `Resolved incident, outcome ${input.outcome.toLowerCase().replace('_', ' ')}`,
+      })
       return { event: { id: input.eventId } }
     },
   }),
@@ -252,7 +281,14 @@ export const adminEventActions = {
       const event = await prisma.event.update({
         where: { id: input.eventId },
         data: { deletedAt: new Date(), visible: false, updatedById: context.locals.user.id },
-        select: { id: true },
+        select: { id: true, title: true },
+      })
+      await recordAuditLog(prisma, {
+        actorId: context.locals.user.id,
+        action: 'DELETED',
+        targetType: 'EVENT',
+        targetId: event.id,
+        summary: `Deleted event "${event.title}"`,
       })
       return { event }
     },
@@ -268,7 +304,14 @@ export const adminEventActions = {
       const event = await prisma.event.update({
         where: { id: input.eventId },
         data: { deletedAt: null, visible: true, updatedById: context.locals.user.id },
-        select: { id: true },
+        select: { id: true, title: true },
+      })
+      await recordAuditLog(prisma, {
+        actorId: context.locals.user.id,
+        action: 'STATUS_CHANGED',
+        targetType: 'EVENT',
+        targetId: event.id,
+        summary: `Restored event "${event.title}"`,
       })
       return { event }
     },
@@ -281,8 +324,18 @@ export const adminEventActions = {
     input: z.object({
       eventId: z.coerce.number().int().positive(),
     }),
-    handler: async (input) => {
-      const event = await prisma.event.delete({ where: { id: input.eventId } })
+    handler: async (input, context) => {
+      const event = await prisma.event.delete({
+        where: { id: input.eventId },
+        select: { id: true, title: true },
+      })
+      await recordAuditLog(prisma, {
+        actorId: context.locals.user.id,
+        action: 'DELETED',
+        targetType: 'EVENT',
+        targetId: event.id,
+        summary: `Purged event "${event.title}" for good`,
+      })
       return { event }
     },
   }),
