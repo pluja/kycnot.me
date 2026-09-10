@@ -230,9 +230,9 @@ jobs:
           git init -q
           git -c http.extraHeader="Authorization: token $FORGEJO_TOKEN" fetch -q \
             "$FORGEJO_SERVER_URL/$FORGEJO_REPOSITORY.git" \
-            "+refs/heads/master:refs/heads/master" "+refs/tags/*:refs/tags/*"
+            "+refs/heads/master:refs/remotes/origin/master" "+refs/tags/*:refs/tags/*"
 
-          if [ "$(git rev-parse "refs/tags/$tag^{commit}")" != "$(git rev-parse refs/heads/master)" ]; then
+          if [ "$(git rev-parse "refs/tags/$tag^{commit}")" != "$(git rev-parse refs/remotes/origin/master)" ]; then
             echo "master moved past $tag since this release started. Not publishing." >&2
             exit 1
           fi
@@ -240,7 +240,7 @@ jobs:
           # Deploy production in the public repository starts when this tag lands there.
           git -c http.extraHeader="Authorization: token $token" push -q \
             "$FORGEJO_SERVER_URL/$PUBLIC_REPO.git" \
-            "refs/heads/master:refs/heads/master" "refs/tags/$tag:refs/tags/$tag"
+            "refs/remotes/origin/master:refs/heads/master" "refs/tags/$tag:refs/tags/$tag"
 
           previous="$(git tag --list 'v*' --sort=-creatordate | grep -vx "$tag" | head -n 1 || true)"
           if [ -n "$previous" ]; then
