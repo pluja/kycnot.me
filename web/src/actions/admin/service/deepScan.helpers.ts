@@ -31,7 +31,7 @@ export function buildAuditLines({
 }: {
   inputs: AcceptInputs
   proposedAttributes: ProposedAttributes
-  proposedKycLevel: number
+  proposedKycLevel: number | null
 }): string[] {
   const acceptedAdd = intersectAcceptedAttributeIds(inputs.attributeAddIds, proposedAttributes.add)
   const acceptedRemove = intersectAcceptedAttributeIds(inputs.attributeRemoveIds, proposedAttributes.remove)
@@ -40,7 +40,7 @@ export function buildAuditLines({
   if (inputs.acceptTosReview) {
     lines.push('ToS review published')
   }
-  if (inputs.acceptKycLevel) {
+  if (inputs.acceptKycLevel && proposedKycLevel !== null) {
     lines.push(`KYC level set to ${proposedKycLevel.toString()}`)
   }
   if (inputs.acceptKycPolicy) {
@@ -118,8 +118,9 @@ export function collectDeclines({
     sourceContentHash: (urlKey && documentHashes.get(urlKey)) || null,
   })
 
+  const attributes = proposed.attributes ?? { add: [], remove: [] }
   const rows: DeclineRow[] = (['attribute:add', 'attribute:remove'] as const).flatMap((kind) =>
-    (kind === 'attribute:add' ? proposed.attributes.add : proposed.attributes.remove)
+    (kind === 'attribute:add' ? attributes.add : attributes.remove)
       .filter((item) => !accepted[kind].has(String(item.attributeId)))
       .map((item) => ({
         serviceId,
@@ -147,7 +148,7 @@ export function collectDeclines({
   // Keyed on the level, not the service: turning down a move to 3 leaves a later
   // move to 4 free to be proposed. It carries no source document, so it holds
   // until someone proposes that same level again.
-  if (proposed.kycPolicy.levelFingerprint && !acceptedKycLevel) {
+  if (proposed.kycPolicy?.levelFingerprint && !acceptedKycLevel) {
     rows.push({
       serviceId,
       declinedById,
@@ -161,7 +162,7 @@ export function collectDeclines({
 
   // Keyed on the corpus, since the wording changes every run. Final for these
   // documents; edited terms carry a new hash and are asked about afresh.
-  if (proposed.kycPolicy.notesFingerprint && !acceptedKycNotes) {
+  if (proposed.kycPolicy?.notesFingerprint && !acceptedKycNotes) {
     rows.push({
       serviceId,
       declinedById,

@@ -1,3 +1,4 @@
+import { ServiceScanJobKind } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
@@ -26,26 +27,34 @@ export const deepScanActions = {
     permissions: cap('services:edit'),
     input: z.object({
       serviceId: z.coerce.number().int().positive(),
+      kind: z.nativeEnum(ServiceScanJobKind).default('DEEP_SCAN'),
     }),
     handler: async (input, { locals }) => {
       const service = await prisma.service.findUnique({
         where: { id: input.serviceId },
-        select: { id: true, tosUrls: true },
+        select: { id: true, tosUrls: true, serviceUrls: true },
       })
       if (!service) {
         throw new ActionError({ code: 'NOT_FOUND', message: 'Service not found' })
       }
-      if (service.tosUrls.length === 0) {
+      if (input.kind === 'DEEP_SCAN' && service.tosUrls.length === 0) {
         throw new ActionError({
           code: 'BAD_REQUEST',
           message: 'Service has no ToS URLs to scan.',
         })
       }
+      if (input.kind === 'DESCRIPTION' && service.serviceUrls.length === 0) {
+        throw new ActionError({
+          code: 'BAD_REQUEST',
+          message: 'Service has no URL to read a front page from.',
+        })
+      }
 
       await prisma.serviceScanJob.upsert({
-        where: { serviceId: input.serviceId },
+        where: { serviceId_kind: { serviceId: input.serviceId, kind: input.kind } },
         create: {
           serviceId: input.serviceId,
+          kind: input.kind,
           requestedByUserId: locals.user.id,
         },
         update: {
@@ -105,39 +114,39 @@ export const deepScanActions = {
       }
 
       const proposed = suggestion.proposedEdits
+      // A description review carries none of the scan blocks; every gate below
+      // then reads as "not offered", and only the description can be applied.
+      const kycPolicy = proposed.kycPolicy ?? null
+      const attributes = proposed.attributes ?? { add: [], remove: [] }
       // Only act on the level when the reviewer was shown it as a decision. A
       // disabled checkbox submits nothing, so without this an untouched, never
       // offered level reads as one they turned down.
       const kycLevelWasOffered =
-        !!proposed.kycPolicy.levelFingerprint &&
-        input.kycLevelFingerprint === proposed.kycPolicy.levelFingerprint
+        !!kycPolicy?.levelFingerprint && input.kycLevelFingerprint === kycPolicy.levelFingerprint
       const acceptKycLevel = kycLevelWasOffered && input.acceptKycLevel
       const kycNotesWasOffered =
-        !!proposed.kycPolicy.notesFingerprint &&
-        input.kycNotesFingerprint === proposed.kycPolicy.notesFingerprint
-      const acceptKycPolicy = kycNotesWasOffered && input.acceptKycPolicy && !!proposed.kycPolicy.notesMd
+        !!kycPolicy?.notesFingerprint && input.kycNotesFingerprint === kycPolicy.notesFingerprint
+      const acceptKycPolicy = kycNotesWasOffered && input.acceptKycPolicy && !!kycPolicy.notesMd
+      const acceptTosReview = input.acceptTosReview && !!proposed.tosReview
       const descriptionWasOffered =
         !!proposed.description?.fingerprint &&
         input.descriptionFingerprint === proposed.description.fingerprint
       const acceptDescription =
         descriptionWasOffered && input.acceptDescription && !!proposed.description?.text
-      const acceptedAdd = intersectAcceptedAttributeIds(input.attributeAddIds, proposed.attributes.add)
-      const acceptedRemove = intersectAcceptedAttributeIds(
-        input.attributeRemoveIds,
-        proposed.attributes.remove
-      )
+      const acceptedAdd = intersectAcceptedAttributeIds(input.attributeAddIds, attributes.add)
+      const acceptedRemove = intersectAcceptedAttributeIds(input.attributeRemoveIds, attributes.remove)
 
       const auditLines = buildAuditLines({
         inputs: {
-          acceptTosReview: input.acceptTosReview,
+          acceptTosReview,
           acceptKycLevel,
           acceptKycPolicy,
           acceptDescription,
           attributeAddIds: input.attributeAddIds,
           attributeRemoveIds: input.attributeRemoveIds,
         },
-        proposedAttributes: proposed.attributes,
-        proposedKycLevel: proposed.kycPolicy.inferredLevel,
+        proposedAttributes: attributes,
+        proposedKycLevel: kycPolicy?.inferredLevel ?? null,
       })
 
       // Anything left unticked is a decision, not an oversight. Recording it is
@@ -222,7 +231,7 @@ export const deepScanActions = {
         }
 
         if (
-          input.acceptTosReview ||
+          acceptTosReview ||
           acceptKycLevel ||
           acceptKycPolicy ||
           acceptDescription ||
@@ -231,7 +240,7 @@ export const deepScanActions = {
           await tx.service.update({
             where: { id: suggestion.serviceId },
             data: {
-              ...(input.acceptTosReview
+              ...(acceptTosReview && proposed.tosReview
                 ? {
                     tosReview: {
                       contentHash: proposed.contentHash,
@@ -240,8 +249,8 @@ export const deepScanActions = {
                     tosReviewAt: new Date(),
                   }
                 : {}),
-              ...(acceptKycLevel ? { kycLevel: proposed.kycPolicy.inferredLevel } : {}),
-              ...(acceptKycPolicy ? { kycPolicyMd: proposed.kycPolicy.notesMd } : {}),
+              ...(acceptKycLevel ? { kycLevel: kycPolicy.inferredLevel } : {}),
+              ...(acceptKycPolicy ? { kycPolicyMd: kycPolicy.notesMd } : {}),
               ...(acceptDescription ? { description: proposed.description?.text } : {}),
               ...listingUpdate,
             },

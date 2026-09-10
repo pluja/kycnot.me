@@ -26,31 +26,51 @@ type Suggestion = Prisma.ServiceSuggestionGetPayload<{
 }>
 
 type ScanJob = Prisma.ServiceScanJobGetPayload<{
-  select: { id: true; createdAt: true; claimedAt: true; processedAt: true; error: true }
+  select: { id: true; kind: true; createdAt: true; claimedAt: true; processedAt: true; error: true }
 }>
 
 type Service = Prisma.ServiceGetPayload<{
-  select: { id: true; description: true; kycLevel: true; kycPolicyMd: true; tosUrls: true; tosReview: true }
+  select: {
+    id: true
+    description: true
+    kycLevel: true
+    kycPolicyMd: true
+    tosUrls: true
+    serviceUrls: true
+    tosReview: true
+  }
 }>
 
 type Props = {
   service: Service
   scanJob: ScanJob | null
+  descriptionJob: ScanJob | null
   pendingSuggestion: Suggestion | null
   attributes: Attribute[]
   id?: string
 }
 
-const { service, scanJob, pendingSuggestion, attributes, id = 'tasks' } = Astro.props
+const { service, scanJob, descriptionJob, pendingSuggestion, attributes, id = 'tasks' } = Astro.props
 
 const scanClaimTimeoutMs = 15 * 60 * 1000
-const isScanStalled =
-  !!scanJob?.claimedAt &&
-  scanJob.processedAt === null &&
-  Date.now() - scanJob.claimedAt.getTime() > scanClaimTimeoutMs
-const isScanning = !!scanJob && scanJob.processedAt === null && !isScanStalled
-const stalledClaimedAt = isScanStalled ? scanJob.claimedAt : null
-const lastScanFailed = !!scanJob?.error && !!scanJob.processedAt
+// A claim older than the worker's timeout is a worker that died mid-job.
+const jobState = (job: ScanJob | null) => {
+  const stalledSince =
+    job?.claimedAt && job.processedAt === null && Date.now() - job.claimedAt.getTime() > scanClaimTimeoutMs
+      ? job.claimedAt
+      : null
+  return {
+    running: job?.processedAt === null && !stalledSince ? job : null,
+    stalledSince,
+    failed: job?.error && job.processedAt ? job.error : null,
+  }
+}
+const scan = jobState(scanJob)
+const isScanStalled = !!scan.stalledSince
+const isScanning = !!scan.running
+const stalledClaimedAt = scan.stalledSince
+const lastScanFailed = !!scan.failed
+const description = jobState(descriptionJob)
 
 const proposedEdits = pendingSuggestion?.proposedEdits ?? null
 const currentUrl = `${Astro.url.pathname}${Astro.url.search}`
@@ -68,11 +88,11 @@ const sectionHash = `#${id}`
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="text-sm text-day-300">
           {
-            isScanning ? (
+            scan.running ? (
               <span class="inline-flex items-center gap-2">
                 <Icon name="ri:loader-4-line" class="size-4 animate-spin text-orange-400" />
                 Scanning since
-                <TimeFormatted date={scanJob.createdAt} hourPrecision />
+                <TimeFormatted date={scan.running.createdAt} hourPrecision />
               </span>
             ) : stalledClaimedAt ? (
               <span class="inline-flex items-center gap-2 text-yellow-300">
@@ -136,7 +156,91 @@ const sectionHash = `#${id}`
         lastScanFailed && (
           <p class="mt-2 rounded-sm bg-red-500/10 p-2 text-xs text-red-300">
             <Icon name="ri:error-warning-line" class="me-1 inline-block size-3.5 align-[-0.15em]" />
-            Last scan failed: {scanJob.error}
+            Last scan failed: {scan.failed}
+          </p>
+        )
+      }
+    </div>
+  </FormSubSection>
+
+  <FormSubSection title="Description review">
+    <p class="text-center text-sm text-day-400">
+      Read the front page and propose a description that follows the editorial rule, without touching the
+      terms. Cheap, and works for listings with no ToS URL.
+    </p>
+
+    <div class="rounded-lg border border-night-600 bg-night-800 p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="text-sm text-day-300">
+          {
+            description.running ? (
+              <span class="inline-flex items-center gap-2">
+                <Icon name="ri:loader-4-line" class="size-4 animate-spin text-orange-400" />
+                Reviewing since
+                <TimeFormatted date={description.running.createdAt} hourPrecision />
+              </span>
+            ) : description.stalledSince ? (
+              <span class="inline-flex items-center gap-2 text-yellow-300">
+                <Icon name="ri:alert-line" class="size-4" />
+                Review stalled since
+                <TimeFormatted date={description.stalledSince} hourPrecision />
+              </span>
+            ) : descriptionJob?.processedAt ? (
+              <span class="inline-flex items-center gap-2 text-day-400">
+                <Icon name="ri:history-line" class="size-4" />
+                Last reviewed
+                <TimeFormatted date={descriptionJob.processedAt} hourPrecision />
+              </span>
+            ) : (
+              <span class="text-day-500">Never reviewed</span>
+            )
+          }
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          {
+            description.running && (
+              <a
+                href={currentUrl}
+                hx-get={currentUrl}
+                hx-target={`#${id}`}
+                hx-select={`#${id}`}
+                hx-swap="outerHTML"
+                hx-indicator="this"
+                class="inline-flex items-center gap-2 rounded-md border border-day-500/30 bg-night-700 px-3 py-1.5 text-sm font-medium text-day-200 transition-colors hover:bg-night-600 htmx-request:opacity-70"
+              >
+                <Icon name="ri:refresh-line" class="size-4 htmx-request:animate-spin" />
+                Refresh status
+              </a>
+            )
+          }
+
+          <form method="POST" action={`${actions.admin.service.deepScan.request}${sectionHash}`}>
+            <input type="hidden" name="serviceId" value={service.id} />
+            <input type="hidden" name="kind" value="DESCRIPTION" />
+            <button
+              type="submit"
+              disabled={!!description.running || service.serviceUrls.length === 0}
+              class="inline-flex items-center gap-2 rounded-md border border-orange-500/40 bg-orange-500/10 px-3 py-1.5 text-sm font-medium text-orange-200 transition-colors hover:bg-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon name="ri:quill-pen-line" class="size-4" />
+              {
+                description.running
+                  ? 'Reviewing...'
+                  : description.stalledSince
+                    ? 'Retry review'
+                    : 'Review description'
+              }
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {
+        description.failed && (
+          <p class="mt-2 rounded-sm bg-red-500/10 p-2 text-xs text-red-300">
+            <Icon name="ri:error-warning-line" class="me-1 inline-block size-3.5 align-[-0.15em]" />
+            {description.failed}
           </p>
         )
       }

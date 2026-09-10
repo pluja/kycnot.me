@@ -237,21 +237,22 @@ const evidenceImages = await Astro.locals.banners.try(
   []
 )
 
-const [scanJob, pendingDeepScanSuggestion] = await Astro.locals.banners.tryMany([
+const [scanJobs, pendingDeepScanSuggestion] = await Astro.locals.banners.tryMany([
   [
-    'Error fetching scan job',
+    'Error fetching scan jobs',
     () =>
-      prisma.serviceScanJob.findUnique({
+      prisma.serviceScanJob.findMany({
         where: { serviceId: service.id },
         select: {
           id: true,
+          kind: true,
           createdAt: true,
           claimedAt: true,
           processedAt: true,
           error: true,
         },
       }),
-    null,
+    [] as [],
   ],
   [
     'Error fetching deep scan suggestion',
@@ -288,7 +289,7 @@ const apiCalls = await Astro.locals.banners.try(
   []
 )
 
-const isScanning = !!scanJob && scanJob.processedAt === null
+const isScanning = scanJobs.some((job) => job.processedAt === null)
 const tasksBadge = pendingDeepScanSuggestion ? '!' : isScanning ? '...' : undefined
 
 // Events are gated by their own capability, so a services:edit-only editor
@@ -408,7 +409,8 @@ const navItems = [
 
         <TasksSection
           service={service}
-          scanJob={scanJob}
+          scanJob={scanJobs.find((job) => job.kind === 'DEEP_SCAN') ?? null}
+          descriptionJob={scanJobs.find((job) => job.kind === 'DESCRIPTION') ?? null}
           pendingSuggestion={pendingDeepScanSuggestion}
           attributes={attributes}
         />

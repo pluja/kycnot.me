@@ -62,10 +62,10 @@ declare global {
       | 'verification'
 
     type ProposedEdits = {
-      /** sha256 hash of the legal corpus used to generate these edits. */
+      /** sha256 hash of what was read: the legal corpus, or the front page for a description review. */
       contentHash: string
-      /** Same shape as Service.tosReview, mirrored here for the admin UI. */
-      tosReview: {
+      /** Absent on a description review, which never reads the terms. */
+      tosReview?: {
         kycLevel: 0 | 1 | 2 | 3 | 4
         summary: MarkdownString
         complexity: 'high' | 'low' | 'medium'
@@ -79,7 +79,8 @@ declare global {
           sourceUrl?: string
         }[]
       }
-      kycPolicy: {
+      /** Absent on a description review. */
+      kycPolicy?: {
         /** Set while a level change is still open; null once declined or unchanged. */
         levelFingerprint?: string | null
         inferredLevel: 0 | 1 | 2 | 3 | 4
@@ -88,7 +89,8 @@ declare global {
         notesMd: MarkdownString
         rationale: string
       }
-      attributes: {
+      /** Absent on a description review. */
+      attributes?: {
         add: ProposedAttribute[]
         remove: ProposedAttribute[]
       }

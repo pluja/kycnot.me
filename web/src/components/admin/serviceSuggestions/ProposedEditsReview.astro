@@ -60,41 +60,42 @@ const {
 const proposedEdits = suggestion.proposedEdits
 
 const currentKycLevelInfo = getKycLevelInfo(service.kycLevel.toString())
-const proposedKycLevelInfo = proposedEdits
-  ? getKycLevelInfo(proposedEdits.kycPolicy.inferredLevel.toString())
-  : null
+// A description review carries only the description; the scan rows stay out.
+const kycPolicy = proposedEdits?.kycPolicy ?? null
+const proposedTosReview = proposedEdits?.tosReview ?? null
+const proposedAttributes = proposedEdits?.attributes ?? { add: [], remove: [] }
+const isDescriptionOnly = !!proposedEdits && !kycPolicy && !proposedTosReview
+const proposedKycLevelInfo = kycPolicy ? getKycLevelInfo(kycPolicy.inferredLevel.toString()) : null
 
 // Whether the level is still open, which is not the same as whether it differs
 // from the record: a level a reviewer already turned down still differs, and
 // offering it again pre-ticked is how a declined change gets applied by accident.
-const kycLevelFingerprint = proposedEdits?.kycPolicy.levelFingerprint ?? null
+const kycLevelFingerprint = kycPolicy?.levelFingerprint ?? null
 const kycLevelChanged = !!kycLevelFingerprint
-const kycLevelDeclined =
-  !!proposedEdits && !kycLevelFingerprint && proposedEdits.kycPolicy.inferredLevel !== service.kycLevel
+const kycLevelDeclined = !!kycPolicy && !kycLevelFingerprint && kycPolicy.inferredLevel !== service.kycLevel
 // An empty text is never offered: clearing the notes is an edit-form job, not
 // a box a reviewer can tick through.
-const kycNotesFingerprint = proposedEdits?.kycPolicy.notesFingerprint ?? null
+const kycNotesFingerprint = kycPolicy?.notesFingerprint ?? null
 const kycPolicyChanged =
-  !!kycNotesFingerprint &&
-  !!proposedEdits?.kycPolicy.notesMd &&
-  proposedEdits.kycPolicy.notesMd !== (service.kycPolicyMd ?? '')
+  !!kycNotesFingerprint && !!kycPolicy?.notesMd && kycPolicy.notesMd !== (service.kycPolicyMd ?? '')
 const descriptionFingerprint = proposedEdits?.description?.fingerprint ?? null
 const descriptionChanged =
   !!descriptionFingerprint &&
   !!proposedEdits?.description?.text &&
   proposedEdits.description.text !== service.description
-const addCount = proposedEdits?.attributes.add.length ?? 0
+const addCount = proposedAttributes.add.length
 const listingCheckCount = proposedEdits?.listingChecks?.length ?? 0
-const removeCount = proposedEdits?.attributes.remove.length ?? 0
+const removeCount = proposedAttributes.remove.length
 const warningCount = proposedEdits?.warnings.length ?? 0
 const isActionable = suggestion.status === 'PENDING' || suggestion.status === 'UNDER_REVIEW'
 const currentTosReview = service.tosReview
 const tosSummaryChanged =
-  !!proposedEdits && (currentTosReview?.summary ?? '') !== proposedEdits.tosReview.summary
+  !!proposedTosReview && (currentTosReview?.summary ?? '') !== proposedTosReview.summary
 const tosHighlightsChanged =
-  !!proposedEdits &&
-  JSON.stringify(currentTosReview?.highlights ?? []) !== JSON.stringify(proposedEdits.tosReview.highlights)
-const tosReviewChanged = tosSummaryChanged || tosHighlightsChanged || !currentTosReview
+  !!proposedTosReview &&
+  JSON.stringify(currentTosReview?.highlights ?? []) !== JSON.stringify(proposedTosReview.highlights)
+const tosReviewChanged =
+  !!proposedTosReview && (tosSummaryChanged || tosHighlightsChanged || !currentTosReview)
 
 const warningSeverityIcons = {
   info: { icon: 'ri:information-line', className: 'text-blue-400' },
@@ -165,137 +166,151 @@ const acceptTosReviewInputId = `accept-tos-review-${suggestion.id}`
           </div>
 
           <div class="divide-y divide-night-600">
-            <TosReviewProposalRow
-              currentTosReview={currentTosReview}
-              proposedTosReview={proposedEdits.tosReview}
-              changed={tosReviewChanged}
-              isActionable={isActionable}
-              inputId={acceptTosReviewInputId}
-            />
-
-            <label
-              class={cn(
-                'grid gap-3 p-4 sm:grid-cols-[auto_1fr] sm:items-start',
-                isActionable && kycLevelChanged
-                  ? 'cursor-pointer bg-orange-500/5 hover:bg-orange-500/10'
-                  : 'bg-night-800'
-              )}
-            >
-              <input
-                type="checkbox"
-                name="acceptKycLevel"
-                value="on"
-                checked={kycLevelChanged}
-                disabled={!isActionable || !kycLevelChanged}
-                class="mt-1"
+            {proposedTosReview && (
+              <TosReviewProposalRow
+                currentTosReview={currentTosReview}
+                proposedTosReview={proposedTosReview}
+                changed={tosReviewChanged}
+                isActionable={isActionable}
+                inputId={acceptTosReviewInputId}
               />
-              {/* A disabled checkbox is not submitted, so without this the server
-                  cannot tell "left unticked" from "never offered" and would record
-                  a decline the reviewer never made. */}
-              {isActionable && kycLevelFingerprint && (
-                <input type="hidden" name="kycLevelFingerprint" value={kycLevelFingerprint} />
-              )}
-              <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="font-title text-sm font-semibold text-day-100">Apply KYC level change</span>
-                  {kycLevelDeclined ? (
-                    <BadgeSmall color="gray" text="Previously declined" icon="ri:indeterminate-circle-line" />
-                  ) : (
-                    !kycLevelChanged && (
-                      <BadgeSmall color="gray" text="No change" icon="ri:checkbox-circle-line" />
-                    )
-                  )}
-                </div>
-                <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                  <Tooltip text={currentKycLevelInfo.name}>
-                    <span class="inline-flex items-center gap-1.5 rounded-md border border-night-500 bg-night-900 px-2 py-1 text-day-300">
-                      <Icon name={currentKycLevelInfo.icon} class="size-4" />
-                      KYC {service.kycLevel}
-                    </span>
-                  </Tooltip>
-                  <Icon name="ri:arrow-right-line" class="size-4 text-day-500" />
-                  {proposedKycLevelInfo && (
-                    <Tooltip text={proposedKycLevelInfo.name}>
-                      <span
-                        class={cn(
-                          'inline-flex items-center gap-1.5 rounded-md border px-2 py-1',
-                          kycLevelChanged
-                            ? 'border-orange-500/40 bg-orange-500/10 text-orange-100'
-                            : 'border-night-500 bg-night-900 text-day-300'
-                        )}
-                      >
-                        <Icon name={proposedKycLevelInfo.icon} class="size-4" />
-                        KYC {proposedEdits.kycPolicy.inferredLevel}
-                      </span>
-                    </Tooltip>
-                  )}
-                </div>
-                {!!proposedEdits.kycPolicy.rationale && (
-                  <p class="mt-2 text-sm text-day-400">{proposedEdits.kycPolicy.rationale}</p>
-                )}
-              </div>
-            </label>
+            )}
 
-            <div
-              class={cn(
-                'p-4',
-                isActionable && kycPolicyChanged ? 'bg-orange-500/5 hover:bg-orange-500/10' : 'bg-night-800'
-              )}
-            >
-              <label
-                class={cn(
-                  'grid gap-3 sm:grid-cols-[auto_1fr] sm:items-start',
-                  isActionable && kycPolicyChanged && 'cursor-pointer'
-                )}
-              >
-                <input
-                  type="checkbox"
-                  name="acceptKycPolicy"
-                  value="on"
-                  checked={kycPolicyChanged}
-                  disabled={!isActionable || !kycPolicyChanged}
-                  class="mt-1"
-                />
-                {isActionable && kycPolicyChanged && (
-                  <input type="hidden" name="kycNotesFingerprint" value={kycNotesFingerprint} />
-                )}
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="font-title text-sm font-semibold text-day-100">Apply KYC policy notes</span>
-                  {kycPolicyChanged ? (
-                    <BadgeSmall color="orange" text="Text update" icon="ri:file-edit-line" />
-                  ) : (
-                    <BadgeSmall color="gray" text="No change" icon="ri:checkbox-circle-line" />
+            {kycPolicy && (
+              <>
+                <label
+                  class={cn(
+                    'grid gap-3 p-4 sm:grid-cols-[auto_1fr] sm:items-start',
+                    isActionable && kycLevelChanged
+                      ? 'cursor-pointer bg-orange-500/5 hover:bg-orange-500/10'
+                      : 'bg-night-800'
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    name="acceptKycLevel"
+                    value="on"
+                    checked={kycLevelChanged}
+                    disabled={!isActionable || !kycLevelChanged}
+                    class="mt-1"
+                  />
+                  {/* A disabled checkbox is not submitted, so without this the server
+                      cannot tell "left unticked" from "never offered" and would record
+                      a decline the reviewer never made. */}
+                  {isActionable && kycLevelFingerprint && (
+                    <input type="hidden" name="kycLevelFingerprint" value={kycLevelFingerprint} />
+                  )}
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="font-title text-sm font-semibold text-day-100">
+                        Apply KYC level change
+                      </span>
+                      {kycLevelDeclined ? (
+                        <BadgeSmall
+                          color="gray"
+                          text="Previously declined"
+                          icon="ri:indeterminate-circle-line"
+                        />
+                      ) : (
+                        !kycLevelChanged && (
+                          <BadgeSmall color="gray" text="No change" icon="ri:checkbox-circle-line" />
+                        )
+                      )}
+                    </div>
+                    <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                      <Tooltip text={currentKycLevelInfo.name}>
+                        <span class="inline-flex items-center gap-1.5 rounded-md border border-night-500 bg-night-900 px-2 py-1 text-day-300">
+                          <Icon name={currentKycLevelInfo.icon} class="size-4" />
+                          KYC {service.kycLevel}
+                        </span>
+                      </Tooltip>
+                      <Icon name="ri:arrow-right-line" class="size-4 text-day-500" />
+                      {proposedKycLevelInfo && (
+                        <Tooltip text={proposedKycLevelInfo.name}>
+                          <span
+                            class={cn(
+                              'inline-flex items-center gap-1.5 rounded-md border px-2 py-1',
+                              kycLevelChanged
+                                ? 'border-orange-500/40 bg-orange-500/10 text-orange-100'
+                                : 'border-night-500 bg-night-900 text-day-300'
+                            )}
+                          >
+                            <Icon name={proposedKycLevelInfo.icon} class="size-4" />
+                            KYC {kycPolicy.inferredLevel}
+                          </span>
+                        </Tooltip>
+                      )}
+                    </div>
+                    {!!kycPolicy.rationale && <p class="mt-2 text-sm text-day-400">{kycPolicy.rationale}</p>}
+                  </div>
+                </label>
+
+                <div
+                  class={cn(
+                    'p-4',
+                    isActionable && kycPolicyChanged
+                      ? 'bg-orange-500/5 hover:bg-orange-500/10'
+                      : 'bg-night-800'
+                  )}
+                >
+                  <label
+                    class={cn(
+                      'grid gap-3 sm:grid-cols-[auto_1fr] sm:items-start',
+                      isActionable && kycPolicyChanged && 'cursor-pointer'
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      name="acceptKycPolicy"
+                      value="on"
+                      checked={kycPolicyChanged}
+                      disabled={!isActionable || !kycPolicyChanged}
+                      class="mt-1"
+                    />
+                    {isActionable && kycPolicyChanged && (
+                      <input type="hidden" name="kycNotesFingerprint" value={kycNotesFingerprint} />
+                    )}
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="font-title text-sm font-semibold text-day-100">
+                        Apply KYC policy notes
+                      </span>
+                      {kycPolicyChanged ? (
+                        <BadgeSmall color="orange" text="Text update" icon="ri:file-edit-line" />
+                      ) : (
+                        <BadgeSmall color="gray" text="No change" icon="ri:checkbox-circle-line" />
+                      )}
+                    </div>
+                  </label>
+                  {/* Outside the label on purpose: a click that opens the comparison
+                      must not toggle the decision. */}
+                  {kycPolicyChanged && (
+                    <details class="mt-3 rounded-md border border-night-600 bg-night-900 p-3">
+                      <summary class="cursor-pointer text-sm font-medium text-day-200">
+                        Compare current and proposed notes
+                      </summary>
+                      <div class="mt-3 grid gap-3 lg:grid-cols-2">
+                        <div>
+                          <p class="text-xs font-bold tracking-wider text-day-500 uppercase">Current</p>
+                          <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-400 prose-invert">
+                            {service.kycPolicyMd ? (
+                              <Markdown content={service.kycPolicyMd} />
+                            ) : (
+                              <p class="text-day-500 italic">(empty)</p>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <p class="text-xs font-bold tracking-wider text-orange-300 uppercase">Proposed</p>
+                          <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-200 prose-invert">
+                            <Markdown content={kycPolicy.notesMd} />
+                          </div>
+                        </div>
+                      </div>
+                    </details>
                   )}
                 </div>
-              </label>
-              {/* Outside the label on purpose: a click that opens the comparison
-                  must not toggle the decision. */}
-              {kycPolicyChanged && (
-                <details class="mt-3 rounded-md border border-night-600 bg-night-900 p-3">
-                  <summary class="cursor-pointer text-sm font-medium text-day-200">
-                    Compare current and proposed notes
-                  </summary>
-                  <div class="mt-3 grid gap-3 lg:grid-cols-2">
-                    <div>
-                      <p class="text-xs font-bold tracking-wider text-day-500 uppercase">Current</p>
-                      <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-400 prose-invert">
-                        {service.kycPolicyMd ? (
-                          <Markdown content={service.kycPolicyMd} />
-                        ) : (
-                          <p class="text-day-500 italic">(empty)</p>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <p class="text-xs font-bold tracking-wider text-orange-300 uppercase">Proposed</p>
-                      <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-200 prose-invert">
-                        <Markdown content={proposedEdits.kycPolicy.notesMd} />
-                      </div>
-                    </div>
-                  </div>
-                </details>
-              )}
-            </div>
+              </>
+            )}
 
             <div
               class={cn(
@@ -346,14 +361,18 @@ const acceptTosReviewInputId = `accept-tos-review-${suggestion.id}`
               )}
             </div>
 
-            <ListingChecksSection checks={proposedEdits.listingChecks ?? []} isActionable={isActionable} />
+            {!isDescriptionOnly && (
+              <ListingChecksSection checks={proposedEdits.listingChecks ?? []} isActionable={isActionable} />
+            )}
 
-            <AttributeProposalGroups
-              add={proposedEdits.attributes.add}
-              remove={proposedEdits.attributes.remove}
-              attributes={attributes}
-              isActionable={isActionable}
-            />
+            {!isDescriptionOnly && (
+              <AttributeProposalGroups
+                add={proposedAttributes.add}
+                remove={proposedAttributes.remove}
+                attributes={attributes}
+                isActionable={isActionable}
+              />
+            )}
           </div>
         </div>
 
