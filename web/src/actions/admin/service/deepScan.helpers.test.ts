@@ -15,6 +15,11 @@ const proposed = {
     levelFingerprint: 'open',
     notesFingerprint: 'open-notes',
   },
+  description: {
+    fingerprint: 'open-description',
+    text: 'Instant exchange with a Tor mirror.',
+    reasons: ['marketing'],
+  },
   attributes: {
     add: [
       { attributeId: 12, rationale: 'a', sourceUrlKey: 'x.com/terms' },
@@ -42,6 +47,7 @@ const collect = (accepted: {
   listing?: string[]
   kycLevel?: boolean
   kycNotes?: boolean
+  description?: boolean
 }) =>
   collectDeclines({
     serviceId: 1,
@@ -56,7 +62,21 @@ const collect = (accepted: {
     acceptedListingFields: accepted.listing ?? [],
     acceptedKycLevel: accepted.kycLevel ?? true,
     acceptedKycNotes: accepted.kycNotes ?? true,
+    acceptedDescription: accepted.description ?? true,
   })
+
+test('an unticked description rewrite is declined for this corpus only', () => {
+  const rows = collect({
+    add: [12, 13],
+    remove: [7],
+    listing: ['registrationCountryCode'],
+    description: false,
+  })
+
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0]?.kind, 'description')
+  assert.equal(rows[0]?.fingerprint, scanFingerprint(1, 'description', 'corpus-hash'))
+})
 
 test('unticked KYC notes are declined for this corpus only', () => {
   const rows = collect({ add: [12, 13], remove: [7], listing: ['registrationCountryCode'], kycNotes: false })
@@ -124,6 +144,7 @@ test('collectDeclines leaves the KYC level alone when no change was proposed', (
     acceptedListingFields: ['registrationCountryCode'],
     acceptedKycLevel: false,
     acceptedKycNotes: true,
+    acceptedDescription: true,
   })
 
   assert.deepEqual(rows, [])
@@ -185,6 +206,7 @@ test('collectDeclines survives a scan that predates listing checks', () => {
     acceptedListingFields: [],
     acceptedKycLevel: true,
     acceptedKycNotes: true,
+    acceptedDescription: true,
   })
 
   assert.equal(rows.length, 3)

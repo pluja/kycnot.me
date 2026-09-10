@@ -30,7 +30,7 @@ type ScanJob = Prisma.ServiceScanJobGetPayload<{
 }>
 
 type Service = Prisma.ServiceGetPayload<{
-  select: { id: true; kycLevel: true; kycPolicyMd: true; tosUrls: true; tosReview: true }
+  select: { id: true; description: true; kycLevel: true; kycPolicyMd: true; tosUrls: true; tosReview: true }
 }>
 
 type Props = {

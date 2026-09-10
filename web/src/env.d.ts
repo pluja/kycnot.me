@@ -105,6 +105,14 @@ declare global {
         sourceUrlKey?: string
         fingerprint: string
       }[]
+      /** Absent on scans generated before descriptions were reviewed. */
+      description?: {
+        /** Set while the rewrite is open; null once declined for this corpus or when the current text passes. */
+        fingerprint?: string | null
+        text: string
+        /** Each rule the current text breaks, in a few words. */
+        reasons: string[]
+      }
       warnings: {
         title: string
         bodyMd: MarkdownString

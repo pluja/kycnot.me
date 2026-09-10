@@ -9,6 +9,7 @@ type AcceptInputs = {
   acceptTosReview: boolean
   acceptKycLevel: boolean
   acceptKycPolicy: boolean
+  acceptDescription: boolean
   attributeAddIds: number[]
   attributeRemoveIds: number[]
 }
@@ -45,6 +46,9 @@ export function buildAuditLines({
   if (inputs.acceptKycPolicy) {
     lines.push('KYC policy notes updated')
   }
+  if (inputs.acceptDescription) {
+    lines.push('Description rewritten')
+  }
   if (acceptedAdd.length > 0) {
     lines.push(`Added attributes: ${acceptedAdd.join(', ')}`)
   }
@@ -68,6 +72,7 @@ type DeclineInputs = {
   acceptedListingFields: string[]
   acceptedKycLevel: boolean
   acceptedKycNotes: boolean
+  acceptedDescription: boolean
 }
 
 /**
@@ -89,6 +94,7 @@ export function collectDeclines({
   acceptedListingFields,
   acceptedKycLevel,
   acceptedKycNotes,
+  acceptedDescription,
 }: DeclineInputs) {
   const accepted = {
     'attribute:add': new Set(acceptedAttributeAdd.map(String)),
@@ -164,6 +170,18 @@ export function collectDeclines({
       fingerprint: scanFingerprint(serviceId, 'kycNotes', proposed.contentHash),
       kind: 'kycNotes',
       label: 'Keep the KYC policy notes as they are',
+    })
+  }
+
+  if (proposed.description?.fingerprint && !acceptedDescription) {
+    rows.push({
+      serviceId,
+      declinedById,
+      sourceUrlKey: null,
+      sourceContentHash: null,
+      fingerprint: scanFingerprint(serviceId, 'description', proposed.contentHash),
+      kind: 'description',
+      label: 'Keep the description as it is',
     })
   }
 

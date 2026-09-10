@@ -34,7 +34,7 @@ type Suggestion = Prisma.ServiceSuggestionGetPayload<{
 }>
 
 type Service = Prisma.ServiceGetPayload<{
-  select: { id: true; kycLevel: true; kycPolicyMd: true; tosReview: true }
+  select: { id: true; description: true; kycLevel: true; kycPolicyMd: true; tosReview: true }
 }>
 
 type Props = {
@@ -78,6 +78,11 @@ const kycPolicyChanged =
   !!kycNotesFingerprint &&
   !!proposedEdits?.kycPolicy.notesMd &&
   proposedEdits.kycPolicy.notesMd !== (service.kycPolicyMd ?? '')
+const descriptionFingerprint = proposedEdits?.description?.fingerprint ?? null
+const descriptionChanged =
+  !!descriptionFingerprint &&
+  !!proposedEdits?.description?.text &&
+  proposedEdits.description.text !== service.description
 const addCount = proposedEdits?.attributes.add.length ?? 0
 const listingCheckCount = proposedEdits?.listingChecks?.length ?? 0
 const removeCount = proposedEdits?.attributes.remove.length ?? 0
@@ -152,6 +157,7 @@ const acceptTosReviewInputId = `accept-tos-review-${suggestion.id}`
               {Number(tosReviewChanged) +
                 Number(kycLevelChanged) +
                 Number(kycPolicyChanged) +
+                Number(descriptionChanged) +
                 addCount +
                 removeCount}{' '}
               proposed
@@ -288,6 +294,55 @@ const acceptTosReviewInputId = `accept-tos-review-${suggestion.id}`
                     </div>
                   </div>
                 </details>
+              )}
+            </div>
+
+            <div
+              class={cn(
+                'p-4',
+                isActionable && descriptionChanged ? 'bg-orange-500/5 hover:bg-orange-500/10' : 'bg-night-800'
+              )}
+            >
+              <label
+                class={cn(
+                  'grid gap-3 sm:grid-cols-[auto_1fr] sm:items-start',
+                  isActionable && descriptionChanged && 'cursor-pointer'
+                )}
+              >
+                <input
+                  type="checkbox"
+                  name="acceptDescription"
+                  value="on"
+                  checked={descriptionChanged}
+                  disabled={!isActionable || !descriptionChanged}
+                  class="mt-1"
+                />
+                {isActionable && descriptionChanged && (
+                  <input type="hidden" name="descriptionFingerprint" value={descriptionFingerprint} />
+                )}
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-title text-sm font-semibold text-day-100">Rewrite the description</span>
+                  {descriptionChanged ? (
+                    <BadgeSmall color="orange" text="Text update" icon="ri:file-edit-line" />
+                  ) : (
+                    <BadgeSmall color="gray" text="No change" icon="ri:checkbox-circle-line" />
+                  )}
+                </div>
+              </label>
+              {descriptionChanged && proposedEdits.description && (
+                <div class="mt-3 grid gap-3 lg:grid-cols-2">
+                  <div>
+                    <p class="text-xs font-bold tracking-wider text-day-500 uppercase">Current</p>
+                    <p class="mt-2 text-sm text-pretty text-day-400">{service.description}</p>
+                  </div>
+                  <div>
+                    <p class="text-xs font-bold tracking-wider text-orange-300 uppercase">Proposed</p>
+                    <p class="mt-2 text-sm text-pretty text-day-200">{proposedEdits.description.text}</p>
+                    {proposedEdits.description.reasons.length > 0 && (
+                      <p class="mt-2 text-xs text-day-500">{proposedEdits.description.reasons.join('. ')}.</p>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
 

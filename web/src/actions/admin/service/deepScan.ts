@@ -70,6 +70,8 @@ export const deepScanActions = {
       kycLevelFingerprint: z.string().trim().optional(),
       acceptKycPolicy: checkboxBoolean,
       kycNotesFingerprint: z.string().trim().optional(),
+      acceptDescription: checkboxBoolean,
+      descriptionFingerprint: z.string().trim().optional(),
       attributeAddIds: z.array(z.coerce.number().int().positive()),
       attributeRemoveIds: z.array(z.coerce.number().int().positive()),
       listingFields: z.array(z.enum(listingCheckFieldIds)),
@@ -114,6 +116,11 @@ export const deepScanActions = {
         !!proposed.kycPolicy.notesFingerprint &&
         input.kycNotesFingerprint === proposed.kycPolicy.notesFingerprint
       const acceptKycPolicy = kycNotesWasOffered && input.acceptKycPolicy && !!proposed.kycPolicy.notesMd
+      const descriptionWasOffered =
+        !!proposed.description?.fingerprint &&
+        input.descriptionFingerprint === proposed.description.fingerprint
+      const acceptDescription =
+        descriptionWasOffered && input.acceptDescription && !!proposed.description?.text
       const acceptedAdd = intersectAcceptedAttributeIds(input.attributeAddIds, proposed.attributes.add)
       const acceptedRemove = intersectAcceptedAttributeIds(
         input.attributeRemoveIds,
@@ -125,6 +132,7 @@ export const deepScanActions = {
           acceptTosReview: input.acceptTosReview,
           acceptKycLevel,
           acceptKycPolicy,
+          acceptDescription,
           attributeAddIds: input.attributeAddIds,
           attributeRemoveIds: input.attributeRemoveIds,
         },
@@ -149,6 +157,7 @@ export const deepScanActions = {
         acceptedListingFields: input.listingFields,
         acceptedKycLevel: !kycLevelWasOffered || input.acceptKycLevel,
         acceptedKycNotes: !kycNotesWasOffered || input.acceptKycPolicy,
+        acceptedDescription: !descriptionWasOffered || input.acceptDescription,
       })
 
       // Two gates, because the field name has two untrusted sources. The form
@@ -212,7 +221,13 @@ export const deepScanActions = {
           listingUpdate[check.field] = parsed.data
         }
 
-        if (input.acceptTosReview || acceptKycLevel || acceptKycPolicy || acceptedListing.length > 0) {
+        if (
+          input.acceptTosReview ||
+          acceptKycLevel ||
+          acceptKycPolicy ||
+          acceptDescription ||
+          acceptedListing.length > 0
+        ) {
           await tx.service.update({
             where: { id: suggestion.serviceId },
             data: {
@@ -227,6 +242,7 @@ export const deepScanActions = {
                 : {}),
               ...(acceptKycLevel ? { kycLevel: proposed.kycPolicy.inferredLevel } : {}),
               ...(acceptKycPolicy ? { kycPolicyMd: proposed.kycPolicy.notesMd } : {}),
+              ...(acceptDescription ? { description: proposed.description?.text } : {}),
               ...listingUpdate,
             },
           })
