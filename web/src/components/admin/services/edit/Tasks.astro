@@ -1,25 +1,13 @@
 ---
+import { proposalJobKind } from '../../../../lib/scanJobs'
 import FormSection from '../../../FormSection.astro'
 import FormSubSection from '../../../FormSubSection.astro'
 import JobCard from './JobCard.astro'
-import ProposedEditsReview from '../../serviceSuggestions/ProposedEditsReview.astro'
 
-import type { Prisma } from '@prisma/client'
-
-type Attribute = Prisma.AttributeGetPayload<{
-  select: {
-    id: true
-    title: true
-    description: true
-    category: true
-    type: true
-    privacyPoints: true
-    trustPoints: true
-  }
-}>
+import type { Prisma, ServiceScanJobKind } from '@prisma/client'
 
 type Suggestion = Prisma.ServiceSuggestionGetPayload<{
-  select: { id: true; status: true; createdAt: true; proposedEdits: true }
+  select: { id: true; proposedEdits: true }
 }>
 
 type ScanJob = Prisma.ServiceScanJobGetPayload<{
@@ -33,37 +21,24 @@ type ScanJob = Prisma.ServiceScanJobGetPayload<{
   }
 }>
 
-type Service = Prisma.ServiceGetPayload<{
-  select: {
-    id: true
-    description: true
-    kycLevel: true
-    kycPolicyMd: true
-    tosUrls: true
-    serviceUrls: true
-    tosReview: true
-  }
-}>
-
 type Props = {
-  service: Service
+  service: Prisma.ServiceGetPayload<{ select: { id: true; tosUrls: true; serviceUrls: true } }>
   scanJob: ScanJob | null
   descriptionJob: ScanJob | null
-  pendingSuggestion: Suggestion | null
-  attributes: Attribute[]
+  pendingSuggestions: Suggestion[]
   id?: string
 }
 
-const { service, scanJob, descriptionJob, pendingSuggestion, attributes, id = 'tasks' } = Astro.props
+const { service, scanJob, descriptionJob, pendingSuggestions, id = 'tasks' } = Astro.props
 
-const proposedEdits = pendingSuggestion?.proposedEdits ?? null
-const sectionHash = `#${id}`
+const pendingFor = (kind: ServiceScanJobKind) =>
+  pendingSuggestions.find((s) => s.proposedEdits && proposalJobKind(s.proposedEdits) === kind) ?? null
 ---
 
 <FormSection title="Tasks" id={id}>
   <FormSubSection
     title="Jobs"
-    subtitle="Each job proposes edits for a person to review. Nothing is published on its own."
+    subtitle="Each job proposes edits for a person to review. A job cannot run again until its proposal is reviewed or dismissed."
   >
     <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
       <JobCard
@@ -75,7 +50,7 @@ const sectionHash = `#${id}`
         icon="ri:sparkling-2-line"
         action="Run scan"
         blocker={service.tosUrls.length === 0 ? 'Add a ToS URL in the details first.' : null}
-        resultHref={pendingSuggestion ? `#${id}-review` : null}
+        pendingSuggestion={pendingFor('DEEP_SCAN')}
         sectionId={id}
       />
       <JobCard
@@ -87,24 +62,9 @@ const sectionHash = `#${id}`
         icon="ri:quill-pen-line"
         action="Review"
         blocker={service.serviceUrls.length === 0 ? 'Add a service URL in the details first.' : null}
-        resultHref={pendingSuggestion ? `#${id}-review` : null}
+        pendingSuggestion={pendingFor('DESCRIPTION')}
         sectionId={id}
       />
     </div>
   </FormSubSection>
-
-  {
-    !!proposedEdits && !!pendingSuggestion && (
-      <FormSubSection title="Proposed edits awaiting review" id={`${id}-review`} class="scroll-mt-24">
-        <ProposedEditsReview
-          suggestion={pendingSuggestion}
-          service={service}
-          attributes={attributes}
-          title="Deep scan proposed edits"
-          compactHeader
-          actionHash={sectionHash}
-        />
-      </FormSubSection>
-    )
-  }
 </FormSection>

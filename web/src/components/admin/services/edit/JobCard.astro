@@ -25,35 +25,39 @@ type Props = {
   action: string
   /** Why the job cannot run right now, or null. */
   blocker: string | null
-  /** Where the job's pending proposal is reviewed, once there is one. */
-  resultHref: string | null
+  pendingSuggestion: Prisma.ServiceSuggestionGetPayload<{ select: { id: true } }> | null
   sectionId: string
 }
 
-const { serviceId, kind, job, title, description, icon, action, blocker, resultHref, sectionId } = Astro.props
+const { serviceId, kind, job, title, description, icon, action, blocker, pendingSuggestion, sectionId } =
+  Astro.props
 
 const now = Date.now()
 
-type State = 'done' | 'failed' | 'idle' | 'queued' | 'running' | 'stalled'
-const state: State = !job
-  ? 'idle'
-  : job.processedAt
-    ? job.error
-      ? 'failed'
-      : 'done'
-    : !job.claimedAt
-      ? 'queued'
-      : now - job.claimedAt.getTime() > SCAN_CLAIM_TIMEOUT_MS
-        ? 'stalled'
-        : 'running'
+type State = 'done' | 'failed' | 'idle' | 'pending' | 'queued' | 'running' | 'stalled'
+const state: State =
+  pendingSuggestion && !(job && !job.processedAt)
+    ? 'pending'
+    : !job
+      ? 'idle'
+      : job.processedAt
+        ? job.error
+          ? 'failed'
+          : 'done'
+        : !job.claimedAt
+          ? 'queued'
+          : now - job.claimedAt.getTime() > SCAN_CLAIM_TIMEOUT_MS
+            ? 'stalled'
+            : 'running'
 
 const isActive = state === 'queued' || state === 'running'
 
 const badge: Record<
   State,
-  { text: string; color: 'gray' | 'green' | 'orange' | 'red' | 'yellow'; icon: string }
+  { text: string; color: 'blue' | 'gray' | 'green' | 'orange' | 'red' | 'yellow'; icon: string }
 > = {
   idle: { text: 'Never run', color: 'gray', icon: 'ri:time-line' },
+  pending: { text: 'Awaiting review', color: 'blue', icon: 'ri:draft-line' },
   queued: { text: 'Queued', color: 'orange', icon: 'ri:hourglass-line' },
   running: { text: 'Running', color: 'orange', icon: 'ri:loader-4-line' },
   stalled: { text: 'Stalled', color: 'yellow', icon: 'ri:alert-line' },
@@ -85,7 +89,7 @@ const currentUrl = `${Astro.url.pathname}${Astro.url.search}`
   id={cardId}
   class={cn(
     'flex flex-col gap-3 rounded-lg border bg-night-800 p-3 transition-colors',
-    isActive ? 'border-orange-500/40' : 'border-night-600'
+    isActive ? 'border-orange-500/40' : state === 'pending' ? 'border-blue-500/40' : 'border-night-600'
   )}
   hx-get={isActive ? currentUrl : undefined}
   hx-trigger={isActive ? 'every 4s' : undefined}
@@ -117,7 +121,7 @@ const currentUrl = `${Astro.url.pathname}${Astro.url.search}`
     <span class="inline-flex min-w-0 items-center gap-1.5">
       {detail && <span>{detail}</span>}
       {
-        (state === 'done' || state === 'failed') && job?.processedAt && (
+        (state === 'done' || state === 'failed' || state === 'pending') && job?.processedAt && (
           <>
             <Icon name="ri:history-line" class="size-3.5 shrink-0" />
             <TimeFormatted date={job.processedAt} hourPrecision />
@@ -125,42 +129,46 @@ const currentUrl = `${Astro.url.pathname}${Astro.url.search}`
         )
       }
       {state === 'idle' && <span>{blocker ?? 'Ready'}</span>}
-      {
-        state === 'done' && resultHref && (
-          <a
-            href={resultHref}
-            class="ms-2 text-orange-200 underline underline-offset-4 hover:text-orange-100"
-          >
-            Review the proposal
-          </a>
-        )
-      }
     </span>
 
-    <form
-      method="POST"
-      action={`${actions.admin.service.deepScan.request}#${sectionId}`}
-      hx-post={`${Astro.url.pathname}${actions.admin.service.deepScan.request}`}
-      hx-target={`#${cardId}`}
-      hx-select={`#${cardId}`}
-      hx-swap="outerHTML"
-      hx-disinherit="*"
-      class="shrink-0"
-    >
-      <input type="hidden" name="serviceId" value={serviceId} />
-      <input type="hidden" name="kind" value={kind} />
-      <Button
-        as="button"
-        type="submit"
-        size="sm"
-        color="warning"
-        variant="faded"
-        icon={state === 'stalled' || state === 'failed' ? 'ri:restart-line' : 'ri:play-line'}
-        label={isActive ? 'Working' : state === 'stalled' || state === 'failed' ? 'Retry' : action}
-        disabled={isActive || !!blocker}
-        title={blocker ?? undefined}
-      />
-    </form>
+    {
+      state === 'pending' && pendingSuggestion ? (
+        <Button
+          as="a"
+          href={`/admin/service-suggestions/${String(pendingSuggestion.id)}`}
+          size="sm"
+          color="info"
+          icon="ri:draft-line"
+          label={`Review #${String(pendingSuggestion.id)}`}
+          class="shrink-0"
+        />
+      ) : (
+        <form
+          method="POST"
+          action={`${actions.admin.service.deepScan.request}#${sectionId}`}
+          hx-post={`${Astro.url.pathname}${actions.admin.service.deepScan.request}`}
+          hx-target={`#${cardId}`}
+          hx-select={`#${cardId}`}
+          hx-swap="outerHTML"
+          hx-disinherit="*"
+          class="shrink-0"
+        >
+          <input type="hidden" name="serviceId" value={serviceId} />
+          <input type="hidden" name="kind" value={kind} />
+          <Button
+            as="button"
+            type="submit"
+            size="sm"
+            color="warning"
+            variant="faded"
+            icon={state === 'stalled' || state === 'failed' ? 'ri:restart-line' : 'ri:play-line'}
+            label={isActive ? 'Working' : state === 'stalled' || state === 'failed' ? 'Retry' : action}
+            disabled={isActive || !!blocker}
+            title={blocker ?? undefined}
+          />
+        </form>
+      )
+    }
   </div>
 
   {

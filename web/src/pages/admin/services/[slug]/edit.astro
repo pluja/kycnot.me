@@ -106,12 +106,6 @@ Astro.locals.banners.addIfSuccess(evidenceImageDeleteResult, 'Evidence image del
 const deepScanRequestResult = Astro.getActionResult(actions.admin.service.deepScan.request)
 Astro.locals.banners.addIfSuccess(deepScanRequestResult, 'Deep scan queued')
 
-const deepScanApplyResult = Astro.getActionResult(actions.admin.service.deepScan.apply)
-Astro.locals.banners.addIfSuccess(deepScanApplyResult, 'Proposed edits applied')
-
-const deepScanDismissResult = Astro.getActionResult(actions.admin.service.deepScan.dismiss)
-Astro.locals.banners.addIfSuccess(deepScanDismissResult, 'Proposed edits dismissed')
-
 const [service, categories, attributes] = await Astro.locals.banners.tryMany([
   [
     'Error fetching service',
@@ -237,7 +231,7 @@ const evidenceImages = await Astro.locals.banners.try(
   []
 )
 
-const [scanJobs, pendingDeepScanSuggestion] = await Astro.locals.banners.tryMany([
+const [scanJobs, pendingScanSuggestions] = await Astro.locals.banners.tryMany([
   [
     'Error fetching scan jobs',
     () =>
@@ -255,23 +249,18 @@ const [scanJobs, pendingDeepScanSuggestion] = await Astro.locals.banners.tryMany
     [] as [],
   ],
   [
-    'Error fetching deep scan suggestion',
+    'Error fetching scan suggestions',
     () =>
-      prisma.serviceSuggestion.findFirst({
+      prisma.serviceSuggestion.findMany({
         where: {
           serviceId: service.id,
           status: { in: ['PENDING', 'UNDER_REVIEW'] },
           proposedEdits: { not: Prisma.AnyNull },
         },
-        select: {
-          id: true,
-          status: true,
-          createdAt: true,
-          proposedEdits: true,
-        },
+        select: { id: true, proposedEdits: true },
         orderBy: { createdAt: 'desc' },
       }),
-    null,
+    [] as [],
   ],
 ])
 
@@ -290,7 +279,7 @@ const apiCalls = await Astro.locals.banners.try(
 )
 
 const isScanning = scanJobs.some((job) => job.processedAt === null)
-const tasksBadge = pendingDeepScanSuggestion ? '!' : isScanning ? '...' : undefined
+const tasksBadge = pendingScanSuggestions.length > 0 ? '!' : isScanning ? '...' : undefined
 
 // Events are gated by their own capability, so a services:edit-only editor
 // neither sees nor can act on the events section.
@@ -411,8 +400,7 @@ const navItems = [
           service={service}
           scanJob={scanJobs.find((job) => job.kind === 'DEEP_SCAN') ?? null}
           descriptionJob={scanJobs.find((job) => job.kind === 'DESCRIPTION') ?? null}
-          pendingSuggestion={pendingDeepScanSuggestion}
-          attributes={attributes}
+          pendingSuggestions={pendingScanSuggestions}
         />
 
         <TosHighlightsSection

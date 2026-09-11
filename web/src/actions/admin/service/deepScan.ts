@@ -1,4 +1,4 @@
-import { ServiceScanJobKind } from '@prisma/client'
+import { Prisma, ServiceScanJobKind } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
@@ -14,6 +14,7 @@ import { defineProtectedAction } from '../../../lib/defineProtectedAction'
 import { checkDescription } from '../../../lib/descriptionRules'
 import { cap } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
+import { proposalJobKind } from '../../../lib/scanJobs'
 
 import { buildAuditLines, collectDeclines, intersectAcceptedAttributeIds } from './deepScan.helpers'
 
@@ -49,6 +50,21 @@ export const deepScanActions = {
         throw new ActionError({
           code: 'BAD_REQUEST',
           message: 'Service has no URL to read a front page from.',
+        })
+      }
+
+      const pending = await prisma.serviceSuggestion.findMany({
+        where: {
+          serviceId: input.serviceId,
+          status: { in: ['PENDING', 'UNDER_REVIEW'] },
+          proposedEdits: { not: Prisma.AnyNull },
+        },
+        select: { id: true, proposedEdits: true },
+      })
+      if (pending.some((s) => s.proposedEdits && proposalJobKind(s.proposedEdits) === input.kind)) {
+        throw new ActionError({
+          code: 'CONFLICT',
+          message: 'This job already has a proposal awaiting review. Review or dismiss it first.',
         })
       }
 
