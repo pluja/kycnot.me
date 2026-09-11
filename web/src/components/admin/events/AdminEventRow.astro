@@ -1,5 +1,4 @@
 ---
-import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
 import { getIncidentSeverityInfo } from '../../../constants/incidentSeverities'
@@ -101,15 +100,17 @@ const isDeleted = event.deletedAt !== null
     </Tooltip>
 
     <Tooltip text="View on the public site">
-      <a
+      <Button
+        as="a"
         href={`/service/${encodeURIComponent(event.service.slug)}#event-${event.id.toString()}`}
         target="_blank"
         rel="noopener"
-        aria-label="View on the public site"
-        class="flex size-7 items-center justify-center rounded-md text-day-400 transition-colors hover:bg-night-700 hover:text-day-100"
-      >
-        <Icon name="ri:external-link-line" class="size-4" />
-      </a>
+        variant="faded"
+        size="sm"
+        icon="ri:external-link-line"
+        iconOnly
+        label="View on the public site"
+      />
     </Tooltip>
   </Fragment>
 

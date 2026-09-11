@@ -167,13 +167,14 @@ const proseClass =
 <article
   id={canOpen ? undefined : anchor}
   class={cn(
-    'relative scroll-mt-24 overflow-hidden rounded-lg border pl-3 has-[:target]:ring-2 has-[:target]:ring-day-400',
+    'relative scroll-mt-24 rounded-lg border pl-3 has-[:target]:ring-2 has-[:target]:ring-day-400',
     shell.card,
     faded && 'opacity-80'
   )}
 >
-  <span class={cn('absolute inset-y-0 left-0 w-1', shell.rail, settled && 'opacity-40')} aria-hidden="true"
-  ></span>
+  <span
+    class={cn('absolute inset-y-0 left-0 w-1 rounded-l-lg', shell.rail, settled && 'opacity-40')}
+    aria-hidden="true"></span>
 
   <Shell class="group/event">
     <Head
