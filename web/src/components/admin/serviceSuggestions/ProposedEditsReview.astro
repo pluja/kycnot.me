@@ -124,11 +124,13 @@ const acceptTosReviewInputId = `accept-tos-review-${suggestion.id}`
         </div>
 
         <div class="flex flex-wrap gap-1.5">
-          <BadgeSmall
-            color={kycLevelChanged ? 'orange' : 'gray'}
-            text={kycLevelChanged ? 'KYC change' : 'KYC unchanged'}
-            icon={kycLevelChanged ? 'ri:exchange-line' : 'ri:checkbox-circle-line'}
-          />
+          {!isDescriptionOnly && (
+            <BadgeSmall
+              color={kycLevelChanged ? 'orange' : 'gray'}
+              text={kycLevelChanged ? 'KYC change' : 'KYC unchanged'}
+              icon={kycLevelChanged ? 'ri:exchange-line' : 'ri:checkbox-circle-line'}
+            />
+          )}
           {(addCount > 0 || removeCount > 0) && (
             <BadgeSmall
               color="blue"
@@ -409,6 +411,7 @@ const acceptTosReviewInputId = `accept-tos-review-${suggestion.id}`
         {Number(tosReviewChanged) +
           Number(kycLevelChanged) +
           Number(kycPolicyChanged) +
+          Number(descriptionChanged) +
           addCount +
           removeCount +
           listingCheckCount ===
@@ -423,7 +426,7 @@ const acceptTosReviewInputId = `accept-tos-review-${suggestion.id}`
           <div class="flex flex-wrap items-center justify-between gap-3 border-t border-night-600 pt-4">
             <p class="text-xs text-day-500">
               Checked items are applied. Anything left unchecked is recorded as declined and will not be
-              proposed again until this service edits its legal documents.
+              proposed again until the page it was read from changes.
             </p>
             <InputSubmitButton label="Apply selected" icon="ri:check-line" hideCancel class="ml-auto" />
           </div>
