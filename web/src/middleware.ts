@@ -81,59 +81,57 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
     return next()
   }
 
-  if (action) {
+  // An RPC call (client script, API) is run by Astro's own /_actions route;
+  // running it here as well would execute every handler twice.
+  if (action?.calledFrom === 'form') {
     // Capture the submitted fields before the handler consumes the body, so a
     // re-rendered form (validation error, duplicate prompt, ...) can replay
     // them after the redirect. Success paths store them too but redirect away
     // without reading, so the cost is one extra parse per form submission.
-    const requestCloneForReplay = action.calledFrom === 'form' ? context.request.clone() : null
+    const requestCloneForReplay = context.request.clone()
 
     const actionResult = await action.handler()
     addActionBannerIfNeeded(context, actionResult.error)
 
-    if (action.calledFrom === 'form') {
-      const submittedFormValues = requestCloneForReplay
-        ? await readSubmittedFormValues(requestCloneForReplay)
-        : undefined
+    const submittedFormValues = await readSubmittedFormValues(requestCloneForReplay)
 
-      // HTMX manages its own state via XHR. The PRG dance returns a 302
-      // whose empty body HTMX swaps into the target, so the first click
-      // looks like a no-op and the result only surfaces on the second
-      // click (when the stored cookie is consumed). Render in place
-      // instead and let HTMX swap the rendered partial directly.
-      const isHtmx = context.request.headers.get('HX-Request') === 'true'
-      if (isHtmx) {
-        setActionResult(action.name, serializeActionResult(actionResult))
-        context.locals.actionFormValues = submittedFormValues ?? null
-        return next()
-      }
-
-      const sessionId = await redisActionsSessions.store({
-        actionName: action.name,
-        actionResult: serializeActionResult(actionResult),
-        formValues: submittedFormValues,
-      })
-
-      context.cookies.set(ACTION_SESSION_COOKIE, sessionId, {
-        path: '/',
-        httpOnly: true,
-        secure: cookieSecureForUrl(context.url),
-        sameSite: 'strict',
-        maxAge: redisActionsSessions.expirationTime,
-      })
-
-      if (actionResult.error) {
-        // Re-render the submitted form. Prefer a same-origin referer (so forms
-        // that post to a different page than they live on go back to the form),
-        // but fall back to the posted-to path when the referer is missing or
-        // fails the origin check (e.g. an http referer vs the https-normalised
-        // origin in dev) instead of dropping the user on '/'.
-        const referer = context.request.headers.get('Referer')
-        const safeReferer = referer ? makeSafeRedirectUrl(referer, browserOriginForUrl(context.url)) : null
-        return context.redirect(safeReferer && safeReferer !== '/' ? safeReferer : context.originPathname)
-      }
-      return context.redirect(context.originPathname)
+    // HTMX manages its own state via XHR. The PRG dance returns a 302
+    // whose empty body HTMX swaps into the target, so the first click
+    // looks like a no-op and the result only surfaces on the second
+    // click (when the stored cookie is consumed). Render in place
+    // instead and let HTMX swap the rendered partial directly.
+    const isHtmx = context.request.headers.get('HX-Request') === 'true'
+    if (isHtmx) {
+      setActionResult(action.name, serializeActionResult(actionResult))
+      context.locals.actionFormValues = submittedFormValues ?? null
+      return next()
     }
+
+    const sessionId = await redisActionsSessions.store({
+      actionName: action.name,
+      actionResult: serializeActionResult(actionResult),
+      formValues: submittedFormValues,
+    })
+
+    context.cookies.set(ACTION_SESSION_COOKIE, sessionId, {
+      path: '/',
+      httpOnly: true,
+      secure: cookieSecureForUrl(context.url),
+      sameSite: 'strict',
+      maxAge: redisActionsSessions.expirationTime,
+    })
+
+    if (actionResult.error) {
+      // Re-render the submitted form. Prefer a same-origin referer (so forms
+      // that post to a different page than they live on go back to the form),
+      // but fall back to the posted-to path when the referer is missing or
+      // fails the origin check (e.g. an http referer vs the https-normalised
+      // origin in dev) instead of dropping the user on '/'.
+      const referer = context.request.headers.get('Referer')
+      const safeReferer = referer ? makeSafeRedirectUrl(referer, browserOriginForUrl(context.url)) : null
+      return context.redirect(safeReferer && safeReferer !== '/' ? safeReferer : context.originPathname)
+    }
+    return context.redirect(context.originPathname)
   }
 
   return next()
