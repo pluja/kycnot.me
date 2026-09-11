@@ -117,6 +117,7 @@ for (const entry of entries) {
 }
 
 const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+if (filters.page > totalPages) return Astro.redirect(urlWithParams(Astro.url, { page: totalPages }))
 const rangeStart = total === 0 ? 0 : (filters.page - 1) * PAGE_SIZE + 1
 const rangeEnd = Math.min(filters.page * PAGE_SIZE, total)
 
