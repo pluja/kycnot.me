@@ -12,6 +12,10 @@ coverImage: ./cover.webp
 draft: false
 ---
 
+> **Update, September 2026: Swapter is now flagged as a scam.** Since November 2025, Swapter has held large swaps for months without paying or refunding, including one of 700 XMR. Users who sent ID and proof of funds were still not paid. Swapter did not answer our two emails. Do not use it. [See the evidence on the Swapter listing](/service/swapter#verification-proof).
+>
+> We are keeping this review online so the record stays public. It describes the service as we tested it in May 2024.
+
 These reviews are sponsored, yet the sponsorship does not influence the outcome of the evaluations. Sponsored reviews are independent from the kycnot.me list, being only part of the blog. The reviews have no impact on the scores of the listings or their continued presence on the list. Should any issues arise, I will not hesitate to remove any listing. Reviews are in collaboration with [Orangefren](/service/orangefren).
 
 ## The review
@@ -26,10 +30,8 @@ These reviews are sponsored, yet the sponsorship does not influence the outcome 
 | Works over Tor  | Front-end not synced with back-end |
 | Pretty UI       |                                    |
 
-**Rating**: ★★★☆☆
+**Rating**: ~~★★★☆☆~~ Withdrawn, see the update above.
 **Service Website:** <a href="https://swapter.io" rel="sponsored">swapter.io</a>
-
-> ⚠️ There is an ongoing issue with this service: [read more on Reddit](https://old.reddit.com/r/Monero/comments/1d8olsd/swapter_225_xmr_missing/).
 
 ### Test Trades
 
@@ -39,9 +41,9 @@ Our first trade had the ID of: `mpUitpGemhN8jjNAjQuo6EvQ`. We were promised **0.
 
 On the return journey we performed trade with ID: `yaCRb5pYcRKAZcBqg0AzEGYg`. This time we were promised **0.4815 XMR** for sending **0.799 LTC**. After Litecoin arrived we were sent **0.4765 XMR**.
 
-As such we saw a discrepancy of `~0.1%!`(MISSING) in the first trade and `~1%!`(MISSING) in the second trade. Considering those trades were floating we determine the estimates presented in the UI to be highly accurate and honest.
+As such we saw a discrepancy of `~0.1%` in the first trade and `~1%` in the second trade. Considering those trades were floating we determine the estimates presented in the UI to be highly accurate and honest.
 
-Of course Swapter could've been imposing a large fee on their estimates, but we checked their estimates against CoinGecko and found the difference to be equivalent to a fee of just over `0.5%!`(MISSING). Perfectly in line with other swapping services.
+Of course Swapter could've been imposing a large fee on their estimates, but we checked their estimates against CoinGecko and found the difference to be equivalent to a fee of just over `0.5%`. Perfectly in line with other swapping services.
 
 ### Trading
 

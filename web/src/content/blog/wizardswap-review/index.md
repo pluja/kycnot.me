@@ -44,7 +44,7 @@ It's clear the team behind WizardSwap is aware of this shortfall and so they've 
 
 ### Trading
 
-Fees on WizardSwap are middle-of-the-pack. The normal fee is 2.2%! (MISSING)That's more than some exchanges that reserve the right to suddenly demand you undergo verification, yet less than half the fees on some other privacy-first exchanges. However as we mentioned in the section above you can earn almost all of that fee (2%!)(MISSING) if you provide liquidity to WizardSwap. 
+Fees on WizardSwap are middle-of-the-pack. The normal fee is 2.2%. That's more than some exchanges that reserve the right to suddenly demand you undergo verification, yet less than half the fees on some other privacy-first exchanges. However as we mentioned in the section above you can earn almost all of that fee (2%) if you provide liquidity to WizardSwap. 
 
 It's good that with the current Bitcoin fee market their fees are constant regardless of how much, or how little, you send. This is in stark contrast with some of the alternative swap providers that will charge you a massive premium when attempting to swap small amounts of BTC away. 
 
@@ -91,7 +91,7 @@ You can also contact them via email at: `support @ wizardswap . io`
 
 *None of the above should be understood as investment or financial advice. The views are our own only and constitute a faithful representation of our experience in using and investigating this exchange. This review is not a guarantee of any kind on the services rendered by the exchange. Do your own research before using any service.*
 
-> Before sending crypto to any service, including WizardSwap, follow the [5 rules for safely using crypto services](/blog/stay-safe-using-services). For another sponsored swap review, see [Swapter](/blog/swapter-review).
+> Before sending crypto to any service, including WizardSwap, follow the [5 rules for safely using crypto services](/blog/stay-safe-using-services).
 
 [^1]: https://deeponion.org/community/threads/wizardswap-io-news.46713/
 [^2]: https://twitter.com/WizardSwap_io/status/1732814285242290380
