@@ -2,7 +2,7 @@ import { z } from 'astro/zod'
 
 import { prisma } from './prisma'
 
-import type { Prisma, RatingMuteReason } from '@prisma/client'
+import type { ModerationAction, Prisma, RatingMuteReason } from '@prisma/client'
 
 export const MAX_COMMENT_DEPTH = 12
 
@@ -67,6 +67,7 @@ export const commentReplyQuery = {
     aiIsBrigade: true,
     aiBrigadeConfidence: true,
     aiReasoning: true,
+    aiSignals: true,
     humanDecidedAt: true,
     humanReasoning: true,
     humanDecidedBy: {
@@ -383,3 +384,11 @@ export type CommentBadgeFields = Pick<
   | 'ratingWeight'
   | 'status'
 >
+
+// getAiHardGateReason explains why an AI "approve" was downgraded to HOLD.
+// The worker records gate reasons on every verdict, but they only take effect on a HOLD.
+export function getAiHardGateReason(comment: { aiAction: ModerationAction | null; aiSignals: unknown }) {
+  if (comment.aiAction !== 'HOLD') return null
+  const parsed = z.object({ hardGateReason: z.string().min(1) }).safeParse(comment.aiSignals)
+  return parsed.success ? parsed.data.hardGateReason : null
+}

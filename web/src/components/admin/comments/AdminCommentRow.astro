@@ -4,6 +4,7 @@ import { Icon } from 'astro-icon/components'
 import { commentModerationStateById } from '../../../constants/commentModerationState'
 import { commentStatusById } from '../../../constants/commentStatus'
 import { cn } from '../../../lib/cn'
+import { getAiHardGateReason } from '../../../lib/commentsWithReplies'
 import BadgeSmall from '../../BadgeSmall.astro'
 import CommentModeration from '../../CommentModeration.astro'
 import MyPicture from '../../MyPicture.astro'
@@ -46,6 +47,7 @@ type Props = {
       aiIsBrigade: true
       aiBrigadeConfidence: true
       aiReasoning: true
+      aiSignals: true
       aiDecidedAt: true
       humanAction: true
       humanDecidedAt: true
@@ -98,6 +100,8 @@ type Props = {
 }
 
 const { comment, isPriority = false, defaultOpen = false } = Astro.props
+
+const aiHardGateReason = getAiHardGateReason(comment)
 
 const aiActionColor: Record<ModerationAction, TailwindColor> = {
   APPROVE: 'green',
@@ -447,6 +451,14 @@ const ribbonClass = ratingMutePenalty
                 <span class="ml-1 text-day-500">{comment.aiBrigadeConfidence}/5</span>
               )}
             </span>
+            {aiHardGateReason && (
+              <span
+                class="rounded-sm bg-yellow-500/20 px-1.5 py-0.5 text-yellow-300"
+                title="Server-side checks that block auto-approval and hold the comment for a human."
+              >
+                Held: {aiHardGateReason}
+              </span>
+            )}
           </div>
           {comment.aiReasoning && (
             <p class="text-[12px] leading-snug whitespace-pre-wrap text-day-300">

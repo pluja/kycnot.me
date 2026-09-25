@@ -3,6 +3,7 @@ import { Icon } from 'astro-icon/components'
 
 import { communityNotePresets } from '../constants/communityNotePresets'
 import { cn } from '../lib/cn'
+import { getAiHardGateReason } from '../lib/commentsWithReplies'
 
 import AdminCommentContext from './admin/comments/AdminCommentContext.astro'
 import TimeFormatted from './TimeFormatted.astro'
@@ -42,6 +43,7 @@ type Props = HTMLAttributes<'div'> & {
       aiIsBrigade: true
       aiBrigadeConfidence: true
       aiReasoning: true
+      aiSignals: true
       aiDecidedAt: true
       humanAction: true
       humanDecidedAt: true
@@ -123,6 +125,7 @@ const aiActionClasses: Record<ModerationAction, string> = {
 }
 
 const hasAiVerdict = comment.aiDecidedAt !== null || comment.aiAction !== null
+const aiHardGateReason = getAiHardGateReason(comment)
 
 // The effective decision falls back to status for legacy comments that pre-date
 // humanAction tracking, so the active button reflects reality either way.
@@ -219,6 +222,14 @@ const noteFieldClass =
                 Brigade
                 {typeof comment.aiBrigadeConfidence === 'number' &&
                   ` · conf ${comment.aiBrigadeConfidence}/5`}
+              </span>
+            )}
+            {aiHardGateReason && (
+              <span
+                class="rounded-sm bg-yellow-500/20 px-1.5 py-0.5 text-yellow-300"
+                title="Server-side checks that block auto-approval and hold the comment for a human."
+              >
+                Held: {aiHardGateReason}
               </span>
             )}
           </div>
