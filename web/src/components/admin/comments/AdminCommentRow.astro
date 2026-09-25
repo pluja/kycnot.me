@@ -102,6 +102,13 @@ type Props = {
 const { comment, isPriority = false, defaultOpen = false } = Astro.props
 
 const aiHardGateReason = getAiHardGateReason(comment)
+const adminNote = comment.adminNote?.trim()
+
+const notes = [
+  { label: 'Public note', icon: 'ri:global-line', iconClass: 'text-emerald-400', text: comment.publicNote?.trim() },
+  { label: 'Admin note', icon: 'ri:shield-keyhole-line', iconClass: 'text-amber-400', text: adminNote },
+  { label: 'Author note', icon: 'ri:user-line', iconClass: 'text-sky-400', text: comment.authorNote?.trim() },
+].filter((note) => !!note.text)
 
 const aiActionColor: Record<ModerationAction, TailwindColor> = {
   APPROVE: 'green',
@@ -258,8 +265,17 @@ const ribbonClass = ratingMutePenalty
           brigade and rating-mute state live in the expanded AI verdict and
           review line, so they don't crowd the collapsed row. */}
       {
-        (comment.privateProof !== null || comment.issues.length > 0) && (
+        (comment.privateProof !== null || comment.issues.length > 0 || adminNote) && (
           <span class="flex shrink-0 items-center gap-1">
+            {adminNote && (
+              <Tooltip
+                as="span"
+                text={`Admin note: ${adminNote}`}
+                class="inline-flex items-center text-amber-400"
+              >
+                <Icon name="ri:shield-keyhole-line" class="size-3.5" />
+              </Tooltip>
+            )}
             {comment.privateProof && (
               <Tooltip
                 as="span"
@@ -375,26 +391,10 @@ const ribbonClass = ratingMutePenalty
   </summary>
 
   <!-- Expanded content. Sections are visually bounded so the eye can find
-       each kind of information quickly. Order: who-is-this, what-AI-thinks,
-       mod-actions, parent-context-if-reply, the comment itself. -->
+       each kind of information quickly. Order: what-AI-thinks,
+       parent-context-if-reply, the comment with its author and notes,
+       mod-actions. -->
   <div class="space-y-3 border-t border-zinc-800 bg-night-800/30 p-3">
-    <!-- Context section: author + rating + proof + issues in one panel -->
-    <section class="rounded-md border border-zinc-800 bg-night-700 p-2.5">
-      <header class="mb-1.5 flex flex-wrap items-center gap-2 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
-        <span class="flex items-center gap-1">
-          <Icon name="ri:information-line" class="size-3" />
-          Context
-        </span>
-        <BadgeSmall
-          icon={statusInfo.icon}
-          color={statusInfo.color as TailwindColor}
-          text={statusInfo.label}
-          inlineIcon
-        />
-      </header>
-      <AdminCommentContext comment={comment} />
-    </section>
-
     <!-- AI verdict, only when present. Structured signals first, reasoning below. -->
     {
       comment.aiAction && (
@@ -482,15 +482,39 @@ const ribbonClass = ratingMutePenalty
       )
     }
 
-    <!-- The comment itself: the thing being judged. Read this, then act. -->
+    <!-- The comment itself: the thing being judged, with who wrote it and any
+         notes attached. Read this, then act. -->
     <section class="rounded-md border border-l-4 border-zinc-700 border-l-zinc-500 bg-night-900 p-3.5">
-      <header class="mb-1.5 flex items-center gap-1 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
-        <Icon name="ri:chat-quote-line" class="size-3" />
-        Comment
+      <header class="mb-1.5 flex flex-wrap items-center gap-2 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
+        <span class="flex items-center gap-1">
+          <Icon name="ri:chat-quote-line" class="size-3" />
+          Comment
+        </span>
+        <BadgeSmall
+          icon={statusInfo.icon}
+          color={statusInfo.color as TailwindColor}
+          text={statusInfo.label}
+          inlineIcon
+        />
       </header>
+      <AdminCommentContext comment={comment} class="mb-3" />
       <div class="text-base leading-relaxed whitespace-pre-wrap text-day-100">
         {comment.content}
       </div>
+      {
+        notes.length > 0 && (
+          <ul class="mt-3 space-y-1 border-t border-zinc-800 pt-2 text-[12px] leading-snug">
+            {notes.map((note) => (
+              <li class="flex gap-1.5">
+                <Icon name={note.icon} class={cn('mt-0.5 size-3.5 shrink-0', note.iconClass)} />
+                <p class="whitespace-pre-wrap text-day-300">
+                  <span class="font-medium text-day-400">{note.label}:</span> {note.text}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )
+      }
     </section>
 
     <!-- Moderation tools last: act on what you just read. -->
