@@ -1178,16 +1178,15 @@ def apply_ai_moderation_decision(
     ai_reasoning: str,
     rating_muted: bool,
     rating_mute_reason: Optional[str],
-    admin_note: str,
     public_note: Optional[str],
 ) -> bool:
     """Persist the AI verdict to a comment row.
 
     Writes the ai* audit columns (never overwritten by humans), the status
-    derived from ai_action, the rating mute state when applicable, and the
-    admin-only audit note. publicNote is only touched when the AI returns a
-    new value; we never clear an existing publicNote when the LLM has nothing
-    to add (a prior AI run or a moderator may have set it). Status is set
+    derived from ai_action, and the rating mute state when applicable.
+    adminNote is left to moderators. publicNote is only touched when the AI
+    returns a new value; we never clear an existing publicNote when the LLM
+    has nothing to add (a prior AI run or a moderator may have set it). Status is set
     directly; the BEFORE-WRITE rating-trust trigger picks up ratingMuted /
     ratingMuteReason changes automatically. Returns True on success.
     """
@@ -1205,7 +1204,6 @@ def apply_ai_moderation_decision(
         '"aiReasoning" = %(aiReasoning)s',
         '"ratingMuted" = %(ratingMuted)s',
         '"ratingMuteReason" = %(ratingMuteReason)s::"RatingMuteReason"',
-        '"adminNote" = %(adminNote)s',
         '"updatedAt" = NOW()',
     ]
 
@@ -1221,7 +1219,6 @@ def apply_ai_moderation_decision(
         "aiReasoning": ai_reasoning,
         "ratingMuted": rating_muted,
         "ratingMuteReason": rating_mute_reason,
-        "adminNote": admin_note,
     }
 
     if public_note is not None:

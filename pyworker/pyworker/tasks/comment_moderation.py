@@ -63,21 +63,6 @@ class _DateTimeEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-def _build_admin_note(ai_result: Mapping[str, Any], hard_gate_reason: str) -> str:
-    """Compact audit line plus the AI's reasoning."""
-    header = (
-        f"AI: {ai_result['recommendedAction']} "
-        f"(quality={ai_result['commentQuality']}, "
-        f"spam={ai_result['isSpam']}, "
-        f"brigade={ai_result['brigadeConfidence']}/5, "
-        f"ratingDisable={ai_result['ratingShouldBeDisabled']})"
-    )
-    if hard_gate_reason:
-        header += f" | hardGate: {hard_gate_reason}"
-    reasoning = (ai_result.get("reasoning") or "").strip()
-    return f"{header}\n{reasoning}" if reasoning else header
-
-
 def _pick_mute_reason(
     ai_result: Mapping[str, Any],
     context: Mapping[str, Any],
@@ -177,7 +162,6 @@ def _decide(ai_result: Mapping[str, Any], context: Mapping[str, Any]) -> Dict[st
         "ai_signals": ai_signals,
         "rating_muted": rating_muted,
         "rating_mute_reason": rating_mute_reason,
-        "admin_note": _build_admin_note(ai_result, hard_gate_reason),
         "public_note": public_note,
         "hard_gate_reason": hard_gate_reason,
     }
@@ -241,7 +225,6 @@ class CommentModerationTask(Task):
                 ai_reasoning=(ai_result.get("reasoning") or "").strip(),
                 rating_muted=decision["rating_muted"],
                 rating_mute_reason=decision["rating_mute_reason"],
-                admin_note=decision["admin_note"],
                 public_note=decision["public_note"],
             )
 

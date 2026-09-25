@@ -122,7 +122,6 @@ def run(comment_ids: List[int]) -> None:
                 ai_reasoning=(ai.get('reasoning') or '').strip(),
                 rating_muted=decision['rating_muted'],
                 rating_mute_reason=decision['rating_mute_reason'],
-                admin_note=decision['admin_note'],
                 public_note=decision['public_note'],
             )
             if not ok:
