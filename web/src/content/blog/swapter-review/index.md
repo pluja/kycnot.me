@@ -12,7 +12,7 @@ coverImage: ./cover.webp
 draft: false
 ---
 
-> **Update, September 2026: Swapter is now flagged as a scam.** Since November 2025, Swapter has held large swaps for months without paying or refunding, including one of 700 XMR. Users who sent ID and proof of funds were still not paid. Swapter did not answer our two emails. Do not use it. [See the evidence on the Swapter listing](/service/swapter#verification-proof).
+> **Update, September 2026: Swapter is now flagged as a scam.** Since November 2025, Swapter has held large swaps for months without paying or refunding, including one of 700 XMR. For months Swapter told that user the exchange processing the deposit was delaying it, and that there was no ID problem. Later it asked for ID. Swapter now says the user has sent part of the requested information, but it declined to share the exchange's request, calling it confidential. We asked Swapter for proof in July. It only answered after we flagged it, and sent no proof. Do not use it. [See the evidence on the Swapter listing](/service/swapter#verification-proof).
 >
 > We are keeping this review online so the record stays public. It describes the service as we tested it in May 2024.
 
