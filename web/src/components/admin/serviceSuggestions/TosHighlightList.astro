@@ -1,0 +1,46 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { getTosHighlightRatingInfo } from '../../../constants/tosHighlightRating'
+import { cn } from '../../../lib/cn'
+import Markdown from '../../Markdown.astro'
+import QuotedClause from '../../QuotedClause.astro'
+
+import type { MarkdownString } from '../../../lib/markdown'
+
+type Props = {
+  highlights: {
+    title: string
+    content: MarkdownString
+    rating: 'negative' | 'neutral' | 'positive'
+    evidence?: string
+    sourceUrl?: string
+  }[]
+}
+
+const { highlights } = Astro.props
+---
+
+{
+  highlights.length > 0 ? (
+    <ul class="divide-y divide-night-600 rounded-md border border-night-600">
+      {highlights.map((highlight) => {
+        const ratingInfo = getTosHighlightRatingInfo(highlight.rating)
+        return (
+          <li class="flex items-start gap-3 p-3 text-sm">
+            <Icon name={ratingInfo.icon} class={cn('mt-0.5 size-4 shrink-0', ratingInfo.classNames.icon)} />
+            <div>
+              <div class="font-semibold text-day-100">{highlight.title}</div>
+              <div class="prose prose-sm mt-1 max-w-none text-day-400 prose-invert">
+                <Markdown content={highlight.content} />
+              </div>
+              <QuotedClause quote={highlight.evidence} sourceUrl={highlight.sourceUrl} class="text-day-500" />
+            </div>
+          </li>
+        )
+      })}
+    </ul>
+  ) : (
+    <p class="text-sm text-day-500 italic">No highlights.</p>
+  )
+}

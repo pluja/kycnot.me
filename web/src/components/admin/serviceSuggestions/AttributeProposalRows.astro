@@ -1,0 +1,120 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { getAttributeTypeInfo } from '../../../constants/attributeTypes'
+import { cn } from '../../../lib/cn'
+import { formatNumber } from '../../../lib/numbers'
+import BadgeSmall from '../../BadgeSmall.astro'
+import QuotedClause from '../../QuotedClause.astro'
+import ProposalRow from '../../serviceSuggestions/ProposalRow.astro'
+
+import type { Prisma } from '@prisma/client'
+
+type Attribute = Prisma.AttributeGetPayload<{
+  select: {
+    id: true
+    title: true
+    description: true
+    category: true
+    type: true
+    privacyPoints: true
+    trustPoints: true
+  }
+}>
+
+type ProposedEdits = NonNullable<
+  Prisma.ServiceSuggestionGetPayload<{ select: { proposedEdits: true } }>['proposedEdits']
+>
+type AttributeProposal = NonNullable<ProposedEdits['attributes']>['add'][number]
+
+type Props = {
+  add: AttributeProposal[]
+  remove: AttributeProposal[]
+  attributes: Attribute[]
+  isActionable: boolean
+}
+
+const { add, remove, attributes, isActionable } = Astro.props
+const attributesById = new Map(attributes.map((attribute) => [attribute.id, attribute]))
+
+const kinds = {
+  add: {
+    name: 'attributeAddIds',
+    badge: 'Add',
+    color: 'green',
+    icon: 'ri:add-circle-line',
+    iconClassName: 'text-green-400',
+  },
+  remove: {
+    name: 'attributeRemoveIds',
+    badge: 'Remove',
+    color: 'red',
+    icon: 'ri:indeterminate-circle-line',
+    iconClassName: 'text-red-400',
+  },
+} as const
+
+const proposals = [
+  ...add.map((proposal) => ({ proposal, kind: kinds.add })),
+  ...remove.map((proposal) => ({ proposal, kind: kinds.remove })),
+]
+
+const scoreTextClass = (value: number) =>
+  cn('font-medium tabular-nums', {
+    'text-green-400': value > 0,
+    'text-red-400': value < 0,
+    'text-day-500': value === 0,
+  })
+---
+
+{
+  proposals.map(({ proposal, kind }) => {
+    const attribute = attributesById.get(proposal.attributeId)
+    const typeInfo = attribute ? getAttributeTypeInfo(attribute.type) : null
+    return (
+      <ProposalRow
+        icon={kind.icon}
+        iconClassName={kind.iconClassName}
+        label={attribute?.title ?? `Unknown attribute #${String(proposal.attributeId)}`}
+        checkbox={{ name: kind.name, value: proposal.attributeId, checked: true, disabled: !isActionable }}
+      >
+        <Fragment slot="badges">
+          <BadgeSmall color={kind.color} text={kind.badge} icon={kind.icon} />
+          {typeInfo && (
+            <span
+              class={cn(
+                'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium',
+                typeInfo.classNames.container,
+                typeInfo.classNames.text
+              )}
+            >
+              <Icon name={typeInfo.icon} class="size-3" />
+              {typeInfo.label}
+            </span>
+          )}
+          {attribute && (
+            <span class="inline-flex items-center gap-2 rounded-md bg-night-900 px-2 py-0.5 text-xs text-day-400">
+              <span>
+                Privacy{' '}
+                <span class={scoreTextClass(attribute.privacyPoints)}>
+                  {formatNumber(attribute.privacyPoints, { showSign: true })}
+                </span>
+              </span>
+              <span class="text-night-400">/</span>
+              <span>
+                Trust{' '}
+                <span class={scoreTextClass(attribute.trustPoints)}>
+                  {formatNumber(attribute.trustPoints, { showSign: true })}
+                </span>
+              </span>
+            </span>
+          )}
+        </Fragment>
+
+        {attribute?.description && <p class="text-xs text-day-500">{attribute.description}</p>}
+        <p class="mt-1 text-day-300">{proposal.rationale}</p>
+        <QuotedClause quote={proposal.quote} sourceUrl={proposal.sourceUrl} class="text-day-500" />
+      </ProposalRow>
+    )
+  })
+}

@@ -2,17 +2,18 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
-import { getKycLevelInfo } from '../../../constants/kycLevels'
+import { isListingCheckFieldId, listingCheckFieldLabels } from '../../../constants/listingCheckFields'
 import { cn } from '../../../lib/cn'
 import BadgeSmall from '../../BadgeSmall.astro'
-import Button from '../../Button.astro'
-import InputSubmitButton from '../../InputSubmitButton.astro'
 import Markdown from '../../Markdown.astro'
-import TimeFormatted from '../../TimeFormatted.astro'
-import Tooltip from '../../Tooltip.astro'
+import BeforeAfter from '../../serviceSuggestions/BeforeAfter.astro'
+import KycLevelPill from '../../serviceSuggestions/KycLevelPill.astro'
+import ProposalApplyBar from '../../serviceSuggestions/ProposalApplyBar.astro'
+import ProposalPanel from '../../serviceSuggestions/ProposalPanel.astro'
+import ProposalRow from '../../serviceSuggestions/ProposalRow.astro'
 
-import AttributeProposalGroups from './AttributeProposalGroups.astro'
-import ListingChecksSection from './ListingChecksSection.astro'
+import AttributeProposalRows from './AttributeProposalRows.astro'
+import ListingCheckRows from './ListingCheckRows.astro'
 import TosReviewProposalRow from './TosReviewProposalRow.astro'
 
 import type { Prisma } from '@prisma/client'
@@ -30,7 +31,7 @@ type Attribute = Prisma.AttributeGetPayload<{
 }>
 
 type Suggestion = Prisma.ServiceSuggestionGetPayload<{
-  select: { id: true; status: true; createdAt: true; proposedEdits: true }
+  select: { id: true; status: true; proposedEdits: true }
 }>
 
 type Service = Prisma.ServiceGetPayload<{
@@ -42,20 +43,17 @@ type Props = {
   service: Service
   attributes: Attribute[]
   class?: string
-  title?: string
 }
 
-const { suggestion, service, attributes, class: className, title = 'Structured proposed edits' } = Astro.props
+const { suggestion, service, attributes, class: className } = Astro.props
 
 const proposedEdits = suggestion.proposedEdits
 
-const currentKycLevelInfo = getKycLevelInfo(service.kycLevel.toString())
 // A description review carries only the description; the scan rows stay out.
 const kycPolicy = proposedEdits?.kycPolicy ?? null
 const proposedTosReview = proposedEdits?.tosReview ?? null
 const proposedAttributes = proposedEdits?.attributes ?? { add: [], remove: [] }
 const isDescriptionOnly = !!proposedEdits && !kycPolicy && !proposedTosReview
-const proposedKycLevelInfo = kycPolicy ? getKycLevelInfo(kycPolicy.inferredLevel.toString()) : null
 
 // Whether the level is still open, which is not the same as whether it differs
 // from the record: a level a reviewer already turned down still differs, and
@@ -74,7 +72,6 @@ const descriptionChanged =
   !!proposedEdits?.description?.text &&
   proposedEdits.description.text !== service.description
 const addCount = proposedAttributes.add.length
-const listingCheckCount = proposedEdits?.listingChecks?.length ?? 0
 const removeCount = proposedAttributes.remove.length
 const warningCount = proposedEdits?.warnings.length ?? 0
 const isActionable = suggestion.status === 'PENDING' || suggestion.status === 'UNDER_REVIEW'
@@ -93,278 +90,222 @@ const warningSeverityIcons = {
   alert: { icon: 'ri:error-warning-line', className: 'text-red-400' },
 } as const
 
-const acceptTosReviewInputId = `accept-tos-review-${suggestion.id}`
+const attributeTitle = (attributeId: number) =>
+  attributes.find((attribute) => attribute.id === attributeId)?.title ?? `Attribute #${String(attributeId)}`
+
+// Only proposals the reviewer can actually decide on get a chip in the summary.
+const summaryItems = [
+  tosReviewChanged && {
+    name: 'acceptTosReview',
+    value: 'on',
+    icon: 'ri:file-list-3-line',
+    label: 'ToS review',
+    detail: `${String(proposedTosReview.highlights.length)} highlights`,
+  },
+  kycLevelChanged && {
+    name: 'acceptKycLevel',
+    value: 'on',
+    icon: 'ri:shield-user-line',
+    label: 'KYC level',
+    detail: `${String(service.kycLevel)} → ${String(kycPolicy?.inferredLevel)}`,
+  },
+  kycPolicyChanged && {
+    name: 'acceptKycPolicy',
+    value: 'on',
+    icon: 'ri:file-shield-2-line',
+    label: 'KYC notes',
+    detail: 'rewritten',
+  },
+  descriptionChanged && {
+    name: 'acceptDescription',
+    value: 'on',
+    icon: 'ri:file-text-line',
+    label: 'Description',
+    detail: 'rewritten',
+  },
+  ...(isDescriptionOnly ? [] : (proposedEdits?.listingChecks ?? [])).map((check) => ({
+    name: 'listingFields',
+    value: check.field,
+    icon: 'ri:scales-3-line',
+    label: isListingCheckFieldId(check.field) ? listingCheckFieldLabels[check.field] : check.field,
+    detail: check.found,
+  })),
+  ...(isDescriptionOnly ? [] : proposedAttributes.add).map((proposal) => ({
+    name: 'attributeAddIds',
+    value: proposal.attributeId,
+    icon: 'ri:add-circle-line',
+    label: attributeTitle(proposal.attributeId),
+    detail: '',
+  })),
+  ...(isDescriptionOnly ? [] : proposedAttributes.remove).map((proposal) => ({
+    name: 'attributeRemoveIds',
+    value: proposal.attributeId,
+    icon: 'ri:indeterminate-circle-line',
+    label: attributeTitle(proposal.attributeId),
+    detail: '',
+  })),
+].filter((item) => !!item)
 ---
 
 {
   proposedEdits && (
-    <section class={cn('rounded-lg border border-night-500 bg-night-700 p-4', className)}>
-      <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 class="font-title text-xl font-semibold text-day-100">{title}</h2>
-          <p class="mt-1 flex flex-wrap items-center gap-2 text-xs text-day-500">
-            <span>Suggestion #{suggestion.id}</span>
-            <span class="text-night-400">/</span>
-            <span>
-              Created <TimeFormatted date={suggestion.createdAt} hourPrecision />
-            </span>
-          </p>
-        </div>
+    <ProposalPanel
+      title="Proposed changes"
+      description={`${isDescriptionOnly ? 'Description review' : 'Deep scan'} · suggestion #${String(suggestion.id)}`}
+      class={className}
+    >
+      <Fragment slot="badges">
+        {!isDescriptionOnly && (
+          <BadgeSmall
+            color={kycLevelChanged ? 'orange' : 'gray'}
+            text={kycLevelChanged ? 'KYC change' : 'KYC unchanged'}
+            icon={kycLevelChanged ? 'ri:exchange-line' : 'ri:checkbox-circle-line'}
+          />
+        )}
+        {(addCount > 0 || removeCount > 0) && (
+          <BadgeSmall color="blue" text={`${addCount + removeCount} attributes`} icon="ri:price-tag-3-line" />
+        )}
+        {warningCount > 0 && (
+          <BadgeSmall color="yellow" text={`${warningCount} warnings`} icon="ri:alert-line" />
+        )}
+      </Fragment>
 
-        <div class="flex flex-wrap gap-1.5">
-          {!isDescriptionOnly && (
-            <BadgeSmall
-              color={kycLevelChanged ? 'orange' : 'gray'}
-              text={kycLevelChanged ? 'KYC change' : 'KYC unchanged'}
-              icon={kycLevelChanged ? 'ri:exchange-line' : 'ri:checkbox-circle-line'}
-            />
-          )}
-          {(addCount > 0 || removeCount > 0) && (
-            <BadgeSmall
-              color="blue"
-              text={`${addCount + removeCount} attributes`}
-              icon="ri:price-tag-3-line"
-            />
-          )}
-          {warningCount > 0 && (
-            <BadgeSmall color="yellow" text={`${warningCount} warnings`} icon="ri:alert-line" />
-          )}
-        </div>
-      </div>
-
-      <form method="POST" action={actions.admin.service.deepScan.apply} class="space-y-4">
+      <form method="POST" action={actions.admin.service.deepScan.apply} class="mt-4 space-y-4">
         <input type="hidden" name="suggestionId" value={suggestion.id} />
 
-        <div class="rounded-md border border-night-600 bg-night-800">
-          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-night-600 px-4 py-3">
-            <div>
-              <h3 class="font-title text-base font-semibold text-day-100">Review changes</h3>
-              <p class="mt-1 text-xs text-day-500">
-                Select exactly what should be applied to the service record.
-              </p>
-            </div>
-            <span class="inline-flex items-center gap-1.5 rounded-md bg-night-700 px-2 py-1 text-xs text-day-400">
-              <Icon name="ri:checkbox-multiple-line" class="size-3.5" />
-              {Number(tosReviewChanged) +
-                Number(kycLevelChanged) +
-                Number(kycPolicyChanged) +
-                Number(descriptionChanged) +
-                addCount +
-                removeCount}{' '}
-              proposed
-            </span>
-          </div>
+        <ul class="divide-y divide-night-600 rounded-md border border-night-600 bg-night-800">
+          {proposedTosReview && (
+            <TosReviewProposalRow
+              currentTosReview={currentTosReview}
+              proposedTosReview={proposedTosReview}
+              changed={tosReviewChanged}
+              isActionable={isActionable}
+            />
+          )}
 
-          <div class="divide-y divide-night-600">
-            {proposedTosReview && (
-              <TosReviewProposalRow
-                currentTosReview={currentTosReview}
-                proposedTosReview={proposedTosReview}
-                changed={tosReviewChanged}
-                isActionable={isActionable}
-                inputId={acceptTosReviewInputId}
-              />
-            )}
+          {kycPolicy && (
+            <ProposalRow
+              icon="ri:shield-user-line"
+              label="KYC level"
+              checkbox={{
+                name: 'acceptKycLevel',
+                value: 'on',
+                checked: kycLevelChanged,
+                disabled: !isActionable || !kycLevelChanged,
+              }}
+            >
+              <Fragment slot="badges">
+                {kycLevelDeclined ? (
+                  <BadgeSmall color="gray" text="Previously declined" icon="ri:indeterminate-circle-line" />
+                ) : (
+                  !kycLevelChanged && (
+                    <BadgeSmall color="gray" text="No change" icon="ri:checkbox-circle-line" />
+                  )
+                )}
+              </Fragment>
 
-            {kycPolicy && (
-              <>
-                <label
-                  class={cn(
-                    'grid gap-3 p-4 sm:grid-cols-[auto_1fr] sm:items-start',
-                    isActionable && kycLevelChanged
-                      ? 'cursor-pointer bg-orange-500/5 hover:bg-orange-500/10'
-                      : 'bg-night-800'
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    name="acceptKycLevel"
-                    value="on"
-                    checked={kycLevelChanged}
-                    disabled={!isActionable || !kycLevelChanged}
-                    class="mt-1"
+              {/* A disabled checkbox is not submitted, so without this the server
+                  cannot tell "left unticked" from "never offered" and would record
+                  a decline the reviewer never made. */}
+              {isActionable && kycLevelFingerprint && (
+                <input type="hidden" name="kycLevelFingerprint" value={kycLevelFingerprint} />
+              )}
+              <BeforeAfter>
+                <KycLevelPill slot="before" level={service.kycLevel} />
+                <KycLevelPill slot="after" level={kycPolicy.inferredLevel} />
+              </BeforeAfter>
+              {!!kycPolicy.rationale && <p class="mt-2 text-day-400">{kycPolicy.rationale}</p>}
+            </ProposalRow>
+          )}
+
+          {kycPolicy && (
+            <ProposalRow
+              icon="ri:file-shield-2-line"
+              label="KYC policy notes"
+              checkbox={{
+                name: 'acceptKycPolicy',
+                value: 'on',
+                checked: kycPolicyChanged,
+                disabled: !isActionable || !kycPolicyChanged,
+              }}
+            >
+              <Fragment slot="badges">
+                {kycPolicyChanged ? (
+                  <BadgeSmall
+                    color="orange"
+                    text={service.kycPolicyMd ? 'Text update' : 'New notes'}
+                    icon="ri:file-edit-line"
                   />
-                  {/* A disabled checkbox is not submitted, so without this the server
-                      cannot tell "left unticked" from "never offered" and would record
-                      a decline the reviewer never made. */}
-                  {isActionable && kycLevelFingerprint && (
-                    <input type="hidden" name="kycLevelFingerprint" value={kycLevelFingerprint} />
-                  )}
-                  <div class="min-w-0">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span class="font-title text-sm font-semibold text-day-100">
-                        Apply KYC level change
-                      </span>
-                      {kycLevelDeclined ? (
-                        <BadgeSmall
-                          color="gray"
-                          text="Previously declined"
-                          icon="ri:indeterminate-circle-line"
-                        />
-                      ) : (
-                        !kycLevelChanged && (
-                          <BadgeSmall color="gray" text="No change" icon="ri:checkbox-circle-line" />
-                        )
-                      )}
-                    </div>
-                    <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                      <Tooltip text={currentKycLevelInfo.name}>
-                        <span class="inline-flex items-center gap-1.5 rounded-md border border-night-500 bg-night-900 px-2 py-1 text-day-300">
-                          <Icon name={currentKycLevelInfo.icon} class="size-4" />
-                          KYC {service.kycLevel}
-                        </span>
-                      </Tooltip>
-                      <Icon name="ri:arrow-right-line" class="size-4 text-day-500" />
-                      {proposedKycLevelInfo && (
-                        <Tooltip text={proposedKycLevelInfo.name}>
-                          <span
-                            class={cn(
-                              'inline-flex items-center gap-1.5 rounded-md border px-2 py-1',
-                              kycLevelChanged
-                                ? 'border-orange-500/40 bg-orange-500/10 text-orange-100'
-                                : 'border-night-500 bg-night-900 text-day-300'
-                            )}
-                          >
-                            <Icon name={proposedKycLevelInfo.icon} class="size-4" />
-                            KYC {kycPolicy.inferredLevel}
-                          </span>
-                        </Tooltip>
-                      )}
-                    </div>
-                    {!!kycPolicy.rationale && <p class="mt-2 text-sm text-day-400">{kycPolicy.rationale}</p>}
-                  </div>
-                </label>
+                ) : (
+                  <BadgeSmall color="gray" text="No change" icon="ri:checkbox-circle-line" />
+                )}
+              </Fragment>
 
-                <div
-                  class={cn(
-                    'p-4',
-                    isActionable && kycPolicyChanged
-                      ? 'bg-orange-500/5 hover:bg-orange-500/10'
-                      : 'bg-night-800'
-                  )}
-                >
-                  <label
-                    class={cn(
-                      'grid gap-3 sm:grid-cols-[auto_1fr] sm:items-start',
-                      isActionable && kycPolicyChanged && 'cursor-pointer'
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      name="acceptKycPolicy"
-                      value="on"
-                      checked={kycPolicyChanged}
-                      disabled={!isActionable || !kycPolicyChanged}
-                      class="mt-1"
-                    />
-                    {isActionable && kycPolicyChanged && (
-                      <input type="hidden" name="kycNotesFingerprint" value={kycNotesFingerprint} />
-                    )}
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span class="font-title text-sm font-semibold text-day-100">
-                        Apply KYC policy notes
-                      </span>
-                      {kycPolicyChanged ? (
-                        <BadgeSmall color="orange" text="Text update" icon="ri:file-edit-line" />
-                      ) : (
-                        <BadgeSmall color="gray" text="No change" icon="ri:checkbox-circle-line" />
-                      )}
+              {isActionable && kycPolicyChanged && (
+                <input type="hidden" name="kycNotesFingerprint" value={kycNotesFingerprint} />
+              )}
+              {kycPolicyChanged && (
+                <BeforeAfter beforeLabel="Current notes" afterLabel="Proposed notes">
+                  {service.kycPolicyMd && (
+                    <div slot="before" class="prose prose-sm max-w-none text-day-400 prose-invert">
+                      <Markdown content={service.kycPolicyMd} />
                     </div>
-                  </label>
-                  {/* Outside the label on purpose: a click that opens the comparison
-                      must not toggle the decision. */}
-                  {kycPolicyChanged && (
-                    <details class="mt-3 rounded-md border border-night-600 bg-night-900 p-3">
-                      <summary class="cursor-pointer text-sm font-medium text-day-200">
-                        Compare current and proposed notes
-                      </summary>
-                      <div class="mt-3 grid gap-3 lg:grid-cols-2">
-                        <div>
-                          <p class="text-xs font-bold tracking-wider text-day-500 uppercase">Current</p>
-                          <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-400 prose-invert">
-                            {service.kycPolicyMd ? (
-                              <Markdown content={service.kycPolicyMd} />
-                            ) : (
-                              <p class="text-day-500 italic">(empty)</p>
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <p class="text-xs font-bold tracking-wider text-orange-300 uppercase">Proposed</p>
-                          <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-200 prose-invert">
-                            <Markdown content={kycPolicy.notesMd} />
-                          </div>
-                        </div>
-                      </div>
-                    </details>
                   )}
-                </div>
+                  <div slot="after" class="prose prose-sm max-w-none text-day-200 prose-invert">
+                    <Markdown content={kycPolicy.notesMd} />
+                  </div>
+                </BeforeAfter>
+              )}
+            </ProposalRow>
+          )}
+
+          <ProposalRow
+            icon="ri:file-text-line"
+            label="Description"
+            checkbox={{
+              name: 'acceptDescription',
+              value: 'on',
+              checked: descriptionChanged,
+              disabled: !isActionable || !descriptionChanged,
+            }}
+          >
+            <Fragment slot="badges">
+              {descriptionChanged ? (
+                <BadgeSmall color="orange" text="Text update" icon="ri:file-edit-line" />
+              ) : (
+                <BadgeSmall color="gray" text="No change" icon="ri:checkbox-circle-line" />
+              )}
+            </Fragment>
+
+            {isActionable && descriptionChanged && (
+              <input type="hidden" name="descriptionFingerprint" value={descriptionFingerprint} />
+            )}
+            {descriptionChanged && proposedEdits.description && (
+              <>
+                <BeforeAfter>
+                  <Fragment slot="before">{service.description}</Fragment>
+                  <Fragment slot="after">{proposedEdits.description.text}</Fragment>
+                </BeforeAfter>
+                {proposedEdits.description.reasons.length > 0 && (
+                  <p class="mt-2 text-xs text-day-500">{proposedEdits.description.reasons.join('. ')}.</p>
+                )}
               </>
             )}
+          </ProposalRow>
 
-            <div
-              class={cn(
-                'p-4',
-                isActionable && descriptionChanged ? 'bg-orange-500/5 hover:bg-orange-500/10' : 'bg-night-800'
-              )}
-            >
-              <label
-                class={cn(
-                  'grid gap-3 sm:grid-cols-[auto_1fr] sm:items-start',
-                  isActionable && descriptionChanged && 'cursor-pointer'
-                )}
-              >
-                <input
-                  type="checkbox"
-                  name="acceptDescription"
-                  value="on"
-                  checked={descriptionChanged}
-                  disabled={!isActionable || !descriptionChanged}
-                  class="mt-1"
-                />
-                {isActionable && descriptionChanged && (
-                  <input type="hidden" name="descriptionFingerprint" value={descriptionFingerprint} />
-                )}
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="font-title text-sm font-semibold text-day-100">Rewrite the description</span>
-                  {descriptionChanged ? (
-                    <BadgeSmall color="orange" text="Text update" icon="ri:file-edit-line" />
-                  ) : (
-                    <BadgeSmall color="gray" text="No change" icon="ri:checkbox-circle-line" />
-                  )}
-                </div>
-              </label>
-              {descriptionChanged && proposedEdits.description && (
-                <div class="mt-3 grid gap-3 lg:grid-cols-2">
-                  <div>
-                    <p class="text-xs font-bold tracking-wider text-day-500 uppercase">Current</p>
-                    <p class="mt-2 text-sm text-pretty text-day-400">{service.description}</p>
-                  </div>
-                  <div>
-                    <p class="text-xs font-bold tracking-wider text-orange-300 uppercase">Proposed</p>
-                    <p class="mt-2 text-sm text-pretty text-day-200">{proposedEdits.description.text}</p>
-                    {proposedEdits.description.reasons.length > 0 && (
-                      <p class="mt-2 text-xs text-day-500">{proposedEdits.description.reasons.join('. ')}.</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+          {!isDescriptionOnly && (
+            <ListingCheckRows checks={proposedEdits.listingChecks ?? []} isActionable={isActionable} />
+          )}
 
-            {!isDescriptionOnly && (
-              <ListingChecksSection checks={proposedEdits.listingChecks ?? []} isActionable={isActionable} />
-            )}
-
-            {!isDescriptionOnly && (
-              <AttributeProposalGroups
-                add={proposedAttributes.add}
-                remove={proposedAttributes.remove}
-                attributes={attributes}
-                isActionable={isActionable}
-              />
-            )}
-          </div>
-        </div>
+          {!isDescriptionOnly && (
+            <AttributeProposalRows
+              add={proposedAttributes.add}
+              remove={proposedAttributes.remove}
+              attributes={attributes}
+              isActionable={isActionable}
+            />
+          )}
+        </ul>
 
         {warningCount > 0 && (
           <details class="rounded-md border border-yellow-500/20 bg-yellow-500/5 p-3">
@@ -396,14 +337,7 @@ const acceptTosReviewInputId = `accept-tos-review-${suggestion.id}`
           </details>
         )}
 
-        {Number(tosReviewChanged) +
-          Number(kycLevelChanged) +
-          Number(kycPolicyChanged) +
-          Number(descriptionChanged) +
-          addCount +
-          removeCount +
-          listingCheckCount ===
-          0 && (
+        {summaryItems.length === 0 && (
           <div class="rounded-md border border-night-600 bg-night-800 p-3 text-sm text-day-400">
             No direct service-record changes were proposed. Warnings and ToS evidence remain available for
             review.
@@ -411,13 +345,20 @@ const acceptTosReviewInputId = `accept-tos-review-${suggestion.id}`
         )}
 
         {isActionable ? (
-          <div class="flex flex-wrap items-center justify-between gap-3 border-t border-night-600 pt-4">
-            <p class="text-xs text-day-500">
-              Checked items are applied. Anything left unchecked is recorded as declined and will not be
-              proposed again until the page it was read from changes.
-            </p>
-            <InputSubmitButton label="Apply selected" icon="ri:check-line" hideCancel class="ml-auto" />
-          </div>
+          <ProposalApplyBar
+            items={summaryItems}
+            note="Unticked proposals are declined and not proposed again until the page they came from changes."
+            emptyButton={
+              summaryItems.length > 0
+                ? { label: 'Decline all', icon: 'ri:close-line' }
+                : { label: 'Close as reviewed', icon: 'ri:check-double-line', color: 'gray' }
+            }
+            discardButton={{
+              formaction: actions.admin.service.deepScan.dismiss,
+              tooltip:
+                'Close this proposal without applying or remembering anything. The next scan may propose the same again.',
+            }}
+          />
         ) : (
           <div class="rounded-md border border-night-600 bg-night-800 p-3 text-sm text-day-400">
             This suggestion is {suggestion.status.toLowerCase().replace('_', ' ')} and can no longer be
@@ -425,21 +366,6 @@ const acceptTosReviewInputId = `accept-tos-review-${suggestion.id}`
           </div>
         )}
       </form>
-
-      {isActionable && (
-        <form method="POST" action={actions.admin.service.deepScan.dismiss} class="mt-3 flex justify-end">
-          <input type="hidden" name="suggestionId" value={suggestion.id} />
-          <Button
-            as="button"
-            type="submit"
-            color="danger"
-            variant="faded"
-            size="sm"
-            icon="ri:close-line"
-            label="Dismiss without applying"
-          />
-        </form>
-      )}
-    </section>
+    </ProposalPanel>
   )
 }

@@ -1,0 +1,44 @@
+---
+import { isListingCheckFieldId, listingCheckFieldLabels } from '../../../constants/listingCheckFields'
+import QuotedClause from '../../QuotedClause.astro'
+import BeforeAfter from '../../serviceSuggestions/BeforeAfter.astro'
+import ProposalRow from '../../serviceSuggestions/ProposalRow.astro'
+
+import type { Prisma } from '@prisma/client'
+
+type ProposedEdits = NonNullable<
+  Prisma.ServiceSuggestionGetPayload<{ select: { proposedEdits: true } }>['proposedEdits']
+>
+
+type Props = {
+  checks: NonNullable<ProposedEdits['listingChecks']>
+  isActionable: boolean
+}
+
+const { checks, isActionable } = Astro.props
+---
+
+{
+  checks.length > 0 && (
+    <li class="px-4 py-3 text-xs text-day-500">
+      The documents disagree with our record below. A service may use a legal template naming another
+      jurisdiction, so read the clause before changing anything. Tick to update our record, leave unticked to
+      keep it and stop being asked.
+    </li>
+  )
+}
+{
+  checks.map((check) => (
+    <ProposalRow
+      icon="ri:scales-3-line"
+      label={isListingCheckFieldId(check.field) ? listingCheckFieldLabels[check.field] : check.field}
+      checkbox={{ name: 'listingFields', value: check.field, checked: false, disabled: !isActionable }}
+    >
+      <BeforeAfter beforeLabel="Our record" afterLabel="Documents say">
+        {check.current && <Fragment slot="before">{check.current}</Fragment>}
+        <Fragment slot="after">{check.found}</Fragment>
+      </BeforeAfter>
+      <QuotedClause quote={check.quote} sourceUrl={check.sourceUrl} class="text-day-500" />
+    </ProposalRow>
+  ))
+}
