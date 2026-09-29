@@ -3,6 +3,7 @@ import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
 import { capabilitiesZodEnum } from '../../constants/capabilities'
+import { recordAuditLog } from '../../lib/auditLog'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { saveFileLocally } from '../../lib/fileStorage'
 import { cap } from '../../lib/permissions'
@@ -24,6 +25,40 @@ const selectUserReturnFields = {
   updatedAt: true,
   spammer: true,
 } as const satisfies Prisma.UserSelect
+
+type AuditedUserFields = Prisma.UserGetPayload<{
+  select: {
+    name: true
+    displayName: true
+    link: true
+    verifiedLink: true
+    picture: true
+    admin: true
+    spammer: true
+    capabilities: true
+    canCreateApiKeys: true
+  }
+}>
+
+function userUpdateAuditSummary(before: AuditedUserFields, after: AuditedUserFields) {
+  const granted = after.capabilities.filter((capability) => !before.capabilities.includes(capability))
+  const revoked = before.capabilities.filter((capability) => !after.capabilities.includes(capability))
+  const profileFields = (['name', 'displayName', 'link', 'verifiedLink', 'picture'] as const).filter(
+    (field) => before[field] !== after[field]
+  )
+
+  return [
+    before.admin !== after.admin && (after.admin ? 'Made admin' : 'Removed admin'),
+    before.spammer !== after.spammer && (after.spammer ? 'Marked as spammer' : 'Unmarked as spammer'),
+    granted.length > 0 && `Granted ${granted.join(', ')}`,
+    revoked.length > 0 && `Revoked ${revoked.join(', ')}`,
+    before.canCreateApiKeys !== after.canCreateApiKeys &&
+      (after.canCreateApiKeys ? 'Allowed API keys' : 'Disallowed API keys'),
+    profileFields.length > 0 && `Edited ${profileFields.join(', ')}`,
+  ]
+    .filter(Boolean)
+    .join('; ')
+}
 
 export const adminUserActions = {
   search: defineProtectedAction({
@@ -81,6 +116,15 @@ export const adminUserActions = {
         },
         select: {
           id: true,
+          name: true,
+          displayName: true,
+          link: true,
+          verifiedLink: true,
+          picture: true,
+          admin: true,
+          spammer: true,
+          capabilities: true,
+          canCreateApiKeys: true,
         },
       })
 
@@ -96,27 +140,42 @@ export const adminUserActions = {
           ? await saveFileLocally(pictureFile, pictureFile.name, 'users/pictures/')
           : null
 
-      const updatedUser = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          name: valuesToUpdate.name,
-          link: valuesToUpdate.link,
-          verifiedLink: valuesToUpdate.verifiedLink,
-          displayName: valuesToUpdate.displayName,
-          verified: !!valuesToUpdate.verifiedLink,
-          picture: pictureUrl,
-          // Role, capability and API-key grants are admin-only; a users:manage
-          // editor (e.g. support) leaves them untouched.
-          ...(context.locals.user.admin
-            ? {
-                admin: type.includes('admin'),
-                spammer: type.includes('spammer'),
-                capabilities,
-                canCreateApiKeys,
-              }
-            : {}),
-        },
-        select: selectUserReturnFields,
+      const updatedUser = await prisma.$transaction(async (tx) => {
+        const updated = await tx.user.update({
+          where: { id: user.id },
+          data: {
+            name: valuesToUpdate.name,
+            link: valuesToUpdate.link,
+            verifiedLink: valuesToUpdate.verifiedLink,
+            displayName: valuesToUpdate.displayName,
+            verified: !!valuesToUpdate.verifiedLink,
+            picture: pictureUrl,
+            // Role, capability and API-key grants are admin-only; a users:manage
+            // editor (e.g. support) leaves them untouched.
+            ...(context.locals.user.admin
+              ? {
+                  admin: type.includes('admin'),
+                  spammer: type.includes('spammer'),
+                  capabilities,
+                  canCreateApiKeys,
+                }
+              : {}),
+          },
+          select: selectUserReturnFields,
+        })
+
+        const summary = userUpdateAuditSummary(user, updated)
+        if (summary) {
+          await recordAuditLog(tx, {
+            actorId: context.locals.user.id,
+            action: 'UPDATED',
+            targetType: 'USER',
+            targetId: user.id,
+            summary,
+          })
+        }
+
+        return updated
       })
 
       return {
@@ -199,7 +258,7 @@ export const adminUserActions = {
         serviceId: z.coerce.number().int().positive(),
         role: z.enum(['OWNER', 'ADMIN', 'MODERATOR', 'SUPPORT', 'TEAM_MEMBER']),
       }),
-      handler: async (input) => {
+      handler: async (input, context) => {
         // Check if the user exists
         const user = await prisma.user.findUnique({
           where: { id: input.userId },
@@ -253,6 +312,14 @@ export const adminUserActions = {
               },
             })
 
+            await recordAuditLog(prisma, {
+              actorId: context.locals.user.id,
+              action: 'UPDATED',
+              targetType: 'USER',
+              targetId: input.userId,
+              summary: `Affiliation with ${service.name} changed to ${input.role.toLowerCase().replace('_', ' ')}`,
+            })
+
             return { serviceAffiliation, serviceName: service.name, updated: true }
           } else {
             // Create new affiliation
@@ -262,6 +329,14 @@ export const adminUserActions = {
                 serviceId: input.serviceId,
                 role: input.role as ServiceUserRole,
               },
+            })
+
+            await recordAuditLog(prisma, {
+              actorId: context.locals.user.id,
+              action: 'UPDATED',
+              targetType: 'USER',
+              targetId: input.userId,
+              summary: `Affiliated with ${service.name} as ${input.role.toLowerCase().replace('_', ' ')}`,
             })
 
             return { serviceAffiliation, serviceName: service.name }
@@ -282,7 +357,7 @@ export const adminUserActions = {
       input: z.object({
         id: z.coerce.number().int().positive(),
       }),
-      handler: async (input) => {
+      handler: async (input, context) => {
         const serviceAffiliation = await prisma.serviceUser.delete({
           where: {
             id: input.id,
@@ -294,6 +369,14 @@ export const adminUserActions = {
               },
             },
           },
+        })
+
+        await recordAuditLog(prisma, {
+          actorId: context.locals.user.id,
+          action: 'UPDATED',
+          targetType: 'USER',
+          targetId: serviceAffiliation.userId,
+          summary: `Removed affiliation with ${serviceAffiliation.service.name}`,
         })
 
         return { serviceAffiliation }
