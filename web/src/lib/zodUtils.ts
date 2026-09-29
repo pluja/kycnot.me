@@ -46,14 +46,19 @@ export const zodUrlOptionalProtocol = z.preprocess(
     })
 )
 
+const PHONE_REGEX = /^([\d\s+\-_/()[\]*#.,]|ext|x){7,}$/i
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+
+// zodContactMethod is idempotent: a stored value (already carrying mailto: or
+// tel:) parses back to itself, so a prefilled form round-trips unchanged.
 export const zodContactMethod = z.preprocess(
   (input) => {
     if (typeof input !== 'string') return input
     const cleanInput = input.trim()
 
-    if (/^([\d\s+\-_/()[\]*#.,]|ext|x){7,}$/i.test(cleanInput)) return `tel:${cleanInput}`
-
-    if (/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanInput)) return `mailto:${cleanInput}`
+    if (/^(mailto|tel):/i.test(cleanInput)) return cleanInput
+    if (PHONE_REGEX.test(cleanInput)) return `tel:${cleanInput}`
+    if (EMAIL_REGEX.test(cleanInput)) return `mailto:${cleanInput}`
 
     return cleanUrl(cleanInput)
   },
@@ -61,10 +66,11 @@ export const zodContactMethod = z.preprocess(
     .string()
     .trim()
     .refine(
-      (value) =>
-        /^((https?:\/\/)?[^\s$.?#]+(\.[^\s$.?#])*(\.[a-z0-9]{2,}).*|([\d\s+\-_/()[\]*#.,]|ext|x){7,}|[0-9\s+-_\\/()[\]*#.]|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})*$/i.test(
-          value
-        ),
+      (value) => {
+        if (/^tel:/i.test(value)) return PHONE_REGEX.test(value.slice('tel:'.length))
+        if (/^mailto:/i.test(value)) return EMAIL_REGEX.test(value.slice('mailto:'.length))
+        return /^(https?:\/\/)?[^\s$.?#]+(\.[^\s$.?#])*(\.[a-z0-9]{2,}).*$/i.test(value)
+      },
       {
         message: 'Invalid contact method',
       }
@@ -99,8 +105,9 @@ export const stringListOfUrlsSchemaRequired = z.preprocess(
   z.array(zodUrlOptionalProtocol).min(1)
 )
 
+// Split on line breaks only: a phone number contains spaces.
 export const stringListOfContactMethodsSchema = z.preprocess(
-  stringToArrayFactory(/[\s,\n]+/),
+  stringToArrayFactory(/[\r\n]+/),
   z.array(zodContactMethod).default([])
 )
 
