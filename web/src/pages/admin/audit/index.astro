@@ -16,11 +16,12 @@ import {
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { auditLogSelect } from '../../../lib/auditLog'
 import { cn } from '../../../lib/cn'
+import { makeCommentUrl } from '../../../lib/commentsWithReplies'
 import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
 import { prisma } from '../../../lib/prisma'
 import { urlWithParams } from '../../../lib/urls'
 
-import type { Prisma } from '@prisma/client'
+import type { AuditTargetType, Prisma } from '@prisma/client'
 
 const PAGE_SIZE = 50
 
@@ -69,36 +70,81 @@ const [entries, total] = await Astro.locals.banners.try(
   ]
 )
 
-// Services are addressed by slug in the admin, so their names and links come
-// from one lookup over the page's own entries rather than a relation.
-const serviceIds = [
-  ...new Set(entries.filter((entry) => entry.targetType === 'SERVICE').map((entry) => entry.targetId)),
+// Services, comments and users are addressed by slug or name in the admin, so
+// their labels and links come from one lookup per type over the page's own
+// entries rather than a relation.
+const targetIdsOf = (targetType: AuditTargetType) => [
+  ...new Set(entries.filter((entry) => entry.targetType === targetType).map((entry) => entry.targetId)),
 ]
-const services = await Astro.locals.banners.try(
-  'Error fetching services',
-  () =>
-    prisma.service.findMany({
-      where: { id: { in: serviceIds } },
-      select: { id: true, name: true, slug: true },
-    }),
-  []
-)
+const [services, comments, users] = await Astro.locals.banners.tryMany([
+  [
+    'Error fetching services',
+    () =>
+      prisma.service.findMany({
+        where: { id: { in: targetIdsOf('SERVICE') } },
+        select: { id: true, name: true, slug: true },
+      }),
+    [],
+  ],
+  [
+    'Error fetching comments',
+    () =>
+      prisma.comment.findMany({
+        where: { id: { in: targetIdsOf('COMMENT') } },
+        select: { id: true, service: { select: { name: true, slug: true } } },
+      }),
+    [],
+  ],
+  [
+    'Error fetching users',
+    () =>
+      prisma.user.findMany({
+        where: { id: { in: targetIdsOf('USER') } },
+        select: { id: true, name: true },
+      }),
+    [],
+  ],
+])
 const serviceById = new Map(services.map((service) => [service.id, service]))
+const commentById = new Map(comments.map((comment) => [comment.id, comment]))
+const userById = new Map(users.map((user) => [user.id, user]))
 
 const targetOf = (entry: (typeof entries)[number]) => {
   const info = getAuditTargetTypeInfo(entry.targetType)
-  if (entry.targetType === 'SERVICE') {
-    const service = serviceById.get(entry.targetId)
-    return {
-      icon: info.icon,
-      label: service?.name ?? `Service #${String(entry.targetId)}`,
-      href: service ? `/admin/services/${service.slug}/edit` : null,
+  const fallbackLabel = `${info.label} #${String(entry.targetId)}`
+  switch (entry.targetType) {
+    case 'SERVICE': {
+      const service = serviceById.get(entry.targetId)
+      return {
+        icon: info.icon,
+        label: service?.name ?? fallbackLabel,
+        href: service ? `/admin/services/${service.slug}/edit` : null,
+      }
     }
-  }
-  return {
-    icon: info.icon,
-    label: `${info.label} #${String(entry.targetId)}`,
-    href: info.href ? info.href(entry.targetId) : null,
+    case 'COMMENT': {
+      const comment = commentById.get(entry.targetId)
+      return {
+        icon: info.icon,
+        label: comment ? `${fallbackLabel} on ${comment.service.name}` : fallbackLabel,
+        href: comment
+          ? makeCommentUrl({ serviceSlug: comment.service.slug, commentId: comment.id, origin: '' })
+          : null,
+      }
+    }
+    case 'USER': {
+      const user = userById.get(entry.targetId)
+      return {
+        icon: info.icon,
+        label: user?.name ?? fallbackLabel,
+        href: user ? `/admin/users/${user.name}` : null,
+      }
+    }
+    default:
+      return {
+        icon: info.icon,
+        label: fallbackLabel,
+        href: info.href ? info.href(entry.targetId) : null,
+      }
   }
 }
 
