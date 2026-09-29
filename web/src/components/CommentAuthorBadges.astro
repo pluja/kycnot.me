@@ -2,7 +2,7 @@
 import { karmaUnlocksById } from '../constants/karmaUnlocks'
 import { getServiceUserRoleInfo } from '../constants/serviceUserRoles'
 import { computeKarmaUnlocks } from '../lib/karmaUnlocks'
-import { isStaff } from '../lib/permissions'
+import { staffBadgeLabel } from '../lib/permissions'
 
 import BadgeSmall from './BadgeSmall.astro'
 import Tooltip from './Tooltip.astro'
@@ -19,15 +19,17 @@ const authorUnlocks = computeKarmaUnlocks(comment.author.totalKarma)
 const authorCommentCount = comment.author._count.comments
 const authorStatsText = `${authorCommentCount.toLocaleString()} ${authorCommentCount === 1 ? 'comment' : 'comments'}, ${comment.author.totalKarma.toLocaleString()} karma`
 
+const staffLabel = staffBadgeLabel(comment.author)
+
 const isNewUser =
   new Date().getTime() - new Date(comment.author.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000
-const shouldShowNewUserAgeBadge = isNewUser && !comment.author.admin && !isStaff(comment.author)
+const shouldShowNewUserAgeBadge = isNewUser && !comment.author.admin && !staffLabel
 const shouldShowSingleReviewBadge =
   authorCommentCount === 1 &&
   comment.rating !== null &&
   !comment.parentId &&
   !comment.author.admin &&
-  !isStaff(comment.author)
+  !staffLabel
 const isUserRatingTrustLabel = ['Active user', 'Trusted user'].includes(comment.ratingTrustLabel ?? '')
 const shouldShowUserRatingTrustBadge =
   comment.rating !== null &&
@@ -35,7 +37,7 @@ const shouldShowUserRatingTrustBadge =
   !!comment.ratingTrustLabel &&
   isUserRatingTrustLabel &&
   !comment.author.admin &&
-  !isStaff(comment.author) &&
+  !staffLabel &&
   !comment.author.verified
 ---
 
@@ -46,8 +48,8 @@ const shouldShowUserRatingTrustBadge =
     )
   }
   {
-    isStaff(comment.author) && !comment.author.admin && (
-      <BadgeSmall icon="ri:graduation-cap-fill" color="teal" text="Staff" variant="faded" inlineIcon />
+    !comment.author.admin && staffLabel && (
+      <BadgeSmall icon="ri:graduation-cap-fill" color="teal" text={staffLabel} variant="faded" inlineIcon />
     )
   }
 
@@ -80,7 +82,7 @@ const shouldShowUserRatingTrustBadge =
     )
   }
   {
-    authorUnlocks.highKarmaBadge && !comment.author.admin && !isStaff(comment.author) && (
+    authorUnlocks.highKarmaBadge && !comment.author.admin && !staffLabel && (
       <BadgeSmall
         icon={karmaUnlocksById.highKarmaBadge.icon}
         color="lime"

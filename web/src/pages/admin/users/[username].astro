@@ -18,7 +18,7 @@ import { capabilities } from '../../../constants/capabilities'
 import { capabilityPresets } from '../../../constants/capabilityPresets'
 import { getServiceUserRoleInfo, serviceUserRoles } from '../../../constants/serviceUserRoles'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
-import { isStaff } from '../../../lib/permissions'
+import { staffBadgeLabel } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
 
 const { username } = Astro.params
@@ -119,6 +119,8 @@ const [user, allServices] = await Astro.locals.banners.tryMany([
 ])
 
 if (!user) return Astro.rewrite('/404')
+
+const staffLabel = staffBadgeLabel(user)
 ---
 
 <BaseLayout
@@ -147,7 +149,7 @@ if (!user) return Astro.rewrite('/404')
     <div class="mb-4 flex flex-wrap justify-center gap-2">
       {user.admin && <BadgeSmall color="green" text="Admin" icon="ri:shield-star-fill" />}
       {user.verified && <BadgeSmall color="cyan" text="Verified" icon="ri:verified-badge-fill" />}
-      {isStaff(user) && <BadgeSmall color="blue" text="Staff" icon="ri:graduation-cap-fill" />}
+      {staffLabel && <BadgeSmall color="blue" text={staffLabel} icon="ri:graduation-cap-fill" />}
       {user.spammer && <BadgeSmall color="red" text="Spammer" icon="ri:alert-fill" />}
     </div>
 

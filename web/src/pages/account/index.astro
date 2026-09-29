@@ -19,7 +19,7 @@ import { verificationStatusesByValue } from '../../constants/verificationStatus'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
 import { makeUserWithKarmaUnlocks } from '../../lib/karmaUnlocks'
-import { isStaff } from '../../lib/permissions'
+import { staffBadgeLabel } from '../../lib/permissions'
 import { pluralize } from '../../lib/pluralize'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
@@ -162,6 +162,8 @@ const user = await Astro.locals.banners.try('user', async () => {
 
 if (!user) return Astro.rewrite('/404')
 
+const staffLabel = staffBadgeLabel(user)
+
 const daysUntilDeletion = user.scheduledDeletionAt
   ? differenceInCalendarDays(user.scheduledDeletionAt, new Date())
   : null
@@ -215,7 +217,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
           </h1>
           {user.displayName && <p class="font-title text-day-200">{user.name}</p>}
           {
-            (user.admin || user.verified || isStaff(user)) && (
+            (user.admin || user.verified || staffLabel) && (
               <div class="mt-1 flex gap-2">
                 {user.admin && (
                   <span class="rounded-full border border-red-500/50 bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
@@ -227,9 +229,9 @@ const daysUntilDeletion = user.scheduledDeletionAt
                     verified
                   </span>
                 )}
-                {isStaff(user) && (
+                {staffLabel && (
                   <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                    Staff
+                    {staffLabel}
                   </span>
                 )}
               </div>
@@ -373,14 +375,14 @@ const daysUntilDeletion = user.scheduledDeletionAt
                     )
                   }
                   {
-                    isStaff(user) && (
+                    staffLabel && (
                       <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                        Staff
+                        {staffLabel}
                       </span>
                     )
                   }
                   {
-                    !user.admin && !user.verified && !isStaff(user) && (
+                    !user.admin && !user.verified && !staffLabel && (
                       <span class="rounded-full border border-day-700/50 bg-day-700/20 px-2 py-0.5 text-xs text-day-400">
                         Standard User
                       </span>

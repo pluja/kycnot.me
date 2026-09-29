@@ -76,10 +76,27 @@ export function isStaff(user: UserForPermissions | null | undefined): boolean {
   return userCan(user, 'comments:moderate') && userCan(user, 'services:edit')
 }
 
+// Capabilities whose holders act on public content, so they are named publicly.
+// Internal grants (stats, audit, notifications...) stay private.
+const moderatorCapabilities = [
+  'cases:manage',
+  'comments:moderate',
+  'events:manage',
+  'suggestions:manage',
+] as const satisfies Capability[]
+
+// staffBadgeLabel names a team member publicly: "Staff" for the isStaff set, and
+// "Moderator" for anyone else holding a moderation capability.
+export function staffBadgeLabel(user: UserForPermissions | null | undefined): 'Moderator' | 'Staff' | null {
+  if (isStaff(user)) return 'Staff'
+  if (moderatorCapabilities.some((capability) => userCan(user, capability))) return 'Moderator'
+  return null
+}
+
 // hasAnyCapability is true for any holder of at least one capability. The admin
 // user list keys both its "Staff" filter and the per-row badge on this, so a
 // scoped account (e.g. cases:manage only) never falls between the staff and
-// regular buckets. The narrower isStaff drives the public-facing badge instead.
+// regular buckets. The narrower staffBadgeLabel drives the public-facing badge instead.
 export function hasAnyCapability(user: UserForPermissions | null | undefined): boolean {
   return !!user && user.capabilities.length > 0
 }

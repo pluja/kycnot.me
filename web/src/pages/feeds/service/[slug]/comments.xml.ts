@@ -3,7 +3,7 @@ import rss from '@astrojs/rss'
 import { getServiceUserRoleInfo } from '../../../../constants/serviceUserRoles'
 import { makeCommentUrl } from '../../../../lib/commentsWithReplies'
 import { getCommentsForService } from '../../../../lib/feeds'
-import { isStaff } from '../../../../lib/permissions'
+import { staffBadgeLabel } from '../../../../lib/permissions'
 import { absoluteSiteUrl, siteOrigin } from '../../../../lib/urls'
 
 import type { APIRoute } from 'astro'
@@ -28,11 +28,12 @@ export const GET: APIRoute = async (context) => {
           ? `${authorName} rated ${service.name} (${String(comment.rating)}/5 stars)`
           : `${authorName} commented on ${service.name}`
 
+        const staffLabel = staffBadgeLabel(comment.author)
         const badges = [
           comment.author.verified ? '✅' : null,
           comment.author.spammer ? '(Spammer)' : null,
           comment.author.admin ? '(Admin)' : null,
-          isStaff(comment.author) && !comment.author.admin ? '(Staff)' : null,
+          staffLabel && !comment.author.admin ? `(${staffLabel})` : null,
           ...comment.author.serviceAffiliations.map(
             (affiliation) =>
               ` (${getServiceUserRoleInfo(affiliation.role).label} at ${affiliation.service.name})`

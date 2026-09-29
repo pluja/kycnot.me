@@ -21,7 +21,7 @@ import { verificationStatusesByValue } from '../../constants/verificationStatus'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
 import { makeUserWithKarmaUnlocks } from '../../lib/karmaUnlocks'
-import { isStaff } from '../../lib/permissions'
+import { isStaff, staffBadgeLabel } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
 import { formatDateShort } from '../../lib/timeAgo'
@@ -201,6 +201,8 @@ const user = await Astro.locals.banners.try('user', async () => {
 
 if (!user) return Astro.rewrite('/404')
 
+const staffLabel = staffBadgeLabel(user)
+
 const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
 ---
 
@@ -237,7 +239,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
         sameAs: user.link ? [user.link] : undefined,
         description: `User profile page for ${user.displayName ?? user.name} on KYCnot.me`,
         identifier: [user.name, user.id.toString()],
-        jobTitle: user.admin ? 'Administrator' : isStaff(user) ? 'Staff' : undefined,
+        jobTitle: user.admin ? 'Administrator' : (staffLabel ?? undefined),
         memberOf: KYCNOTME_SCHEMA_MINI,
         interactionStatistic: [
           {
@@ -306,9 +308,9 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
               )
             }
             {
-              isStaff(user) && (
+              staffLabel && (
                 <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                  Staff
+                  {staffLabel}
                 </span>
               )
             }
@@ -442,14 +444,14 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                     )
                   }
                   {
-                    isStaff(user) && (
+                    staffLabel && (
                       <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                        Staff
+                        {staffLabel}
                       </span>
                     )
                   }
                   {
-                    !user.admin && !user.verified && !isStaff(user) && (
+                    !user.admin && !user.verified && !staffLabel && (
                       <span class="rounded-full border border-day-700/50 bg-day-700/20 px-2 py-0.5 text-xs text-day-400">
                         Standard User
                       </span>
