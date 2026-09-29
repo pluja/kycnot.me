@@ -15,6 +15,7 @@ import { checkDescription } from '../../../lib/descriptionRules'
 import { cap } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
 import { proposalJobKind } from '../../../lib/scanJobs'
+import { transitionSuggestion } from '../../../lib/serviceSuggestionReview'
 
 import { buildAuditLines, collectDeclines, intersectAcceptedAttributeIds } from './deepScan.helpers'
 
@@ -109,7 +110,7 @@ export const deepScanActions = {
 
   apply: defineProtectedAction({
     accept: 'form',
-    permissions: cap('services:edit'),
+    permissions: [cap('services:edit'), cap('suggestions:manage')],
     input: z.object({
       suggestionId: z.coerce.number().int().positive(),
       acceptTosReview: checkboxBoolean,
@@ -327,10 +328,7 @@ export const deepScanActions = {
           })
         }
 
-        await tx.serviceSuggestion.update({
-          where: { id: suggestion.id },
-          data: { status: 'APPROVED' },
-        })
+        await transitionSuggestion(tx, suggestion.id, 'APPROVED')
 
         await recordAuditLog(tx, {
           actorId: locals.user.id,
@@ -362,7 +360,7 @@ export const deepScanActions = {
 
   dismiss: defineProtectedAction({
     accept: 'form',
-    permissions: cap('services:edit'),
+    permissions: [cap('services:edit'), cap('suggestions:manage')],
     input: z.object({
       suggestionId: z.coerce.number().int().positive(),
       reason: z.string().trim().max(500).optional(),
@@ -392,10 +390,7 @@ export const deepScanActions = {
       const dismissalLine = input.reason ? `Dismissed: ${input.reason}` : 'Dismissed'
 
       await prisma.$transaction(async (tx) => {
-        await tx.serviceSuggestion.update({
-          where: { id: input.suggestionId },
-          data: { status: 'REJECTED' },
-        })
+        await transitionSuggestion(tx, suggestion.id, 'REJECTED')
         await recordAuditLog(tx, {
           actorId: locals.user.id,
           action: 'STATUS_CHANGED',
