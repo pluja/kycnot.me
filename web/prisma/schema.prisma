@@ -511,6 +511,10 @@ model ServiceSuggestion {
   notes            String?
   /// [ProposedEdits]
   proposedEdits    Json?
+  /// [ServiceFieldEdits]
+  /// A person's field-by-field edit. Kept apart from proposedEdits, which the
+  /// deep scan owns and withdraws wholesale when a newer scan lands.
+  fieldEdits       Json?
   createdAt        DateTime                   @default(now())
   updatedAt        DateTime                   @default(now()) @updatedAt
   userId           Int

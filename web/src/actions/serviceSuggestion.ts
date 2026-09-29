@@ -1,16 +1,27 @@
 import { Currency } from '@prisma/client'
 import { z } from 'astro/zod'
-import { ActionError } from 'astro:actions'
+import { ActionError, ActionInputError } from 'astro:actions'
 import { formatDistanceStrict } from 'date-fns'
 
 import { countriesZodEnumByCode } from '../constants/countries'
 import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../lib/captchaValidation'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
-import { descriptionOpeningRefinement, descriptionSchema } from '../lib/descriptionRules'
+import {
+  checkDescription,
+  describeViolations,
+  descriptionOpeningRefinement,
+  descriptionSchema,
+} from '../lib/descriptionRules'
 import { saveFileLocally } from '../lib/fileStorage'
 import { findServicesBySimilarity } from '../lib/findServicesBySimilarity'
 import { prisma } from '../lib/prisma'
 import { sendChatMessageEvents } from '../lib/sendChatEvents'
+import {
+  diffServiceFieldValues,
+  serviceEditableSelect,
+  serviceFieldValues,
+  serviceFieldValuesFromForm,
+} from '../lib/serviceFieldEdits'
 import { handleHoneypotTrap } from '../lib/spamDetection'
 import { separateServiceUrlsByType } from '../lib/urls'
 import {
@@ -26,10 +37,34 @@ const SUGGESTION_MESSAGE_RATE_LIMIT_WINDOW_MINUTES = 1
 const MAX_SUGGESTION_MESSAGES_PER_WINDOW = 5
 
 export const SUGGESTION_NOTES_MAX_LENGTH = 1000
-export const SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH = 50
+const SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH = 50
+// Lenient on purpose: an untouched description may predate the current length
+// rule, and a changed one is checked against the rule separately.
+const SUGGESTION_EDIT_DESCRIPTION_MAX_LENGTH = 2000
+export const SUGGESTION_EDIT_REASON_MIN_LENGTH = 10
+export const SERVICE_NAME_MAX_LENGTH = 40
 export const SUGGESTION_NAME_MAX_LENGTH = 20
 export const SUGGESTION_SLUG_MAX_LENGTH = 20
 export const SUGGESTION_MESSAGE_CONTENT_MAX_LENGTH = 1000
+
+// Fields both forms share. Name and description differ: a new listing is held
+// to the full rules, while an edit only has to pass them if it changes them.
+// Links and contacts are create-only, see serviceEditFields.
+const serviceSuggestionFieldsSchema = {
+  kycLevel: zodCohercedNumber(z.coerce.number().int().min(0).max(4)),
+  attributes: z.array(z.coerce.number().int().positive()).max(200),
+  categories: z.array(z.coerce.number().int().positive()).min(1).max(50),
+  acceptedCurrencies: z.array(z.nativeEnum(Currency)).min(1).max(20),
+  operatingSince: z.coerce.date().optional(),
+  registrationCountryCode: z
+    .union([countriesZodEnumByCode, z.literal('')])
+    .optional()
+    .nullable()
+    .refine((val) => val === null || val === undefined || val === '' || val.length === 2, {
+      message: 'Country code must be a valid 2-character code or empty',
+    }),
+  registeredCompanyName: z.string().trim().max(100).optional(),
+}
 
 const findPossibleDuplicates = async (input: { name: string }) => {
   const matches = await findServicesBySimilarity(input.name, 0.3)
@@ -105,16 +140,18 @@ export const serviceSuggestionActions = {
     permissions: 'not-spammer',
     input: z
       .object({
+        serviceId: z.coerce.number().int().positive(),
         notes: z
           .string()
           .trim()
           .min(
-            SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH,
-            `Notes must be at least ${SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH.toLocaleString()} characters long`
+            SUGGESTION_EDIT_REASON_MIN_LENGTH,
+            `Explain the edit in at least ${SUGGESTION_EDIT_REASON_MIN_LENGTH.toLocaleString()} characters`
           )
           .max(SUGGESTION_NOTES_MAX_LENGTH),
-        serviceId: z.coerce.number().int().positive(),
-        extraNotes: z.string().optional(),
+        name: z.string().trim().min(1).max(SERVICE_NAME_MAX_LENGTH),
+        description: z.string().trim().min(1).max(SUGGESTION_EDIT_DESCRIPTION_MAX_LENGTH),
+        ...serviceSuggestionFieldsSchema,
         /** @deprecated Honey pot field, do not use */
         message: z.unknown().optional(),
         ...captchaFormSchemaProperties,
@@ -129,10 +166,7 @@ export const serviceSuggestionActions = {
       })
 
       const service = await prisma.service.findUnique({
-        select: {
-          id: true,
-          slug: true,
-        },
+        select: { id: true, ...serviceEditableSelect },
         where: { id: input.serviceId },
       })
 
@@ -143,15 +177,40 @@ export const serviceSuggestionActions = {
         })
       }
 
-      // Combine notes and extraNotes if available
-      const combinedNotes = input.extraNotes
-        ? `${input.notes}\n\nSuggested changes:\n${input.extraNotes}`
-        : input.notes
+      // zodCohercedNumber is typed loosely; the schema has already made it an integer from 0 to 4.
+      const proposed = serviceFieldValuesFromForm({ ...input, kycLevel: Number(input.kycLevel) })
+      const fieldEdits = diffServiceFieldValues(serviceFieldValues(service), proposed)
+
+      // Only a changed description is held to the rules: many listings predate
+      // them, and fixing a URL must not require rewriting the description too.
+      if (fieldEdits.some((edit) => edit.field === 'description')) {
+        const violations = checkDescription(input.description, input.name)
+        if (violations.length > 0) {
+          throw new ActionInputError(
+            describeViolations(violations).map((message) => ({
+              code: z.ZodIssueCode.custom,
+              path: ['description'],
+              message,
+            }))
+          )
+        }
+      }
+
+      if (fieldEdits.length === 0 && input.notes.length < SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH) {
+        throw new ActionInputError([
+          {
+            code: z.ZodIssueCode.custom,
+            path: ['notes'],
+            message: `Nothing in the form changed. Change a field, or describe the edit in at least ${SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH.toLocaleString()} characters.`,
+          },
+        ])
+      }
 
       const serviceSuggestion = await prisma.serviceSuggestion.create({
         data: {
           type: 'EDIT_SERVICE',
-          notes: combinedNotes,
+          notes: input.notes,
+          fieldEdits: fieldEdits.length > 0 ? fieldEdits : undefined,
           status: 'PENDING',
           userId: context.locals.user.id,
           serviceId: service.id,
@@ -161,7 +220,7 @@ export const serviceSuggestionActions = {
         },
       })
 
-      return { serviceSuggestion, service }
+      return { serviceSuggestion }
     },
   }),
   createService: defineProtectedAction({
@@ -182,25 +241,13 @@ export const serviceSuggestionActions = {
         allServiceUrls: stringListOfUrlsSchemaRequired,
         tosUrls: stringListOfUrlsSchemaRequired,
         contactMethods: stringListOfContactMethodsSchema,
-        kycLevel: zodCohercedNumber(z.coerce.number().int().min(0).max(4)),
-        attributes: z.array(z.coerce.number().int().positive()),
-        categories: z.array(z.coerce.number().int().positive()).min(1),
-        acceptedCurrencies: z.array(z.nativeEnum(Currency)).min(1),
+        ...serviceSuggestionFieldsSchema,
         imageFile: imageFileSchemaRequired,
         rulesConfirm: z.literal('on', {
           errorMap: () => ({
             message: 'You must accept the suggestion rules and process to continue',
           }),
         }),
-        operatingSince: z.coerce.date().optional(),
-        registrationCountryCode: z
-          .union([countriesZodEnumByCode, z.literal('')])
-          .optional()
-          .nullable()
-          .refine((val) => val === null || val === undefined || val === '' || val.length === 2, {
-            message: 'Country code must be a valid 2-character code or empty',
-          }),
-        registeredCompanyName: z.string().trim().max(100).optional(),
         /** @deprecated Honey pot field, do not use */
         message: z.unknown().optional(),
         skipDuplicateCheck: z

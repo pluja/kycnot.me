@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/consistent-type-definitions */
 
 import type { Capability } from './constants/capabilities'
+import type { ServiceEditListFieldId, ServiceEditTextFieldId } from './constants/serviceEditFields'
 import type { ErrorBanners } from './lib/errorBanners'
 import type { ActionFormValues } from './lib/formReplay'
 import type { KarmaUnlocks } from './lib/karmaUnlocks'
@@ -123,6 +124,20 @@ declare global {
         severity: 'alert' | 'info' | 'warning'
       }[]
     }
+
+    /** One row per field the person changed; `current` is the service's value when they suggested it. */
+    type ServiceFieldEdits = (
+      | {
+          field: ServiceEditListFieldId
+          current: string[]
+          proposed: string[]
+        }
+      | {
+          field: ServiceEditTextFieldId
+          current: string | null
+          proposed: string | null
+        }
+    )[]
 
     type ProposedAttribute = {
       attributeId: number

@@ -1,0 +1,229 @@
+---
+import { Icon } from 'astro-icon/components'
+import { orderBy } from 'lodash-es'
+
+import { getAttributeCategoryInfo } from '../constants/attributeCategories'
+import { getAttributeTypeInfo } from '../constants/attributeTypes'
+import { contactMethodUrlTypes } from '../constants/contactMethods'
+import { countries } from '../constants/countries'
+import { currencies } from '../constants/currencies'
+import { kycLevels } from '../constants/kycLevels'
+import { DESCRIPTION_MAX_LENGTH, DESCRIPTION_RULE } from '../lib/descriptionRules'
+
+import InputCardGroup from './InputCardGroup.astro'
+import InputCheckboxGroup from './InputCheckboxGroup.astro'
+import InputSelect from './InputSelect.astro'
+import InputText from './InputText.astro'
+import InputTextArea from './InputTextArea.astro'
+
+import type { FormReplay } from '../lib/formReplay'
+import type { ServiceFieldValues } from '../lib/serviceFieldEdits'
+import type { Prisma } from '@prisma/client'
+
+type Props = {
+  replay: FormReplay
+  inputErrors: Partial<Record<string, string[]>>
+  categories: Prisma.CategoryGetPayload<{ select: { id: true; name: true; icon: true } }>[]
+  attributes: Prisma.AttributeGetPayload<{ select: { id: true; title: true; category: true; type: true } }>[]
+  /** The service's current values, when editing one. */
+  values?: ServiceFieldValues
+}
+
+const { replay, inputErrors, categories, attributes, values } = Astro.props
+const isEdit = !!values
+
+const text = (field: keyof ServiceFieldValues) => {
+  const value = values?.[field]
+  return replay.text(field, Array.isArray(value) ? value.join('\n') : (value ?? undefined))
+}
+const list = (field: keyof ServiceFieldValues) => {
+  const value = values?.[field]
+  return replay.list(field, Array.isArray(value) ? value : undefined)
+}
+---
+
+<InputTextArea
+  label="Description"
+  name="description"
+  id="description"
+  value={text('description')}
+  description={DESCRIPTION_RULE}
+  inputProps={{
+    required: true,
+    maxlength: DESCRIPTION_MAX_LENGTH,
+  }}
+  error={inputErrors.description}
+/>
+
+{
+  isEdit ? (
+    <div class="flex items-start gap-3 rounded-md border border-night-500 bg-night-700 p-3 text-sm text-day-300">
+      <Icon name="ri:link-unlink" class="mt-0.5 size-5 shrink-0 text-yellow-400" />
+      <p>
+        Links and contact details can't be edited here, to keep scam addresses out of listings. If one is
+        wrong or missing, say so in the reason above and a moderator will check it by hand.
+      </p>
+    </div>
+  ) : (
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <InputTextArea
+        label="Service URLs"
+        description="One per line. Accepts **Web**, **Onion**, and **I2P** URLs."
+        name="allServiceUrls"
+        value={replay.text('allServiceUrls')}
+        inputProps={{
+          placeholder: 'example1.com\nexample2.onion\nexample3.b32.i2p',
+          class: 'md:min-h-20 min-h-24 h-full',
+          required: true,
+        }}
+        class="flex flex-col self-stretch"
+        error={inputErrors.allServiceUrls}
+      />
+
+      <InputTextArea
+        label="Contact Methods"
+        description={[
+          'One per line.',
+          `Accepts: ${contactMethodUrlTypes.map((type) => type.labelPlural).join(', ')}`,
+        ].join('\n')}
+        name="contactMethods"
+        value={replay.text('contactMethods')}
+        inputProps={{
+          placeholder: 'contact@example.com\nt.me/example\n+123 456 7890',
+          class: 'h-full',
+        }}
+        class="flex flex-col self-stretch"
+        error={inputErrors.contactMethods}
+      />
+    </div>
+  )
+}
+
+<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+  {
+    !isEdit && (
+      <InputTextArea
+        label="ToS URLs"
+        description="One per line. AI review uses the first working URL only."
+        name="tosUrls"
+        value={replay.text('tosUrls')}
+        inputProps={{
+          placeholder: 'example.com/tos',
+          required: true,
+          class: 'min-h-10',
+        }}
+        error={inputErrors.tosUrls}
+      />
+    )
+  }
+
+  <InputText
+    label="Operating since"
+    name="operatingSince"
+    inputProps={{
+      type: 'date',
+      max: new Date().toISOString().slice(0, 10),
+      value: text('operatingSince'),
+    }}
+    error={inputErrors.operatingSince}
+  />
+</div>
+
+<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+  <InputText
+    label="Registered Company Name"
+    name="registeredCompanyName"
+    description="Official name of the registered company (optional)"
+    inputProps={{
+      placeholder: 'e.g. Example Corp Ltd.',
+      value: text('registeredCompanyName'),
+    }}
+    error={inputErrors.registeredCompanyName}
+  />
+
+  <InputSelect
+    name="registrationCountryCode"
+    label="Company Registration Country"
+    description="Country where the service company is legally registered (optional)"
+    options={[
+      { label: 'Not registered', value: '' },
+      ...[...countries]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((country) => ({
+          label: `${country.flag} ${country.name}`,
+          value: country.code,
+        })),
+    ]}
+    selectedValue={text('registrationCountryCode') ?? ''}
+    error={inputErrors.registrationCountryCode}
+  />
+</div>
+
+<InputCardGroup
+  name="kycLevel"
+  label="KYC Level"
+  options={kycLevels.map((kycLevel) => ({
+    label: kycLevel.name,
+    value: kycLevel.id,
+    icon: kycLevel.icon,
+    description: `${kycLevel.description}\n\n_KYC Level ${kycLevel.value}/4_`,
+  }))}
+  iconSize="md"
+  cardSize="md"
+  required
+  selectedValue={text('kycLevel')}
+  error={inputErrors.kycLevel}
+/>
+
+<div class="grid grid-cols-1 items-stretch gap-x-4 gap-y-6 xs:grid-cols-[1fr_2fr]">
+  <InputCheckboxGroup
+    name="categories"
+    label="Categories"
+    required
+    selectedValues={list('categories')}
+    options={categories.map((category) => ({
+      label: category.name,
+      value: category.id.toString(),
+      icon: category.icon,
+    }))}
+    size="lg"
+    error={inputErrors.categories}
+    class="min-w-auto"
+  />
+
+  <InputCheckboxGroup
+    name="attributes"
+    label="Attributes"
+    selectedValues={list('attributes')}
+    options={orderBy(
+      attributes.map((attribute) => ({
+        ...attribute,
+        categoryInfo: getAttributeCategoryInfo(attribute.category),
+        typeInfo: getAttributeTypeInfo(attribute.type),
+      })),
+      ['categoryInfo.order', 'typeInfo.order']
+    ).map((attribute) => ({
+      label: attribute.title,
+      value: attribute.id.toString(),
+      icon: [attribute.categoryInfo.icon, attribute.typeInfo.icon],
+      iconClassName: [attribute.categoryInfo.classNames.icon, attribute.typeInfo.classNames.icon],
+    }))}
+    description="See list of [all attributes](/attributes) and their scoring."
+    error={inputErrors.attributes}
+    size="lg"
+  />
+</div>
+
+<InputCardGroup
+  name="acceptedCurrencies"
+  label="Accepted Currencies"
+  options={currencies.map((currency) => ({
+    label: currency.name,
+    value: currency.id,
+    icon: currency.icon,
+  }))}
+  error={inputErrors.acceptedCurrencies}
+  selectedValue={list('acceptedCurrencies')}
+  required
+  multiple
+/>

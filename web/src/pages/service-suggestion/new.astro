@@ -1,7 +1,6 @@
 ---
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
-import { orderBy } from 'lodash-es'
 
 import {
   SUGGESTION_NAME_MAX_LENGTH,
@@ -10,23 +9,14 @@ import {
 } from '../../actions/serviceSuggestion'
 import Captcha from '../../components/Captcha.astro'
 import FormReplay from '../../components/FormReplay.astro'
-import InputCardGroup from '../../components/InputCardGroup.astro'
 import InputCheckbox from '../../components/InputCheckbox.astro'
-import InputCheckboxGroup from '../../components/InputCheckboxGroup.astro'
 import InputHoneypotTrap from '../../components/InputHoneypotTrap.astro'
 import InputImageFile from '../../components/InputImageFile.astro'
-import InputSelect from '../../components/InputSelect.astro'
 import InputSubmitButton from '../../components/InputSubmitButton.astro'
 import InputText from '../../components/InputText.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
-import { getAttributeCategoryInfo } from '../../constants/attributeCategories'
-import { getAttributeTypeInfo } from '../../constants/attributeTypes'
-import { contactMethodUrlTypes } from '../../constants/contactMethods'
-import { countries } from '../../constants/countries'
-import { currencies } from '../../constants/currencies'
-import { kycLevels } from '../../constants/kycLevels'
+import ServiceSuggestionFields from '../../components/ServiceSuggestionFields.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
-import { DESCRIPTION_MAX_LENGTH, DESCRIPTION_RULE } from '../../lib/descriptionRules'
 import { getFormReplay } from '../../lib/formReplay'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
@@ -209,172 +199,11 @@ const [categories, attributes] = await Astro.locals.banners.tryMany([
       }}
     />
 
-    <InputTextArea
-      label="Description"
-      name="description"
-      id="description"
-      value={replay.text('description')}
-      description={DESCRIPTION_RULE}
-      inputProps={{
-        required: true,
-        maxlength: DESCRIPTION_MAX_LENGTH,
-      }}
-      error={inputErrors.description}
-    />
-
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <InputTextArea
-        label="Service URLs"
-        description="One per line. Accepts **Web**, **Onion**, and **I2P** URLs."
-        name="allServiceUrls"
-        value={replay.text('allServiceUrls')}
-        inputProps={{
-          placeholder: 'example1.com\nexample2.onion\nexample3.b32.i2p',
-          class: 'md:min-h-20 min-h-24 h-full',
-          required: true,
-        }}
-        class="flex flex-col self-stretch"
-        error={inputErrors.allServiceUrls}
-      />
-
-      <InputTextArea
-        label="Contact Methods"
-        description={[
-          'One per line.',
-          `Accepts: ${contactMethodUrlTypes.map((type) => type.labelPlural).join(', ')}`,
-        ].join('\n')}
-        name="contactMethods"
-        value={replay.text('contactMethods')}
-        inputProps={{
-          placeholder: 'contact@example.com\nt.me/example\n+123 456 7890',
-          class: 'h-full',
-        }}
-        class="flex flex-col self-stretch"
-        error={inputErrors.contactMethods}
-      />
-    </div>
-
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <InputTextArea
-        label="ToS URLs"
-        description="One per line. AI review uses the first working URL only."
-        name="tosUrls"
-        value={replay.text('tosUrls')}
-        inputProps={{
-          placeholder: 'example.com/tos',
-          required: true,
-          class: 'min-h-10',
-        }}
-        error={inputErrors.tosUrls}
-      />
-
-      <InputText
-        label="Operating since"
-        name="operatingSince"
-        inputProps={{
-          type: 'date',
-          max: new Date().toISOString().slice(0, 10),
-          value: replay.text('operatingSince'),
-        }}
-        error={inputErrors.operatingSince}
-      />
-    </div>
-
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <InputText
-        label="Registered Company Name"
-        name="registeredCompanyName"
-        description="Official name of the registered company (optional)"
-        inputProps={{
-          placeholder: 'e.g. Example Corp Ltd.',
-          value: replay.text('registeredCompanyName'),
-        }}
-      />
-
-      <InputSelect
-        name="registrationCountryCode"
-        label="Company Registration Country"
-        description="Country where the service company is legally registered (optional)"
-        options={[
-          { label: 'Not registered', value: '' },
-          ...countries
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((country) => ({
-              label: `${country.flag} ${country.name}`,
-              value: country.code,
-            })),
-        ]}
-        selectedValue={replay.text('registrationCountryCode', '')}
-      />
-    </div>
-
-    <InputCardGroup
-      name="kycLevel"
-      label="KYC Level"
-      options={kycLevels.map((kycLevel) => ({
-        label: kycLevel.name,
-        value: kycLevel.id,
-        icon: kycLevel.icon,
-        description: `${kycLevel.description}\n\n_KYC Level ${kycLevel.value}/4_`,
-      }))}
-      iconSize="md"
-      cardSize="md"
-      required
-      selectedValue={replay.text('kycLevel')}
-      error={inputErrors.kycLevel}
-    />
-
-    <div class="grid grid-cols-1 items-stretch gap-x-4 gap-y-6 xs:grid-cols-[1fr_2fr]">
-      <InputCheckboxGroup
-        name="categories"
-        label="Categories"
-        required
-        selectedValues={replay.list('categories')}
-        options={categories.map((category) => ({
-          label: category.name,
-          value: category.id.toString(),
-          icon: category.icon,
-        }))}
-        size="lg"
-        error={inputErrors.categories}
-        class="min-w-auto"
-      />
-
-      <InputCheckboxGroup
-        name="attributes"
-        label="Attributes"
-        selectedValues={replay.list('attributes')}
-        options={orderBy(
-          attributes.map((attribute) => ({
-            ...attribute,
-            categoryInfo: getAttributeCategoryInfo(attribute.category),
-            typeInfo: getAttributeTypeInfo(attribute.type),
-          })),
-          ['categoryInfo.order', 'typeInfo.order']
-        ).map((attribute) => ({
-          label: attribute.title,
-          value: attribute.id.toString(),
-          icon: [attribute.categoryInfo.icon, attribute.typeInfo.icon],
-          iconClassName: [attribute.categoryInfo.classNames.icon, attribute.typeInfo.classNames.icon],
-        }))}
-        description="See list of [all attributes](/attributes) and their scoring."
-        error={inputErrors.attributes}
-        size="lg"
-      />
-    </div>
-
-    <InputCardGroup
-      name="acceptedCurrencies"
-      label="Accepted Currencies"
-      options={currencies.map((currency) => ({
-        label: currency.name,
-        value: currency.id,
-        icon: currency.icon,
-      }))}
-      error={inputErrors.acceptedCurrencies}
-      selectedValue={replay.list('acceptedCurrencies')}
-      required
-      multiple
+    <ServiceSuggestionFields
+      replay={replay}
+      inputErrors={inputErrors}
+      categories={categories}
+      attributes={attributes}
     />
 
     <InputImageFile

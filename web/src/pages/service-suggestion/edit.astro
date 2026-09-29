@@ -1,26 +1,31 @@
 ---
+import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 import { z } from 'astro:content'
 
 import {
-  SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH,
+  SERVICE_NAME_MAX_LENGTH,
+  SUGGESTION_EDIT_REASON_MIN_LENGTH,
   SUGGESTION_NOTES_MAX_LENGTH,
 } from '../../actions/serviceSuggestion'
 import Captcha from '../../components/Captcha.astro'
 import FormReplay from '../../components/FormReplay.astro'
 import InputHoneypotTrap from '../../components/InputHoneypotTrap.astro'
 import InputSubmitButton from '../../components/InputSubmitButton.astro'
+import InputText from '../../components/InputText.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
 import ServiceCard from '../../components/ServiceCard.astro'
+import ServiceSuggestionFields from '../../components/ServiceSuggestionFields.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { getFormReplay } from '../../lib/formReplay'
 import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
+import { serviceEditableSelect, serviceFieldValues } from '../../lib/serviceFieldEdits'
 
 const user = Astro.locals.user
 if (!user) {
-  return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Login to suggest a new service' }))
+  return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Login to suggest an edit' }))
 }
 
 const result = Astro.getActionResult(actions.serviceSuggestion.editService)
@@ -29,8 +34,8 @@ if (result && !result.error) {
 }
 const inputErrors = isInputError(result?.error) ? result.error.fields : {}
 
-// Replay the previous submission into the notes field so a failed validation
-// (e.g. a wrong captcha) does not wipe what the user typed.
+// Replay the previous submission so a failed validation (e.g. a wrong captcha)
+// does not wipe what the user changed.
 const replay = getFormReplay(Astro.locals.actionFormValues)
 
 const { data: params } = zodParseQueryParamsStoringErrors(
@@ -43,41 +48,55 @@ const { data: params } = zodParseQueryParamsStoringErrors(
 
 if (!params.serviceId) return Astro.rewrite('/404')
 
-const service = await Astro.locals.banners.try(
-  'Failed to fetch service',
-  async () =>
-    prisma.service.findUnique({
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        description: true,
-        overallScore: true,
-        privacyScore: true,
-        trustScore: true,
-        kycLevel: true,
-        imageUrl: true,
-        verificationStatus: true,
-        acceptedCurrencies: true,
-        categories: {
-          select: {
-            name: true,
-            icon: true,
-          },
+const [service, categories, attributes] = await Astro.locals.banners.tryMany([
+  [
+    'Failed to fetch service',
+    () =>
+      prisma.service.findUnique({
+        select: {
+          ...serviceEditableSelect,
+          id: true,
+          slug: true,
+          overallScore: true,
+          privacyScore: true,
+          trustScore: true,
+          imageUrl: true,
+          verificationStatus: true,
+          serviceVisibility: true,
+          categories: { select: { id: true, name: true, icon: true } },
         },
-        serviceVisibility: true,
-      },
-      where: { id: params.serviceId },
-    }),
-  null
-)
+        where: { id: params.serviceId },
+      }),
+    null,
+  ],
+  [
+    'Failed to fetch categories',
+    () =>
+      prisma.category.findMany({
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, icon: true },
+      }),
+    [],
+  ],
+  [
+    'Failed to fetch attributes',
+    () =>
+      prisma.attribute.findMany({
+        orderBy: { category: 'asc' },
+        select: { id: true, title: true, category: true, type: true },
+      }),
+    [],
+  ],
+])
 
 if (!service) return Astro.rewrite('/404')
+
+const values = serviceFieldValues(service)
 ---
 
 <BaseLayout
-  pageTitle="Edit service"
-  description="Suggest an edit to service"
+  pageTitle={`Suggest an edit to ${service.name}`}
+  description={`Suggest a correction or update to the ${service.name} listing on KYCnot.me`}
   noindex
   ogImage={{
     template: 'generic',
@@ -96,27 +115,61 @@ if (!service) return Astro.rewrite('/404')
     },
   ]}
 >
-  <h1 class="mt-12 mb-6 text-center font-title text-3xl font-bold">Edit service</h1>
+  <h1 class="mt-12 text-center font-title text-3xl font-bold">Suggest an edit</h1>
+
+  <p class="mb-6 text-center text-sm text-day-400">
+    Change what is wrong below and tell us why. Moderators review every edit before it goes live.
+  </p>
 
   <ServiceCard service={service} withoutLink class="mb-6" />
 
   <form method="POST" action={actions.serviceSuggestion.editService} class="space-y-6">
-    <input type="hidden" name="serviceId" value={params.serviceId} />
+    <input type="hidden" name="serviceId" value={service.id} />
 
     <InputTextArea
-      label="Note for Moderators"
+      label="Reason for the edit"
       name="notes"
       value={replay.text('notes', params.notes)}
-      description={`Required. Explain the requested changes with enough detail for moderators to act on them. Minimum ${SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH.toLocaleString()} characters.`}
+      description="Required. Say what is wrong and how you know, with links to proof if you can. If you prefer not to use the form below, describe the full change here instead."
       inputProps={{
-        rows: 10,
+        rows: 5,
         required: true,
-        minlength: SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH,
+        minlength: SUGGESTION_EDIT_REASON_MIN_LENGTH,
         maxlength: SUGGESTION_NOTES_MAX_LENGTH,
-        placeholder:
-          'List the changes you want us to make to the service. Example: "Add X, Y and Z attributes" "Monero is accepted". Provide supporting evidence.',
+        placeholder: 'Example: They accept Monero now, see their FAQ at example.com/faq.',
       }}
       error={inputErrors.notes}
+    />
+
+    <div class="flex items-center gap-3 pt-4" role="separator">
+      <div class="h-px flex-1 bg-night-400"></div>
+      <div class="text-center">
+        <h2 class="inline-flex items-center gap-2 font-title text-lg font-semibold text-day-100">
+          <Icon name="ri:edit-2-line" class="size-5 text-day-400" />
+          Service details
+        </h2>
+        <p class="text-xs text-day-500">Change only what is wrong. Leave the rest as it is.</p>
+      </div>
+      <div class="h-px flex-1 bg-night-400"></div>
+    </div>
+
+    <InputText
+      label="Name"
+      name="name"
+      inputProps={{
+        required: true,
+        maxlength: SERVICE_NAME_MAX_LENGTH,
+        value: replay.text('name', values.name ?? undefined),
+      }}
+      error={inputErrors.name}
+    />
+
+    <ServiceSuggestionFields
+      replay={replay}
+      inputErrors={inputErrors}
+      categories={categories}
+      attributes={attributes}
+      values={values}
     />
 
     <Captcha action={actions.serviceSuggestion.editService} />
@@ -125,6 +178,6 @@ if (!service) return Astro.rewrite('/404')
 
     <InputHoneypotTrap name="message" />
 
-    <InputSubmitButton />
+    <InputSubmitButton label="Submit edit" />
   </form>
 </BaseLayout>

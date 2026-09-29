@@ -1982,15 +1982,35 @@ async function main() {
 
   // Then create 5 EDIT_SERVICE suggestions
   await Promise.all(
-    services.slice(0, 5).map(async (service) => {
+    services.slice(0, 5).map(async (service, index) => {
       const status = faker.helpers.arrayElement(Object.values(ServiceSuggestionStatus))
+      // Most carry a field-by-field edit, so the review panel has something to show.
+      const fieldEdits: PrismaJson.ServiceFieldEdits | undefined =
+        index < 3
+          ? [
+              { field: 'name', current: service.name, proposed: `${service.name} Pro` },
+              {
+                field: 'kycLevel',
+                current: String(service.kycLevel),
+                proposed: String((service.kycLevel + 1) % 5),
+              },
+              {
+                field: 'acceptedCurrencies',
+                current: service.acceptedCurrencies,
+                proposed: [...service.acceptedCurrencies.slice(1), 'MONERO'],
+              },
+            ]
+          : undefined
       const suggestion = await prisma.serviceSuggestion.create({
-        data: generateFakeServiceSuggestion({
-          type: ServiceSuggestionType.EDIT_SERVICE,
-          status,
-          userId: specialUsers.normal.id,
-          serviceId: service.id,
-        }),
+        data: {
+          ...generateFakeServiceSuggestion({
+            type: ServiceSuggestionType.EDIT_SERVICE,
+            status,
+            userId: specialUsers.normal.id,
+            serviceId: service.id,
+          }),
+          fieldEdits,
+        },
       })
 
       // Create some messages for each suggestion
