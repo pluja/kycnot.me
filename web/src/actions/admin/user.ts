@@ -149,7 +149,7 @@ export const adminUserActions = {
             verifiedLink: valuesToUpdate.verifiedLink,
             displayName: valuesToUpdate.displayName,
             verified: !!valuesToUpdate.verifiedLink,
-            picture: pictureUrl,
+            ...(pictureUrl ? { picture: pictureUrl } : {}),
             // Role, capability and API-key grants are admin-only; a users:manage
             // editor (e.g. support) leaves them untouched.
             ...(context.locals.user.admin
