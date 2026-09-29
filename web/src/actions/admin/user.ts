@@ -300,43 +300,47 @@ export const adminUserActions = {
 
           if (existingAffiliation) {
             // Update existing affiliation
-            serviceAffiliation = await prisma.serviceUser.update({
-              where: {
-                userId_serviceId: {
-                  userId: input.userId,
-                  serviceId: input.serviceId,
+            serviceAffiliation = await prisma.$transaction(async (tx) => {
+              const updated = await tx.serviceUser.update({
+                where: {
+                  userId_serviceId: {
+                    userId: input.userId,
+                    serviceId: input.serviceId,
+                  },
                 },
-              },
-              data: {
-                role: input.role as ServiceUserRole,
-              },
-            })
-
-            await recordAuditLog(prisma, {
-              actorId: context.locals.user.id,
-              action: 'UPDATED',
-              targetType: 'USER',
-              targetId: input.userId,
-              summary: `Affiliation with ${service.name} changed to ${input.role.toLowerCase().replace('_', ' ')}`,
+                data: {
+                  role: input.role as ServiceUserRole,
+                },
+              })
+              await recordAuditLog(tx, {
+                actorId: context.locals.user.id,
+                action: 'UPDATED',
+                targetType: 'USER',
+                targetId: input.userId,
+                summary: `Affiliation with ${service.name} changed to ${input.role.toLowerCase().replace('_', ' ')}`,
+              })
+              return updated
             })
 
             return { serviceAffiliation, serviceName: service.name, updated: true }
           } else {
             // Create new affiliation
-            serviceAffiliation = await prisma.serviceUser.create({
-              data: {
-                userId: input.userId,
-                serviceId: input.serviceId,
-                role: input.role as ServiceUserRole,
-              },
-            })
-
-            await recordAuditLog(prisma, {
-              actorId: context.locals.user.id,
-              action: 'UPDATED',
-              targetType: 'USER',
-              targetId: input.userId,
-              summary: `Affiliated with ${service.name} as ${input.role.toLowerCase().replace('_', ' ')}`,
+            serviceAffiliation = await prisma.$transaction(async (tx) => {
+              const created = await tx.serviceUser.create({
+                data: {
+                  userId: input.userId,
+                  serviceId: input.serviceId,
+                  role: input.role as ServiceUserRole,
+                },
+              })
+              await recordAuditLog(tx, {
+                actorId: context.locals.user.id,
+                action: 'UPDATED',
+                targetType: 'USER',
+                targetId: input.userId,
+                summary: `Affiliated with ${service.name} as ${input.role.toLowerCase().replace('_', ' ')}`,
+              })
+              return created
             })
 
             return { serviceAffiliation, serviceName: service.name }
@@ -358,25 +362,27 @@ export const adminUserActions = {
         id: z.coerce.number().int().positive(),
       }),
       handler: async (input, context) => {
-        const serviceAffiliation = await prisma.serviceUser.delete({
-          where: {
-            id: input.id,
-          },
-          include: {
-            service: {
-              select: {
-                name: true,
+        const serviceAffiliation = await prisma.$transaction(async (tx) => {
+          const deleted = await tx.serviceUser.delete({
+            where: {
+              id: input.id,
+            },
+            include: {
+              service: {
+                select: {
+                  name: true,
+                },
               },
             },
-          },
-        })
-
-        await recordAuditLog(prisma, {
-          actorId: context.locals.user.id,
-          action: 'UPDATED',
-          targetType: 'USER',
-          targetId: serviceAffiliation.userId,
-          summary: `Removed affiliation with ${serviceAffiliation.service.name}`,
+          })
+          await recordAuditLog(tx, {
+            actorId: context.locals.user.id,
+            action: 'UPDATED',
+            targetType: 'USER',
+            targetId: deleted.userId,
+            summary: `Removed affiliation with ${deleted.service.name}`,
+          })
+          return deleted
         })
 
         return { serviceAffiliation }

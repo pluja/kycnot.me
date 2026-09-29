@@ -5,14 +5,14 @@ import { commentModerationAudit } from './commentModeration'
 
 const before = { status: 'PENDING', privateProofStatus: null, ratingMuteReason: null } as const
 
-test('status changes name the new and previous status', () => {
+void test('status changes name the new and previous status', () => {
   assert.deepEqual(commentModerationAudit({ commentId: 1, action: 'status', value: 'APPROVED' }, before), {
     action: 'STATUS_CHANGED',
     summary: 'Status set to approved, from pending',
   })
 })
 
-test('proof status reads as none when the comment had no proof status', () => {
+void test('proof status reads as none when the comment had no proof status', () => {
   assert.equal(
     commentModerationAudit({ commentId: 1, action: 'private-proof-status', value: 'REJECTED' }, before)
       .summary,
@@ -20,7 +20,7 @@ test('proof status reads as none when the comment had no proof status', () => {
   )
 })
 
-test('notes are quoted and shortened, and an empty note reads as cleared', () => {
+void test('notes are quoted and shortened, and an empty note reads as cleared', () => {
   const long = commentModerationAudit({ commentId: 1, action: 'admin-note', value: 'x'.repeat(500) }, before)
   assert.equal(long.action, 'UPDATED')
   assert.ok(long.summary.startsWith('Admin note set: "xxx'))
@@ -32,7 +32,7 @@ test('notes are quoted and shortened, and an empty note reads as cleared', () =>
   )
 })
 
-test('issues read in plain words', () => {
+void test('issues read in plain words', () => {
   assert.equal(
     commentModerationAudit({ commentId: 1, action: 'add-issue', value: 'FUNDS_BLOCKED' }, before).summary,
     'Flagged issue: funds blocked'

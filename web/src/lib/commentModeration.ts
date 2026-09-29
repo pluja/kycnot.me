@@ -99,7 +99,7 @@ export function commentModerationAudit(
     case 'rating-mute-reason':
       return {
         action: 'UPDATED',
-        summary: `Rating mute reason set to ${words(input.value)}, from ${words(before.ratingMuteReason ?? 'none')}`,
+        summary: `Muted the rating as ${words(input.value)}, reason was ${words(before.ratingMuteReason ?? 'none')}`,
       }
     case 'public-note':
     case 'admin-note':
