@@ -1,0 +1,54 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../lib/cn'
+import { proposalKey } from '../../lib/proposalKey'
+
+type Props = {
+  icon: string
+  label: string
+  /** Omitted when the row is read-only. */
+  checkbox?: {
+    name: string
+    value: number | string
+    checked: boolean
+    disabled?: boolean
+  }
+  iconClassName?: string
+}
+
+const { icon, label, checkbox, iconClassName } = Astro.props
+const isSelectable = !!checkbox && !checkbox.disabled
+---
+
+<li class={cn('p-4', isSelectable && 'hover:bg-night-700/60')}>
+  <label class={cn('flex items-start gap-3', isSelectable && 'cursor-pointer')}>
+    {
+      checkbox && (
+        <input
+          type="checkbox"
+          name={checkbox.name}
+          value={checkbox.value}
+          checked={checkbox.checked}
+          disabled={checkbox.disabled}
+          data-proposal-key={proposalKey(checkbox.name, checkbox.value)}
+          class="mt-1 shrink-0"
+        />
+      )
+    }
+    <span class="flex min-w-0 flex-wrap items-center gap-2">
+      <Icon name={icon} class={cn('size-4 shrink-0 text-day-400', iconClassName)} />
+      <span class="font-title text-sm font-semibold text-day-100">{label}</span>
+      <slot name="badges" />
+    </span>
+  </label>
+
+  {/* Outside the label on purpose: reading or expanding the body must not toggle the decision. */}
+  {
+    Astro.slots.has('default') && (
+      <div class={cn('mt-2 min-w-0 text-sm', checkbox && 'pl-7')}>
+        <slot />
+      </div>
+    )
+  }
+</li>

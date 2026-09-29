@@ -1,0 +1,60 @@
+---
+import { cn } from '../../lib/cn'
+
+type Props = {
+  beforeLabel?: string
+  afterLabel?: string
+}
+
+const { beforeLabel = 'Before', afterLabel = 'After' } = Astro.props
+
+// Rendered up front because a slot passed conditionally still counts as passed,
+// so a slot fallback would never show for an empty side.
+const renderSlot = async (name: string) =>
+  Astro.slots.has(name) ? (await Astro.slots.render(name)).trim() : ''
+const [before, after, beforeDetails, afterDetails] = await Promise.all(
+  ['before', 'after', 'before-details', 'after-details'].map(renderSlot)
+)
+const empty = '<span class="italic">(empty)</span>'
+const hasDetails = !!beforeDetails || !!afterDetails
+
+const sides = [
+  {
+    label: beforeLabel,
+    content: before,
+    details: beforeDetails,
+    labelClassName: 'text-day-500',
+    contentClassName: 'text-day-400',
+  },
+  {
+    label: afterLabel,
+    content: after,
+    details: afterDetails,
+    labelClassName: 'text-orange-300',
+    contentClassName: 'text-day-100',
+  },
+]
+---
+
+{
+  /* Column-major on a shared grid, so each row (label, value, details) starts at the same height on both sides. */
+}
+<div
+  class={cn(
+    'grid gap-x-3 gap-y-1 text-sm sm:grid-flow-col sm:grid-cols-2',
+    hasDetails ? 'sm:grid-rows-[auto_auto_auto]' : 'sm:grid-rows-[auto_auto]'
+  )}
+>
+  {
+    sides.map((side) => (
+      <>
+        <p class={cn('text-xs font-bold tracking-wider uppercase', side.labelClassName)}>{side.label}</p>
+        <div
+          class={cn('min-w-0 text-pretty wrap-anywhere', side.contentClassName)}
+          set:html={side.content === '' ? empty : side.content}
+        />
+        {hasDetails && <div class="mt-2 mb-3 min-w-0 sm:mb-0" set:html={side.details} />}
+      </>
+    ))
+  }
+</div>

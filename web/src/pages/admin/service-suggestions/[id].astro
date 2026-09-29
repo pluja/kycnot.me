@@ -9,6 +9,7 @@ import Button from '../../../components/Button.astro'
 import Chat from '../../../components/Chat.astro'
 import InputSelect from '../../../components/InputSelect.astro'
 import ServiceCard from '../../../components/ServiceCard.astro'
+import FieldEditsReview from '../../../components/serviceSuggestions/FieldEditsReview.astro'
 import UserBadge from '../../../components/UserBadge.astro'
 import {
   getServiceSuggestionStatusInfo,
@@ -20,6 +21,7 @@ import { auditLogSelect } from '../../../lib/auditLog'
 import { parseIntWithFallback } from '../../../lib/numbers'
 import { prisma } from '../../../lib/prisma'
 import { makeLoginUrl } from '../../../lib/redirectUrls'
+import { serviceEditableSelect, serviceFieldValues } from '../../../lib/serviceFieldEdits'
 import { formatDateShort } from '../../../lib/timeAgo'
 
 const user = Astro.locals.user
@@ -35,6 +37,9 @@ const serviceSuggestionUpdateInputErrors = isInputError(serviceSuggestionUpdateR
 
 const deepScanApplyResult = Astro.getActionResult(actions.admin.service.deepScan.apply)
 Astro.locals.banners.addIfSuccess(deepScanApplyResult, 'Proposed edits applied')
+
+const applyFieldEditsResult = Astro.getActionResult(actions.admin.serviceSuggestions.applyFieldEdits)
+Astro.locals.banners.addIfSuccess(applyFieldEditsResult, 'Changes applied')
 
 const deepScanDismissResult = Astro.getActionResult(actions.admin.service.deepScan.dismiss)
 Astro.locals.banners.addIfSuccess(deepScanDismissResult, 'Proposed edits dismissed')
@@ -55,6 +60,7 @@ const serviceSuggestion = await Astro.locals.banners.try('Error fetching service
       status: true,
       notes: true,
       proposedEdits: true,
+      fieldEdits: true,
       createdAt: true,
       type: true,
       user: {
@@ -67,22 +73,20 @@ const serviceSuggestion = await Astro.locals.banners.try('Error fetching service
       },
       service: {
         select: {
+          ...serviceEditableSelect,
           id: true,
-          name: true,
           slug: true,
-          description: true,
           overallScore: true,
           privacyScore: true,
           trustScore: true,
-          kycLevel: true,
           kycPolicyMd: true,
           tosReview: true,
           imageUrl: true,
           verificationStatus: true,
-          acceptedCurrencies: true,
           serviceVisibility: true,
           categories: {
             select: {
+              id: true,
               name: true,
               icon: true,
             },
@@ -127,25 +131,29 @@ const auditEntries = await Astro.locals.banners.try(
   []
 )
 
-const attributes = serviceSuggestion.proposedEdits
-  ? await Astro.locals.banners.try(
-      'Error fetching attributes',
-      () =>
-        prisma.attribute.findMany({
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            category: true,
-            type: true,
-            privacyPoints: true,
-            trustPoints: true,
-          },
-          orderBy: [{ category: 'asc' }, { title: 'asc' }],
-        }),
-      []
-    )
-  : []
+const hasStructuredEdits = !!serviceSuggestion.proposedEdits || !!serviceSuggestion.fieldEdits
+const [attributes, categories] = hasStructuredEdits
+  ? await Astro.locals.banners.tryMany([
+      [
+        'Error fetching attributes',
+        () =>
+          prisma.attribute.findMany({
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              category: true,
+              type: true,
+              privacyPoints: true,
+              trustPoints: true,
+            },
+            orderBy: [{ category: 'asc' }, { title: 'asc' }],
+          }),
+        [],
+      ],
+      ['Error fetching categories', () => prisma.category.findMany({ select: { id: true, name: true } }), []],
+    ])
+  : [[], []]
 
 const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
 const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
@@ -226,6 +234,20 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
     }
 
     {
+      serviceSuggestion.fieldEdits && (
+        <FieldEditsReview
+          suggestion={serviceSuggestion}
+          fieldEdits={serviceSuggestion.fieldEdits}
+          liveValues={serviceFieldValues(serviceSuggestion.service)}
+          categories={categories}
+          attributes={attributes}
+          reviewable={user.admin || serviceSuggestion.user.id !== user.id}
+          class="mt-6"
+        />
+      )
+    }
+
+    {
       !serviceSuggestion.proposedEdits && (
         <form
           method="POST"
@@ -236,10 +258,13 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
           <InputSelect
             name="status"
             label="Update status"
-            options={serviceSuggestionStatuses.map((status) => ({
-              label: status.label,
-              value: status.value,
-            }))}
+            options={serviceSuggestionStatuses
+              // An edit is approved by applying it, never by setting the status.
+              .filter((status) => !serviceSuggestion.fieldEdits || status.value !== 'APPROVED')
+              .map((status) => ({
+                label: status.label,
+                value: status.value,
+              }))}
             selectedValue={serviceSuggestion.status}
             class="flex-1"
             error={serviceSuggestionUpdateInputErrors.status}

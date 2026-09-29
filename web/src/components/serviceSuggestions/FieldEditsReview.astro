@@ -1,0 +1,182 @@
+---
+import { actions } from 'astro:actions'
+import { truncate } from 'lodash-es'
+
+import { getCountryInfo } from '../../constants/countries'
+import { getCurrencyInfo } from '../../constants/currencies'
+import { getKycLevelInfo } from '../../constants/kycLevels'
+import { getServiceEditFieldInfo } from '../../constants/serviceEditFields'
+import { isListFieldEdit, isSameFieldValue, listFieldDelta } from '../../lib/serviceFieldEdits'
+import BadgeSmall from '../BadgeSmall.astro'
+
+import BeforeAfter from './BeforeAfter.astro'
+import ChangeChips from './ChangeChips.astro'
+import KycLevelPill from './KycLevelPill.astro'
+import ProposalApplyBar from './ProposalApplyBar.astro'
+import ProposalPanel from './ProposalPanel.astro'
+import ProposalRow from './ProposalRow.astro'
+
+import type { ServiceEditFieldId } from '../../constants/serviceEditFields'
+import type { ServiceFieldValues } from '../../lib/serviceFieldEdits'
+import type { Prisma } from '@prisma/client'
+
+const SUMMARY_VALUE_LENGTH = 24
+
+type Props = {
+  suggestion: Prisma.ServiceSuggestionGetPayload<{ select: { id: true; status: true } }>
+  fieldEdits: NonNullable<Prisma.ServiceSuggestionGetPayload<{ select: { fieldEdits: true } }>['fieldEdits']>
+  /** The service as it is now, to flag fields that changed after the suggestion was made. */
+  liveValues: ServiceFieldValues
+  categories: Prisma.CategoryGetPayload<{ select: { id: true; name: true } }>[]
+  attributes: Prisma.AttributeGetPayload<{ select: { id: true; title: true } }>[]
+  /** Renders a checkbox per field and the apply button, for moderators. */
+  reviewable?: boolean
+  class?: string
+}
+
+const {
+  suggestion,
+  fieldEdits,
+  liveValues,
+  categories,
+  attributes,
+  reviewable = false,
+  class: className,
+} = Astro.props
+
+const isOpen = suggestion.status === 'PENDING' || suggestion.status === 'UNDER_REVIEW'
+const isActionable = reviewable && isOpen
+
+const categoryNames = new Map(categories.map((category) => [String(category.id), category.name]))
+const attributeTitles = new Map(attributes.map((attribute) => [String(attribute.id), attribute.title]))
+
+const formatValue = (field: ServiceEditFieldId, value: string | null) => {
+  if (value === null || value === '') return null
+  switch (field) {
+    case 'kycLevel':
+      return `KYC ${value}: ${getKycLevelInfo(value).name}`
+    case 'registrationCountryCode': {
+      const country = getCountryInfo(value)
+      return `${country.flag} ${country.name}`
+    }
+    case 'categories':
+      return categoryNames.get(value) ?? `Deleted category #${value}`
+    case 'attributes':
+      return attributeTitles.get(value) ?? `Deleted attribute #${value}`
+    case 'acceptedCurrencies':
+      return getCurrencyInfo(value).name
+    default:
+      return value
+  }
+}
+
+// summaryOf is the few words a summary chip shows: the change itself, short.
+const summaryOf = (edit: (typeof fieldEdits)[number]) => {
+  if (isListFieldEdit(edit)) {
+    const { added, removed } = listFieldDelta(edit)
+    return [
+      added.length > 0 && `+${String(added.length)}`,
+      removed.length > 0 && `−${String(removed.length)}`,
+    ]
+      .filter(Boolean)
+      .join(' ')
+  }
+  if (edit.field === 'description') return 'rewritten'
+  if (edit.field === 'kycLevel') return `${edit.current ?? '?'} → ${edit.proposed ?? '?'}`
+  const short = (value: string | null) =>
+    truncate(formatValue(edit.field, value) ?? 'empty', { length: SUMMARY_VALUE_LENGTH })
+  return `${short(edit.current)} → ${short(edit.proposed)}`
+}
+
+const Wrapper = isActionable ? 'form' : 'div'
+---
+
+<ProposalPanel
+  title="Proposed changes"
+  description={isActionable
+    ? 'Ticked changes are applied to the service. Lists apply only what was added or removed, so changes made since are kept.'
+    : 'What this suggestion changes, compared with the listing when it was sent.'}
+  class={className}
+>
+  <Wrapper
+    {...isActionable ? { method: 'POST', action: actions.admin.serviceSuggestions.applyFieldEdits } : {}}
+    class="mt-4 space-y-4"
+  >
+    {isActionable && <input type="hidden" name="suggestionId" value={suggestion.id} />}
+
+    <ul class="divide-y divide-night-600 rounded-md border border-night-600 bg-night-800">
+      {
+        fieldEdits.map((edit) => {
+          const info = getServiceEditFieldInfo(edit.field)
+          const isStale = isOpen && !isSameFieldValue(edit.current, liveValues[edit.field])
+
+          return (
+            <ProposalRow
+              icon={info.icon}
+              label={info.label}
+              checkbox={
+                isActionable ? { name: 'fields', value: edit.field, checked: info.preselected } : undefined
+              }
+            >
+              <Fragment slot="badges">
+                {isActionable && !info.preselected && (
+                  <BadgeSmall color="orange" text="Check before applying" icon="ri:eye-line" />
+                )}
+                {isStale && <BadgeSmall color="yellow" text="Changed since suggested" icon="ri:time-line" />}
+              </Fragment>
+
+              {isListFieldEdit(edit) ? (
+                <ChangeChips
+                  items={[
+                    ...listFieldDelta(edit).added.map((value) => ({
+                      text: formatValue(edit.field, value) ?? value,
+                      kind: 'add' as const,
+                    })),
+                    ...listFieldDelta(edit).removed.map((value) => ({
+                      text: formatValue(edit.field, value) ?? value,
+                      kind: 'remove' as const,
+                    })),
+                  ]}
+                />
+              ) : (
+                <BeforeAfter>
+                  {edit.field === 'kycLevel' && edit.current && (
+                    <KycLevelPill slot="before" level={edit.current} />
+                  )}
+                  {edit.field === 'kycLevel' && edit.proposed && (
+                    <KycLevelPill slot="after" level={edit.proposed} />
+                  )}
+                  {edit.field !== 'kycLevel' && formatValue(edit.field, edit.current) && (
+                    <Fragment slot="before">{formatValue(edit.field, edit.current)}</Fragment>
+                  )}
+                  {edit.field !== 'kycLevel' && formatValue(edit.field, edit.proposed) && (
+                    <Fragment slot="after">{formatValue(edit.field, edit.proposed)}</Fragment>
+                  )}
+                </BeforeAfter>
+              )}
+            </ProposalRow>
+          )
+        })
+      }
+    </ul>
+
+    {
+      isActionable && (
+        <ProposalApplyBar
+          items={fieldEdits.map((edit) => {
+            const info = getServiceEditFieldInfo(edit.field)
+            return {
+              name: 'fields',
+              value: edit.field,
+              icon: info.icon,
+              label: info.label,
+              detail: summaryOf(edit),
+            }
+          })}
+          note="Unticked changes are declined."
+          emptyButton={{ label: 'Reject suggestion', icon: 'ri:close-line', name: 'intent', value: 'reject' }}
+        />
+      )
+    }
+  </Wrapper>
+</ProposalPanel>

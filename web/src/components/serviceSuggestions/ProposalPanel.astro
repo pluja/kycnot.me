@@ -1,0 +1,25 @@
+---
+import { cn } from '../../lib/cn'
+
+type Props = {
+  title: string
+  description: string
+  class?: string
+}
+
+const { title, description, class: className } = Astro.props
+---
+
+<section class={cn('rounded-lg border border-night-500 bg-night-700 p-4', className)}>
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h2 class="font-title text-xl font-semibold text-day-100">{title}</h2>
+      <p class="mt-1 text-xs text-day-500">{description}</p>
+    </div>
+    <div class="flex flex-wrap gap-1.5">
+      <slot name="badges" />
+    </div>
+  </div>
+
+  <slot />
+</section>

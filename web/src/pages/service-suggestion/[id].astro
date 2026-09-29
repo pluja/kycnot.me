@@ -7,12 +7,14 @@ import BadgeSmall from '../../components/BadgeSmall.astro'
 import Button from '../../components/Button.astro'
 import Chat from '../../components/Chat.astro'
 import ServiceCard from '../../components/ServiceCard.astro'
+import FieldEditsReview from '../../components/serviceSuggestions/FieldEditsReview.astro'
 import { getServiceSuggestionStatusInfo } from '../../constants/serviceSuggestionStatus'
 import { getServiceSuggestionTypeInfo } from '../../constants/serviceSuggestionType'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { parseIntWithFallback } from '../../lib/numbers'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
+import { serviceEditableSelect, serviceFieldValues } from '../../lib/serviceFieldEdits'
 import { formatDateShort } from '../../lib/timeAgo'
 
 const user = Astro.locals.user
@@ -33,23 +35,22 @@ const serviceSuggestion = await Astro.locals.banners.try('Error fetching service
       type: true,
       status: true,
       notes: true,
+      fieldEdits: true,
       createdAt: true,
       service: {
         select: {
+          ...serviceEditableSelect,
           id: true,
-          name: true,
           slug: true,
-          description: true,
           overallScore: true,
           privacyScore: true,
           trustScore: true,
-          kycLevel: true,
           imageUrl: true,
           verificationStatus: true,
-          acceptedCurrencies: true,
           serviceVisibility: true,
           categories: {
             select: {
+              id: true,
               name: true,
               icon: true,
             },
@@ -83,9 +84,22 @@ const serviceSuggestion = await Astro.locals.banners.try('Error fetching service
 )
 
 if (!serviceSuggestion) {
-  if (user.admin) return Astro.redirect(`/admin/service-suggestions/${serviceSuggestionIdRaw}`)
+  if (Astro.locals.userCan('suggestions:manage')) {
+    return Astro.redirect(`/admin/service-suggestions/${serviceSuggestionIdRaw}`)
+  }
   return Astro.rewrite('/404')
 }
+
+const [attributes, categories] = serviceSuggestion.fieldEdits
+  ? await Astro.locals.banners.tryMany([
+      [
+        'Error fetching attributes',
+        () => prisma.attribute.findMany({ select: { id: true, title: true } }),
+        [],
+      ],
+      ['Error fetching categories', () => prisma.category.findMany({ select: { id: true, name: true } }), []],
+    ])
+  : [[], []]
 
 const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
 const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
@@ -173,6 +187,19 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
         )
       }
     </div>
+
+    {
+      serviceSuggestion.fieldEdits && (
+        <FieldEditsReview
+          suggestion={serviceSuggestion}
+          fieldEdits={serviceSuggestion.fieldEdits}
+          liveValues={serviceFieldValues(serviceSuggestion.service)}
+          categories={categories}
+          attributes={attributes}
+          class="mt-6"
+        />
+      )
+    }
   </section>
 
   <Chat

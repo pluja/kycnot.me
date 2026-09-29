@@ -1,0 +1,23 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { getKycLevelInfo } from '../../constants/kycLevels'
+import { cn } from '../../lib/cn'
+
+type Props = {
+  level: number | string
+}
+
+const kycInfo = getKycLevelInfo(String(Astro.props.level))
+---
+
+<span
+  class={cn(
+    'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium not-italic',
+    kycInfo.badgeClassName
+  )}
+>
+  <Icon name={kycInfo.icon} class="size-4 shrink-0" aria-hidden="true" />
+  <span>KYC {kycInfo.value}</span>
+  <span class="opacity-80">· {kycInfo.name}</span>
+</span>

@@ -1,0 +1,174 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../lib/cn'
+import { proposalKey } from '../../lib/proposalKey'
+import Button from '../Button.astro'
+import Tooltip from '../Tooltip.astro'
+
+type Props = {
+  /** One per offered checkbox, matched to it by name and value. */
+  items: { name: string; value: number | string; icon: string; label: string; detail: string }[]
+  note: string
+  /** Replaces Apply when nothing is ticked. */
+  emptyButton: {
+    label: string
+    icon: string
+    name?: string
+    value?: string
+    formaction?: string
+    color?: 'danger' | 'gray'
+  }
+  /** Closes the suggestion without applying or recording anything. */
+  discardButton?: {
+    formaction: string
+    tooltip: string
+  }
+}
+
+const { items, note, emptyButton, discardButton } = Astro.props
+
+const groups = [
+  {
+    kind: 'apply',
+    title: 'Will apply',
+    icon: 'ri:checkbox-circle-fill',
+    titleClassName: 'text-green-300',
+    chipClassName: 'border-green-500/40 bg-green-500/10 text-green-100',
+  },
+  {
+    kind: 'decline',
+    title: 'Will decline',
+    icon: 'ri:close-circle-fill',
+    titleClassName: 'text-day-400',
+    chipClassName: 'border-night-500 bg-night-800 text-day-400 line-through',
+  },
+] as const
+---
+
+<div class="space-y-3" data-proposal-apply-bar>
+  {
+    items.length > 0 && (
+      <div data-apply-summary hidden class="space-y-2 rounded-md border border-night-600 bg-night-900 p-3">
+        {groups.map((group) => (
+          <div class="flex flex-wrap items-center gap-1.5 text-sm">
+            <span class={cn('mr-1 inline-flex items-center gap-1 font-semibold', group.titleClassName)}>
+              <Icon name={group.icon} class="size-4" />
+              {group.title}
+            </span>
+            {items.map((item) => (
+              <span
+                data-summary-key={proposalKey(item.name, item.value)}
+                data-summary-kind={group.kind}
+                class={cn(
+                  'inline-flex items-center gap-1 rounded-md border px-2 py-0.5',
+                  group.chipClassName
+                )}
+              >
+                <Icon name={item.icon} class="size-3.5 shrink-0" />
+                {item.label}
+                {item.detail && <span class="opacity-70">{item.detail}</span>}
+              </span>
+            ))}
+            <span data-summary-empty={group.kind} class="text-day-500 italic">
+              nothing
+            </span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <p class="text-xs text-day-500">{note}</p>
+    {
+      /* Apply comes first in the markup so it stays the form's default (Enter) button; Discard is moved left visually. */
+    }
+    <div class="ml-auto flex flex-wrap items-center gap-2">
+      <Button
+        as="button"
+        type="submit"
+        name="intent"
+        value="apply"
+        color="success"
+        icon="ri:check-line"
+        label="Apply selected"
+        data-apply-button
+      />
+      <Button
+        as="button"
+        type="submit"
+        name={emptyButton.name}
+        value={emptyButton.value}
+        formaction={emptyButton.formaction}
+        color={emptyButton.color ?? 'danger'}
+        icon={emptyButton.icon}
+        label={emptyButton.label}
+        hidden
+        data-empty-button
+      />
+      {
+        discardButton && (
+          <Tooltip text={discardButton.tooltip} class="order-first">
+            <Button
+              as="button"
+              type="submit"
+              formaction={discardButton.formaction}
+              variant="faded"
+              color="gray"
+              icon="ri:delete-bin-line"
+              label="Discard proposal"
+              title={discardButton.tooltip}
+            />
+          </Tooltip>
+        )
+      }
+    </div>
+  </div>
+</div>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Optional script for proposal reviews.                  //
+  // Shows what the submit will apply and decline as the    //
+  // moderator ticks, and swaps Apply for the empty-state   //
+  // button when nothing is ticked. Without it the form     //
+  // still applies the ticked proposals.                    //
+  ////////////////////////////////////////////////////////////
+  document.addEventListener('astro:page-load', () => {
+    document.querySelectorAll<HTMLElement>('[data-proposal-apply-bar]').forEach((bar) => {
+      const form = bar.closest('form')
+      const applyButton = bar.querySelector<HTMLElement>('[data-apply-button]')
+      const emptyButton = bar.querySelector<HTMLElement>('[data-empty-button]')
+      if (!form || !applyButton || !emptyButton) return
+
+      const checkboxes = [
+        ...form.querySelectorAll<HTMLInputElement>('input[data-proposal-key]:not(:disabled)'),
+      ]
+      const summary = bar.querySelector<HTMLElement>('[data-apply-summary]')
+
+      const render = () => {
+        const ticked = new Set(
+          checkboxes.filter((box) => box.checked).map((box) => box.dataset.proposalKey ?? '')
+        )
+        bar.querySelectorAll<HTMLElement>('[data-summary-key]').forEach((chip) => {
+          const isApplied = ticked.has(chip.dataset.summaryKey ?? '')
+          chip.hidden = (chip.dataset.summaryKind === 'apply') !== isApplied
+        })
+        bar.querySelectorAll<HTMLElement>('[data-summary-empty]').forEach((empty) => {
+          const count = empty.dataset.summaryEmpty === 'apply' ? ticked.size : checkboxes.length - ticked.size
+          empty.hidden = count > 0
+        })
+        // The attribute, not a class: a hidden class would fight the button's own display class.
+        applyButton.hidden = ticked.size === 0
+        emptyButton.hidden = ticked.size > 0
+      }
+
+      if (summary) summary.hidden = false
+      checkboxes.forEach((box) => {
+        box.addEventListener('change', render)
+      })
+      render()
+    })
+  })
+</script>

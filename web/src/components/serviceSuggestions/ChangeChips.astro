@@ -1,0 +1,41 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../lib/cn'
+
+type Props = {
+  items: { text: string; kind: 'add' | 'remove' }[]
+}
+
+const { items } = Astro.props
+
+const kinds = {
+  add: {
+    icon: 'ri:add-line',
+    srLabel: 'Added:',
+    className: 'border-green-500/40 bg-green-500/10 text-green-100',
+  },
+  remove: {
+    icon: 'ri:subtract-line',
+    srLabel: 'Removed:',
+    className: 'border-red-500/40 bg-red-500/10 text-red-100 line-through',
+  },
+} as const
+---
+
+<ul class="flex flex-wrap gap-1.5 text-sm">
+  {
+    items.map((item) => (
+      <li
+        class={cn(
+          'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 wrap-anywhere',
+          kinds[item.kind].className
+        )}
+      >
+        <Icon name={kinds[item.kind].icon} class="size-3.5 shrink-0" />
+        <span class="sr-only">{kinds[item.kind].srLabel}</span>
+        {item.text}
+      </li>
+    ))
+  }
+</ul>
