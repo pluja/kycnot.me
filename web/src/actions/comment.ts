@@ -5,6 +5,8 @@ import { ActionError } from 'astro:actions'
 import { formatDistanceStrict } from 'date-fns'
 
 import { karmaUnlocksById } from '../constants/karmaUnlocks'
+import { recordAuditLog } from '../lib/auditLog'
+import { commentModerationAudit, commentModerationInputSchema } from '../lib/commentModeration'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
 import { makeKarmaUnlockMessage } from '../lib/karmaUnlocks'
 import { getOrCreateNotificationPreferences } from '../lib/notificationPreferences'
@@ -438,50 +440,7 @@ export const commentActions = {
 
   moderate: defineProtectedAction({
     permissions: cap('comments:moderate'),
-    input: z.discriminatedUnion('action', [
-      z.object({
-        commentId: z.number().int().positive(),
-        action: z.literal('status'),
-        value: z.enum(['PENDING', 'APPROVED', 'VERIFIED', 'REJECTED']),
-      }),
-      z.object({
-        commentId: z.number().int().positive(),
-        action: z.literal('human-action'),
-        value: z.enum(['APPROVE', 'REJECT', 'HOLD']),
-      }),
-      z.object({
-        commentId: z.number().int().positive(),
-        action: z.literal('rating-mute'),
-        value: z.boolean(),
-      }),
-      z.object({
-        commentId: z.number().int().positive(),
-        action: z.literal('rating-mute-reason'),
-        value: z.enum([
-          'AUTHOR_AFFILIATED',
-          'AUTHOR_LOW_TRUST',
-          'SUSPICIOUS_PATTERN',
-          'TEMPLATE_SPAM',
-          'CONFLICT_OF_INTEREST',
-          'MODERATOR_DISCRETION',
-        ]),
-      }),
-      z.object({
-        commentId: z.number().int().positive(),
-        action: z.literal('private-proof-status'),
-        value: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN']),
-      }),
-      z.object({
-        commentId: z.number().int().positive(),
-        action: z.enum(['public-note', 'admin-note', 'author-note']),
-        value: z.string().max(4000),
-      }),
-      z.object({
-        commentId: z.number().int().positive(),
-        action: z.enum(['add-issue', 'remove-issue']),
-        value: z.enum(['KYC_REQUESTED', 'FUNDS_BLOCKED']),
-      }),
-    ]),
+    input: commentModerationInputSchema,
     handler: async (input, context) => {
       try {
         const comment = await prisma.comment.findUnique({
@@ -491,6 +450,8 @@ export const commentActions = {
             rating: true,
             serviceId: true,
             authorId: true,
+            status: true,
+            ratingMuteReason: true,
             privateProof: true,
             privateProofStatus: true,
           },
@@ -605,6 +566,13 @@ export const commentActions = {
               preferredCommentId,
             })
           }
+
+          await recordAuditLog(tx, {
+            ...commentModerationAudit(input, comment),
+            actorId: context.locals.user.id,
+            targetType: 'COMMENT',
+            targetId: comment.id,
+          })
         })
       } catch (error) {
         if (error instanceof ActionError) throw error
