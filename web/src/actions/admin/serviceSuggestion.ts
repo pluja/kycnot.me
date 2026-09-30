@@ -8,7 +8,6 @@ import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { sendChatMessageEvents } from '../../lib/sendChatEvents'
-import { assertNotOwnSuggestion, transitionSuggestion } from '../../lib/serviceSuggestionReview'
 import {
   isListFieldEdit,
   listFieldDelta,
@@ -16,6 +15,11 @@ import {
   serviceFieldValues,
   serviceUpdateFromFieldEdits,
 } from '../../lib/serviceFieldEdits'
+import {
+  assertCanReviewSuggestion,
+  selfReviewNote,
+  transitionSuggestion,
+} from '../../lib/serviceSuggestionReview'
 import { transformCase } from '../../lib/strings'
 
 export const adminServiceSuggestionActions = {
@@ -53,7 +57,7 @@ export const adminServiceSuggestionActions = {
         })
       }
       if (input.status === 'APPROVED') {
-        assertNotOwnSuggestion(suggestion, locals.user)
+        assertCanReviewSuggestion(suggestion, locals.user)
         // Approving here would credit the author with an edit that was never made.
         if (suggestion.fieldEdits) {
           throw new ActionError({
@@ -70,7 +74,7 @@ export const adminServiceSuggestionActions = {
           action: 'STATUS_CHANGED',
           targetType: 'SERVICE_SUGGESTION',
           targetId: suggestion.id,
-          summary: `Status set to ${transformCase(input.status.replace('_', ' '), 'lower')}, from ${transformCase(suggestion.status.replace('_', ' '), 'lower')}`,
+          summary: `Status set to ${transformCase(input.status.replace('_', ' '), 'lower')}, from ${transformCase(suggestion.status.replace('_', ' '), 'lower')}${input.status === 'APPROVED' ? selfReviewNote(suggestion, locals.user) : ''}`,
         })
       })
     },
@@ -108,7 +112,7 @@ export const adminServiceSuggestionActions = {
           message: `Suggestion is already ${suggestion.status.toLowerCase()}.`,
         })
       }
-      assertNotOwnSuggestion(suggestion, locals.user)
+      assertCanReviewSuggestion(suggestion, locals.user)
 
       if (input.intent === 'reject') {
         await prisma.$transaction(async (tx) => {
@@ -155,12 +159,10 @@ export const adminServiceSuggestionActions = {
 
       const fieldLabels = (edits: typeof accepted) =>
         edits.map((edit) => getServiceEditFieldInfo(edit.field).label).join(', ')
-      const summary = [
-        `Applied ${fieldLabels(accepted)}`,
-        declined.length > 0 && `declined ${fieldLabels(declined)}`,
-      ]
-        .filter(Boolean)
-        .join('; ')
+      const summary =
+        [`Applied ${fieldLabels(accepted)}`, declined.length > 0 && `declined ${fieldLabels(declined)}`]
+          .filter(Boolean)
+          .join('; ') + selfReviewNote(suggestion, locals.user)
 
       await prisma.$transaction(async (tx) => {
         await transitionSuggestion(tx, suggestion.id, 'APPROVED')

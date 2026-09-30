@@ -22,6 +22,7 @@ import { parseIntWithFallback } from '../../../lib/numbers'
 import { prisma } from '../../../lib/prisma'
 import { makeLoginUrl } from '../../../lib/redirectUrls'
 import { serviceEditableSelect, serviceFieldValues } from '../../../lib/serviceFieldEdits'
+import { canReviewSuggestion } from '../../../lib/serviceSuggestionReview'
 import { formatDateShort } from '../../../lib/timeAgo'
 
 const user = Astro.locals.user
@@ -241,7 +242,7 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
           liveValues={serviceFieldValues(serviceSuggestion.service)}
           categories={categories}
           attributes={attributes}
-          reviewable={user.admin || serviceSuggestion.user.id !== user.id}
+          reviewable={canReviewSuggestion({ userId: serviceSuggestion.user.id }, user)}
           class="mt-6"
         />
       )

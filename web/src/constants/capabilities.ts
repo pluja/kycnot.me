@@ -91,6 +91,14 @@ export const {
       icon: 'ri:lightbulb-line',
     },
     {
+      value: 'suggestions:self-apply',
+      slug: 'suggestions-self-apply',
+      label: 'Apply own edits',
+      description:
+        'Apply your own edit suggestions without a second reviewer. Needs Review suggestions. Links and contacts stay out of reach, and each self-applied edit is marked in the audit log.',
+      icon: 'ri:user-follow-line',
+    },
+    {
       value: 'audit:read',
       slug: 'audit-read',
       label: 'Read the audit log',

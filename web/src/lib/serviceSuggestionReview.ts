@@ -1,5 +1,7 @@
 import { ActionError } from 'astro:actions'
 
+import { userCan } from './permissions'
+
 import type { ServiceSuggestionStatus } from '@prisma/client'
 
 type SuggestionWriter = {
@@ -33,16 +35,25 @@ export async function transitionSuggestion(
   }
 }
 
+type Reviewer = { id: number; admin: boolean; capabilities: string[] }
+
 /**
- * Keeps scoped staff from approving their own edits, which would turn a
- * suggestion into a direct write with no second pair of eyes. Admins already
- * edit services directly, so the rule would only get in their way.
+ * Whether the user may approve this suggestion. Their own needs a second pair
+ * of eyes unless they hold suggestions:self-apply; admins hold every capability.
  */
-export function assertNotOwnSuggestion(suggestion: { userId: number }, user: { id: number; admin: boolean }) {
-  if (!user.admin && suggestion.userId === user.id) {
+export function canReviewSuggestion(suggestion: { userId: number }, user: Reviewer) {
+  return suggestion.userId !== user.id || userCan(user, 'suggestions:self-apply')
+}
+
+export function assertCanReviewSuggestion(suggestion: { userId: number }, user: Reviewer) {
+  if (!canReviewSuggestion(suggestion, user)) {
     throw new ActionError({
       code: 'FORBIDDEN',
       message: 'You cannot review your own suggestion. Another moderator has to.',
     })
   }
 }
+
+/** Marks an audit summary when someone approved their own suggestion. */
+export const selfReviewNote = (suggestion: { userId: number }, user: { id: number }) =>
+  suggestion.userId === user.id ? ' (self-applied)' : ''
