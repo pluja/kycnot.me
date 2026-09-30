@@ -368,21 +368,30 @@ DECLARE
     service_visibility "ServiceVisibility";
     is_user_admin_or_moderator BOOLEAN;
 BEGIN
-    -- Award karma for first approval
-    -- Check that OLD.status is not NULL to handle the initial creation case if needed,
-    -- and ensure it wasn't already APPROVED.
-    IF OLD.status IS DISTINCT FROM 'APPROVED' AND NEW.status = 'APPROVED' THEN
+    -- Award karma for the first approval only. The existence check stops a
+    -- suggestion that is reopened and approved again from paying out twice.
+    IF OLD.status IS DISTINCT FROM 'APPROVED' AND NEW.status = 'APPROVED'
+        AND NOT EXISTS (
+            SELECT 1 FROM "KarmaTransaction" kt
+            WHERE kt."suggestionId" = NEW.id AND kt.action = 'SUGGESTION_APPROVED'
+        )
+    THEN
         -- Fetch service details for the description
         SELECT name, "serviceVisibility" INTO service_name, service_visibility FROM "Service" WHERE id = NEW."serviceId";
         
         -- Only award karma if the service is public
         IF service_visibility = 'PUBLIC' THEN
-            -- Check if the user is an admin or moderator
-            SELECT (admin = true OR 'comments:moderate' = ANY(capabilities))
+            -- Staff who review suggestions can approve their own, so they
+            -- earn nothing from it, like admins and comment moderators.
+            SELECT (
+                admin = true
+                OR 'comments:moderate' = ANY(capabilities)
+                OR 'suggestions:manage' = ANY(capabilities)
+            )
             FROM "User"
             WHERE id = NEW."userId"
             INTO is_user_admin_or_moderator;
-            
+
             -- Only award karma if the user is NOT an admin/moderator
             IF NOT COALESCE(is_user_admin_or_moderator, false) THEN
                 -- Insert karma transaction, linking it to the suggestion

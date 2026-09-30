@@ -1,6 +1,6 @@
 import { ActionError } from 'astro:actions'
 
-import { userCan } from './permissions'
+import { canReviewSuggestion } from './permissions'
 
 import type { ServiceSuggestionStatus } from '@prisma/client'
 
@@ -37,16 +37,12 @@ export async function transitionSuggestion(
 
 type Reviewer = { id: number; admin: boolean; capabilities: string[] }
 
-/**
- * Whether the user may approve this suggestion. Their own needs a second pair
- * of eyes unless they hold suggestions:self-apply; admins hold every capability.
- */
-export function canReviewSuggestion(suggestion: { userId: number }, user: Reviewer) {
-  return suggestion.userId !== user.id || userCan(user, 'suggestions:self-apply')
-}
-
-export function assertCanReviewSuggestion(suggestion: { userId: number }, user: Reviewer) {
-  if (!canReviewSuggestion(suggestion, user)) {
+export function assertCanReviewSuggestion(
+  suggestion: { userId: number },
+  user: Reviewer,
+  options: { applyingFieldEdits: boolean }
+) {
+  if (!canReviewSuggestion(suggestion, user, options)) {
     throw new ActionError({
       code: 'FORBIDDEN',
       message: 'You cannot review your own suggestion. Another moderator has to.',
@@ -54,6 +50,7 @@ export function assertCanReviewSuggestion(suggestion: { userId: number }, user: 
   }
 }
 
-/** Marks an audit summary when someone approved their own suggestion. */
+// selfReviewNote marks audit summaries written by the suggestion's own author,
+// so self-review can be found by searching the log.
 export const selfReviewNote = (suggestion: { userId: number }, user: { id: number }) =>
-  suggestion.userId === user.id ? ' (self-applied)' : ''
+  suggestion.userId === user.id ? ' (by its author)' : ''

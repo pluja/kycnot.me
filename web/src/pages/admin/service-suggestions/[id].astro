@@ -19,10 +19,10 @@ import { getServiceSuggestionTypeInfo } from '../../../constants/serviceSuggesti
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { auditLogSelect } from '../../../lib/auditLog'
 import { parseIntWithFallback } from '../../../lib/numbers'
+import { canReviewSuggestion } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
 import { makeLoginUrl } from '../../../lib/redirectUrls'
 import { serviceEditableSelect, serviceFieldValues } from '../../../lib/serviceFieldEdits'
-import { canReviewSuggestion } from '../../../lib/serviceSuggestionReview'
 import { formatDateShort } from '../../../lib/timeAgo'
 
 const user = Astro.locals.user
@@ -242,7 +242,9 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
           liveValues={serviceFieldValues(serviceSuggestion.service)}
           categories={categories}
           attributes={attributes}
-          reviewable={canReviewSuggestion({ userId: serviceSuggestion.user.id }, user)}
+          reviewable={canReviewSuggestion({ userId: serviceSuggestion.user.id }, user, {
+            applyingFieldEdits: true,
+          })}
           class="mt-6"
         />
       )

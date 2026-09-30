@@ -56,8 +56,15 @@ export const adminServiceSuggestionActions = {
           message: 'This edit was already applied. Suggest a new edit instead of reopening it.',
         })
       }
+      // Reopening and approving again is how a suggestion would be approved twice.
+      if (suggestion.status === 'APPROVED' && !locals.user.admin) {
+        throw new ActionError({
+          code: 'FORBIDDEN',
+          message: 'Only an admin can change an approved suggestion.',
+        })
+      }
       if (input.status === 'APPROVED') {
-        assertCanReviewSuggestion(suggestion, locals.user)
+        assertCanReviewSuggestion(suggestion, locals.user, { applyingFieldEdits: false })
         // Approving here would credit the author with an edit that was never made.
         if (suggestion.fieldEdits) {
           throw new ActionError({
@@ -74,7 +81,7 @@ export const adminServiceSuggestionActions = {
           action: 'STATUS_CHANGED',
           targetType: 'SERVICE_SUGGESTION',
           targetId: suggestion.id,
-          summary: `Status set to ${transformCase(input.status.replace('_', ' '), 'lower')}, from ${transformCase(suggestion.status.replace('_', ' '), 'lower')}${input.status === 'APPROVED' ? selfReviewNote(suggestion, locals.user) : ''}`,
+          summary: `Status set to ${transformCase(input.status.replace('_', ' '), 'lower')}, from ${transformCase(suggestion.status.replace('_', ' '), 'lower')}${selfReviewNote(suggestion, locals.user)}`,
         })
       })
     },
@@ -112,7 +119,7 @@ export const adminServiceSuggestionActions = {
           message: `Suggestion is already ${suggestion.status.toLowerCase()}.`,
         })
       }
-      assertCanReviewSuggestion(suggestion, locals.user)
+      assertCanReviewSuggestion(suggestion, locals.user, { applyingFieldEdits: true })
 
       if (input.intent === 'reject') {
         await prisma.$transaction(async (tx) => {
@@ -122,7 +129,7 @@ export const adminServiceSuggestionActions = {
             action: 'STATUS_CHANGED',
             targetType: 'SERVICE_SUGGESTION',
             targetId: suggestion.id,
-            summary: 'Rejected all changes',
+            summary: `Rejected all changes${selfReviewNote(suggestion, locals.user)}`,
           })
         })
         return
