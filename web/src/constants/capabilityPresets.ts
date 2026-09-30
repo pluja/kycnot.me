@@ -13,11 +13,18 @@ export const capabilityPresets = [
       'contact:manage',
       'attributes:manage',
       'suggestions:manage',
+      'suggestions:self-apply',
       'users:manage',
       'announcements:manage',
       'notifications:manage',
       'stats:view',
     ],
+  },
+  {
+    id: 'moderator',
+    label: 'Moderator',
+    icon: 'ri:shield-user-line',
+    capabilities: ['events:manage', 'suggestions:manage', 'comments:moderate'],
   },
   {
     id: 'comments-moderator',

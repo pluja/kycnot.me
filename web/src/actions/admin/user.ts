@@ -6,7 +6,7 @@ import { capabilitiesZodEnum } from '../../constants/capabilities'
 import { recordAuditLog } from '../../lib/auditLog'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { saveFileLocally } from '../../lib/fileStorage'
-import { cap } from '../../lib/permissions'
+import { cap, withoutOrphanCapabilities } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 
 const selectUserReturnFields = {
@@ -156,7 +156,7 @@ export const adminUserActions = {
               ? {
                   admin: type.includes('admin'),
                   spammer: type.includes('spammer'),
-                  capabilities,
+                  capabilities: withoutOrphanCapabilities(capabilities),
                   canCreateApiKeys,
                 }
               : {}),

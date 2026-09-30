@@ -14,7 +14,7 @@ import InputTextArea from '../../../components/InputTextArea.astro'
 import Markdown from '../../../components/Markdown.astro'
 import MyPicture from '../../../components/MyPicture.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
-import { capabilities } from '../../../constants/capabilities'
+import { capabilities, capabilityRequirements, getCapabilityInfo } from '../../../constants/capabilities'
 import { capabilityPresets } from '../../../constants/capabilityPresets'
 import { getServiceUserRoleInfo, serviceUserRoles } from '../../../constants/serviceUserRoles'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
@@ -282,12 +282,19 @@ const staffLabel = staffBadgeLabel(user)
             <InputCardGroup
               name="capabilities"
               label="Capabilities"
-              options={capabilities.map((capability) => ({
-                label: capability.label,
-                value: capability.value,
-                icon: capability.icon,
-                description: capability.description,
-              }))}
+              data-capability-requirements={JSON.stringify(capabilityRequirements)}
+              options={capabilities.map((capability) => {
+                const requires = capabilityRequirements[capability.value] ?? []
+                return {
+                  label: capability.label,
+                  value: capability.value,
+                  icon: capability.icon,
+                  description:
+                    requires.length > 0
+                      ? `${capability.description}\n\n_Needs ${requires.map((required) => getCapabilityInfo(required).label).join(', ')}._`
+                      : capability.description,
+                }
+              })}
               selectedValue={user.capabilities}
               cardSize="sm"
               iconSize="sm"
@@ -563,18 +570,40 @@ const staffLabel = staffBadgeLabel(user)
 
 <script>
   ////////////////////////////////////////////////////////////
-  // Optional script for the capability role presets.       //
-  // Clicking a preset ticks exactly its capabilities in the //
-  // capabilities checkbox group.                            //
+  // Optional script for the capability grants.             //
+  // Clicking a preset ticks exactly its capabilities, and  //
+  // a capability that needs others stays disabled until    //
+  // they are ticked. The server drops orphans either way.  //
   ////////////////////////////////////////////////////////////
   document.addEventListener('astro:page-load', () => {
+    document.querySelectorAll<HTMLElement>('[data-capability-requirements]').forEach((group) => {
+      const requirements = JSON.parse(group.dataset.capabilityRequirements ?? '{}') as Record<
+        string,
+        string[]
+      >
+      const inputs = [...group.querySelectorAll<HTMLInputElement>('input[name="capabilities"]')]
+      const render = () => {
+        const ticked = new Set(inputs.filter((input) => input.checked).map((input) => input.value))
+        inputs.forEach((input) => {
+          const allowed = (requirements[input.value] ?? []).every((required) => ticked.has(required))
+          input.disabled = !allowed
+          if (!allowed) input.checked = false
+        })
+      }
+      group.addEventListener('change', render)
+      render()
+    })
+
+    // Presets tick every box first and announce the change once, so a
+    // capability listed before its requirement is not cleared midway.
     document.querySelectorAll<HTMLButtonElement>('[data-capability-preset]').forEach((button) => {
       button.addEventListener('click', () => {
         const wanted = new Set((button.dataset.capabilityPreset ?? '').split(',').filter(Boolean))
-        document.querySelectorAll<HTMLInputElement>('input[name="capabilities"]').forEach((input) => {
+        const inputs = [...document.querySelectorAll<HTMLInputElement>('input[name="capabilities"]')]
+        inputs.forEach((input) => {
           input.checked = wanted.has(input.value)
-          input.dispatchEvent(new Event('change', { bubbles: true }))
         })
+        inputs[0]?.dispatchEvent(new Event('change', { bubbles: true }))
       })
     })
   })

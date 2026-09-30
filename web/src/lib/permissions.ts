@@ -1,5 +1,7 @@
 import { ContactCategory } from '@prisma/client'
 
+import { capabilityRequirements } from '../constants/capabilities'
+
 import type { Capability } from '../constants/capabilities'
 
 // Capability-based access control. To add a capability:
@@ -16,10 +18,37 @@ type UserForPermissions = {
   capabilities: string[]
 }
 
+// capabilityRequirementsMet is true when everything the capability requires is
+// itself held, recursively. A requirement cycle would recurse forever; the
+// capabilities test rejects one before it can ship.
+export function capabilityRequirementsMet(granted: readonly string[], capability: Capability): boolean {
+  return (capabilityRequirements[capability] ?? []).every(
+    (required) => granted.includes(required) && capabilityRequirementsMet(granted, required)
+  )
+}
+
 export function userCan(user: UserForPermissions | null | undefined, capability: Capability): boolean {
   if (!user) return false
   if (user.admin) return true
-  return user.capabilities.includes(capability)
+  return user.capabilities.includes(capability) && capabilityRequirementsMet(user.capabilities, capability)
+}
+
+// withoutOrphanCapabilities runs on save, so a grant whose requirements are
+// missing is never stored rather than stored and ignored.
+export function withoutOrphanCapabilities(granted: Capability[]): Capability[] {
+  return granted.filter((capability) => capabilityRequirementsMet(granted, capability))
+}
+
+// canReviewSuggestion allows one exception to the second-reviewer rule: a
+// holder of suggestions:self-apply may apply field edits they wrote. It never
+// covers approving by status, which would approve without changing anything.
+export function canReviewSuggestion(
+  suggestion: { userId: number },
+  user: UserForPermissions & { id: number },
+  { applyingFieldEdits }: { applyingFieldEdits: boolean }
+): boolean {
+  if (user.admin || suggestion.userId !== user.id) return true
+  return applyingFieldEdits && userCan(user, 'suggestions:self-apply')
 }
 
 // cap builds the action permission object, keeping the capability literal typed
@@ -66,7 +95,7 @@ export function userCanAccessAdmin(user: UserForPermissions | null | undefined):
   if (!user) return false
   if (user.admin) return true
   return adminRouteCapabilities.some((route) =>
-    route.capabilities.some((capability) => user.capabilities.includes(capability))
+    route.capabilities.some((capability) => userCan(user, capability))
   )
 }
 
