@@ -1,3 +1,5 @@
+import { publishedCommentStatuses } from './experiences'
+import { notificationDisplaySelect } from './notifications'
 import { prisma } from './prisma'
 
 import type { Prisma } from '@prisma/client'
@@ -61,11 +63,9 @@ export async function getService(slug: string | undefined): Promise<
 
 const serviceCommentSelect = {
   id: true,
+  kind: true,
   content: true,
-  rating: true,
-  ratingActive: true,
   createdAt: true,
-  updatedAt: true,
   author: {
     select: {
       name: true,
@@ -97,9 +97,8 @@ export async function getCommentsForService(slug: string | undefined): Promise<
   const comments = await prisma.comment.findMany({
     where: {
       serviceId: service.id,
-      status: { in: ['APPROVED', 'VERIFIED'] },
-      ratingMuted: false,
-      parentId: null, // Only root comments for the main feed
+      status: { in: publishedCommentStatuses },
+      parentId: null,
     },
     select: serviceCommentSelect,
     orderBy: {
@@ -230,115 +229,10 @@ const userSelect = {
   displayName: true,
 } as const satisfies Prisma.UserSelect
 
-const notificationSelect = {
-  id: true,
-  type: true,
-  createdAt: true,
-  aboutAccountStatusChange: true,
-  aboutCommentStatusChange: true,
-  aboutServiceVerificationStatusChange: true,
-  aboutSuggestionStatusChange: true,
-  aboutServiceSuggestionId: true,
-  aboutComment: {
-    select: {
-      id: true,
-      content: true,
-      publicNote: true,
-      status: true,
-      author: {
-        select: {
-          id: true,
-        },
-      },
-      parent: {
-        select: {
-          author: {
-            select: {
-              id: true,
-            },
-          },
-        },
-      },
-      service: {
-        select: {
-          slug: true,
-          name: true,
-        },
-      },
-    },
-  },
-  aboutEvent: {
-    select: {
-      title: true,
-      content: true,
-      type: true,
-      class: true,
-      sentiment: true,
-      startedAt: true,
-      endedAt: true,
-      incident: { select: { state: true } },
-      service: {
-        select: {
-          slug: true,
-          name: true,
-        },
-      },
-    },
-  },
-  aboutService: {
-    select: {
-      slug: true,
-      name: true,
-      verificationStatus: true,
-    },
-  },
-  aboutServiceSuggestion: {
-    select: {
-      id: true,
-      type: true,
-      status: true,
-      service: {
-        select: {
-          name: true,
-        },
-      },
-    },
-  },
-  aboutServiceSuggestionMessage: {
-    select: {
-      id: true,
-      content: true,
-      suggestion: {
-        select: {
-          id: true,
-          service: {
-            select: {
-              name: true,
-            },
-          },
-        },
-      },
-    },
-  },
-  aboutContactThreadId: true,
-  aboutContactThread: {
-    select: {
-      authorId: true,
-    },
-  },
-  aboutKarmaTransaction: {
-    select: {
-      points: true,
-      action: true,
-      description: true,
-    },
-  },
-} as const satisfies Prisma.NotificationSelect
-
 export async function getUserNotifications(feedId: string | undefined): Promise<
   SafeResult<{
     user: Prisma.UserGetPayload<{ select: typeof userSelect }>
-    notifications: Prisma.NotificationGetPayload<{ select: typeof notificationSelect }>[]
+    notifications: Prisma.NotificationGetPayload<{ select: typeof notificationDisplaySelect }>[]
   }>
 > {
   if (!feedId || typeof feedId !== 'string') {
@@ -358,7 +252,7 @@ export async function getUserNotifications(feedId: string | undefined): Promise<
     where: {
       userId: user.id,
     },
-    select: notificationSelect,
+    select: notificationDisplaySelect,
     orderBy: {
       createdAt: 'desc',
     },

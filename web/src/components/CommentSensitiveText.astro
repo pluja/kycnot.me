@@ -1,0 +1,95 @@
+---
+import { actions } from 'astro:actions'
+
+import { getCommentStatusInfo } from '../constants/commentStatus'
+import { MODERATOR_REASON_LENGTH, POST_LENGTH } from '../lib/commentLimits'
+import { distinctVersions } from '../lib/commentPage'
+import { REMOVED_MARKER, FULL_REMOVAL_TEXT, commentContentHash } from '../lib/commentRedaction'
+import { getFormReplay } from '../lib/formReplay'
+
+import Button from './Button.astro'
+import FormReplay from './FormReplay.astro'
+import InputText from './InputText.astro'
+import InputTextArea from './InputTextArea.astro'
+import TimeFormatted from './TimeFormatted.astro'
+
+import type { CommentPagePost, CommentPageRevision } from '../lib/commentPage'
+
+type Props = { comment: CommentPagePost; revisions: CommentPageRevision[]; panelPath: string }
+const { comment, revisions, panelPath } = Astro.props
+const olderVersions = distinctVersions(revisions, comment.content)
+const result = Astro.getActionResult(actions.admin.experience.redactRevision)
+const replay = getFormReplay(result?.error ? Astro.locals.actionFormValues : null)
+const selectedRevisionId = Number(
+  Astro.url.searchParams.get('redactVersion') ?? replay.text('revisionId', '')
+)
+const selectedRevision = olderVersions.find((revision) => revision.id === selectedRevisionId)
+const content = selectedRevision?.content ?? comment.content
+const changesCurrentPost = content === comment.content
+const versionLink = (revisionId?: number) =>
+  `${panelPath}?tab=redact${revisionId ? `&redactVersion=${revisionId.toString()}` : ''}`
+---
+
+<div class="space-y-4">
+  <p class="text-xs text-day-400">
+    Replace private details with <code>{REMOVED_MARKER}</code>, or the whole text with
+    <code>{FULL_REMOVAL_TEXT}</code>.
+  </p>
+  {
+    olderVersions.length > 0 && (
+      <nav aria-label="Version to edit" class="flex flex-wrap items-center gap-2 text-xs">
+        <span class="text-day-400">Editing:</span>
+        <a
+          href={versionLink()}
+          aria-current={!selectedRevision ? 'true' : undefined}
+          class={!selectedRevision ? 'font-medium text-green-300' : 'text-day-300 underline'}
+        >
+          Current post
+        </a>
+        {olderVersions.map((revision) => (
+          <a
+            href={versionLink(revision.id)}
+            aria-current={selectedRevision?.id === revision.id ? 'true' : undefined}
+            class={
+              selectedRevision?.id === revision.id ? 'font-medium text-green-300' : 'text-day-300 underline'
+            }
+          >
+            <TimeFormatted date={revision.decidedAt ?? revision.createdAt} /> (
+            {getCommentStatusInfo(revision.status).publicLabel.toLowerCase()})
+          </a>
+        ))}
+      </nav>
+    )
+  }
+  <form method="POST" action={`${panelPath}${actions.admin.experience.redactRevision}`} class="space-y-4">
+    <input type="hidden" name="commentId" value={comment.id} />
+    <FormReplay />
+    {selectedRevision && <input type="hidden" name="revisionId" value={selectedRevision.id} />}
+    <input type="hidden" name="version" value={comment.version} />
+    <input type="hidden" name="sourceHash" value={commentContentHash(content)} />
+    <InputTextArea
+      name="content"
+      label={changesCurrentPost ? 'Post text' : 'Older version text'}
+      value={replay.text('content', content)}
+      inputProps={{ required: true, minlength: POST_LENGTH.min, maxlength: POST_LENGTH.max, rows: 7 }}
+    />
+    <InputText
+      name="reason"
+      label="Reason (moderators only)"
+      inputProps={{
+        required: true,
+        minlength: MODERATOR_REASON_LENGTH.min,
+        maxlength: MODERATOR_REASON_LENGTH.max,
+        value: replay.text('reason', ''),
+      }}
+    />
+    <p class="text-xs text-day-400">
+      {
+        changesCurrentPost
+          ? 'The author is notified, and readers see that text was removed.'
+          : 'Only this older version changes.'
+      }
+    </p>
+    <Button type="submit" label="Save" color="danger" variant="faded" size="sm" />
+  </form>
+</div>

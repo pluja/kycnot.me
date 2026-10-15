@@ -76,8 +76,6 @@ export const notificationActions = {
       input: z.object({
         enableOnMyCommentStatusChange: z.coerce.boolean().optional(),
         enableAutowatchMyComments: z.coerce.boolean().optional(),
-        enableNotifyPendingRepliesOnWatch: z.coerce.boolean().optional(),
-        karmaNotificationThreshold: z.coerce.number().int().min(1).max(1_000_000).optional(),
       }),
       handler: async (input, context) => {
         await prisma.notificationPreferences.upsert({
@@ -85,15 +83,11 @@ export const notificationActions = {
           update: {
             enableOnMyCommentStatusChange: input.enableOnMyCommentStatusChange,
             enableAutowatchMyComments: input.enableAutowatchMyComments,
-            enableNotifyPendingRepliesOnWatch: input.enableNotifyPendingRepliesOnWatch,
-            karmaNotificationThreshold: input.karmaNotificationThreshold,
           },
           create: {
             userId: context.locals.user.id,
             enableOnMyCommentStatusChange: input.enableOnMyCommentStatusChange,
             enableAutowatchMyComments: input.enableAutowatchMyComments,
-            enableNotifyPendingRepliesOnWatch: input.enableNotifyPendingRepliesOnWatch,
-            karmaNotificationThreshold: input.karmaNotificationThreshold,
           },
         })
       },

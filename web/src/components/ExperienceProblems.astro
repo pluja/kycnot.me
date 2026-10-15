@@ -1,0 +1,36 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { commentIssueTypes } from '../constants/commentIssueTypes'
+import { cn } from '../lib/cn'
+import { problemStatus } from '../lib/experiences'
+
+import type { CommentIssueType, ExperienceOutcome } from '@prisma/client'
+
+type Props = { issues: CommentIssueType[]; outcome: ExperienceOutcome }
+const { issues, outcome } = Astro.props
+const shownIssues = commentIssueTypes.filter((issue) => issues.includes(issue.value))
+const status = problemStatus(outcome)
+---
+
+{
+  shownIssues.length > 0 && (
+    <span class="inline-flex flex-wrap items-center gap-x-2">
+      {shownIssues.map((issue) => (
+        <span class="inline-flex items-center gap-1">
+          <Icon
+            name={issue.icon}
+            class={cn('size-3.5', status === 'ongoing' ? issue.ongoingIconClass : 'text-day-400')}
+          />
+          {issue.postLabel}
+        </span>
+      ))}
+      {status && (
+        <>
+          <span class="text-day-500">·</span>
+          <span>{status}</span>
+        </>
+      )}
+    </span>
+  )
+}

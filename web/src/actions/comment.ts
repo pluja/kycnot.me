@@ -1,239 +1,81 @@
-import crypto from 'crypto'
-
+import { CommentKind, SentimentSource } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 import { formatDistanceStrict } from 'date-fns'
 
-import { karmaUnlocksById } from '../constants/karmaUnlocks'
-import { recordAuditLog } from '../lib/auditLog'
-import { commentModerationAudit, commentModerationInputSchema } from '../lib/commentModeration'
+import { commentIssueTypesZodEnumByValue } from '../constants/commentIssueTypes'
+import { withEvidenceImage } from '../lib/commentEvidence'
+import { POST_LENGTH, postContentSchema } from '../lib/commentLimits'
+import { validateCommentTimestamp } from '../lib/commentSubmission'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
-import { makeKarmaUnlockMessage } from '../lib/karmaUnlocks'
+import {
+  experienceInput,
+  isPublishedComment,
+  isServicePubliclyReadable,
+  outcomeForProblems,
+  issuesNeedingProof,
+  proofRequiredMessage,
+} from '../lib/experiences'
 import { getOrCreateNotificationPreferences } from '../lib/notificationPreferences'
-import { cap, userCan } from '../lib/permissions'
 import { prisma } from '../lib/prisma'
+import { classifyProof } from '../lib/proofEvidence'
 import { handleHoneypotTrap, handleXSSDetection } from '../lib/spamDetection'
-import { timeTrapSecretKey } from '../lib/timeTrapSecret'
+import { commentsDisabledMessage } from '../lib/trust'
+import { formCheckbox, imageFileSchema } from '../lib/zodUtils'
 
-import type { CommentStatus, Prisma } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 
 const COMMENT_RATE_LIMIT_WINDOW_MINUTES = 2
 const MAX_COMMENTS_PER_WINDOW = 1
 const MAX_COMMENTS_PER_WINDOW_VERIFIED_USER = 10
-export const COMMENT_ORDER_ID_MAX_LENGTH = 100
-
-const activeRatingStatuses = ['APPROVED', 'VERIFIED'] satisfies CommentStatus[]
-
-type RefreshActiveRatingOptions = {
-  preferredCommentId?: number
-}
-
-type CommentRatingTransaction = Pick<typeof prisma, 'comment'>
-
-function isActiveRatingStatus(status: CommentStatus) {
-  return status === 'APPROVED' || status === 'VERIFIED'
-}
-
-async function refreshActiveRatingForUserService(
-  tx: CommentRatingTransaction,
-  authorId: number,
-  serviceId: number,
-  options: RefreshActiveRatingOptions = {}
-) {
-  const activeRatingWhere = {
-    authorId,
-    serviceId,
-    rating: { not: null },
-    parentId: null,
-    status: { in: activeRatingStatuses },
-    ratingMuted: false,
-  } satisfies Prisma.CommentWhereInput
-
-  const preferredRating = options.preferredCommentId
-    ? await tx.comment.findFirst({
-        where: {
-          ...activeRatingWhere,
-          id: options.preferredCommentId,
-        },
-        select: {
-          id: true,
-          ratingActive: true,
-        },
-      })
-    : null
-
-  const ratingToActivate =
-    preferredRating ??
-    (await tx.comment.findFirst({
-      where: activeRatingWhere,
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      select: {
-        id: true,
-        ratingActive: true,
-      },
-    }))
-
-  await tx.comment.updateMany({
-    where: {
-      authorId,
-      serviceId,
-      rating: { not: null },
-      parentId: null,
-      ratingActive: true,
-      ...(ratingToActivate ? { id: { not: ratingToActivate.id } } : {}),
-    },
-    data: {
-      ratingActive: false,
-    },
-  })
-
-  if (ratingToActivate && !ratingToActivate.ratingActive) {
-    await tx.comment.update({
-      where: { id: ratingToActivate.id },
-      data: {
-        ratingActive: true,
-      },
-    })
-  }
-}
+const COMMENT_ORDER_ID_MAX_LENGTH = 100
 
 export const commentActions = {
-  vote: defineProtectedAction({
-    accept: 'form',
-    permissions: 'user',
-    input: z.object({
-      commentId: z.coerce.number().int().positive(),
-      downvote: z.coerce.boolean(),
-    }),
-    handler: async (input, context) => {
-      try {
-        // Check user karma requirement
-        if (!context.locals.user.karmaUnlocks.voteComments) {
-          throw new ActionError({
-            code: 'FORBIDDEN',
-            message: makeKarmaUnlockMessage(karmaUnlocksById.voteComments),
-          })
-        }
-
-        const comment = await prisma.comment.findUnique({
-          where: { id: input.commentId },
-          select: { authorId: true, status: true },
-        })
-        if (!comment) {
-          throw new ActionError({ code: 'NOT_FOUND', message: 'Comment not found' })
-        }
-        // Reddit and Hacker News both refuse this, and without it one account
-        // that reaches the voting threshold can raise its own karma without limit.
-        if (comment.authorId === context.locals.user.id) {
-          throw new ActionError({
-            code: 'FORBIDDEN',
-            message: 'You cannot vote on your own comment.',
-          })
-        }
-        // The form only offers votes on visible comments, but the action takes a
-        // comment id, so a hidden or pending one is otherwise reachable directly.
-        if (comment.status !== 'APPROVED' && comment.status !== 'VERIFIED') {
-          throw new ActionError({
-            code: 'FORBIDDEN',
-            message: 'This comment cannot be voted on.',
-          })
-        }
-
-        // Handle the vote in a transaction
-        await prisma.$transaction(async (tx) => {
-          // Get existing vote if any
-          const existingVote = await tx.commentVote.findUnique({
-            where: {
-              commentId_userId: {
-                commentId: input.commentId,
-                userId: context.locals.user.id,
-              },
-            },
-          })
-
-          if (existingVote) {
-            // If vote type is the same, remove the vote
-            if (existingVote.downvote === input.downvote) {
-              await tx.commentVote.delete({
-                where: { id: existingVote.id },
-              })
-            } else {
-              // If vote type is different, update the vote
-              await tx.commentVote.update({
-                where: { id: existingVote.id },
-                data: { downvote: input.downvote },
-              })
-            }
-          } else {
-            // Create new vote
-            await tx.commentVote.create({
-              data: {
-                downvote: input.downvote,
-                commentId: input.commentId,
-                userId: context.locals.user.id,
-              },
-            })
-          }
-        })
-
-        return true
-      } catch (error) {
-        if (error instanceof ActionError) throw error
-
-        console.error('Error voting on comment:', error)
-        throw new ActionError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Error voting on comment',
-        })
-      }
-    },
-  }),
-
   create: defineProtectedAction({
     accept: 'form',
     permissions: 'user',
     input: z
       .object({
-        content: z.string().min(10).max(2000),
+        ...experienceInput.shape,
+        content: postContentSchema,
         serviceId: z.coerce.number().int().positive(),
-        parentId: z.coerce.number().optional(),
+        parentId: z.coerce.number().int().positive().optional(),
         /** @deprecated Honey pot field, do not use */
         message: z.unknown().optional(),
-        rating: z.coerce.number().int().min(1).max(5).optional(),
+
         encTimestamp: z.string().min(1), // time trap field
-        internalNote: z.string().max(500).optional(),
-        issueKycRequested: z.coerce.boolean().optional(),
-        issueFundsBlocked: z.coerce.boolean().optional(),
-        issueScam: z.coerce.boolean().optional(),
-        issueDetails: z.string().max(120).optional(),
+        issues: z.array(commentIssueTypesZodEnumByValue).default([]),
+        noProblems: formCheckbox,
+        resolvedSince: formCheckbox,
         orderId: z.string().max(COMMENT_ORDER_ID_MAX_LENGTH).optional(),
+        proofImage: imageFileSchema,
       })
       .superRefine((data, ctx) => {
-        if (data.rating && data.parentId) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ['parentId'],
-            message: 'Ratings cannot be provided for replies',
-          })
-        }
         if (!data.parentId) {
-          if (data.content.length < 30) {
+          if (data.content.length < POST_LENGTH.rootMin) {
             ctx.addIssue({
               code: z.ZodIssueCode.too_small,
-              minimum: 30,
+              minimum: POST_LENGTH.rootMin,
               type: 'string',
               inclusive: true,
               path: ['content'],
-              message: 'Content must be at least 30 characters',
+              message: `Content must be at least ${String(POST_LENGTH.rootMin)} characters`,
             })
+          }
+          const hasProof = !!data.orderId?.trim() || !!data.proofImage
+          if (!hasProof && issuesNeedingProof(data.issues).length > 0) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['orderId'], message: proofRequiredMessage })
           }
         }
       }),
     handler: async (input, context) => {
-      if (context.locals.user.karmaUnlocks.commentsDisabled) {
+      if (context.locals.user.trust.commentsDisabled) {
+        throw new ActionError({ code: 'FORBIDDEN', message: commentsDisabledMessage })
+      }
+      if (!input.parentId && !input.sentiment) {
         throw new ActionError({
-          code: 'FORBIDDEN',
-          message: makeKarmaUnlockMessage(karmaUnlocksById.commentsDisabled),
+          code: 'BAD_REQUEST',
+          message: 'Pick how it went: positive, mixed or negative.',
         })
       }
 
@@ -252,45 +94,8 @@ export const commentActions = {
         dontMarkAsSpammer: context.locals.user.admin,
       })
 
-      // --- Time Trap Validation Start ---
-      try {
-        const algorithm = 'aes-256-cbc'
-        const decodedValue = Buffer.from(input.encTimestamp, 'base64').toString('utf8')
-        const [ivHex, encryptedHex] = decodedValue.split(':')
+      validateCommentTimestamp(input.encTimestamp)
 
-        if (!ivHex || !encryptedHex) {
-          throw new Error('Invalid time trap format.')
-        }
-
-        const iv = Buffer.from(ivHex, 'hex')
-        const decipher = crypto.createDecipheriv(algorithm, timeTrapSecretKey, iv)
-        let decrypted = decipher.update(encryptedHex, 'hex', 'utf8')
-        decrypted += decipher.final('utf8')
-
-        const originalTimestamp = parseInt(decrypted, 10)
-        if (isNaN(originalTimestamp)) {
-          throw new Error('Invalid timestamp data.')
-        }
-
-        const now = Date.now()
-        const timeDiff = now - originalTimestamp
-        const minTimeSeconds = 2 // 2 seconds
-        const maxTimeMinutes = 60 // 1 hour
-
-        if (timeDiff < minTimeSeconds * 1000 || timeDiff > maxTimeMinutes * 60 * 1000) {
-          console.warn(`Time trap triggered: ${(timeDiff / 1000).toLocaleString()}s`)
-          throw new Error('Invalid submission timing.')
-        }
-      } catch (err) {
-        console.warn('Time trap validation failed:', err instanceof Error ? err.message : 'Unknown error')
-        throw new ActionError({
-          code: 'BAD_REQUEST',
-          message: 'Invalid request',
-        })
-      }
-      // --- Time Trap Validation End ---
-
-      // --- Rate Limit Check Start ---
       const isVerifiedUser = context.locals.user.admin || context.locals.user.verified
       const maxCommentsPerWindow = isVerifiedUser
         ? MAX_COMMENTS_PER_WINDOW_VERIFIED_USER
@@ -319,113 +124,174 @@ export const commentActions = {
 
         console.warn(`Rate limit exceeded for user ${context.locals.user.id.toLocaleString()}`)
         throw new ActionError({
-          code: 'TOO_MANY_REQUESTS', // Use specific 429 code
+          code: 'TOO_MANY_REQUESTS',
           message: `Rate limit exceeded. Please wait ${oldestCreatedAt ? `${formatDistanceStrict(oldestCreatedAt, windowStart)} ` : ''}before commenting again.`,
         })
       }
-      // --- Rate Limit Check End ---
 
-      // --- Issue tags and admin-only note from user submission ---
-      const issueTypes: ('FUNDS_BLOCKED' | 'KYC_REQUESTED')[] = []
-      if (input.issueKycRequested) issueTypes.push('KYC_REQUESTED')
-      if (input.issueFundsBlocked) issueTypes.push('FUNDS_BLOCKED')
-
-      const isIssueReport = issueTypes.length > 0 || input.issueScam === true
-
-      let formattedAdminNote: string | null = null
-      if (isIssueReport) {
-        const tagLabels: string[] = [...issueTypes]
-        if (input.issueScam) tagLabels.push('POTENTIAL_SCAM')
-        const details = input.issueDetails?.trim() ?? ''
-        formattedAdminNote = `[${tagLabels.join(', ')}]${details ? `: ${details}` : ''}`
-      } else if (input.internalNote?.trim()) {
-        formattedAdminNote = input.internalNote.trim()
+      // Checked before a proof image is decoded, then again inside the transaction.
+      const targetService = await prisma.service.findUnique({
+        where: { id: input.serviceId },
+        select: { serviceVisibility: true },
+      })
+      if (!targetService || !isServicePubliclyReadable(targetService.serviceVisibility)) {
+        throw new ActionError({ code: 'NOT_FOUND' })
       }
 
-      try {
-        await prisma.$transaction(async (tx) => {
-          // Check for existing privateProof for this service if provided
-          if (input.orderId?.trim()) {
-            const existingProof = await tx.comment.findFirst({
-              where: {
-                serviceId: input.serviceId,
-                privateProof: input.orderId.trim(),
-              },
-              select: { id: true },
-            })
+      const issueTypes = !input.parentId ? [...new Set(input.issues)] : []
 
-            if (existingProof) {
+      const attachesProof = !input.parentId
+      const proofImage = attachesProof && !context.locals.user.spammer ? input.proofImage : undefined
+      // Admins are trusted: their posts skip the queue and publish as their own decision.
+      const publishesDirectly = context.locals.user.admin
+      const created = { updatesVerdict: false }
+      const hasProof = attachesProof && (!!input.orderId?.trim() || !!proofImage)
+      const waitsForProofCheck = !publishesDirectly && hasProof && issuesNeedingProof(issueTypes).length > 0
+      try {
+        await withEvidenceImage(proofImage, (proofImagePath) =>
+          prisma.$transaction(async (tx) => {
+            await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${context.locals.user.id} FOR UPDATE`
+            const recentCount = await tx.comment.count({
+              where: { authorId: context.locals.user.id, createdAt: { gte: windowStart } },
+            })
+            if (recentCount >= maxCommentsPerWindow) {
               throw new ActionError({
-                code: 'BAD_REQUEST',
-                message: 'This proof has already been reported for this service.',
+                code: 'TOO_MANY_REQUESTS',
+                message: 'Rate limit exceeded. Please wait before commenting again.',
               })
             }
-          }
-
-          const isRelatedToService = !!(await tx.serviceUser.findUnique({
-            where: {
-              userId_serviceId: {
-                userId: context.locals.user.id,
-                serviceId: input.serviceId,
-              },
-            },
-            select: {
-              id: true,
-            },
-          }))
-
-          const commentStatus: CommentStatus =
-            userCan(context.locals.user, 'comments:moderate') || isRelatedToService
-              ? 'APPROVED'
-              : 'PENDING'
-
-          const commentData: Prisma.CommentCreateInput = {
-            content: input.content,
-            service: { connect: { id: input.serviceId } },
-            author: { connect: { id: context.locals.user.id } },
-            status: commentStatus,
-            privateProof: input.orderId?.trim() ?? null,
-            issues: issueTypes,
-          }
-
-          if (input.parentId) {
-            commentData.parent = { connect: { id: input.parentId } }
-          }
-
-          if (input.rating) {
-            commentData.rating = input.rating
-            commentData.ratingActive = false
-          }
-
-          if (formattedAdminNote) {
-            commentData.adminNote = formattedAdminNote
-          }
-
-          const newComment = await tx.comment.create({
-            data: commentData,
-          })
-
-          const notiPref = await getOrCreateNotificationPreferences(
-            context.locals.user.id,
-            { enableAutowatchMyComments: true },
-            tx
-          )
-
-          if (notiPref.enableAutowatchMyComments) {
-            await tx.notificationPreferences.update({
-              where: { userId: context.locals.user.id },
-              data: {
-                watchedComments: { connect: { id: newComment.id } },
-              },
+            const service = await tx.service.findUnique({
+              where: { id: input.serviceId },
+              select: { id: true, serviceVisibility: true, proofLookupUrl: true, proofIdPattern: true },
             })
-          }
+            if (!service || !isServicePubliclyReadable(service.serviceVisibility)) {
+              throw new ActionError({ code: 'NOT_FOUND' })
+            }
+            const thread = input.parentId
+              ? await tx.comment.findUnique({
+                  where: { id: input.parentId },
+                  select: {
+                    id: true,
+                    parentId: true,
+                    serviceId: true,
+                    status: true,
+                    authorId: true,
+                    kind: true,
+                    experience: { select: { id: true } },
+                  },
+                })
+              : null
+            if (
+              input.parentId &&
+              (thread?.serviceId !== input.serviceId || !isPublishedComment(thread.status))
+            ) {
+              throw new ActionError({
+                code: 'BAD_REQUEST',
+                message: 'Reply to a published post on this service.',
+              })
+            }
+            const rootId = thread ? (thread.parentId ?? thread.id) : null
+            const replyToId = thread?.parentId ? thread.id : null
+            if (rootId && rootId !== thread?.id) {
+              const root = await tx.comment.findUnique({ where: { id: rootId }, select: { status: true } })
+              if (!root || !isPublishedComment(root.status)) {
+                throw new ActionError({
+                  code: 'BAD_REQUEST',
+                  message: 'Reply to a published post on this service.',
+                })
+              }
+            }
+            const commentData: Prisma.CommentCreateInput = {
+              content: input.content,
+              service: { connect: { id: input.serviceId } },
+              author: { connect: { id: context.locals.user.id } },
+              status: 'PENDING',
+              kind: input.parentId ? CommentKind.DISCUSSION : CommentKind.EXPERIENCE,
+              issues: issueTypes,
+            }
 
-          if (input.rating && isActiveRatingStatus(commentStatus)) {
-            await refreshActiveRatingForUserService(tx, context.locals.user.id, input.serviceId)
-          }
-        })
+            // A direct reply to your own experience may change its verdict; it then counts as an update.
+            const ownExperienceId =
+              thread &&
+              !thread.parentId &&
+              thread.authorId === context.locals.user.id &&
+              thread.kind === 'EXPERIENCE'
+                ? thread.experience?.id
+                : undefined
+            if (ownExperienceId && (input.sentiment || input.outcome !== 'UNSPECIFIED')) {
+              created.updatesVerdict = true
+              commentData.experienceUpdate = {
+                create: {
+                  experienceId: ownExperienceId,
+                  sentiment: input.sentiment ?? null,
+                  outcome: input.outcome === 'UNSPECIFIED' ? null : input.outcome,
+                },
+              }
+            }
 
-        return { success: true }
+            if (rootId) commentData.parent = { connect: { id: rootId } }
+            if (replyToId) commentData.replyTo = { connect: { id: replyToId } }
+
+            if (!input.parentId) {
+              commentData.experience = {
+                create: {
+                  occurredMonth: input.occurredMonth,
+                  sentiment: input.sentiment,
+                  sentimentSource: input.sentiment ? SentimentSource.AUTHOR : undefined,
+                  outcome: outcomeForProblems({
+                    noProblems: input.noProblems,
+                    issues: issueTypes,
+                    resolved: input.resolvedSince,
+                  }),
+                },
+              }
+            }
+
+            const newComment = await tx.comment.create({
+              data: commentData,
+            })
+
+            const notiPref = await getOrCreateNotificationPreferences(
+              context.locals.user.id,
+              { enableAutowatchMyComments: true },
+              tx
+            )
+
+            if (notiPref.enableAutowatchMyComments) {
+              await tx.notificationPreferences.update({
+                where: { userId: context.locals.user.id },
+                data: {
+                  watchedComments: { connect: { id: newComment.id } },
+                },
+              })
+            }
+
+            const proofText = input.orderId?.trim()
+            if (attachesProof && (proofText || proofImagePath)) {
+              await tx.commentEvidence.create({
+                data: {
+                  commentId: newComment.id,
+                  authorId: context.locals.user.id,
+                  body: proofText || null,
+                  imagePath: proofImagePath,
+                  ...classifyProof(proofText, !!proofImagePath, service),
+                },
+              })
+            }
+
+            if (publishesDirectly) {
+              await tx.comment.update({
+                where: { id: newComment.id },
+                data: {
+                  status: 'APPROVED',
+                  humanAction: 'APPROVE',
+                  humanDecidedAt: new Date(),
+                  humanDecidedById: context.locals.user.id,
+                },
+              })
+            }
+          })
+        )
       } catch (error) {
         if (error instanceof ActionError) throw error
 
@@ -435,153 +301,10 @@ export const commentActions = {
           message: 'Error creating comment',
         })
       }
-    },
-  }),
-
-  moderate: defineProtectedAction({
-    permissions: cap('comments:moderate'),
-    input: commentModerationInputSchema,
-    handler: async (input, context) => {
-      try {
-        const comment = await prisma.comment.findUnique({
-          where: { id: input.commentId },
-          select: {
-            id: true,
-            rating: true,
-            serviceId: true,
-            authorId: true,
-            status: true,
-            ratingMuteReason: true,
-            privateProof: true,
-            privateProofStatus: true,
-          },
-        })
-
-        if (!comment) {
-          throw new ActionError({
-            code: 'NOT_FOUND',
-            message: 'Comment not found',
-          })
-        }
-
-        // Proof gate: a comment carrying a private proof cannot be approved
-        // (or verified) while that proof is still pending. The moderator must
-        // first resolve the proof (approve / reject / withdraw it). Resolving
-        // the proof to APPROVED is itself the approval path, handled below.
-        const isApproveIntent =
-          (input.action === 'human-action' && input.value === 'APPROVE') ||
-          (input.action === 'status' && (input.value === 'APPROVED' || input.value === 'VERIFIED'))
-        if (isApproveIntent && comment.privateProof !== null && comment.privateProofStatus === 'PENDING') {
-          throw new ActionError({
-            code: 'BAD_REQUEST',
-            message: 'Resolve the private proof (approve, reject, or withdraw it) before approving this comment.',
-          })
-        }
-
-        const updateData: Prisma.CommentUpdateInput = {}
-
-        switch (input.action) {
-          case 'status': {
-            updateData.status = input.value
-            // A status set from the dropdown is a human decision; record it so
-            // the audit trail captures who acted and moderationState classifies
-            // the row as human-resolved rather than AI-auto-decided. VERIFIED is
-            // an approve-with-badge; PENDING means "send back to the queue".
-            updateData.humanAction =
-              input.value === 'REJECTED' ? 'REJECT' : input.value === 'PENDING' ? 'HOLD' : 'APPROVE'
-            updateData.humanDecidedAt = new Date()
-            updateData.humanDecidedBy = { connect: { id: context.locals.user.id } }
-            break
-          }
-          case 'human-action': {
-            updateData.humanAction = input.value
-            updateData.humanDecidedAt = new Date()
-            updateData.humanDecidedBy = { connect: { id: context.locals.user.id } }
-            updateData.status =
-              input.value === 'APPROVE' ? 'APPROVED' : input.value === 'REJECT' ? 'REJECTED' : 'PENDING'
-            break
-          }
-          case 'rating-mute':
-            updateData.ratingMuted = input.value
-            updateData.ratingMuteReason = input.value ? 'MODERATOR_DISCRETION' : null
-            break
-          case 'rating-mute-reason':
-            updateData.ratingMuteReason = input.value
-            updateData.ratingMuted = true
-            break
-          case 'public-note':
-            updateData.publicNote = input.value
-            break
-          case 'admin-note':
-            updateData.adminNote = input.value
-            break
-          case 'author-note':
-            updateData.authorNote = input.value
-            break
-          case 'private-proof-status':
-            updateData.privateProofStatus = input.value
-            if (input.value === 'APPROVED') {
-              // Proof approval is the mod approving the comment. Record the
-              // human action so audit trail captures who approved and the
-              // Mod Work queue stops surfacing the row.
-              updateData.status = 'APPROVED'
-              updateData.humanAction = 'APPROVE'
-              updateData.humanDecidedAt = new Date()
-              updateData.humanDecidedBy = { connect: { id: context.locals.user.id } }
-            }
-            break
-          case 'add-issue':
-            updateData.issues = { push: input.value }
-            break
-          case 'remove-issue': {
-            const current = await prisma.comment.findUnique({
-              where: { id: input.commentId },
-              select: { issues: true },
-            })
-            updateData.issues = {
-              set: (current?.issues ?? []).filter((i) => i !== input.value),
-            }
-            break
-          }
-        }
-
-        const shouldRefreshActiveRating =
-          comment.rating !== null &&
-          (input.action === 'status' ||
-            input.action === 'human-action' ||
-            input.action === 'rating-mute' ||
-            input.action === 'rating-mute-reason' ||
-            input.action === 'private-proof-status')
-        const preferredCommentId =
-          input.action === 'rating-mute' && !input.value ? input.commentId : undefined
-
-        await prisma.$transaction(async (tx) => {
-          await tx.comment.update({
-            where: { id: input.commentId },
-            data: updateData,
-          })
-
-          if (shouldRefreshActiveRating) {
-            await refreshActiveRatingForUserService(tx, comment.authorId, comment.serviceId, {
-              preferredCommentId,
-            })
-          }
-
-          await recordAuditLog(tx, {
-            ...commentModerationAudit(input, comment),
-            actorId: context.locals.user.id,
-            targetType: 'COMMENT',
-            targetId: comment.id,
-          })
-        })
-      } catch (error) {
-        if (error instanceof ActionError) throw error
-
-        console.error('Error moderating comment:', error)
-        throw new ActionError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Error moderating comment',
-        })
+      return {
+        hasProof,
+        waitsForProofCheck,
+        awaitsVerdictReview: created.updatesVerdict && !publishesDirectly,
       }
     },
   }),

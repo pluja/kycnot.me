@@ -2,198 +2,270 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
-import { COMMENT_ORDER_ID_MAX_LENGTH } from '../actions/comment'
 import { cn } from '../lib/cn'
+import { POST_LENGTH } from '../lib/commentLimits'
+import { getFormReplay } from '../lib/formReplay'
+import { defaultProofHint } from '../lib/proofEvidence'
 import { makeLoginUrl } from '../lib/redirectUrls'
-import { siteOrigin } from '../lib/urls'
+import { actionInPlace } from '../lib/urls'
 
+import ActionFeedback from './ActionFeedback.astro'
 import Button from './Button.astro'
+import ExperienceFields from './ExperienceFields.astro'
+import FormReplay from './FormReplay.astro'
 import FormTimeTrap from './FormTimeTrap.astro'
 import InputHoneypotTrap from './InputHoneypotTrap.astro'
-import InputRating from './InputRating.astro'
-import InputText from './InputText.astro'
-import InputWrapper from './InputWrapper.astro'
+import InputTextArea from './InputTextArea.astro'
 import Markdown from './Markdown.astro'
+import ProblemChips from './ProblemChips.astro'
+import ProofInputs from './ProofInputs.astro'
 import UserBadge from './UserBadge.astro'
 
-import type { Prisma } from '@prisma/client'
 import type { HTMLAttributes } from 'astro/types'
 
-type Props = Omit<HTMLAttributes<'form'>, 'action' | 'enctype' | 'method'> & {
+type Props = HTMLAttributes<'form'> & {
   serviceId: number
   parentId?: number
-  commentId?: number
   strictCommentingEnabled?: boolean
-  commentSectionMessage?: string | null
-  activeRatingComment?: Prisma.CommentGetPayload<{
-    select: {
-      id: true
-      rating: true
-    }
-  }> | null
+  replyToName?: string
+  cancelReplyUrl?: string
+  proofHint?: string | null
+  // Set when the author replies to their own experience, so the reply can update its verdict.
+  ownExperience?: { sentimentLabel: string | null; outcomeLabel: string | null }
 }
-
 const {
   serviceId,
   parentId,
-  commentId,
-  activeRatingComment,
   strictCommentingEnabled,
-  commentSectionMessage,
+  replyToName,
+  cancelReplyUrl,
+  proofHint,
+  ownExperience,
   class: className,
-  ...htmlProps
+  ...props
 } = Astro.props
-
-const MIN_COMMENT_LENGTH = parentId ? 10 : 30
-
 const user = Astro.locals.user
-const userCommentsDisabled = user ? user.karmaUnlocks.commentsDisabled : false
+const result = Astro.getActionResult(actions.comment.create)
+const successMessage = result?.data?.awaitsVerdictReview
+  ? 'Update sent. Your experience changes once a moderator approves it.'
+  : parentId
+    ? 'Reply submitted.'
+    : user?.admin
+      ? 'Posted.'
+      : result?.data?.waitsForProofCheck
+        ? 'Posted. It goes live once a moderator checks your proof.'
+        : result?.data?.hasProof
+          ? 'Posted. It appears once reviewed, and gets a badge once a moderator checks your proof.'
+          : 'Posted. It appears once reviewed.'
+const feedback = result ? { message: successMessage, error: result.error } : null
+const replay = getFormReplay(result?.error ? Astro.locals.actionFormValues : null)
+const formId = Astro.locals.makeId(`comment-form-${parentId ?? 'root'}`)
+const endsSentence = (text: string) => (/[.!?]$/.test(text.trim()) ? text : `${text.trim()}.`)
 ---
 
-<form
-  method="POST"
-  action={actions.comment.create}
-  enctype="application/x-www-form-urlencoded"
-  class={cn(className)}
-  {...htmlProps}
->
-  <FormTimeTrap />
-  <input type="hidden" name="serviceId" value={serviceId} />
-  {parentId && <input type="hidden" name="parentId" value={parentId} />}
-
-  <div class="space-y-1.5">
-    <input
-      type="checkbox"
-      id={`use-form-secret-token-${String(commentId ?? 'new')}`}
-      name="useFormUserSecretToken"
-      checked={!user}
-      class="peer/use-form-secret-token hidden"
-    />
-
-    {
-      user ? (
-        userCommentsDisabled ? (
-          <div class="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-sm text-red-400">
-            <Icon name="ri:forbid-line" class="mr-1 inline size-4 align-[-0.2em]" />
-            You cannot comment due to low karma.
-          </div>
-        ) : (
+{
+  !user ? (
+    <p class="text-sm text-day-400">
+      <a
+        href={makeLoginUrl(Astro.url, { message: 'Log in to share your experience' })}
+        data-astro-reload
+        class="text-green-400 hover:underline"
+      >
+        Log in or create an account
+      </a>{' '}
+      to share your experience. Accounts are anonymous: no email, no personal details.
+    </p>
+  ) : user.trust.commentsDisabled ? (
+    <p class="text-sm text-day-400">
+      Posting is disabled on this account. If you think this is a mistake,{' '}
+      <a href="/contact" class="underline">
+        contact us
+      </a>
+      .
+    </p>
+  ) : parentId ? (
+    <form
+      {...props}
+      method="POST"
+      action={actionInPlace(actions.comment.create, Astro.url, 'reply-form')}
+      class={cn('max-w-[720px] space-y-2', className)}
+    >
+      <FormTimeTrap />
+      <InputHoneypotTrap name="message" />
+      <FormReplay />
+      <input type="hidden" name="serviceId" value={serviceId} />
+      <input type="hidden" name="parentId" value={parentId} />
+      <p class="flex flex-wrap items-center gap-1 text-xs text-day-300">
+        Replying as <UserBadge user={user} size="sm" class="text-green-300" />
+        {replyToName && (
           <>
-            <div class="flex items-center gap-2 text-xs text-day-400 peer-checked/use-form-secret-token:hidden">
-              <Icon name="ri:user-line" class="size-3.5" />
-              <span>
-                Commenting as: <UserBadge user={user} size="sm" class="text-green-400" />
-              </span>
-            </div>
-
-            <InputHoneypotTrap name="message" />
-
-            <div>
-              <textarea
-                id={`comment-${String(commentId ?? 'new')}`}
-                name="content"
-                required
-                minlength={MIN_COMMENT_LENGTH}
-                maxlength={2000}
-                rows="4"
-                placeholder="Write your comment..."
-                class="max-h-128 min-h-16 w-full resize-y rounded-lg border border-night-500 bg-night-800 px-2.5 py-2 text-sm placeholder:text-day-500 focus:border-night-600 focus:ring-1 focus:ring-day-500 focus:outline-hidden"
-              />
-            </div>
-
-            {!parentId ? (
-              <>
-                <div class="[&:has(input[name='rating'][value='']:checked)_[data-show-if-rating]]:hidden">
-                  <div class="flex flex-wrap gap-4">
-                    <InputRating name="rating" label="Rating" />
-
-                    <InputWrapper label="I experienced..." name="tags">
-                      <label class="flex cursor-pointer items-center gap-2">
-                        <input type="checkbox" name="issueKycRequested" class="text-red-400" />
-                        <span class="flex items-center gap-1 text-xs text-red-400">
-                          <Icon name="ri:user-forbid-fill" class="size-3" />
-                          KYC Issue
-                        </span>
-                      </label>
-
-                      <label class="flex cursor-pointer items-center gap-2">
-                        <input type="checkbox" name="issueFundsBlocked" class="text-orange-400" />
-                        <span class="flex items-center gap-1 text-xs text-orange-400">
-                          <Icon name="ri:wallet-3-fill" class="size-3" />
-                          Funds Blocked
-                        </span>
-                      </label>
-                    </InputWrapper>
-
-                    <InputText
-                      label="Private proof"
-                      name="orderId"
-                      inputProps={{
-                        maxlength: COMMENT_ORDER_ID_MAX_LENGTH,
-                        placeholder: 'Order ID / URL / proof',
-                        class: 'bg-night-800',
-                        required: strictCommentingEnabled,
-                      }}
-                      descriptionLabel="Only visible to admins. Used to verify your review."
-                      class="grow"
-                    />
-                  </div>
-
-                  <div class="mt-4 flex flex-wrap items-start justify-end gap-x-4 gap-y-2">
-                    {!!activeRatingComment?.rating && (
-                      <div
-                        class="mt-1 rounded-sm bg-yellow-500/10 px-2 py-1.5 text-xs text-yellow-400"
-                        data-show-if-rating
-                      >
-                        <Icon name="ri:information-line" class="mr-1 inline size-3.5" />
-                        If approved, this replaces your previous
-                        <a
-                          href={`${siteOrigin}${Astro.url.pathname}#comment-${activeRatingComment.id}`}
-                          class="inline-flex items-center gap-1 underline"
-                          target="_blank"
-                          rel="noopener"
-                        >
-                          {activeRatingComment.rating.toLocaleString()}
-                          <Icon name="ri:star-fill" class="inline size-3 align-[-0.1em]" />
-                          rating
-                          <Icon name="ri:external-link-line" class="inline size-2.5 align-[-0.1em]" />
-                        </a>
-                        .
-                      </div>
-                    )}
-
-                    <div class="flex flex-wrap items-start justify-end gap-x-4 gap-y-2">
-                      {!!commentSectionMessage && (
-                        <div class="flex items-start gap-1 pt-1.5">
-                          <Icon name="ri:information-line" class="mt-1.25 inline size-3.5" />
-                          <div class="prose prose-sm max-w-none grow text-day-200 prose-invert">
-                            <Markdown content={commentSectionMessage} />
-                          </div>
-                        </div>
-                      )}
-
-                      <Button type="submit" label="Send" icon="ri:send-plane-2-line" />
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div class="flex items-center justify-end gap-2">
-                <Button type="submit" label="Reply" icon="ri:reply-line" />
-              </div>
+            <span>to</span>
+            <span class="font-medium text-day-100">@{replyToName}</span>
+            {cancelReplyUrl && (
+              <a href={cancelReplyUrl} class="ml-1 text-day-400 underline hover:text-day-200">
+                Reply to the post instead
+              </a>
             )}
           </>
-        )
-      ) : (
-        <a
-          href={makeLoginUrl(Astro.url, { message: 'Login to comment' })}
-          data-astro-reload
-          class="mb-4 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 font-title text-xs text-blue-400 shadow-xs transition-colors duration-200 hover:bg-blue-500/20 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+        )}
+      </p>
+      <InputTextArea
+        name="content"
+        label="Your reply"
+        hideLabel
+        inputProps={{
+          required: true,
+          minlength: POST_LENGTH.min,
+          maxlength: POST_LENGTH.max,
+          rows: 3,
+          class: 'bg-night-800 px-2.5 py-2 text-sm',
+          placeholder: 'Add a useful reply...',
+        }}
+        value={replay.text('content', '')}
+      />
+      {ownExperience && (
+        <details
+          open={!!replay.text('sentiment') || replay.text('outcome', 'UNSPECIFIED') !== 'UNSPECIFIED'}
+          class="group/verdict rounded-md border border-night-600 text-xs"
         >
-          <Icon name="ri:login-box-line" class="size-3.5" />
-          Login to comment
-        </a>
-      )
-    }
-  </div>
-</form>
+          <summary class="flex cursor-pointer list-none flex-wrap items-center gap-x-1.5 gap-y-0.5 px-2.5 py-1.5 text-day-300 hover:text-day-100 [&::-webkit-details-marker]:hidden">
+            <Icon name="ri:refresh-line" class="size-3.5" />
+            Has anything changed?
+            {(ownExperience.sentimentLabel ?? ownExperience.outcomeLabel) && (
+              <span class="text-day-500">
+                Now: {[ownExperience.sentimentLabel, ownExperience.outcomeLabel].filter(Boolean).join(', ')}
+              </span>
+            )}
+            <Icon
+              name="ri:arrow-down-s-line"
+              class="ml-auto size-4 text-day-500 group-open/verdict:rotate-180"
+            />
+          </summary>
+          <div class="space-y-2 border-t border-night-600 p-2.5">
+            <ExperienceFields part="sentiment" update replay={replay} />
+            <ExperienceFields part="details" update replay={replay} />
+            <p class="text-day-500">A moderator approves a change before it updates your experience.</p>
+          </div>
+        </details>
+      )}
+      <ActionFeedback feedback={feedback} />
+      <Button type="submit" label="Reply" icon="ri:send-plane-2-line" size="sm" class="ml-auto flex" />
+    </form>
+  ) : (
+    <details open={!!result} class="group max-w-[720px]">
+      <summary class="flex cursor-pointer list-none items-center gap-3 rounded-lg border border-night-600 bg-night-800 p-3 transition-colors group-open:rounded-b-none hover:border-night-500 [&::-webkit-details-marker]:hidden">
+        <span class="grid size-9 shrink-0 place-items-center rounded-full bg-green-500/15 text-green-300">
+          <Icon name="ri:chat-new-line" class="size-5" />
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-sm font-medium text-day-100">Share your experience</span>
+          <span class="block text-xs text-day-400">Good or bad, tell others how it went.</span>
+        </span>
+        <span class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-green-500 px-3 text-sm font-medium text-black group-open:hidden">
+          <Icon name="ri:edit-line" class="size-4" />
+          Write
+        </span>
+        <span class="hidden text-xs text-day-400 group-open:inline">Close</span>
+      </summary>
+      <form
+        {...props}
+        method="POST"
+        action={actionInPlace(actions.comment.create, Astro.url, 'comments')}
+        enctype="multipart/form-data"
+        data-comment-composer
+        class={cn('space-y-2.5 rounded-b-lg border border-t-0 border-night-600 bg-night-800 p-3', className)}
+      >
+        <FormTimeTrap />
+        <InputHoneypotTrap name="message" />
+        <FormReplay />
+        <input type="hidden" name="serviceId" value={serviceId} />
+        <ExperienceFields part="sentiment" replay={replay} />
+        <InputTextArea
+          name="content"
+          label="Your post"
+          hideLabel
+          inputProps={{
+            required: true,
+            minlength: POST_LENGTH.rootMin,
+            maxlength: POST_LENGTH.max,
+            rows: 3,
+            class: 'bg-night-900 px-2.5 py-2 text-sm',
+            'aria-describedby': `${formId}-hint`,
+            placeholder: 'What did you use it for, and how did it go?',
+          }}
+          value={replay.text('content', '')}
+        />
+        <p id={`${formId}-hint`} class="text-xs text-day-500">
+          Everyone can read this. Don't include order IDs, addresses or personal details.
+        </p>
+        <div class="space-y-3 border-t border-night-600 pt-3">
+          <ProblemChips replay={replay} />
+          <section class="space-y-2 border-t border-night-600 pt-3" aria-labelledby={`${formId}-proof`}>
+            <h3
+              id={`${formId}-proof`}
+              class="flex flex-wrap items-center gap-x-1.5 text-xs font-medium text-day-300"
+            >
+              <Icon name="ri:lock-line" class="size-3.5" />
+              Proof
+              <span data-proof-required class="text-red-400" aria-hidden="true">
+                *
+              </span>
+              <span data-proof-optional class="font-normal text-day-500">
+                · only moderators see it
+              </span>
+              <span data-proof-required class="font-normal text-day-500">
+                · required, only moderators see it
+              </span>
+            </h3>
+            <ProofInputs
+              textName="orderId"
+              imageName="proofImage"
+              value={replay.text('orderId', '')}
+              maxLength={100}
+              describedBy={`${formId}-proof-hint`}
+            />
+            <div id={`${formId}-proof-hint`} class="text-xs text-day-500 [&_a]:underline [&_p]:inline">
+              {proofHint ? (
+                <Markdown content={endsSentence(proofHint)} linkRel={['nofollow', 'noopener']} />
+              ) : (
+                defaultProofHint
+              )}{' '}
+              Checked proof adds a badge and counts more in the summary.
+            </div>
+          </section>
+        </div>
+        <ActionFeedback feedback={feedback} />
+        <div class="flex items-center justify-between gap-3 pt-0.5">
+          <p class="flex min-w-0 flex-wrap items-center gap-1 text-xs text-day-500">
+            <span class="shrink-0">As</span>
+            <UserBadge user={user} size="sm" class="text-green-300" />
+            <span>
+              ·{' '}
+              {user.admin
+                ? 'Published right away'
+                : strictCommentingEnabled
+                  ? 'A moderator reviews it before it goes live'
+                  : 'Reviewed before it goes live'}
+            </span>
+            <span>
+              ·{' '}
+              <a href="/docs/guidelines" class="underline hover:text-day-300">
+                Guidelines
+              </a>
+            </span>
+          </p>
+          <Button type="submit" label="Post" icon="ri:send-plane-2-line" size="sm" color="success" />
+        </div>
+      </form>
+    </details>
+  )
+}
+<style>
+  [data-comment-composer] [data-proof-required],
+  [data-comment-composer]:has(input[data-requires-proof]:checked) [data-proof-optional] {
+    display: none;
+  }
+  [data-comment-composer]:has(input[data-requires-proof]:checked) [data-proof-required] {
+    display: inline;
+  }
+</style>

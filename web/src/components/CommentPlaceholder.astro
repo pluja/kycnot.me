@@ -1,0 +1,85 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../lib/cn'
+import { makeCommentUrl } from '../lib/commentsWithReplies'
+
+import CommentReplyPreview from './CommentReplyPreview.astro'
+import TimeFormatted from './TimeFormatted.astro'
+
+import type { CommentReplyPreviewGroup } from '../lib/commentReplyPreviews'
+import type { CommentStatus } from '@prisma/client'
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = HTMLAttributes<'article'> & {
+  comment: {
+    id: number
+    authorId: number | null
+    withdrawnAt: Date | null
+    statusBeforeWithdrawal: CommentStatus | null
+  }
+  serviceSlug: string
+  serviceName: string
+  replyPreview?: CommentReplyPreviewGroup
+  preview?: boolean
+}
+const {
+  comment,
+  serviceSlug,
+  serviceName,
+  replyPreview,
+  preview = false,
+  class: className,
+  ...props
+} = Astro.props
+// An emptied placeholder from account deletion has no earlier status; a withdrawn post keeps one.
+const fromDeletedAccount = comment.authorId === null && !comment.statusBeforeWithdrawal
+---
+
+<article
+  {...props}
+  id={`comment-${comment.id.toString()}`}
+  class={cn('max-w-[720px] scroll-mt-20 border-b border-night-500 py-5 last:border-b-0', className)}
+>
+  <p class="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm">
+    <Icon
+      name={fromDeletedAccount ? 'ri:user-unfollow-line' : 'ri:arrow-go-back-line'}
+      class="mr-1 size-5 text-day-400"
+    />
+    <span class="font-medium text-day-400">
+      {fromDeletedAccount ? 'Post from a deleted account' : 'Post withdrawn by the author'}
+    </span>
+    {
+      comment.withdrawnAt && !fromDeletedAccount && (
+        <>
+          <span aria-hidden="true" class="text-xs text-day-500">
+            ·
+          </span>
+          <span class="text-xs text-day-400">
+            <TimeFormatted date={comment.withdrawnAt} hourPrecision />
+          </span>
+        </>
+      )
+    }
+    {
+      preview && (
+        <a
+          href={makeCommentUrl({ serviceSlug, commentId: comment.id })}
+          class="ml-auto text-xs text-day-400 hover:text-day-200 hover:underline"
+        >
+          Open the replies
+        </a>
+      )
+    }
+  </p>
+  {
+    replyPreview && (
+      <CommentReplyPreview
+        serviceSlug={serviceSlug}
+        serviceName={serviceName}
+        commentId={comment.id}
+        group={replyPreview}
+      />
+    )
+  }
+</article>

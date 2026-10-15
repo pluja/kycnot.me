@@ -1,105 +1,135 @@
 import { accountStatusChangesById } from '../constants/accountStatusChange'
 import { commentStatusChangesById } from '../constants/commentStatusChange'
-import { getKarmaTransactionActionInfo } from '../constants/karmaTransactionActions'
 import { serviceVerificationStatusChangesById } from '../constants/serviceStatusChange'
 import { getServiceSuggestionTypeInfo } from '../constants/serviceSuggestionType'
 import { serviceSuggestionStatusChangesById } from '../constants/suggestionStatusChange'
 
+import { authorDisplayName } from './authorName'
 import { makeCommentUrl } from './commentsWithReplies'
 import { getEventDisplay } from './eventKind'
+import { PROOF_REQUEST_DAYS } from './proofRequests'
 
 import type { NotificationAction } from './serverEventsTypes'
 import type { Prisma } from '@prisma/client'
 
-export function makeNotificationTitle(
-  notification: Prisma.NotificationGetPayload<{
+// notificationDisplaySelect is what the notification list and push messages need to title and describe one.
+export const notificationDisplaySelect = {
+  id: true,
+  type: true,
+  createdAt: true,
+  aboutAccountStatusChange: true,
+  aboutCommentStatusChange: true,
+  aboutServiceVerificationStatusChange: true,
+  aboutSuggestionStatusChange: true,
+  aboutComment: {
     select: {
-      id: true
-      type: true
-      aboutAccountStatusChange: true
-      aboutCommentStatusChange: true
-      aboutServiceVerificationStatusChange: true
-      aboutSuggestionStatusChange: true
-      aboutKarmaTransaction: {
+      id: true,
+      author: { select: { id: true } },
+      status: true,
+      content: true,
+      publicNote: true,
+      parent: {
         select: {
-          points: true
-          action: true
-        }
-      }
-      aboutComment: {
-        select: {
-          author: { select: { id: true } }
-          status: true
-          parent: {
+          author: {
             select: {
-              author: {
-                select: {
-                  id: true
-                }
-              }
-            }
-          }
+              id: true,
+            },
+          },
+        },
+      },
+      service: {
+        select: {
+          slug: true,
+          name: true,
+        },
+      },
+    },
+  },
+  aboutServiceSuggestionId: true,
+  aboutServiceSuggestion: {
+    select: {
+      status: true,
+      type: true,
+      service: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  },
+  aboutServiceSuggestionMessage: {
+    select: {
+      id: true,
+      content: true,
+      suggestion: {
+        select: {
+          id: true,
           service: {
             select: {
-              name: true
-            }
-          }
-        }
-      }
-      aboutServiceSuggestion: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  },
+  aboutContactThreadId: true,
+  aboutContactThread: {
+    select: {
+      authorId: true,
+    },
+  },
+  aboutContactMessage: {
+    select: {
+      content: true,
+      author: { select: { name: true, displayName: true } },
+    },
+  },
+  aboutEvent: {
+    select: {
+      title: true,
+      type: true,
+      class: true,
+      sentiment: true,
+      startedAt: true,
+      endedAt: true,
+      incident: { select: { state: true } },
+      service: {
         select: {
-          status: true
-          type: true
-          service: {
-            select: {
-              name: true
-            }
-          }
-        }
-      }
-      aboutServiceSuggestionMessage: {
-        select: {
-          suggestion: {
-            select: {
-              service: {
-                select: {
-                  name: true
-                }
-              }
-            }
-          }
-        }
-      }
-      aboutContactThread: {
-        select: {
-          authorId: true
-        }
-      }
-      aboutEvent: {
-        select: {
-          type: true
-          class: true
-          sentiment: true
-          startedAt: true
-          endedAt: true
-          service: {
-            select: {
-              name: true
-            }
-          }
-        }
-      }
-      aboutService: {
-        select: {
-          name: true
-          verificationStatus: true
-        }
-      }
-    }
-  }>,
+          slug: true,
+          name: true,
+        },
+      },
+    },
+  },
+  aboutService: {
+    select: {
+      slug: true,
+      name: true,
+      verificationStatus: true,
+    },
+  },
+} satisfies Prisma.NotificationSelect
+
+// previewText keeps a message notification short: push and chat services show the whole body.
+const previewText = (text: string) => {
+  const oneLine = text.replace(/\s+/g, ' ').trim()
+  return oneLine.length > 200 ? `${oneLine.slice(0, 199).trimEnd()}…` : oneLine
+}
+
+type NotificationDisplay = Prisma.NotificationGetPayload<{ select: typeof notificationDisplaySelect }>
+
+export function makeNotificationTitle(
+  notification: NotificationDisplay,
   user: Prisma.UserGetPayload<{ select: { id: true } }> | null
 ): string {
   switch (notification.type) {
+    case 'COMMENT_EDIT_REVIEWED':
+      return 'Your edit was reviewed'
+    case 'COMMENT_EVIDENCE_CHECKED':
+      return 'A moderator checked your evidence'
+    case 'COMMENT_PROOF_REQUESTED':
+      return 'Proof requested for your post'
     case 'TEST': {
       return `Test notification #${notification.id.toString()}`
     }
@@ -111,7 +141,7 @@ export function makeNotificationTitle(
       }
       const statusChange = commentStatusChangesById[notification.aboutCommentStatusChange]
       const serviceName = notification.aboutComment.service.name
-      const isOwnComment = !!user && notification.aboutComment.author.id === user.id
+      const isOwnComment = !!user && notification.aboutComment.author?.id === user.id
       const prefix = isOwnComment ? 'Your comment' : 'Watched comment'
 
       return `${prefix} on ${serviceName} ${statusChange.notificationTitle}`
@@ -122,7 +152,7 @@ export function makeNotificationTitle(
       if (!notification.aboutComment.parent) {
         return `New reply to a comment on ${serviceName}`
       }
-      const isOwnParentComment = !!user && notification.aboutComment.parent.author.id === user.id
+      const isOwnParentComment = !!user && notification.aboutComment.parent.author?.id === user.id
       return isOwnParentComment
         ? `New reply to your comment on ${serviceName}`
         : `New reply to a watched comment on ${serviceName}`
@@ -130,7 +160,7 @@ export function makeNotificationTitle(
     case 'COMMUNITY_NOTE_ADDED': {
       if (!notification.aboutComment) return 'A community note was added'
       const serviceName = notification.aboutComment.service.name
-      const isOwnComment = !!user && notification.aboutComment.author.id === user.id
+      const isOwnComment = !!user && notification.aboutComment.author?.id === user.id
       return isOwnComment
         ? `Community note added to your comment on ${serviceName}`
         : `Community note added to a watched comment on ${serviceName}`
@@ -155,7 +185,9 @@ export function makeNotificationTitle(
     }
     case 'CONTACT_MESSAGE': {
       const isAuthor = !!user && notification.aboutContactThread?.authorId === user.id
-      return isAuthor ? 'New reply from the team' : 'New contact message'
+      if (isAuthor) return 'Reply from the team'
+      const sender = notification.aboutContactMessage?.author
+      return sender ? `Contact message from ${authorDisplayName(sender)}` : 'Contact message'
     }
     case 'CONTACT_SEEN': {
       return 'The team has seen your message'
@@ -171,17 +203,6 @@ export function makeNotificationTitle(
       }
       const statusChange = serviceSuggestionStatusChangesById[notification.aboutSuggestionStatusChange]
       return `${service} suggestion ${statusChange.notificationTitle}`
-    }
-    // TODO: [KARMA_UNLOCK] Will be added later, when karma unloks are in the database, not in the code.
-    // case 'KARMA_UNLOCK': {
-    //   return 'New karma level unlocked'
-    // }
-    case 'KARMA_CHANGE': {
-      if (!notification.aboutKarmaTransaction) return 'Your karma has changed'
-      const { points, action } = notification.aboutKarmaTransaction
-      const sign = points > 0 ? '+' : ''
-      const karmaInfo = getKarmaTransactionActionInfo(action)
-      return `${sign}${points.toLocaleString()} karma for ${karmaInfo.label}`
     }
     case 'ACCOUNT_STATUS_CHANGE': {
       if (!notification.aboutAccountStatusChange) return 'Your account status has been updated'
@@ -218,59 +239,32 @@ export function makeNotificationTitle(
   }
 }
 
-export function makeNotificationContent(
-  notification: Prisma.NotificationGetPayload<{
-    select: {
-      createdAt: true
-      type: true
-      aboutKarmaTransaction: {
-        select: {
-          description: true
-        }
-      }
-      aboutComment: {
-        select: {
-          content: true
-          publicNote: true
-        }
-      }
-      aboutServiceSuggestionMessage: {
-        select: {
-          content: true
-        }
-      }
-      aboutEvent: {
-        select: {
-          title: true
-        }
-      }
-    }
-  }>
-): string | null {
+export function makeNotificationContent(notification: NotificationDisplay): string | null {
   switch (notification.type) {
     case 'TEST': {
       return `Created on ${notification.createdAt.toLocaleString()}`
     }
-    // TODO: [KARMA_UNLOCK] Will be added later, when karma unloks are in the database, not in the code.
-    // case 'KARMA_UNLOCK':
-    case 'KARMA_CHANGE': {
-      if (!notification.aboutKarmaTransaction) return null
-      return notification.aboutKarmaTransaction.description
+    case 'CONTACT_MESSAGE': {
+      return notification.aboutContactMessage ? previewText(notification.aboutContactMessage.content) : null
     }
     case 'SUGGESTION_CREATED':
     case 'SUGGESTION_STATUS_CHANGE':
-    case 'CONTACT_MESSAGE':
     case 'CONTACT_SEEN':
     case 'CONTACT_RESOLVED':
     case 'ACCOUNT_STATUS_CHANGE':
     case 'SERVICE_VERIFICATION_STATUS_CHANGE': {
       return null
     }
+    case 'COMMENT_PROOF_REQUESTED': {
+      return `You have ${PROOF_REQUEST_DAYS.toString()} days to add proof. Open your post to see what was asked.`
+    }
+    case 'COMMENT_EDIT_REVIEWED':
+    case 'COMMENT_EVIDENCE_CHECKED':
     case 'COMMENT_STATUS_CHANGE':
     case 'REPLY_COMMENT_CREATED':
     case 'ROOT_COMMENT_CREATED': {
       if (!notification.aboutComment) return null
-      return notification.aboutComment.content
+      return 'Open the discussion to read this post.'
     }
     case 'COMMUNITY_NOTE_ADDED': {
       if (!notification.aboutComment) return null
@@ -278,7 +272,7 @@ export function makeNotificationContent(
     }
     case 'SUGGESTION_MESSAGE': {
       if (!notification.aboutServiceSuggestionMessage) return null
-      return notification.aboutServiceSuggestionMessage.content
+      return previewText(notification.aboutServiceSuggestionMessage.content)
     }
     case 'EVENT_CREATED': {
       if (!notification.aboutEvent) return null
@@ -288,53 +282,13 @@ export function makeNotificationContent(
     case 'ACCOUNT_DELETION_WARNING_15_DAYS':
     case 'ACCOUNT_DELETION_WARNING_5_DAYS':
     case 'ACCOUNT_DELETION_WARNING_1_DAY': {
-      return 'Your account will be deleted due to inactivity. Log in and perform any activity (comment, vote, or create a suggestion) to prevent deletion.'
+      return 'Your account will be deleted due to inactivity. Log in and post a comment or create a suggestion to prevent deletion.'
     }
   }
 }
 
 export function makeNotificationActions(
-  notification: Prisma.NotificationGetPayload<{
-    select: {
-      type: true
-      aboutComment: {
-        select: {
-          id: true
-          service: {
-            select: {
-              slug: true
-            }
-          }
-        }
-      }
-      aboutServiceSuggestionId: true
-      aboutServiceSuggestionMessage: {
-        select: {
-          id: true
-          suggestion: {
-            select: {
-              id: true
-            }
-          }
-        }
-      }
-      aboutContactThreadId: true
-      aboutEvent: {
-        select: {
-          service: {
-            select: {
-              slug: true
-            }
-          }
-        }
-      }
-      aboutService: {
-        select: {
-          slug: true
-        }
-      }
-    }
-  }>,
+  notification: NotificationDisplay,
   origin: string
 ): NotificationAction[] {
   switch (notification.type) {
@@ -354,6 +308,25 @@ export function makeNotificationActions(
         },
       ]
     }
+    case 'COMMENT_EDIT_REVIEWED':
+    case 'COMMENT_EVIDENCE_CHECKED':
+    case 'COMMENT_PROOF_REQUESTED':
+      return notification.aboutComment
+        ? [
+            {
+              action: 'view',
+              title: notification.type === 'COMMENT_PROOF_REQUESTED' ? 'Add proof' : 'View decision',
+              ...iconNameAndUrl('ri:arrow-right-line'),
+              url: makeCommentUrl({
+                serviceSlug: notification.aboutComment.service.slug,
+                commentId: notification.aboutComment.id,
+                origin,
+                tool: 'edit',
+                section: notification.type === 'COMMENT_EDIT_REVIEWED' ? 'history' : 'proof',
+              }),
+            },
+          ]
+        : []
     case 'COMMENT_STATUS_CHANGE':
     case 'REPLY_COMMENT_CREATED':
     case 'COMMUNITY_NOTE_ADDED':
@@ -417,20 +390,6 @@ export function makeNotificationActions(
           title: 'View',
           ...iconNameAndUrl('ri:arrow-right-line'),
           url: `${origin}/service-suggestion/${String(notification.aboutServiceSuggestionId)}`,
-        },
-      ]
-    }
-    // TODO: [KARMA_UNLOCK] Will be added later, when karma unloks are in the database, not in the code.
-    // case 'KARMA_UNLOCK': {
-    //   return [{ action: 'view', title: 'View', url: `${origin}/account#karma-unlocks` }]
-    // }
-    case 'KARMA_CHANGE': {
-      return [
-        {
-          action: 'view',
-          title: 'View',
-          ...iconNameAndUrl('ri:arrow-right-line'),
-          url: `${origin}/account#karma-transactions`,
         },
       ]
     }

@@ -1,0 +1,49 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../lib/cn'
+
+import Markdown from './Markdown.astro'
+import Tooltip from './Tooltip.astro'
+
+type Props = {
+  commentId: number
+  publicNote: string | null
+  internalNote?: string | null
+  outOfBand?: boolean
+}
+const { commentId, publicNote, internalNote, outOfBand = false } = Astro.props
+---
+
+<div
+  id={`comment-notes-${commentId.toString()}`}
+  hx-swap-oob={outOfBand ? 'true' : undefined}
+  class={cn('space-y-1.5 text-sm', (publicNote || internalNote) && 'mt-2')}
+>
+  {
+    publicNote && (
+      <div class="flex gap-2 border-l-2 border-day-500 pl-2 text-day-300">
+        <Tooltip size="sm" text="Public moderator note" class="mt-0.5 shrink-0">
+          <Icon name="ri:shield-check-line" class="size-4 text-day-400" aria-label="Moderator note" />
+        </Tooltip>
+        <div class="min-w-0">
+          <div class="prose prose-sm max-w-none text-day-300 prose-invert [&_p]:my-0">
+            <Markdown content={publicNote} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+  {
+    internalNote && (
+      <details class="group/note text-xs text-teal-100">
+        <summary class="flex cursor-pointer list-none items-center gap-1.5 text-teal-300 hover:text-teal-200 [&::-webkit-details-marker]:hidden">
+          <Icon name="ri:lock-line" class="size-3.5 shrink-0" />
+          <span class="shrink-0">Internal note</span>
+          <span class="min-w-0 truncate text-day-500 group-open/note:hidden">{internalNote}</span>
+        </summary>
+        <p class="mt-1 border-l-2 border-teal-500 pl-2 whitespace-pre-wrap">{internalNote}</p>
+      </details>
+    )
+  }
+</div>

@@ -1,0 +1,58 @@
+---
+import CommentEditDiff from './CommentEditDiff.astro'
+import EvidencePublicResult from './EvidencePublicResult.astro'
+import TimeFormatted from './TimeFormatted.astro'
+
+import type { CommentPageEvidence, CommentPageRevision } from '../lib/commentPage'
+import type { CommentIssueType } from '@prisma/client'
+
+type Props =
+  | {
+      section: 'history'
+      // Newest first; the first is the post as it reads now.
+      versions: Pick<
+        CommentPageRevision,
+        'content' | 'createdAt' | 'decidedAt' | 'experienceData' | 'id' | 'redactedAt'
+      >[]
+    }
+  | { section: 'evidence'; evidence: CommentPageEvidence[]; issues: CommentIssueType[] }
+const props = Astro.props
+// Each edit pairs the version it replaced with the version it produced.
+const edits =
+  props.section === 'history'
+    ? props.versions.slice(1).flatMap((before, index) => {
+        const after = props.versions[index]
+        return after ? [{ before, after }] : []
+      })
+    : []
+---
+
+{
+  props.section === 'evidence' ? (
+    <ul class="space-y-2">
+      {!props.evidence.length && <li class="text-day-400">No evidence attached.</li>}
+      {props.evidence.map((item) => (
+        <li class="rounded-md border border-night-600 bg-night-900 p-2.5">
+          <EvidencePublicResult evidence={item} issues={props.issues} />
+        </li>
+      ))}
+      <li class="text-xs text-day-500">
+        A moderator checked the proof in private. The proof itself is never shown.
+      </li>
+    </ul>
+  ) : (
+    <ol class="divide-y divide-night-600 text-sm">
+      {!edits.length && <li class="text-day-400">This post has not been edited.</li>}
+      {edits.map(({ before, after }) => (
+        <li class="space-y-1.5 py-2 first:pt-0 last:pb-0">
+          <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+            <TimeFormatted date={after.decidedAt ?? after.createdAt} class="text-day-500" />
+            {before.content !== after.content && <span class="text-day-400">Text edited</span>}
+            {after.redactedAt && <span class="text-day-500">Sensitive content removed</span>}
+          </p>
+          <CommentEditDiff before={before} after={after} />
+        </li>
+      ))}
+    </ol>
+  )
+}

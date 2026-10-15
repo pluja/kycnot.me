@@ -23,6 +23,21 @@ export const {
   }),
   [
     {
+      id: 'COMMENT_EDIT_REVIEWED',
+      label: 'Edit reviewed',
+      icon: 'ri:edit-line',
+    },
+    {
+      id: 'COMMENT_EVIDENCE_CHECKED',
+      label: 'Evidence checked',
+      icon: 'ri:file-search-line',
+    },
+    {
+      id: 'COMMENT_PROOF_REQUESTED',
+      label: 'Proof requested',
+      icon: 'ri:question-answer-line',
+    },
+    {
       id: 'TEST',
       label: 'Test notification',
       icon: 'ri:flask-line',
@@ -39,7 +54,7 @@ export const {
     },
     {
       id: 'ROOT_COMMENT_CREATED',
-      label: 'New comment/rating',
+      label: 'New post',
       icon: 'ri:chat-4-line',
     },
     {
@@ -76,12 +91,6 @@ export const {
       id: 'SUGGESTION_STATUS_CHANGE',
       label: 'Suggestion status changed',
       icon: 'ri:lightbulb-line',
-    },
-    // TODO: [KARMA_UNLOCK] Will be added later, when karma unloks are in the database, not in the code.
-    {
-      id: 'KARMA_CHANGE',
-      label: 'Karma recieved',
-      icon: 'ri:award-line',
     },
     {
       id: 'ACCOUNT_STATUS_CHANGE',

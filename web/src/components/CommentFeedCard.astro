@@ -3,10 +3,12 @@ import { Icon } from 'astro-icon/components'
 
 import { getVerificationStatusInfo } from '../constants/verificationStatus'
 import { cn } from '../lib/cn'
+import { makeCommentUrl } from '../lib/commentsWithReplies'
+import { postStaffRole, staffNameClasses } from '../lib/permissions'
 
 import BadgeSmall from './BadgeSmall.astro'
 import CommentAuthorBadges from './CommentAuthorBadges.astro'
-import CommentBadges from './CommentBadges.astro'
+import ExperienceProblems from './ExperienceProblems.astro'
 import Markdown from './Markdown.astro'
 import MyPicture from './MyPicture.astro'
 import TimeFormatted from './TimeFormatted.astro'
@@ -14,22 +16,22 @@ import Tooltip from './Tooltip.astro'
 import UserBadge from './UserBadge.astro'
 
 import type { CommentForFeed } from '../lib/commentsWithReplies'
+import type { ExperienceOutcome } from '@prisma/client'
 
 type Props = {
   comment: CommentForFeed
+  outcome?: ExperienceOutcome
 }
 
-const { comment } = Astro.props
+const { comment, outcome } = Astro.props
 const { service } = comment
 
-// Carries the id twice on purpose: the service page reads the query parameter to
-// expand the branch a reply sits in, and the fragment is what scrolls to it.
-const commentUrl = `/service/${service.slug}?comment=${String(comment.id)}#comment-${String(comment.id)}`
+const commentUrl = makeCommentUrl({ serviceSlug: service.slug, commentId: comment.id })
 
-const rating = comment.rating ?? null
 const statusInfo = getVerificationStatusInfo(service.verificationStatus)
 const replyCount = comment._count.replies
 const isPending = comment.status === 'PENDING'
+const staffRole = postStaffRole(comment.author)
 ---
 
 <article
@@ -48,7 +50,7 @@ const isPending = comment.status === 'PENDING'
     </Tooltip>
 
     <a
-      href={commentUrl}
+      href={`/service/${service.slug}#comments`}
       class="inline-flex items-center gap-2 font-title font-bold text-day-100 hover:underline"
     >
       {
@@ -65,19 +67,6 @@ const isPending = comment.status === 'PENDING'
       {service.name}
     </a>
 
-    {
-      rating !== null && (
-        <span class="inline-flex items-center" aria-label={`Rated ${String(rating)} out of 5`}>
-          {Array.from({ length: 5 }, (_, i) => (
-            <Icon
-              name={i < rating ? 'ri:star-fill' : 'ri:star-line'}
-              class={cn('size-3.5', i < rating ? 'text-yellow-400' : 'text-night-400')}
-            />
-          ))}
-        </span>
-      )
-    }
-
     {isPending && <BadgeSmall icon="ri:hourglass-line" color="yellow" text="Pending review" inlineIcon />}
 
     <a href={commentUrl} class="ms-auto shrink-0 text-xs text-day-500 hover:text-day-300 hover:underline">
@@ -86,16 +75,12 @@ const isPending = comment.status === 'PENDING'
   </div>
 
   <div class="prose prose-sm mt-2 max-w-none text-pretty prose-invert">
-    <Markdown content={comment.content} />
+    <Markdown content={comment.content} linkRel={['ugc', 'nofollow', 'noopener']} />
   </div>
 
   <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-day-500">
-    <UserBadge user={comment.author} />
+    <UserBadge user={comment.author} class={cn(staffRole && staffNameClasses[staffRole])} />
     <CommentAuthorBadges comment={comment} serviceSlug={service.slug} />
-    <span class="inline-flex items-center gap-0.5" title="Upvotes">
-      <Icon name="ri:arrow-up-line" class="size-3" />
-      {comment.upvotes}
-    </span>
     {
       replyCount > 0 && (
         <a href={commentUrl} class="inline-flex items-center gap-0.5 hover:text-day-300">
@@ -104,6 +89,6 @@ const isPending = comment.status === 'PENDING'
         </a>
       )
     }
-    <CommentBadges comment={comment} />
+    {outcome && <ExperienceProblems issues={comment.issues} outcome={outcome} />}
   </div>
 </article>

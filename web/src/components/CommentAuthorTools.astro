@@ -1,0 +1,380 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import { getCommentRuleInfo } from '../constants/commentRules'
+import { getCommentStatusInfo } from '../constants/commentStatus'
+import { lastActionFeedback } from '../lib/actionFeedback'
+import { cn } from '../lib/cn'
+import { isPublishedComment } from '../lib/experiences'
+import { getFormReplay } from '../lib/formReplay'
+import { checkedProofStaysMessage, countsAsProof } from '../lib/proofEvidence'
+import { actionInPlace } from '../lib/urls'
+import { withdrawableStatuses } from '../lib/withdrawal'
+
+import ActionFeedback from './ActionFeedback.astro'
+import BadgeSmall from './BadgeSmall.astro'
+import Button from './Button.astro'
+import CommentPrivateEvidence from './CommentPrivateEvidence.astro'
+import ExperienceFields from './ExperienceFields.astro'
+import FormReplay from './FormReplay.astro'
+import FormTimeTrap from './FormTimeTrap.astro'
+import InputHoneypotTrap from './InputHoneypotTrap.astro'
+import InputTextArea from './InputTextArea.astro'
+import Markdown from './Markdown.astro'
+import ProblemChips from './ProblemChips.astro'
+import ProofInputs from './ProofInputs.astro'
+import RadioTabs from './RadioTabs.astro'
+import TimeFormatted from './TimeFormatted.astro'
+import Tooltip from './Tooltip.astro'
+
+import type { CommentPagePost, CommentPagePrivateEvidence, CommentPageRevision } from '../lib/commentPage'
+
+type Props = {
+  comment: CommentPagePost
+  evidence: CommentPagePrivateEvidence[]
+  revisions: Pick<
+    CommentPageRevision,
+    'content' | 'createdAt' | 'decidedAt' | 'decisionRule' | 'id' | 'reason' | 'status'
+  >[]
+}
+const { comment, evidence, revisions } = Astro.props
+const [currentProof] = evidence
+const user = Astro.locals.user
+if (user?.id !== comment.authorId) return null
+const id = comment.id
+const results = {
+  correct: Astro.getActionResult(actions.experience.edit),
+  addProof: Astro.getActionResult(actions.experience.addEvidence),
+  removeProof: Astro.getActionResult(actions.experience.removeEvidence),
+  withdraw: Astro.getActionResult(actions.experience.withdraw),
+  restore: Astro.getActionResult(actions.experience.restore),
+}
+const successMessages = {
+  correct: 'Correction sent. Your current post stays up until the correction is reviewed.',
+  addProof: 'Proof attached. A moderator will check it.',
+  removeProof: 'Proof removed. Published check results stay in the history.',
+  withdraw: 'Withdrawn. Only you and the moderators can see it now. You can usually restore it later.',
+  restore:
+    results.restore?.data?.restored === 'PENDING'
+      ? 'Restored. It goes back through review before it is published again.'
+      : 'Restored and published again.',
+} as const satisfies Record<keyof typeof results, string>
+const { action: lastAction, feedback } = lastActionFeedback(results, successMessages)
+const replayFor = (key: keyof typeof results) =>
+  getFormReplay(results[key]?.error ? Astro.locals.actionFormValues : null)
+const correctReplay = replayFor('correct')
+const proofReplay = replayFor('addProof')
+
+const canWrite = !user.trust.commentsDisabled && isPublishedComment(comment.status)
+const isWithdrawn = comment.status === 'WITHDRAWN'
+const canWithdraw =
+  withdrawableStatuses.includes(comment.status) &&
+  !(comment.experienceUpdate && comment.status === 'APPROVED')
+// A negative or unresolved experience often only needs an update, which keeps the history readable.
+const suggestUpdate =
+  !comment.parentId &&
+  (comment.experience?.sentiment === 'NEGATIVE' || comment.experience?.outcome === 'ONGOING')
+const isExperience = comment.kind === 'EXPERIENCE' && !!comment.experience
+const pendingCorrection = revisions.some((revision) => revision.status === 'PENDING')
+const tabs = [
+  canWrite && !comment.experienceUpdate && { id: 'correct', label: 'Correct', icon: 'ri:edit-line' },
+  isExperience &&
+    !isWithdrawn && {
+      id: 'proof',
+      label: 'Proof',
+      icon: 'ri:lock-line',
+      attention: evidence.length === 0,
+    },
+  revisions.length > 0 && {
+    id: 'history',
+    label: 'Your edits',
+    icon: 'ri:history-line',
+    attention: pendingCorrection,
+  },
+  (canWithdraw || isWithdrawn) && {
+    id: 'withdraw',
+    label: isWithdrawn ? 'Restore' : 'Withdraw',
+    icon: isWithdrawn ? 'ri:arrow-go-forward-line' : 'ri:arrow-go-back-line',
+    attention: isWithdrawn,
+  },
+].filter((tab) => !!tab)
+type TabId = 'correct' | 'history' | 'proof' | 'withdraw'
+const actionTabs: Record<keyof typeof results, TabId> = {
+  correct: 'correct',
+  addProof: 'proof',
+  removeProof: 'proof',
+  withdraw: 'withdraw',
+  restore: 'withdraw',
+}
+const requestedTab = lastAction ? actionTabs[lastAction] : Astro.url.searchParams.get('section')
+const activeTab = tabs.find((tab) => tab.id === requestedTab)?.id ?? tabs[0]?.id
+---
+
+<div class="group/author space-y-3">
+  <ActionFeedback feedback={feedback} />
+  {
+    tabs.length > 1 && (
+      <RadioTabs
+        name={`author-tab-${id.toString()}`}
+        label="Your post"
+        tabs={tabs}
+        activeTab={activeTab}
+        accent="green"
+        class="border-b border-night-600"
+      />
+    )
+  }
+
+  {
+    tabs.some((tab) => tab.id === 'correct') && (
+      <section
+        class={cn(
+          'space-y-2.5',
+          tabs.length > 1 && 'hidden group-has-[[data-tab=correct]:checked]/author:block'
+        )}
+        aria-label="Correct your post"
+      >
+        {pendingCorrection ? (
+          <p class="flex items-start gap-1.5 text-xs text-yellow-200">
+            <Icon name="ri:time-line" class="mt-px size-3.5 shrink-0" />A correction is already waiting for
+            review. You can send another once it's reviewed.
+          </p>
+        ) : (
+          <form
+            method="POST"
+            action={actionInPlace(actions.experience.edit, Astro.url, `comment-${id.toString()}`)}
+            class="space-y-2.5"
+          >
+            <input type="hidden" name="commentId" value={id} />
+            <input type="hidden" name="version" value={comment.version} />
+            <input type="hidden" name="kind" value={isExperience ? 'EXPERIENCE' : 'DISCUSSION'} />
+            <FormReplay />
+            <FormTimeTrap />
+            <InputHoneypotTrap name="message" />
+            {isExperience && (
+              <ExperienceFields part="sentiment" experience={comment.experience} replay={correctReplay} />
+            )}
+            <InputTextArea
+              name="content"
+              label="Your post"
+              hideLabel
+              inputProps={{
+                required: true,
+                minlength: comment.parentId ? 10 : 30,
+                maxlength: 2000,
+                rows: 5,
+                class: 'bg-night-900 px-2.5 py-2 text-sm',
+              }}
+              value={correctReplay.text('content', comment.content)}
+            />
+            {isExperience && comment.experience && (
+              <>
+                <ProblemChips
+                  replay={correctReplay}
+                  current={{ issues: comment.issues, outcome: comment.experience.outcome }}
+                />
+                {comment.experience.occurredMonth && (
+                  <input type="hidden" name="occurredMonth" value={comment.experience.occurredMonth} />
+                )}
+              </>
+            )}
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-xs text-day-500">It is reviewed first. Your current post stays up until then.</p>
+              <Button
+                type="submit"
+                label="Send correction"
+                icon="ri:send-plane-2-line"
+                color="success"
+                size="sm"
+              />
+            </div>
+          </form>
+        )}
+      </section>
+    )
+  }
+
+  {
+    tabs.some((tab) => tab.id === 'proof') && (
+      <section
+        class={cn('space-y-3', tabs.length > 1 && 'hidden group-has-[[data-tab=proof]:checked]/author:block')}
+        aria-label="Your proof"
+      >
+        <p class="flex items-start gap-1.5 text-xs text-day-400">
+          <Icon name="ri:lock-line" class="mt-px size-3.5 shrink-0" />
+          Only you and the moderators see this. Checked proof adds a badge and counts more in the summary.
+        </p>
+        {currentProof && (
+          <ul class="rounded-md border border-night-600">
+            {[currentProof].map((item) => (
+              <li class="flex items-start justify-between gap-3 p-2.5">
+                <div class="min-w-0">
+                  <CommentPrivateEvidence evidence={item} />
+                </div>
+                {countsAsProof(item) ? (
+                  <Tooltip text={checkedProofStaysMessage} class="shrink-0 text-xs text-day-500">
+                    <a href="/contact" class="underline hover:text-day-300">
+                      Ask to delete
+                    </a>
+                  </Tooltip>
+                ) : (
+                  <form
+                    method="POST"
+                    action={actionInPlace(
+                      actions.experience.removeEvidence,
+                      Astro.url,
+                      `comment-${id.toString()}`
+                    )}
+                    class="shrink-0"
+                  >
+                    <input type="hidden" name="evidenceId" value={item.id} />
+                    <button type="submit" class="text-xs text-day-400 underline hover:text-red-300">
+                      Remove
+                    </button>
+                  </form>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {comment.status === 'REJECTED' ? (
+          <p class="text-xs text-day-400">This post was rejected. To share proof, write a new post.</p>
+        ) : (
+          !user.spammer &&
+          !(currentProof && countsAsProof(currentProof)) && (
+            <form
+              method="POST"
+              action={actionInPlace(actions.experience.addEvidence, Astro.url, `comment-${id.toString()}`)}
+              enctype="multipart/form-data"
+              class="space-y-2"
+            >
+              <input type="hidden" name="commentId" value={id} />
+              <FormReplay />
+              <ProofInputs
+                textName="body"
+                imageName="imageFile"
+                value={proofReplay.text('body', '')}
+                maxLength={4000}
+              />
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-xs text-day-500">
+                  {currentProof ? 'Sending again replaces your proof. ' : ''}Blur personal details in
+                  screenshots.
+                </p>
+                <Button
+                  type="submit"
+                  label={currentProof ? 'Replace proof' : 'Attach proof'}
+                  icon="ri:attachment-2"
+                  color="success"
+                  size="sm"
+                />
+              </div>
+            </form>
+          )
+        )}
+      </section>
+    )
+  }
+
+  {
+    tabs.some((tab) => tab.id === 'history') && (
+      <section
+        class={cn(
+          'space-y-2',
+          tabs.length > 1 && 'hidden group-has-[[data-tab=history]:checked]/author:block'
+        )}
+        aria-label="Your edits"
+      >
+        <p class="text-xs text-day-500">Only you and the moderators see corrections and their feedback.</p>
+        <ul class="divide-y divide-night-600 rounded-md border border-night-600">
+          {revisions.map((revision) => (
+            <li>
+              <details class="group/revision">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-2 px-2.5 py-2 text-xs [&::-webkit-details-marker]:hidden">
+                  <span class="text-day-300">
+                    <TimeFormatted date={revision.decidedAt ?? revision.createdAt} />
+                  </span>
+                  <BadgeSmall
+                    text={getCommentStatusInfo(revision.status).publicLabel}
+                    color={getCommentStatusInfo(revision.status).color}
+                    variant="faded"
+                  />
+                </summary>
+                <div class="space-y-2 px-2.5 pb-2.5">
+                  <div class="prose prose-sm max-w-none text-sm prose-invert">
+                    <Markdown content={revision.content} />
+                  </div>
+                  {revision.decisionRule && (
+                    <p class="text-xs text-day-300">
+                      Not published: {getCommentRuleInfo(revision.decisionRule).label.toLowerCase()}. Your
+                      published version is unchanged. You can edit again, or{' '}
+                      <a href="/contact" class="underline">
+                        get in touch
+                      </a>{' '}
+                      if you think this is a mistake.
+                    </p>
+                  )}
+                  {revision.reason && (
+                    <p class="text-xs text-day-300">
+                      <span class="text-day-500">Review feedback:</span> {revision.reason}
+                    </p>
+                  )}
+                </div>
+              </details>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+  {
+    tabs.some((tab) => tab.id === 'withdraw') && (
+      <section
+        class={cn(
+          'space-y-2.5 text-xs text-day-300',
+          tabs.length > 1 && 'hidden group-has-[[data-tab=withdraw]:checked]/author:block'
+        )}
+        aria-label={isWithdrawn ? 'Restore your post' : 'Withdraw your post'}
+      >
+        {isWithdrawn ? (
+          <form
+            method="POST"
+            action={actionInPlace(actions.experience.restore, Astro.url, `comment-${id.toString()}`)}
+            class="space-y-2.5"
+          >
+            <input type="hidden" name="commentId" value={id} />
+            <p>
+              You withdrew this post. Restoring it publishes it again if nothing changed since; otherwise it
+              goes back through review first.
+            </p>
+            <Button type="submit" label="Restore" icon="ri:arrow-go-forward-line" size="sm" color="success" />
+          </form>
+        ) : (
+          <form
+            method="POST"
+            action={actionInPlace(actions.experience.withdraw, Astro.url, `comment-${id.toString()}`)}
+            class="space-y-2.5"
+          >
+            <input type="hidden" name="commentId" value={id} />
+            {suggestUpdate && (
+              <p class="flex items-start gap-1.5 text-yellow-200">
+                <Icon name="ri:lightbulb-line" class="mt-px size-3.5 shrink-0" />
+                Was it resolved? Posting an update keeps your experience and shows how it ended, which helps
+                others more than removing it.
+              </p>
+            )}
+            <p>
+              Withdrawing hides this post{comment.parentId ? '' : ' and your replies under it'} from everyone
+              except you and the moderators.
+              {!comment.parentId &&
+                ' If it was published, a short "Post withdrawn by the author" note with the date stays in its place, and other people keep their replies under it.'}{' '}
+              You can usually restore it later.
+            </p>
+            <Button type="submit" label="Withdraw" icon="ri:arrow-go-back-line" size="sm" color="danger" />
+          </form>
+        )}
+      </section>
+    )
+  }
+</div>

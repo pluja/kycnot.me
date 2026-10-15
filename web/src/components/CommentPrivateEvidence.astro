@@ -1,0 +1,46 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { canReadEvidence } from '../lib/experiences'
+
+import LightboxImage from './LightboxImage.astro'
+
+import type { CommentPagePrivateEvidence } from '../lib/commentPage'
+
+type Props = { evidence: CommentPagePrivateEvidence }
+const { evidence } = Astro.props
+if (!canReadEvidence(Astro.locals.user, evidence)) return null
+let evidenceUrl: string | undefined
+try {
+  const url = new URL(evidence.body?.trim() ?? '')
+  if (['https:', 'http:'].includes(url.protocol)) evidenceUrl = url.href
+} catch {
+  evidenceUrl = undefined
+}
+---
+
+<div class="space-y-2">
+  {
+    evidenceUrl ? (
+      <a
+        href={evidenceUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        referrerpolicy="no-referrer"
+        class="inline-flex max-w-full items-center gap-1 font-mono text-sm break-all text-blue-300 hover:underline"
+      >
+        {evidence.body}
+        <Icon name="ri:external-link-line" class="size-3.5 shrink-0" />
+      </a>
+    ) : (
+      evidence.body && (
+        <pre class="font-mono text-sm wrap-break-word whitespace-pre-wrap">{evidence.body}</pre>
+      )
+    )
+  }
+  {
+    evidence.imagePath && (
+      <LightboxImage src={`/comment-evidence/${evidence.id.toString()}`} alt="Proof image" class="w-20" />
+    )
+  }
+</div>

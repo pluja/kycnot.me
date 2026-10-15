@@ -1,0 +1,76 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { commentIssueTypes } from '../constants/commentIssueTypes'
+import { cn } from '../lib/cn'
+
+import type { FormReplay } from '../lib/formReplay'
+import type { CommentIssueType, ExperienceOutcome } from '@prisma/client'
+
+type Props = {
+  replay: FormReplay
+  // current is the post's existing answer, preselected when editing.
+  current?: { issues: CommentIssueType[]; outcome: ExperienceOutcome }
+}
+const { replay, current } = Astro.props
+const replaying = replay.text('content') !== undefined
+const noProblems = replaying ? !!replay.text('noProblems') : current?.outcome === 'NO_ISSUE'
+const issues = replaying ? replay.list('issues') : (current?.issues ?? [])
+const resolved = replaying ? !!replay.text('resolvedSince') : current?.outcome === 'RESOLVED'
+const chipClass =
+  'inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-night-500 px-2 py-1 text-day-300 hover:border-night-400 has-focus-visible:ring-2 has-focus-visible:ring-blue-500'
+---
+
+<fieldset class="flex flex-wrap items-center gap-1.5 text-xs" data-problem-chips>
+  <legend class="mb-1.5 text-day-400">Did you run into problems?</legend>
+  <label
+    class={cn(
+      chipClass,
+      'has-checked:border-green-500 has-checked:bg-green-500/15 has-checked:text-green-200'
+    )}
+  >
+    <input type="checkbox" name="noProblems" checked={noProblems} class="sr-only" />
+    <Icon name="ri:checkbox-circle-line" class="size-3.5" is:inline />
+    No problems
+  </label>
+  {
+    commentIssueTypes.map((issue) => (
+      <label
+        class={cn(
+          chipClass,
+          'has-checked:border-orange-500 has-checked:bg-orange-500/15 has-checked:text-orange-200'
+        )}
+      >
+        <input
+          type="checkbox"
+          name="issues"
+          value={issue.value}
+          checked={issues.includes(issue.value)}
+          data-requires-proof={issue.requiresProof ? '' : undefined}
+          class="sr-only"
+        />
+        <Icon name={issue.icon} class="size-3.5" is:inline />
+        {issue.formLabel}
+      </label>
+    ))
+  }
+  <div data-resolved-since class="flex basis-full items-center gap-2 pt-1">
+    <span class="text-day-400">Is it resolved now?</span>
+    <label
+      class={cn(
+        chipClass,
+        'has-checked:border-teal-500 has-checked:bg-teal-500/15 has-checked:text-teal-200'
+      )}
+    >
+      <input type="checkbox" name="resolvedSince" checked={resolved} class="sr-only" />
+      <Icon name="ri:check-double-line" class="size-3.5" is:inline />
+      Yes, it's resolved
+    </label>
+  </div>
+</fieldset>
+
+<style>
+  [data-problem-chips]:not(:has(input[name='issues']:checked)) [data-resolved-since] {
+    display: none;
+  }
+</style>

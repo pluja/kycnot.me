@@ -1,0 +1,78 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { experienceOutcomes, experienceSentiments } from '../constants/experiences'
+import { cn } from '../lib/cn'
+
+import type { FormReplay } from '../lib/formReplay'
+import type { CommentExperience } from '@prisma/client'
+
+type Props = {
+  part: 'details' | 'sentiment'
+  experience?: Pick<CommentExperience, 'occurredMonth' | 'outcome' | 'sentiment'> | null
+  replay?: FormReplay
+  // An update only changes what the author picks; blank values keep the earlier ones.
+  update?: boolean
+}
+const { part, experience, replay, update = false } = Astro.props
+const valueOf = (field: 'outcome' | 'sentiment', fallback: string) => {
+  const current = experience?.[field] ?? fallback
+  return replay?.text(field, current) ?? current
+}
+const chipClass =
+  'inline-flex cursor-pointer items-center gap-1 rounded-sm border border-night-500 px-2 py-1 has-focus-visible:ring-2 has-focus-visible:ring-blue-500'
+const inputClass =
+  'block h-8 w-full min-w-0 rounded-md border border-night-500 bg-night-900 px-2 text-xs text-day-100'
+---
+
+{
+  part === 'sentiment' ? (
+    <fieldset class="flex flex-wrap items-center gap-1.5 text-xs">
+      <legend class="sr-only">{update ? 'Has your opinion changed?' : 'How was your experience?'}</legend>
+      <span class="mr-1 w-full text-day-400 sm:w-auto">{update ? 'Opinion now?' : 'How was it?'}</span>
+      {update && (
+        <label class={cn(chipClass, 'text-day-300 has-checked:border-night-300 has-checked:bg-night-600')}>
+          <input
+            type="radio"
+            name="sentiment"
+            value=""
+            checked={valueOf('sentiment', '') === ''}
+            class="sr-only"
+          />
+          No change
+        </label>
+      )}
+      {experienceSentiments.map((item) => (
+        <label class={cn(chipClass, item.classNames.text, item.classNames.checked)}>
+          <input
+            type="radio"
+            name="sentiment"
+            value={item.value}
+            checked={valueOf('sentiment', '') === item.value}
+            required={!update && !experience}
+            class="sr-only"
+          />
+          <Icon name={item.icon} class="size-3.5" />
+          {item.shortLabel}
+        </label>
+      ))}
+    </fieldset>
+  ) : (
+    <div class="grid grid-cols-1 gap-2 sm:max-w-56">
+      {/* The month is no longer asked; an older post keeps the one it has when edited. */}
+      {!update && experience?.occurredMonth && (
+        <input type="hidden" name="occurredMonth" value={experience.occurredMonth} />
+      )}
+      <label class="space-y-1 text-xs text-day-400">
+        <span>{update ? 'Any problem now?' : 'Any problem?'}</span>
+        <select name="outcome" class={inputClass}>
+          {experienceOutcomes.map((item) => (
+            <option value={item.value} selected={item.value === valueOf('outcome', 'UNSPECIFIED')}>
+              {update && item.value === 'UNSPECIFIED' ? 'No change' : item.formLabel}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  )
+}

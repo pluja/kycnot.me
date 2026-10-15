@@ -1,0 +1,267 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import { reportableCommentRules } from '../constants/commentRules'
+import { REPORT_MESSAGE_LENGTH } from '../lib/commentLimits'
+import {
+  distinctVersions,
+  publishedVersionKey,
+  commentPageEvidenceSelect,
+  commentPagePrivateEvidenceSelect,
+  commentPageRevisionSelect,
+  commentPageSelect,
+} from '../lib/commentPage'
+import { makeCommentUrl } from '../lib/commentsWithReplies'
+import { isPublishedComment, publishedCommentStatuses } from '../lib/experiences'
+import { getFormReplay } from '../lib/formReplay'
+import { inlinePanelClose } from '../lib/inlinePanel'
+import { prisma } from '../lib/prisma'
+import { actionInPlace } from '../lib/urls'
+
+import ActionFeedback from './ActionFeedback.astro'
+import Button from './Button.astro'
+import CommentAuthorTools from './CommentAuthorTools.astro'
+import CommentPublicRecords from './CommentPublicRecords.astro'
+import FormReplay from './FormReplay.astro'
+import InlineLoadErrors from './InlineLoadErrors.astro'
+import InputTextArea from './InputTextArea.astro'
+
+import type { CommentTool } from '../lib/commentsWithReplies'
+import type { CommentIssueType } from '@prisma/client'
+
+type Props = {
+  comment: {
+    id: number
+    authorId: number | null
+    content: string
+    serviceId: number
+    issues: CommentIssueType[]
+  }
+  serviceSlug: string
+  tool: Exclude<CommentTool, 'reply'>
+}
+const { comment, serviceSlug, tool } = Astro.props
+const user = Astro.locals.user
+const isAuthor = user?.id === comment.authorId
+if ((tool === 'edit' && !isAuthor) || (tool === 'report' && isAuthor)) return null
+if (tool === 'report' && !user) return null
+
+const needsRevisions = tool === 'history' || tool === 'edit'
+const [revisions, evidence, privateEvidence, post, representsService, openThread] =
+  await Astro.locals.banners.tryMany([
+    [
+      'Failed to load history',
+      () =>
+        needsRevisions
+          ? prisma.commentRevision.findMany({
+              where: {
+                commentId: comment.id,
+                ...(isAuthor ? {} : { status: { in: publishedCommentStatuses } }),
+              },
+              select: { ...commentPageRevisionSelect, reason: isAuthor, decisionRule: isAuthor },
+              orderBy: [{ decidedAt: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
+            })
+          : Promise.resolve([]),
+      [],
+    ],
+    [
+      'Failed to load proof checks',
+      () =>
+        tool === 'evidence'
+          ? prisma.commentEvidence.findMany({
+              where: { commentId: comment.id },
+              select: commentPageEvidenceSelect,
+              orderBy: { createdAt: 'asc' },
+            })
+          : Promise.resolve([]),
+      [],
+    ],
+    [
+      'Failed to load your proof',
+      () =>
+        tool === 'edit' && user
+          ? prisma.commentEvidence.findMany({
+              where: { commentId: comment.id, removedAt: null },
+              select: commentPagePrivateEvidenceSelect,
+              orderBy: { createdAt: 'asc' },
+            })
+          : Promise.resolve([]),
+      [],
+    ],
+    [
+      'Failed to load your post',
+      () =>
+        tool === 'edit'
+          ? prisma.comment.findUnique({ where: { id: comment.id }, select: commentPageSelect })
+          : Promise.resolve(null),
+      null,
+    ],
+    [
+      'Failed to check your service role',
+      async () =>
+        tool === 'report' && user && !isAuthor
+          ? (await prisma.serviceUser.count({ where: { userId: user.id, serviceId: comment.serviceId } })) > 0
+          : false,
+      false,
+    ],
+    [
+      'Failed to check your open conversations',
+      () =>
+        tool === 'report' && user
+          ? prisma.contactThread.findFirst({
+              where: { authorId: user.id, commentId: comment.id, status: { not: 'RESOLVED' } },
+              select: { id: true },
+            })
+          : Promise.resolve(null),
+      null,
+    ],
+  ])
+const reportResult = Astro.getActionResult(actions.experience.report)
+const reportReplay = getFormReplay(reportResult?.error ? Astro.locals.actionFormValues : null)
+const titles = {
+  history: 'Edit history',
+  evidence: 'Proof checks',
+  edit: 'Your post',
+  report: 'Report this post',
+} as const
+// The newest published version is the post as it reads now; the history shows the ones before it that differ.
+const [currentVersion, ...olderVersions] = revisions.filter((revision) => isPublishedComment(revision.status))
+const earlierVersions = distinctVersions(
+  olderVersions,
+  currentVersion ? publishedVersionKey(currentVersion) : undefined,
+  publishedVersionKey
+)
+---
+
+<section
+  id={`comment-tool-${comment.id.toString()}`}
+  data-comment-tool={tool}
+  class="mt-3 scroll-mt-20 border-t border-night-500 pt-3 text-sm"
+>
+  <header class="mb-2 flex items-center justify-between gap-2">
+    <h3 class="text-xs font-medium tracking-wide text-day-400 uppercase">
+      {titles[tool]}
+      {tool === 'evidence' && evidence.length > 0 && ` (${evidence.length.toString()})`}
+    </h3>
+    <a
+      href={makeCommentUrl({ serviceSlug, commentId: comment.id })}
+      {...inlinePanelClose}
+      aria-label="Close"
+      class="inline-flex size-6 items-center justify-center rounded-md text-day-400 hover:bg-night-700 hover:text-day-200"
+    >
+      <Icon name="ri:close-line" class="size-4" />
+    </a>
+  </header>
+  <InlineLoadErrors />
+  {
+    tool === 'history' && (
+      <CommentPublicRecords
+        section="history"
+        versions={currentVersion ? [currentVersion, ...earlierVersions] : []}
+      />
+    )
+  }
+  {
+    tool === 'evidence' && (
+      <CommentPublicRecords section="evidence" evidence={evidence} issues={comment.issues} />
+    )
+  }
+  {
+    tool === 'edit' && post && (
+      <CommentAuthorTools comment={post} evidence={privateEvidence} revisions={revisions} />
+    )
+  }
+  {
+    tool === 'report' && openThread ? (
+      <p class="flex items-start gap-1.5 text-sm text-day-300">
+        <Icon name="ri:chat-1-line" class="mt-0.5 size-4 shrink-0 text-day-400" />
+        <span>
+          You already reported this post.{' '}
+          <a href={`/contact/${openThread.id.toString()}`} class="text-green-300 underline">
+            Continue the conversation
+          </a>
+        </span>
+      </p>
+    ) : (
+      tool === 'report' && (
+        <div class="space-y-3">
+          <ActionFeedback
+            feedback={reportResult?.error ? { message: '', error: reportResult.error } : null}
+          />
+          {representsService && (
+            <p class="flex items-start gap-1.5 rounded-md bg-blue-500/10 px-2.5 py-2 text-xs text-blue-200">
+              <Icon name="ri:reply-line" class="mt-px size-3.5 shrink-0" />
+              <span>
+                You represent this service. To tell your side, a public reply works better: readers see it
+                under the post. If a negative post without checked proof describes something that did not
+                happen, report it as not genuine: its author gets a week to add proof, or the post is marked
+                Unproven and stops counting.{' '}
+                <a
+                  href={makeCommentUrl({ serviceSlug, commentId: comment.id, tool: 'reply' })}
+                  class="underline"
+                >
+                  Reply publicly
+                </a>
+              </span>
+            </p>
+          )}
+          <form
+            method="POST"
+            action={actionInPlace(actions.experience.report, Astro.url, `comment-${comment.id.toString()}`)}
+            class="group/report space-y-3"
+          >
+            <FormReplay />
+            <input type="hidden" name="commentId" value={comment.id} />
+            <fieldset class="space-y-1.5">
+              <legend class="mb-1.5 text-xs font-medium text-day-300">What breaks the rules?</legend>
+              <div class="grid gap-1.5 sm:grid-cols-2">
+                {reportableCommentRules.map((reason) => (
+                  <label class="flex cursor-pointer items-start gap-2 rounded-md border border-night-500 p-2 hover:border-night-400 has-checked:border-red-400/70 has-checked:bg-red-500/10 has-focus-visible:ring-2 has-focus-visible:ring-blue-500">
+                    <input
+                      type="radio"
+                      name="reason"
+                      value={reason.value}
+                      required
+                      checked={reportReplay.text('reason') === reason.value}
+                      data-disputes-genuineness={reason.value === 'NOT_GENUINE' ? '' : undefined}
+                      class="sr-only"
+                    />
+                    <Icon name={reason.icon} class="mt-0.5 size-4 shrink-0 text-day-400" />
+                    <span>
+                      <span class="block text-sm text-day-100">{reason.label}</span>
+                      <span class="block text-xs text-day-400">{reason.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <p class="hidden text-xs text-yellow-200 group-has-[[data-disputes-genuineness]:checked]/report:block">
+              To dispute a post with checked proof, include your evidence.
+            </p>
+            <InputTextArea
+              name="message"
+              label="Details for the moderators"
+              value={reportReplay.text('message', '')}
+              inputProps={{
+                required: true,
+                minlength: REPORT_MESSAGE_LENGTH.min,
+                maxlength: REPORT_MESSAGE_LENGTH.max,
+                rows: 4,
+              }}
+            />
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-xs text-day-500">
+                Private. Moderators remove posts that break the rules, not posts that are negative.{' '}
+                <a href="/docs/guidelines#rules" class="underline">
+                  The rules
+                </a>
+              </p>
+              <Button type="submit" label="Send report" color="success" size="sm" />
+            </div>
+          </form>
+        </div>
+      )
+    )
+  }
+</section>

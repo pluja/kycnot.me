@@ -6,25 +6,31 @@ import CommentFeedCard from '../components/CommentFeedCard.astro'
 import FilterPill from '../components/FilterPill.astro'
 import Pagination from '../components/Pagination.astro'
 import ServicePicker from '../components/ServicePicker.astro'
+import {
+  commentIssueTypes,
+  commentIssueTypesZodEnumByValue,
+  getCommentIssueTypeInfo,
+} from '../constants/commentIssueTypes'
+import { experienceSentiments, experienceSentimentsZodEnumBySlug } from '../constants/experiences'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { commentFeedSelect } from '../lib/commentsWithReplies'
+import { currentExperienceStates, experienceFeedPage } from '../lib/experienceQueries'
+import { publishedCommentStatuses } from '../lib/experiences'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { makeFilterUrl } from '../lib/urls'
 
 import type { CommentForFeed } from '../lib/commentsWithReplies'
-import type { Prisma } from '@prisma/client'
+import type { ExperienceOutcome, Prisma } from '@prisma/client'
 
 const PAGE_SIZE = 30
 
 const { data: params, hasDefaultData: hasDefaultFilters } = zodParseQueryParamsStoringErrors(
   {
     page: z.coerce.number().int().min(1).default(1),
-    /** Service's slug */
     service: z.string().optional(),
-    issue: z.enum(['KYC_REQUESTED', 'FUNDS_BLOCKED']).optional(),
-    rated: z.enum(['positive', 'neutral', 'negative']).optional(),
-    showPending: z.coerce.boolean().default(false),
+    issue: commentIssueTypesZodEnumByValue.optional(),
+    rated: experienceSentimentsZodEnumBySlug.optional(),
     /** Day the previous page ended on, so its heading is not repeated. */
     after: z.string().optional(),
   },
@@ -32,9 +38,7 @@ const { data: params, hasDefaultData: hasDefaultFilters } = zodParseQueryParamsS
 )
 
 const where: Prisma.CommentWhereInput = {
-  // Same rule as a service's own thread: pending comments are shown only when
-  // asked for, and never anything a signed-out reader could not already reach.
-  status: params.showPending ? { in: ['APPROVED', 'VERIFIED', 'PENDING'] } : { in: ['APPROVED', 'VERIFIED'] },
+  status: { in: publishedCommentStatuses },
   service: {
     serviceVisibility: 'PUBLIC',
     // The picker always writes a slug. A name is accepted too, so an address
@@ -44,9 +48,29 @@ const where: Prisma.CommentWhereInput = {
       : {}),
   },
   ...(params.issue ? { issues: { has: params.issue } } : {}),
-  ...(params.rated === 'positive' ? { rating: { gte: 4 } } : {}),
-  ...(params.rated === 'neutral' ? { rating: 3 } : {}),
-  ...(params.rated === 'negative' ? { rating: { lte: 2 } } : {}),
+}
+
+const feedQuery = {
+  select: commentFeedSelect,
+  orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+  skip: (params.page - 1) * PAGE_SIZE,
+  take: PAGE_SIZE,
+} satisfies Prisma.CommentFindManyArgs
+// The current sentiment depends on the latest published update, so that filter pages in SQL.
+const loadRatedPage = async (rated: string) => {
+  const page = await experienceFeedPage({
+    sentiment: rated.toUpperCase(),
+    service: params.service,
+    issue: params.issue,
+    skip: feedQuery.skip,
+    take: feedQuery.take,
+  })
+  const posts = await prisma.comment.findMany({ select: commentFeedSelect, where: { id: { in: page.ids } } })
+  const order = new Map(page.ids.map((id, index) => [id, index]))
+  return [
+    posts.sort((first, second) => (order.get(first.id) ?? 0) - (order.get(second.id) ?? 0)),
+    page.total,
+  ] as const
 }
 
 const filterUrl = (changes: Record<string, string | undefined>) => makeFilterUrl(Astro.url, changes)
@@ -61,29 +85,35 @@ const [services, [comments, totalComments]] = await Astro.locals.banners.tryMany
           name: true,
           slug: true,
           imageUrl: true,
-          _count: { select: { comments: true } },
+          _count: { select: { comments: { where: { status: { in: publishedCommentStatuses } } } } },
         },
         where: {
           serviceVisibility: 'PUBLIC',
-          comments: { some: { status: { in: ['APPROVED', 'VERIFIED'] } } },
+          comments: { some: { status: { in: publishedCommentStatuses } } },
         },
         orderBy: { name: 'asc' },
       }),
-    [] as { id: number; name: string; slug: string; imageUrl: string | null; _count: { comments: number } }[],
+    [] as [],
   ],
   [
     'Error fetching comments',
     () =>
-      prisma.comment.findManyAndCount({
-        select: commentFeedSelect,
-        where,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        skip: (params.page - 1) * PAGE_SIZE,
-        take: PAGE_SIZE,
-      }),
+      params.rated ? loadRatedPage(params.rated) : prisma.comment.findManyAndCount({ ...feedQuery, where }),
     [[], 0] as [CommentForFeed[], number],
   ],
 ])
+
+const outcomes = await Astro.locals.banners.try(
+  'Failed to load experience outcomes',
+  async () =>
+    new Map(
+      (await currentExperienceStates(comments.map((comment) => comment.id))).map((state) => [
+        state.commentId,
+        state.outcome,
+      ])
+    ),
+  new Map<number, ExperienceOutcome>()
+)
 
 const activeService = params.service
   ? services.find(
@@ -99,17 +129,12 @@ const servicesByActivity = [...services].sort((a, b) => b._count.comments - a._c
 
 // Reads as a sentence whichever filters are on: "Latest negative comments about
 // ChangeNOW reporting blocked funds".
-const issuePhrase = {
-  KYC_REQUESTED: 'reporting requested KYC',
-  FUNDS_BLOCKED: 'reporting blocked funds',
-}
 const heading = [
   'Latest',
   params.rated,
-  params.showPending && !params.rated ? 'pending' : null,
   'comments',
   activeService ? `about ${activeService.name}` : null,
-  params.issue ? issuePhrase[params.issue] : null,
+  params.issue ? getCommentIssueTypeInfo(params.issue).filterPhrase : null,
 ]
   .filter(Boolean)
   .join(' ')
@@ -164,13 +189,12 @@ const nextPageUrl = (() => {
 
 <BaseLayout
   pageTitle="Latest comments on KYC-free services"
-  description="Read the newest user comments and ratings on no-KYC exchanges, VPNs and services, including reports of requested KYC and blocked funds."
+  description="Read the newest user experiences and discussion on no-KYC exchanges, VPNs and services, including reports of requested KYC and blocked funds."
   widthClassName="max-w-5xl"
-  noindex={params.showPending}
   ogImage={{
     template: 'generic',
     title: 'Latest comments',
-    description: 'The newest user comments and ratings across KYC-free services',
+    description: 'The newest user experiences and discussion across KYC-free services',
     icon: 'ri:chat-3-line',
   }}
   htmx
@@ -195,59 +219,38 @@ const nextPageUrl = (() => {
 
       <span class="mx-1 h-4 w-px shrink-0 bg-night-500" aria-hidden="true"></span>
 
-      <FilterPill
-        href={filterUrl({ rated: params.rated === 'positive' ? undefined : 'positive' })}
-        label="Positive"
-        accessibleLabel="Comments rated 4 or 5"
-        icon="ri:star-fill"
-        color="green"
-        active={params.rated === 'positive'}
-      />
-      <FilterPill
-        href={filterUrl({ rated: params.rated === 'neutral' ? undefined : 'neutral' })}
-        label="Neutral"
-        accessibleLabel="Comments rated 3"
-        icon="ri:star-half-line"
-        active={params.rated === 'neutral'}
-      />
-      <FilterPill
-        href={filterUrl({ rated: params.rated === 'negative' ? undefined : 'negative' })}
-        label="Negative"
-        accessibleLabel="Comments rated 1 or 2"
-        icon="ri:star-line"
-        color="red"
-        active={params.rated === 'negative'}
-      />
+      {
+        experienceSentiments.map((sentiment) => {
+          const rated = sentiment.slug
+          return (
+            <FilterPill
+              href={filterUrl({ rated: params.rated === rated ? undefined : rated })}
+              label={sentiment.shortLabel}
+              accessibleLabel={`${sentiment.label} experiences`}
+              icon={sentiment.icon}
+              color={sentiment.color}
+              active={params.rated === rated}
+            />
+          )
+        })
+      }
 
       <span class="mx-1 h-4 w-px shrink-0 bg-night-500" aria-hidden="true"></span>
 
-      <FilterPill
-        href={filterUrl({ issue: params.issue === 'KYC_REQUESTED' ? undefined : 'KYC_REQUESTED' })}
-        label="KYC asked"
-        accessibleLabel="Comments reporting that KYC was requested"
-        icon="ri:user-forbid-fill"
-        color="red"
-        active={params.issue === 'KYC_REQUESTED'}
-      />
-      <FilterPill
-        href={filterUrl({ issue: params.issue === 'FUNDS_BLOCKED' ? undefined : 'FUNDS_BLOCKED' })}
-        label="Funds blocked"
-        icon="ri:wallet-3-fill"
-        color="red"
-        active={params.issue === 'FUNDS_BLOCKED'}
-      />
+      {
+        commentIssueTypes.map((issue) => (
+          <FilterPill
+            href={filterUrl({ issue: params.issue === issue.value ? undefined : issue.value })}
+            label={issue.filterLabel}
+            accessibleLabel={`Comments ${issue.filterPhrase}`}
+            icon={issue.icon}
+            color="red"
+            active={params.issue === issue.value}
+          />
+        ))
+      }
 
       <span class="mx-1 h-4 w-px shrink-0 bg-night-500" aria-hidden="true"></span>
-
-      <FilterPill
-        href={filterUrl({ showPending: params.showPending ? undefined : 'true' })}
-        label="Pending"
-        accessibleLabel="Include comments awaiting moderation"
-        icon="ri:hourglass-line"
-        color="yellow"
-        active={params.showPending}
-        nofollow
-      />
     </div>
 
     <div class="mb-5 flex flex-wrap items-center gap-2">
@@ -258,7 +261,6 @@ const nextPageUrl = (() => {
         keep={{
           rated: params.rated,
           issue: params.issue,
-          showPending: params.showPending ? 'true' : undefined,
         }}
         clearHref={filterUrl({ service: undefined })}
       />
@@ -304,7 +306,7 @@ const nextPageUrl = (() => {
                   {item.label}
                 </h2>
               ) : (
-                <CommentFeedCard comment={item.comment} />
+                <CommentFeedCard comment={item.comment} outcome={outcomes.get(item.comment.id)} />
               )}
             </li>
           ))}

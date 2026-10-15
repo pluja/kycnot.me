@@ -2,18 +2,22 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
+import { CONTACT_MESSAGE_MAX_LENGTH } from '../../actions/contact'
 import BadgeSmall from '../../components/BadgeSmall.astro'
 import Chat from '../../components/Chat.astro'
-import type { ChatMessage } from '../../components/ChatMessages.astro'
-import { CONTACT_MESSAGE_MAX_LENGTH } from '../../actions/contact'
+import ReportedPostCard from '../../components/ReportedPostCard.astro'
 import { contactCategoryBadges, contactCategoryLabels } from '../../constants/contactCategories'
 import { getServiceUserRoleInfo } from '../../constants/serviceUserRoles'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { canUserSendMessage } from '../../lib/contactThread'
+import { conflictedCommentWhere } from '../../lib/experiences'
 import { parseIntWithFallback } from '../../lib/numbers'
+import { contactCategoriesForUser } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
+import { reportedPostThreadSelect } from '../../lib/reportedPost'
 
+import type { ChatMessage } from '../../components/ChatMessages.astro'
 import type { ContactStatus } from '@prisma/client'
 
 const user = Astro.locals.user
@@ -27,8 +31,8 @@ if (!threadId) return Astro.rewrite('/404')
 const thread = await Astro.locals.banners.try('Error fetching conversation', async () =>
   prisma.contactThread.findUnique({
     select: {
-      id: true,
-      category: true,
+      ...reportedPostThreadSelect,
+      commentId: true,
       requestedRole: true,
       status: true,
       readAt: true,
@@ -50,19 +54,37 @@ const thread = await Astro.locals.banners.try('Error fetching conversation', asy
 )
 
 if (!thread) {
-  if (Astro.locals.userCan('contact:manage')) {
-    return Astro.redirect(`/admin/contact/${String(threadId)}`)
+  const managedCategories = contactCategoriesForUser(user)
+  if (managedCategories === 'all') return Astro.redirect(`/admin/contact/${String(threadId)}`)
+  // Comment moderators are told about reports on posts, and handle them from the post's panel.
+  if (Astro.locals.userCan('comments:moderate')) {
+    const report = await Astro.locals.banners.try(
+      'Error fetching the report',
+      () =>
+        prisma.contactThread.findUnique({
+          where: {
+            id: threadId,
+            category: 'COMMENT_REPORT',
+            comment: { is: { NOT: conflictedCommentWhere(user) } },
+          },
+          select: { commentId: true },
+        }),
+      null
+    )
+    if (report?.commentId) return Astro.redirect(`/admin/comments/moderate/${String(report.commentId)}`)
   }
+  if (managedCategories.length > 0) return Astro.redirect(`/admin/contact/${String(threadId)}`)
   return Astro.rewrite('/404')
 }
 
 const isResolved = thread.status === 'RESOLVED'
 
-const statusBadge: Record<ContactStatus, { label: string; color: 'blue' | 'green' | 'gray'; icon: string }> = {
-  AWAITING_STAFF: { label: 'Waiting for the team', color: 'blue', icon: 'ri:time-line' },
-  AWAITING_USER: { label: 'Your turn to reply', color: 'green', icon: 'ri:chat-1-line' },
-  RESOLVED: { label: 'Resolved', color: 'gray', icon: 'ri:check-line' },
-}
+const statusBadge: Record<ContactStatus, { label: string; color: 'blue' | 'gray' | 'green'; icon: string }> =
+  {
+    AWAITING_STAFF: { label: 'Waiting for the team', color: 'blue', icon: 'ri:time-line' },
+    AWAITING_USER: { label: 'Your turn to reply', color: 'green', icon: 'ri:chat-1-line' },
+    RESOLVED: { label: 'Resolved', color: 'gray', icon: 'ri:check-line' },
+  }
 // While waiting on staff, surface whether they have read it yet: a read
 // timestamp means they have seen the message but not replied.
 const status =
@@ -142,12 +164,14 @@ const canSend = canUserSendMessage({ status: thread.status, unansweredUserMessag
   >
     <Icon name="ri:information-line" class="mt-0.5 size-4 shrink-0 text-blue-300" />
     <p>
-      <strong class="text-day-200">We reply here.</strong> You will get a notification when we answer.
-      Messages that break the
-      <a href="/contact#rules" class="underline hover:text-blue-200">rules</a> are ignored. Resolved
-      chats are deleted after 30 days.
+      <strong class="text-day-200">We reply here.</strong> You will get a notification when we answer. Messages
+      that break the
+      <a href="/contact#rules" class="underline hover:text-blue-200">rules</a> are ignored. Resolved chats are deleted
+      after 30 days.
     </p>
   </section>
+
+  <ReportedPostCard thread={thread} />
 
   {
     canSend ? (

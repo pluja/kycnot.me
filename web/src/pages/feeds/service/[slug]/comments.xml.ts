@@ -1,9 +1,14 @@
 import rss from '@astrojs/rss'
+import { CommentKind } from '@prisma/client'
+import he from 'he'
 
+import { getCommentKindInfo } from '../../../../constants/commentKinds'
 import { getServiceUserRoleInfo } from '../../../../constants/serviceUserRoles'
+import { authorDisplayName } from '../../../../lib/authorName'
 import { makeCommentUrl } from '../../../../lib/commentsWithReplies'
 import { getCommentsForService } from '../../../../lib/feeds'
 import { staffBadgeLabel } from '../../../../lib/permissions'
+import { stripMarkdown, xmlText } from '../../../../lib/strings'
 import { absoluteSiteUrl, siteOrigin } from '../../../../lib/urls'
 
 import type { APIRoute } from 'astro'
@@ -17,41 +22,41 @@ export const GET: APIRoute = async (context) => {
     const { service, comments } = result.data
 
     return await rss({
-      title: `${service.name} - Comments & Reviews | KYCnot.me`,
-      description: `Latest comments and reviews about ${service.name} from KYCnot.me users`,
+      title: xmlText(`${service.name} - User experiences | KYCnot.me`),
+      description: xmlText(`Latest experiences and discussion about ${service.name} from KYCnot.me users`),
       site: origin,
       xmlns: { dc: 'http://purl.org/dc/elements/1.1/', atom: 'http://www.w3.org/2005/Atom' },
       items: comments.map((comment) => {
-        const authorName = comment.author.displayName ?? comment.author.name
-        const isRating = comment.ratingActive && comment.rating
-        const title = isRating
-          ? `${authorName} rated ${service.name} (${String(comment.rating)}/5 stars)`
-          : `${authorName} commented on ${service.name}`
+        const authorName = authorDisplayName(comment.author)
+        const isExperience = comment.kind === CommentKind.EXPERIENCE
+        const title = isExperience
+          ? `${authorName} shared an experience about ${service.name}`
+          : `${authorName} posted about ${service.name}`
 
         const staffLabel = staffBadgeLabel(comment.author)
         const badges = [
-          comment.author.verified ? '✅' : null,
-          comment.author.spammer ? '(Spammer)' : null,
-          comment.author.admin ? '(Admin)' : null,
-          staffLabel && !comment.author.admin ? `(${staffLabel})` : null,
-          ...comment.author.serviceAffiliations.map(
+          comment.author?.verified ? '✅' : null,
+          comment.author?.spammer ? '(Spammer)' : null,
+          comment.author?.admin ? '(Admin)' : null,
+          staffLabel && !comment.author?.admin ? `(${staffLabel})` : null,
+          ...(comment.author?.serviceAffiliations ?? []).map(
             (affiliation) =>
               ` (${getServiceUserRoleInfo(affiliation.role).label} at ${affiliation.service.name})`
           ),
         ].filter((badge) => badge !== null)
 
         return {
-          title,
+          title: xmlText(title),
           pubDate: comment.createdAt,
-          description: comment.content,
+          description: xmlText(stripMarkdown(comment.content)),
           link: makeCommentUrl({
             origin,
             serviceSlug: service.slug,
             commentId: comment.id,
           }),
-          categories: isRating ? ['Rating'] : ['Comment'],
+          categories: comment.kind === 'UNCLASSIFIED' ? [] : [getCommentKindInfo(comment.kind).label],
           guid: `${service.slug}-comment-${String(comment.id)}`,
-          customData: `<dc:creator>${authorName}${badges.length > 0 ? ` ${badges.join(' ')}` : ''}</dc:creator>`,
+          customData: `<dc:creator>${he.encode(xmlText([authorName, ...badges].join(' ')))}</dc:creator>`,
         }
       }),
       customData: `<language>en-us</language><atom:link href="${absoluteSiteUrl(context.url.pathname)}" rel="self" type="application/rss+xml"/>`,

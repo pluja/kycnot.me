@@ -1,0 +1,15 @@
+---
+import { getCommentStatusInfo } from '../constants/commentStatus'
+
+import BadgeSmall from './BadgeSmall.astro'
+
+import type { CommentStatus } from '@prisma/client'
+
+type Props = { id: string; status: CommentStatus; outOfBand?: boolean }
+const { id, status, outOfBand = false } = Astro.props
+const info = getCommentStatusInfo(status)
+---
+
+<span id={id} hx-swap-oob={outOfBand ? 'true' : undefined}>
+  <BadgeSmall text={info.label} icon={info.icon} color={info.color} variant="faded" />
+</span>

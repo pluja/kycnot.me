@@ -1,0 +1,152 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions, isInputError } from 'astro:actions'
+
+import { commentReportOutcomes, getCommentReportOutcomeInfo } from '../constants/commentReports'
+import { getCommentRuleInfo } from '../constants/commentRules'
+import { proofSummariesByValue } from '../constants/experiences'
+import { makeCommentUrl } from '../lib/commentsWithReplies'
+import { isPublishedComment, isServicePubliclyReadable } from '../lib/experiences'
+import { getFormReplay } from '../lib/formReplay'
+import { inlinePanelToggle } from '../lib/inlinePanel'
+import { summarizeProof } from '../lib/proofEvidence'
+
+import BadgeSmall from './BadgeSmall.astro'
+import Button from './Button.astro'
+import FormReplay from './FormReplay.astro'
+import InputText from './InputText.astro'
+import PostQuote from './PostQuote.astro'
+
+import type { reportedPostThreadSelect } from '../lib/reportedPost'
+import type { Prisma } from '@prisma/client'
+
+type Props = {
+  thread: Prisma.ContactThreadGetPayload<{ select: typeof reportedPostThreadSelect }>
+  // Staff see the moderation links, the reporter's record and the closing form.
+  staff?: { earlierReports: number; earlierNoAction: number; canClose: boolean }
+}
+const { thread, staff } = Astro.props
+const comment = thread.comment
+if (!comment) return null
+const reason = thread.reportReason ? getCommentRuleInfo(thread.reportReason) : null
+const outcome = thread.reportOutcome ? getCommentReportOutcomeInfo(thread.reportOutcome) : null
+const viewerModerates = !!staff && Astro.locals.userCan('comments:moderate')
+// A withdrawn or hidden post shows its reporter neither its text nor who wrote it.
+const showsText =
+  viewerModerates ||
+  (isPublishedComment(comment.status) && isServicePubliclyReadable(comment.service.serviceVisibility))
+const proofLabel =
+  comment.kind === 'EXPERIENCE' && !comment.parentId
+    ? proofSummariesByValue[summarizeProof(comment.evidence)].label
+    : null
+const closeError = Astro.getActionResult(actions.admin.contact.closeReport)?.error
+const closedThisThread = !!closeError && Astro.locals.actionFormValues?.threadId === thread.id.toString()
+const closeReplay = getFormReplay(closedThisThread ? Astro.locals.actionFormValues : null)
+const closeFieldErrors = closedThisThread && isInputError(closeError) ? closeError.fields : {}
+// No action comes first, so Enter in the note field closes the report with the note it explains.
+const closeOutcomes = commentReportOutcomes
+  .filter((option) => option.moderatorChoice)
+  .sort((a, b) => Number(b.value === 'NO_ACTION') - Number(a.value === 'NO_ACTION'))
+const threadUrl = makeCommentUrl({ serviceSlug: comment.service.slug, commentId: comment.id })
+---
+
+<section
+  aria-label="Reported post"
+  class="mb-4 space-y-2.5 rounded-lg border border-amber-500/30 bg-night-800 p-3 text-sm"
+>
+  <header class="flex flex-wrap items-center gap-1.5">
+    <Icon name="ri:flag-line" class="size-4 text-amber-300" />
+    <h2 class="font-medium text-day-100">Reported post</h2>
+    {reason && <BadgeSmall text={reason.label} icon={reason.icon} color="amber" variant="faded" />}
+    {
+      thread.fromService && (
+        <BadgeSmall text="From the service" icon="ri:store-2-line" color="blue" variant="faded" />
+      )
+    }
+    {outcome && <BadgeSmall text={outcome.label} icon={outcome.icon} color={outcome.color} variant="faded" />}
+  </header>
+
+  <PostQuote
+    post={comment}
+    parent={viewerModerates ? comment.parent : null}
+    textHidden={!showsText}
+    label={proofLabel}
+  />
+
+  {
+    thread.reportOutcome === 'NO_ACTION' && thread.reportOutcomeNote && (
+      <p class="text-xs text-day-300">
+        <span class="text-day-500">Why no action:</span> {thread.reportOutcomeNote}
+      </p>
+    )
+  }
+
+  <div class="flex flex-wrap items-center gap-2 text-xs">
+    {
+      viewerModerates && (
+        <Button
+          as="a"
+          {...inlinePanelToggle({
+            url: `/admin/comments/moderate/${comment.id.toString()}`,
+            slotId: `moderation-${comment.id.toString()}`,
+          })}
+          label="Moderate"
+          icon="ri:shield-line"
+          size="sm"
+          color="success"
+          variant="faded"
+        />
+      )
+    }
+    <a href={threadUrl} class="text-day-300 underline hover:text-day-100">Open in thread</a>
+    {
+      staff && staff.earlierReports > 0 && (
+        <span class="ml-auto text-day-400">
+          Reporter's earlier reports: {staff.earlierNoAction.toLocaleString()} of{' '}
+          {staff.earlierReports.toLocaleString()} needed no action
+        </span>
+      )
+    }
+  </div>
+  {viewerModerates && <div id={`moderation-${comment.id.toString()}`} data-inline-panel />}
+
+  {
+    staff?.canClose && thread.category === 'COMMENT_REPORT' && !thread.reportOutcome && (
+      <form
+        method="POST"
+        action={actions.admin.contact.closeReport}
+        class="space-y-2 border-t border-night-600 pt-2.5"
+      >
+        <FormReplay />
+        <input type="hidden" name="threadId" value={thread.id} />
+        <InputText
+          name="note"
+          label="Why no action (the reporter sees this, required for No action)"
+          hideLabel
+          inputProps={{
+            maxlength: 300,
+            placeholder: 'Why no action (the reporter sees this, required for No action)',
+            value: closeReplay.text('note', ''),
+            class: 'text-xs',
+          }}
+          error={closeFieldErrors.note}
+        />
+        <div class="flex flex-wrap items-center gap-1.5 text-xs">
+          <span class="mr-1 text-day-400">Close as</span>
+          {closeOutcomes.map((option) => (
+            <Button
+              type="submit"
+              name="outcome"
+              value={option.value}
+              label={option.label}
+              icon={option.icon}
+              size="sm"
+              color={option.color === 'green' ? 'success' : undefined}
+              variant="faded"
+            />
+          ))}
+        </div>
+      </form>
+    )
+  }
+</section>

@@ -1,0 +1,77 @@
+---
+import { getCommentIssueTypeInfo } from '../constants/commentIssueTypes'
+import { experienceOutcomesByValue, experienceSentimentsByValue } from '../constants/experiences'
+import { cn } from '../lib/cn'
+import { versionDetails } from '../lib/commentPage'
+import { diffWords } from '../lib/textDiff'
+
+import type { CommentIssueType, ExperienceOutcome, ExperienceSentiment } from '@prisma/client'
+
+type Version = { content: string; experienceData: unknown }
+type Props = { before: Version; after: Version }
+
+const { before, after } = Astro.props
+const was = versionDetails(before.experienceData)
+const now = versionDetails(after.experienceData)
+const sentimentLabel = (value: string | null) =>
+  value ? experienceSentimentsByValue[value as ExperienceSentiment].label : 'Unclear'
+const outcomeLabel = (value: string | null) =>
+  value && value !== 'UNSPECIFIED'
+    ? experienceOutcomesByValue[value as ExperienceOutcome].label
+    : 'Not specified'
+const issuesLabel = (issues: string[]) =>
+  issues.length
+    ? issues.map((issue) => getCommentIssueTypeInfo(issue as CommentIssueType).postLabel).join(', ')
+    : 'No problems'
+const sentimentClass = (value: string | null) =>
+  value ? experienceSentimentsByValue[value as ExperienceSentiment].classNames.text : 'text-day-400'
+const changes = [
+  was.sentiment !== now.sentiment && {
+    from: sentimentLabel(was.sentiment),
+    to: sentimentLabel(now.sentiment),
+    toClass: sentimentClass(now.sentiment),
+  },
+  was.outcome !== now.outcome && {
+    from: outcomeLabel(was.outcome),
+    to: outcomeLabel(now.outcome),
+    toClass: 'text-day-100',
+  },
+  was.issues.join() !== now.issues.join() && {
+    from: issuesLabel(was.issues),
+    to: issuesLabel(now.issues),
+    toClass: 'text-day-100',
+  },
+].filter((change) => !!change)
+const textChanged = before.content !== after.content
+---
+
+{
+  changes.length > 0 && (
+    <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+      {changes.map((change) => (
+        <span class="inline-flex items-center gap-1">
+          <span class="text-day-500 line-through decoration-day-600">{change.from}</span>
+          <span aria-label="changed to" class="text-day-600">
+            →
+          </span>
+          <span class={cn('font-medium', change.toClass)}>{change.to}</span>
+        </span>
+      ))}
+    </p>
+  )
+}
+{
+  textChanged && (
+    <p class="rounded-md bg-night-900 px-2.5 py-2 text-sm/relaxed whitespace-pre-wrap text-day-300">
+      {diffWords(before.content, after.content).map((part) =>
+        part.type === 'same' ? (
+          part.text
+        ) : part.type === 'added' ? (
+          <ins class="rounded-xs bg-green-500/15 text-green-200 no-underline">{part.text}</ins>
+        ) : (
+          <del class="rounded-xs bg-red-500/15 text-red-300">{part.text}</del>
+        )
+      )}
+    </p>
+  )
+}

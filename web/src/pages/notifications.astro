@@ -14,12 +14,17 @@ import { getReadStatus, readStatusZodEnum } from '../constants/readStatus'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { cn } from '../lib/cn'
 import { getOrCreateNotificationPreferences } from '../lib/notificationPreferences'
-import { makeNotificationActions, makeNotificationContent, makeNotificationTitle } from '../lib/notifications'
+import {
+  makeNotificationActions,
+  makeNotificationContent,
+  makeNotificationTitle,
+  notificationDisplaySelect,
+} from '../lib/notifications'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { makeLoginUrl } from '../lib/redirectUrls'
 import { transformCase } from '../lib/strings'
-import { siteOrigin , urlWithParams } from '../lib/urls'
+import { siteOrigin, urlWithParams } from '../lib/urls'
 
 import type { Prisma } from '@prisma/client'
 
@@ -56,109 +61,7 @@ const [dbNotifications, notificationPreferences, totalNotifications, pushSubscri
           },
           skip,
           take: PAGE_SIZE,
-          select: {
-            id: true,
-            type: true,
-            createdAt: true,
-            read: true,
-            aboutAccountStatusChange: true,
-            aboutCommentStatusChange: true,
-            aboutServiceVerificationStatusChange: true,
-            aboutSuggestionStatusChange: true,
-            aboutComment: {
-              select: {
-                id: true,
-                author: {
-                  select: {
-                    id: true,
-                  },
-                },
-                status: true,
-                content: true,
-                publicNote: true,
-                service: {
-                  select: {
-                    slug: true,
-                    name: true,
-                  },
-                },
-                parent: {
-                  select: {
-                    author: {
-                      select: {
-                        id: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            aboutServiceSuggestionId: true,
-            aboutServiceSuggestion: {
-              select: {
-                status: true,
-                type: true,
-                service: {
-                  select: {
-                    name: true,
-                  },
-                },
-              },
-            },
-            aboutServiceSuggestionMessage: {
-              select: {
-                id: true,
-                content: true,
-                suggestion: {
-                  select: {
-                    id: true,
-                    service: {
-                      select: {
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            aboutContactThreadId: true,
-            aboutContactThread: {
-              select: {
-                authorId: true,
-              },
-            },
-            aboutEvent: {
-              select: {
-                title: true,
-                type: true,
-                class: true,
-                sentiment: true,
-                startedAt: true,
-                endedAt: true,
-                incident: { select: { state: true } },
-                service: {
-                  select: {
-                    slug: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            aboutService: {
-              select: {
-                slug: true,
-                name: true,
-                verificationStatus: true,
-              },
-            },
-            aboutKarmaTransaction: {
-              select: {
-                points: true,
-                action: true,
-                description: true,
-              },
-            },
-          },
+          select: { ...notificationDisplaySelect, read: true },
         }),
       [],
     ],
@@ -169,8 +72,6 @@ const [dbNotifications, notificationPreferences, totalNotifications, pushSubscri
           id: true,
           enableOnMyCommentStatusChange: true,
           enableAutowatchMyComments: true,
-          enableNotifyPendingRepliesOnWatch: true,
-          karmaNotificationThreshold: true,
         }),
       null,
     ],
@@ -206,11 +107,6 @@ const notificationPreferenceFields = [
     id: 'enableAutowatchMyComments',
     label: 'Autowatch my comments to receive notifications when they get a new reply.',
     icon: 'ri:eye-line',
-  },
-  {
-    id: 'enableNotifyPendingRepliesOnWatch',
-    label: 'Notify me also about unmoderated replies for watched comments.',
-    icon: 'ri:chat-delete-line',
   },
 ] as const satisfies {
   id: Omit<keyof NonNullable<typeof notificationPreferences>, 'id'>
@@ -332,7 +228,7 @@ const notifications = dbNotifications.map((notification) => ({
 
                   <div>
                     <div class="font-medium text-zinc-200">{notification.title}</div>
-                    <p class="text-sm wrap-anywhere text-zinc-400">{notification.content}</p>
+                    <p class="line-clamp-2 text-sm wrap-anywhere text-zinc-400">{notification.content}</p>
                     <div class="mt-1 text-xs text-zinc-500">
                       <TimeFormatted date={notification.createdAt} prefix={false} caseType="sentence" />
                     </div>
@@ -410,25 +306,6 @@ const notifications = dbNotifications.map((notification) => ({
           </label>
         ))
       }
-
-      <div
-        class="mt-4 flex items-center justify-between rounded-md p-2 transition-colors duration-200 hover:bg-zinc-800"
-      >
-        <span class="flex items-center text-zinc-300">
-          <Icon name="ri:award-line" class="mr-2 size-5 text-zinc-400" />
-          Notify me when my karma changes by at least
-        </span>
-        <div class="flex items-center gap-2">
-          <input
-            type="number"
-            name="karmaNotificationThreshold"
-            value={notificationPreferences?.karmaNotificationThreshold}
-            min="1"
-            class="w-20 rounded-sm border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-200 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 focus:outline-none"
-          />
-          <span class="text-zinc-400">points</span>
-        </div>
-      </div>
 
       <div class="mt-4 flex justify-end">
         <Button type="submit" label="Save" icon="ri:save-line" color="success" />

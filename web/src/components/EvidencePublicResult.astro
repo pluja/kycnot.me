@@ -1,0 +1,40 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { evidenceFindingsByValue, evidenceKindsByValue, findingLabel } from '../constants/experiences'
+import { cn } from '../lib/cn'
+import { checkTimeline, publicProofView, shownProofKind } from '../lib/proofEvidence'
+
+import type { CommentPageEvidence } from '../lib/commentPage'
+import type { CommentIssueType } from '@prisma/client'
+
+type Props = { evidence: CommentPageEvidence; issues: CommentIssueType[] }
+const { evidence, issues } = Astro.props
+const view = publicProofView(evidence)
+const check = evidence.checks[0]
+const finding = view.state === 'result' ? evidenceFindingsByValue[view.finding] : null
+const kind = evidenceKindsByValue[shownProofKind(evidence.kind, check?.finding)]
+const quietText = {
+  notCounted: 'Not counted as proof.',
+  removed: check ? 'Removed after the check.' : 'Removed before a check.',
+  unchecked: 'Attached privately, not checked yet.',
+} as const
+const eyebrow = [kind.label, ...checkTimeline(evidence.checks)].filter(Boolean).join(' · ')
+---
+
+<div class="space-y-1">
+  <p class="flex items-center gap-1 text-xs text-day-500">
+    <Icon is:inline name={kind.icon} class="size-3.5" />
+    {eyebrow}
+  </p>
+  {
+    finding && check ? (
+      <p class="text-sm">
+        <span class={cn('font-medium', finding.classNames.text)}>{findingLabel(finding.value, issues)}</span>
+        <span class="text-day-300"> · {check.explanation}</span>
+      </p>
+    ) : (
+      view.state !== 'result' && <p class="text-sm text-day-400">{quietText[view.state]}</p>
+    )
+  }
+</div>

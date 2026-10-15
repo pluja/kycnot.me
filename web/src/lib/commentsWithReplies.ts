@@ -1,170 +1,104 @@
-import { z } from 'astro/zod'
-
+import { filterExperienceIds, publicExperienceSelect, publicEvidenceSelect } from './experienceQueries'
+import { canReadComment, publishedCommentStatuses, withdrawnPlaceholderWhere } from './experiences'
 import { prisma } from './prisma'
 
-import type { ModerationAction, Prisma, RatingMuteReason } from '@prisma/client'
+import type { TrustFacts } from './trust'
+import type { CommentIssueType, ExperienceSentiment, Prisma, ServiceUserRole } from '@prisma/client'
 
-export const MAX_COMMENT_DEPTH = 12
-
-// Spam-class mutes are the only ones that sink to the bottom of a thread.
-// Other mute reasons (affiliated, low trust, COI, mod discretion) just take
-// the rating out of the score; the comment keeps its chronological slot.
-const SPAM_REASONS = new Set<RatingMuteReason>(['SUSPICIOUS_PATTERN', 'TEMPLATE_SPAM'])
-
-export function sinkSpamToBottom<
-  T extends {
-    ratingMuted: boolean
-    ratingMuteReason: RatingMuteReason | null
-    replies?: T[]
+const commentThreadSelect = {
+  id: true,
+  authorId: true,
+  kind: true,
+  experience: { select: publicExperienceSelect },
+  experienceUpdate: { select: { id: true, outcome: true, sentiment: true } },
+  evidence: { select: publicEvidenceSelect },
+  proofRequests: {
+    where: { cancelledAt: null },
+    orderBy: { createdAt: 'desc' },
+    take: 1,
+    select: { source: true, message: true, createdAt: true, dueAt: true },
   },
->(comments: T[]): T[] {
-  const withSortedReplies = comments.map((c) =>
-    c.replies?.length ? { ...c, replies: sinkSpamToBottom(c.replies) } : c
-  )
-  const kept: T[] = []
-  const sunk: T[] = []
-  for (const c of withSortedReplies) {
-    if (c.ratingMuted && c.ratingMuteReason && SPAM_REASONS.has(c.ratingMuteReason)) {
-      sunk.push(c)
-    } else {
-      kept.push(c)
-    }
-  }
-  return [...kept, ...sunk]
-}
-
-/**
- * Fields every rendering of a comment needs. Exported so a listing outside a
- * service thread can select the same shape and reuse the same components.
- */
-export const commentReplyQuery = {
-  select: {
-    id: true,
-    status: true,
-    ratingMuted: true,
-    ratingMuteReason: true,
-    upvotes: true,
-    humanAction: true,
-    aiAction: true,
-    createdAt: true,
-    publicNote: true,
-    adminNote: true,
-    authorNote: true,
-    content: true,
-    serviceId: true,
-    parentId: true,
-    rating: true,
-    ratingActive: true,
-    ratingWeight: true,
-    ratingTrustLabel: true,
-    ratingTrustReason: true,
-    privateProof: true,
-    privateProofStatus: true,
-    issues: true,
-    aiDecidedAt: true,
-    aiQuality: true,
-    aiIsSpam: true,
-    aiIsBrigade: true,
-    aiBrigadeConfidence: true,
-    aiReasoning: true,
-    aiSignals: true,
-    humanDecidedAt: true,
-    humanReasoning: true,
-    humanDecidedBy: {
-      select: {
-        id: true,
-        name: true,
-        displayName: true,
-        picture: true,
-      },
+  sourceCases: {
+    where: { status: { in: ['OPEN', 'RESOLVED', 'DISPUTED'] } },
+    select: { publicId: true, title: true },
+  },
+  status: true,
+  createdAt: true,
+  version: true,
+  revisions: {
+    where: { status: { in: publishedCommentStatuses } },
+    orderBy: [{ decidedAt: 'desc' }, { id: 'desc' }],
+    take: 1,
+    select: { decidedAt: true, createdAt: true },
+  },
+  publicNote: true,
+  content: true,
+  serviceId: true,
+  parentId: true,
+  withdrawnAt: true,
+  statusBeforeWithdrawal: true,
+  replyTargetDeleted: true,
+  replyTo: {
+    select: {
+      id: true,
+      authorId: true,
+      status: true,
+      author: { select: { name: true, displayName: true } },
     },
+  },
+  issues: true,
 
-    author: {
-      select: {
-        id: true,
-        name: true,
-        verified: true,
-        admin: true,
-        capabilities: true,
-        createdAt: true,
-        lastLoginAt: true,
-        displayName: true,
-        picture: true,
-        totalKarma: true,
-        spammer: true,
-        verifiedLink: true,
+  author: {
+    select: {
+      id: true,
+      name: true,
+      verified: true,
+      admin: true,
+      capabilities: true,
+      createdAt: true,
+      displayName: true,
+      picture: true,
 
-        _count: {
-          select: {
-            comments: true,
-          },
+      _count: {
+        select: {
+          comments: { where: { status: { in: publishedCommentStatuses } } },
         },
+      },
 
-        serviceAffiliations: {
-          select: {
-            role: true,
-            service: {
-              select: {
-                name: true,
-                slug: true,
-              },
+      serviceAffiliations: {
+        select: {
+          role: true,
+          service: {
+            select: {
+              name: true,
+              slug: true,
             },
           },
         },
       },
     },
-    votes: {
-      select: {
-        userId: true,
-        downvote: true,
-      },
-    },
   },
-  orderBy: [{ createdAt: 'desc' }],
-} as const satisfies Prisma.CommentFindManyArgs
+} as const satisfies Prisma.CommentSelect
 
-/**
- * A comment listed outside its service thread, which has to name the service it
- * belongs to.
- *
- * Spelled out rather than spread from the thread query, which also carries the
- * moderation record: notes written for moderators, the reasoning behind a
- * verdict, the text of a private proof, and who voted which way. The thread is
- * one service behind a moderator's screen; this feed is every service, public
- * and crawled, so it loads what it draws and nothing else.
- */
 export const commentFeedSelect = {
   id: true,
   content: true,
   createdAt: true,
   status: true,
-  rating: true,
-  upvotes: true,
   issues: true,
   parentId: true,
-  privateProofStatus: true,
-  ratingMuted: true,
-  ratingMuteReason: true,
-  ratingTrustLabel: true,
-  ratingTrustReason: true,
-  ratingWeight: true,
-  // Whether a proof exists, never the proof itself: it is an order id a reader
-  // handed us to show a moderator, and the badge only reflects its verdict.
-  privateProof: true,
   author: {
     select: {
       name: true,
       displayName: true,
       picture: true,
-      totalKarma: true,
       verified: true,
       admin: true,
-      spammer: true,
       createdAt: true,
       // Read by userCan, which the badges call to mark a moderator. Public by
       // design: the badge it draws is shown to everyone.
       capabilities: true,
-      _count: { select: { comments: true } },
+      _count: { select: { comments: { where: { status: { in: publishedCommentStatuses } } } } },
       serviceAffiliations: {
         select: { role: true, service: { select: { name: true, slug: true } } },
       },
@@ -178,217 +112,213 @@ export const commentFeedSelect = {
       verificationStatus: true,
     },
   },
-  _count: { select: { replies: true } },
+  _count: { select: { replies: { where: { status: { in: publishedCommentStatuses } } } } },
 } satisfies Prisma.CommentSelect
 
 export type CommentForFeed = Prisma.CommentGetPayload<{ select: typeof commentFeedSelect }>
 
-export type CommentWithReplies<T extends Record<string, unknown> = Record<never, never>> =
-  Prisma.CommentGetPayload<typeof commentReplyQuery> &
-    T & {
-      replies?: CommentWithReplies<T>[]
-    }
-
-export type CommentWithRepliesPopulated = CommentWithReplies<{
+export type ThreadComment = Prisma.CommentGetPayload<{ select: typeof commentThreadSelect }> & {
   isWatchingReplies: boolean
-}>
-
-export const commentSortSchema = z
-  .enum(['newest', 'upvotes', 'lowest-rating', 'highest-rating', 'trusted', 'status'])
-  .default('newest')
-export type CommentSortOption = z.infer<typeof commentSortSchema>
-
-export async function makeCommentsNestedQuery({
-  depth = 0,
-  user,
-  showPending,
-  serviceId,
-  sort,
-  highlightedCommentId,
-}: {
-  depth?: number
-  user: Prisma.UserGetPayload<{
-    select: {
-      id: true
-    }
-  }> | null
-  showPending?: boolean
-  serviceId: number
-  sort: CommentSortOption
-  highlightedCommentId?: number | null
-}) {
-  const orderByClause: Prisma.CommentOrderByWithRelationInput[] = []
-
-  switch (sort) {
-    case 'upvotes':
-      orderByClause.push({ upvotes: 'desc' }, { createdAt: 'desc' })
-      break
-    case 'lowest-rating':
-      orderByClause.push({ rating: { sort: 'asc', nulls: 'last' } }, { createdAt: 'desc' })
-      break
-    case 'highest-rating':
-      orderByClause.push({ rating: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' })
-      break
-    case 'trusted':
-      orderByClause.push(
-        { ratingWeight: 'desc' },
-        { ratingActive: 'desc' },
-        { upvotes: 'desc' },
-        { createdAt: 'desc' }
-      )
-      break
-    case 'status':
-      orderByClause.push({ status: 'asc' }, { createdAt: 'desc' })
-      break
-    case 'newest':
-    default:
-      orderByClause.push({ createdAt: 'desc' })
-      break
-  }
-  // No DB-level sink: only spam-class mutes go to the bottom, and that
-  // decision lives in sinkSpamToBottom which the caller runs over the
-  // populated tree. Non-spam mutes stay in their natural chronological
-  // slot (the strikethrough on the score conveys "doesn't count").
-
-  const highlightedBranchIds = highlightedCommentId ? await findAllParentIds(highlightedCommentId, depth) : []
-
-  const baseQuery = {
-    ...commentReplyQuery,
-    orderBy: orderByClause,
-    where: {
-      OR: [
-        ...(user ? [{ authorId: user.id } as const satisfies Prisma.CommentWhereInput] : []),
-        showPending
-          ? ({
-              status: { in: ['APPROVED', 'VERIFIED', 'PENDING'] },
-            } as const satisfies Prisma.CommentWhereInput)
-          : ({
-              status: { in: ['APPROVED', 'VERIFIED'] },
-            } as const satisfies Prisma.CommentWhereInput),
-        ...(highlightedBranchIds.length > 0
-          ? [{ id: { in: highlightedBranchIds } } as const satisfies Prisma.CommentWhereInput]
-          : []),
-      ],
-      parentId: null,
-      serviceId,
-    },
-  } as const satisfies Prisma.CommentFindManyArgs
-
-  if (depth <= 0) return baseQuery
-
-  return {
-    ...baseQuery,
-    select: {
-      ...baseQuery.select,
-      replies: makeRepliesQuery(commentReplyQuery, depth - 1),
-    },
-  }
+  authorTrust?: TrustFacts | null
 }
 
-type RepliesQueryRecursive<T extends Prisma.CommentFindManyArgs> =
-  | T
-  | (Omit<T, 'select'> & {
-      select: Omit<T['select'], 'replies'> & {
-        replies: RepliesQueryRecursive<T>
-      }
-    })
+export const commentTools = ['edit', 'report', 'history', 'evidence', 'reply'] as const
+export type CommentTool = (typeof commentTools)[number]
 
-export function makeRepliesQuery<T extends Prisma.CommentFindManyArgs>(
-  query: T,
-  currentDepth: number
-): RepliesQueryRecursive<T> {
-  if (currentDepth <= 0) return query
-
-  return {
-    ...query,
-    select: {
-      ...query.select,
-      replies: makeRepliesQuery(query, currentDepth - 1),
-    },
-  }
-}
-
-async function findAllParentIds(commentId: number, depth: number) {
-  const commentwithManyParents = await prisma.comment.findFirst({
-    where: { id: commentId },
-    select: makeParentQuerySelect(depth),
-  })
-
-  return extractParentIds(commentwithManyParents, [commentId])
-}
-
-type ParentQueryRecursive = {
-  parent: {
-    select: {
-      id: true
-      parent: false | { select: ParentQueryRecursive }
-    }
-  }
-}
-
-function makeParentQuerySelect(depth: number): ParentQueryRecursive {
-  return {
-    parent: {
-      select: {
-        id: true,
-        parent: depth <= 0 ? false : { select: makeParentQuerySelect(depth - 1) },
-      },
-    },
-  } as const satisfies Prisma.CommentSelect
-}
-
-function extractParentIds(
-  comment: Prisma.CommentGetPayload<{ select: ParentQueryRecursive }> | null,
-  acc: number[] = []
-) {
-  if (!comment?.parent?.id) return acc
-
-  return extractParentIds(comment.parent as Prisma.CommentGetPayload<{ select: ParentQueryRecursive }>, [
-    ...acc,
-    comment.parent.id,
-  ])
-}
-
+// makeCommentUrl links into the service thread: `comment` makes the server
+// open the thread holding the comment, `tool` opens one of its inline panels.
+// Tools land on the post itself so it stays in view above its open panel; the
+// reply form sits at the end of the thread, so replies land there.
 export function makeCommentUrl({
   serviceSlug,
   commentId,
-  origin,
+  origin = '',
+  tool,
+  section,
 }: {
   serviceSlug: string
   commentId: number
-  origin: string
+  origin?: string
+  tool?: CommentTool
+  section?: string
 }) {
-  return `${origin}/service/${serviceSlug}?comment=${commentId.toString()}#comment-${commentId.toString()}` as const
+  const params = new URLSearchParams({ comment: commentId.toString() })
+  if (tool) params.set('tool', tool)
+  if (section) params.set('section', section)
+  const anchor = tool === 'reply' ? 'reply-form' : `comment-${commentId.toString()}`
+  return `${origin}/service/${serviceSlug}?${params.toString()}#${anchor}`
 }
 
-/**
- * What the badge components read off a comment.
- *
- * Named rather than taken from either query, because the feed and a service's
- * own thread select different shapes and both draw the same badges. Typing the
- * badges by the fuller of the two would oblige the feed to load fields it never
- * renders.
- */
-export type CommentBadgeFields = Pick<
-  CommentForFeed,
-  | 'author'
-  | 'issues'
-  | 'parentId'
-  | 'privateProof'
-  | 'privateProofStatus'
-  | 'rating'
-  | 'ratingMuted'
-  | 'ratingMuteReason'
-  | 'ratingTrustLabel'
-  | 'ratingTrustReason'
-  | 'ratingWeight'
-  | 'status'
->
+export type CommentBadgeFields = {
+  createdAt: Date
+  parentId: number | null
+  author: {
+    admin: boolean
+    capabilities: string[]
+    createdAt: Date
+    _count: { comments: number }
+    serviceAffiliations: { role: ServiceUserRole; service: { name: string; slug: string } }[]
+  } | null
+}
 
-// getAiHardGateReason explains why an AI "approve" was downgraded to HOLD.
-// The worker records gate reasons on every verdict, but they only take effect on a HOLD.
-export function getAiHardGateReason(comment: { aiAction: ModerationAction | null; aiSignals: unknown }) {
-  if (comment.aiAction !== 'HOLD') return null
-  const parsed = z.object({ hardGateReason: z.string().min(1) }).safeParse(comment.aiSignals)
-  return parsed.success ? parsed.data.hardGateReason : null
+const holdReasonShortLabels: [RegExp, string][] = [
+  [/^spam flag/, 'spam flag'],
+  [/^strict commenting$/, 'strict mode'],
+  [/^(proof awaiting a moderator check|private proof present)$/, 'proof check'],
+  [/^update changes the experience verdict$/, 'verdict change'],
+  [/^brigade confidence/, 'coordinated posting'],
+  [/^author's posting is disabled$/, 'posting disabled'],
+  [/^author has recent penalized rejections$/, 'untrusted author'],
+  [/^claim awaiting a proof check$/, 'claim needs proof'],
+  [/^order ID used on another post$/, 'reused order ID'],
+  [/^order ID does not match the service format$/, 'order ID format'],
+  [/^wave of new-account posts$/, 'new-account wave'],
+  [/^text looks generated or templated$/, 'generated text'],
+]
+
+// holdReasonLabels shortens the worker's hard gate reasons for display; unknown ones pass through.
+export const holdReasonLabels = (hardGateReason: string) => [
+  ...new Set(
+    hardGateReason
+      .split(', ')
+      .map((reason) => holdReasonShortLabels.find(([pattern]) => pattern.test(reason))?.[1] ?? reason)
+  ),
+]
+
+export const THREAD_PAGE_SIZE = 50
+export const LIST_PAGE_SIZE = 20
+
+// commentVisibilityWhere limits what a viewer loads: restricted services show only the viewer's own
+// posts to non-moderators, moderators opening a thread see everything, and otherwise published posts
+// plus the viewer's own.
+export function commentVisibilityWhere({
+  restrictedService,
+  canModerate,
+  viewerId,
+  focused,
+}: {
+  restrictedService: boolean
+  canModerate: boolean
+  viewerId: number | undefined
+  focused: boolean
+}): Prisma.CommentWhereInput {
+  if (restrictedService && !canModerate) return { authorId: viewerId ?? -1 }
+  if (canModerate && focused) return {}
+  return {
+    OR: [
+      { status: { in: publishedCommentStatuses } },
+      withdrawnPlaceholderWhere,
+      ...(viewerId ? [{ authorId: viewerId }] : []),
+    ],
+  }
+}
+
+type CommentLoadQuery = {
+  serviceId: number
+  viewer: Parameters<typeof canReadComment>[0]
+  canModerate: boolean
+  visibleWhere: Prisma.CommentWhereInput
+}
+
+// loadCommentThread loads a thread around one post. With pageFromTarget, the reply page is the one
+// holding the target, so a permalink to a late reply opens where that reply is.
+export async function loadCommentThread({
+  serviceId,
+  viewer,
+  canModerate,
+  visibleWhere,
+  commentId,
+  page: requestedPage,
+  pageFromTarget,
+}: CommentLoadQuery & { commentId: number; page: number; pageFromTarget: boolean }) {
+  const empty = { comments: [], count: 0, focused: true, page: 1 }
+  const target = await prisma.comment.findUnique({
+    where: { id: commentId },
+    select: { id: true, serviceId: true, authorId: true, status: true, parentId: true, createdAt: true },
+  })
+  if (target?.serviceId !== serviceId) return empty
+  const readable = canReadComment(viewer, target, canModerate)
+  const placeholderTarget =
+    !readable && (await prisma.comment.count({ where: { id: target.id, ...withdrawnPlaceholderWhere } })) > 0
+  if (!readable && !placeholderTarget) return empty
+  const rootId = target.parentId ?? target.id
+  const replyWhere: Prisma.CommentWhereInput = { ...visibleWhere, parentId: rootId }
+  const [root, count, repliesBefore] = await Promise.all([
+    prisma.comment.findFirst({ select: commentThreadSelect, where: { ...visibleWhere, id: rootId } }),
+    prisma.comment.count({ where: replyWhere }),
+    target.parentId && pageFromTarget
+      ? prisma.comment.count({
+          where: {
+            AND: [
+              replyWhere,
+              {
+                OR: [
+                  { createdAt: { lt: target.createdAt } },
+                  { createdAt: target.createdAt, id: { lt: target.id } },
+                ],
+              },
+            ],
+          },
+        })
+      : Promise.resolve(null),
+  ])
+  if (!root) return empty
+  const page = repliesBefore === null ? requestedPage : Math.floor(repliesBefore / THREAD_PAGE_SIZE) + 1
+  const replies = await prisma.comment.findMany({
+    select: commentThreadSelect,
+    where: replyWhere,
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    skip: (page - 1) * THREAD_PAGE_SIZE,
+    take: THREAD_PAGE_SIZE,
+  })
+  return { comments: [root, ...replies], count, focused: true, page }
+}
+
+export async function loadCommentList({
+  serviceId,
+  viewer,
+  visibleWhere,
+  page,
+  filters,
+}: CommentLoadQuery & {
+  page: number
+  filters: {
+    search?: string
+    sentiment?: ExperienceSentiment
+    problem?: CommentIssueType | 'any'
+    evidence?: 'checked' | 'unproven'
+    period?: '90d'
+  }
+}) {
+  const matched =
+    filters.sentiment || filters.evidence || filters.problem || filters.period
+      ? await filterExperienceIds(serviceId, {
+          sentiment: filters.sentiment,
+          problem: filters.problem,
+          proof: filters.evidence,
+          recent: !!filters.period,
+        })
+      : null
+  const where: Prisma.CommentWhereInput = {
+    ...visibleWhere,
+    serviceId,
+    parentId: null,
+    ...(filters.search ? { content: { contains: filters.search, mode: 'insensitive' } } : {}),
+    ...(matched ? { id: { in: matched.map((item) => item.id) } } : {}),
+    // Matching a search or filter would reveal what a withdrawn post said, so only its author sees it here.
+    ...(filters.search || matched
+      ? { AND: [{ OR: [{ status: { not: 'WITHDRAWN' } }, ...(viewer ? [{ authorId: viewer.id }] : [])] }] }
+      : {}),
+  }
+  const [count, comments] = await Promise.all([
+    prisma.comment.count({ where }),
+    prisma.comment.findMany({
+      select: commentThreadSelect,
+      where,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: (page - 1) * LIST_PAGE_SIZE,
+      take: LIST_PAGE_SIZE,
+    }),
+  ])
+  return { comments, count, focused: false, page }
 }

@@ -1,4 +1,9 @@
-import { makeNotificationActions, makeNotificationContent, makeNotificationTitle } from './notifications'
+import {
+  makeNotificationActions,
+  makeNotificationContent,
+  makeNotificationTitle,
+  notificationDisplaySelect,
+} from './notifications'
 import { prisma } from './prisma'
 import { getServerEnvVariable } from './serverEnvVariables'
 import { sendPushNotification } from './webPush'
@@ -17,103 +22,8 @@ export async function sendNotification(
   const notification = await prisma.notification.findUnique({
     where: { id: notificationId },
     select: {
-      id: true,
-      type: true,
+      ...notificationDisplaySelect,
       userId: true,
-      createdAt: true,
-      aboutAccountStatusChange: true,
-      aboutCommentStatusChange: true,
-      aboutServiceVerificationStatusChange: true,
-      aboutSuggestionStatusChange: true,
-      aboutComment: {
-        select: {
-          id: true,
-          author: { select: { id: true } },
-          status: true,
-          content: true,
-          publicNote: true,
-          parent: {
-            select: {
-              author: {
-                select: {
-                  id: true,
-                },
-              },
-            },
-          },
-          service: {
-            select: {
-              slug: true,
-              name: true,
-            },
-          },
-        },
-      },
-      aboutServiceSuggestionId: true,
-      aboutServiceSuggestion: {
-        select: {
-          status: true,
-          type: true,
-          service: {
-            select: {
-              name: true,
-            },
-          },
-        },
-      },
-      aboutServiceSuggestionMessage: {
-        select: {
-          id: true,
-          content: true,
-          suggestion: {
-            select: {
-              id: true,
-              service: {
-                select: {
-                  name: true,
-                },
-              },
-            },
-          },
-        },
-      },
-      aboutContactThreadId: true,
-      aboutContactThread: {
-        select: {
-          authorId: true,
-        },
-      },
-      aboutEvent: {
-        select: {
-          title: true,
-          type: true,
-          class: true,
-          sentiment: true,
-          startedAt: true,
-          endedAt: true,
-          incident: { select: { state: true } },
-          service: {
-            select: {
-              slug: true,
-              name: true,
-            },
-          },
-        },
-      },
-      aboutService: {
-        select: {
-          slug: true,
-          name: true,
-          verificationStatus: true,
-        },
-      },
-      aboutKarmaTransaction: {
-        select: {
-          points: true,
-          action: true,
-          description: true,
-        },
-      },
       user: {
         select: {
           id: true,

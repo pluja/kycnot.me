@@ -1,280 +1,619 @@
 ---
+import { ExperienceSentiment } from '@prisma/client'
 import { z } from 'astro/zod'
 import { Icon } from 'astro-icon/components'
 
-import CommentItem from '../components/CommentItem.astro'
-import CommentReply from '../components/CommentReply.astro'
-import { cn } from '../lib/cn'
+import { commentIssueTypes, getCommentIssueTypeInfo } from '../constants/commentIssueTypes'
 import {
-  commentSortSchema,
-  makeCommentsNestedQuery,
-  sinkSpamToBottom,
-  MAX_COMMENT_DEPTH,
-  type CommentSortOption,
-  type CommentWithReplies,
-  type CommentWithRepliesPopulated,
+  experienceSentiments,
+  experienceOutcomesByValue,
+  getExperienceSentimentInfo,
+} from '../constants/experiences'
+import { authorDisplayName } from '../lib/authorName'
+import { cn } from '../lib/cn'
+import { getCommentReplyPreviews, type CommentReplyPreviewGroup } from '../lib/commentReplyPreviews'
+import {
+  commentTools,
+  commentVisibilityWhere,
+  loadCommentList,
+  loadCommentThread,
+  makeCommentUrl,
+  LIST_PAGE_SIZE,
+  THREAD_PAGE_SIZE,
 } from '../lib/commentsWithReplies'
-import { getOrCreateNotificationPreferences } from '../lib/notificationPreferences'
-import { makeOgImageUrl } from '../lib/ogImageUrl'
+import {
+  currentExperienceStates,
+  experienceSummary,
+  filterExperienceIds,
+  summaryWindowDays,
+} from '../lib/experienceQueries'
+import {
+  hasModerationConflict,
+  isPublishedComment,
+  isServicePubliclyReadable,
+  showsAsPlaceholder,
+} from '../lib/experiences'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
+import { countOf } from '../lib/pluralize'
 import { prisma } from '../lib/prisma'
-import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
-import { absoluteSiteUrl, siteOrigin } from '../lib/urls'
+import { getTrustFacts, type TrustFacts } from '../lib/trust'
+import { makeFilterUrl } from '../lib/urls'
 
-import Schema from './Schema.astro'
+import Button from './Button.astro'
+import CommentItem from './CommentItem.astro'
+import CommentPlaceholder from './CommentPlaceholder.astro'
+import CommentReply from './CommentReply.astro'
+import EvidenceCheckTextsScript from './EvidenceCheckTextsScript.astro'
+import ExperienceSummary from './ExperienceSummary.astro'
+import FilterPill from './FilterPill.astro'
+import InputText from './InputText.astro'
+import Pagination from './Pagination.astro'
+import SectionHeading from './SectionHeading.astro'
 
-import type { Prisma } from '@prisma/client'
-import type { DiscussionForumPosting, WithContext } from 'schema-dts'
+import type { ThreadComment } from '../lib/commentsWithReplies'
+import type { ServiceVisibility } from '@prisma/client'
 
 type Props = {
-  itemReviewedId: string
-  service: Prisma.ServiceGetPayload<{
-    select: {
-      id: true
-      slug: true
-      listedAt: true
-      name: true
-      description: true
-      createdAt: true
-      strictCommentingEnabled: true
-      commentSectionMessage: true
-    }
-  }>
+  service: {
+    id: number
+    name: string
+    slug: string
+    strictCommentingEnabled: boolean
+    proofHint?: string | null
+    serviceVisibility?: ServiceVisibility
+  }
+  viewerIsAffiliated: boolean
 }
-
-const { service, itemReviewedId } = Astro.props
-
+const { service, viewerIsAffiliated } = Astro.props
 const { data: params } = zodParseQueryParamsStoringErrors(
   {
-    showPending: z.coerce.boolean().default(false),
-    comment: z.coerce.number().int().positive().nullable().default(null),
-    sort: commentSortSchema,
+    sentiment: z
+      .nativeEnum(ExperienceSentiment)
+      .or(z.literal(''))
+      .optional()
+      .transform((value) => value || undefined),
+    evidence: z
+      .enum(['checked', 'unproven'])
+      .or(z.literal(''))
+      .optional()
+      .transform((value) => value || undefined),
+    problem: z
+      .enum(['any', ...commentIssueTypes.map((issue) => issue.value)])
+      .or(z.literal(''))
+      .optional()
+      .transform((value) => value || undefined),
+    period: z
+      .enum(['90d'])
+      .or(z.literal(''))
+      .optional()
+      .transform((value) => value || undefined),
+    search: z.string().trim().max(100).default(''),
+    page: z.coerce.number().int().min(1).default(1),
+    comment: z.coerce.number().int().positive().optional(),
+    tool: z.enum(commentTools).optional().catch(undefined),
   },
   Astro
 )
-
-const toggleUrl = new URL(Astro.request.url)
-toggleUrl.hash = '#comments'
-if (params.showPending) {
-  toggleUrl.searchParams.delete('showPending')
-} else {
-  toggleUrl.searchParams.set('showPending', 'true')
-}
-
-const getSortUrl = (sortOption: CommentSortOption) => {
-  const url = new URL(Astro.request.url)
-  url.searchParams.set('sort', sortOption)
-  return url.toString() + '#comments'
-}
-
+const targetCommentId = params.comment
 const user = Astro.locals.user
-const canSortByStatus = Astro.locals.userCan('comments:moderate')
-const activeSort = params.sort === 'status' && !canSortByStatus ? 'newest' : params.sort
-const sortOptions: {
-  id: CommentSortOption
-  label: string
-  accessibleLabel?: string
-  icon: string
-  adminOnly?: boolean
-}[] = [
-  { id: 'newest', label: 'Newest', icon: 'ri:time-line' },
-  { id: 'upvotes', label: 'Upvoted', icon: 'ri:arrow-up-line' },
-  { id: 'lowest-rating', label: 'Lowest', accessibleLabel: 'Lowest rating', icon: 'ri:star-line' },
-  { id: 'highest-rating', label: 'Highest', accessibleLabel: 'Highest rating', icon: 'ri:star-fill' },
-  { id: 'trusted', label: 'Trusted', icon: 'ri:shield-check-line' },
-  { id: 'status', label: 'Status', icon: 'ri:filter-line', adminOnly: true },
+// Representatives of the service cannot moderate it, so they also don't see
+// its unpublished posts or internal notes.
+const canModerate = Astro.locals.userCan('comments:moderate') && !viewerIsAffiliated
+// The affiliation half of the conflict rule is already in canModerate; this adds the authorship half.
+const canModeratePost = (post: { authorId: number | null }) =>
+  canModerate && !!user && !hasModerationConflict(user, { authorId: post.authorId, affiliatedUserIds: [] })
+const restrictedService = !!service.serviceVisibility && !isServicePubliclyReadable(service.serviceVisibility)
+const visibleWhere = commentVisibilityWhere({
+  restrictedService,
+  canModerate,
+  viewerId: user?.id,
+  focused: !!targetCommentId,
+})
+const restrictedAuthorId = restrictedService && !canModerate ? (user?.id ?? -1) : undefined
+const loadQuery = { serviceId: service.id, viewer: user, canModerate, visibleWhere }
+const emptyResult = { comments: [], count: 0, focused: !!targetCommentId, page: params.page }
+// With enough checked posts in the summary window, the default view lists only checked posts and folds the rest
+// behind one link, so readers meet evidence first. Any filter, search or focused post shows the list as asked.
+// The switch above the list counts what each view would show: every listed post, and those with checked proof.
+const switchCounts = targetCommentId
+  ? null
+  : await Astro.locals.banners.try(
+      'Failed to count posts',
+      async () => {
+        // Each count matches its list: the full list shows withdrawn posts as placeholders, a filtered one doesn't.
+        const listed = { ...visibleWhere, serviceId: service.id, parentId: null }
+        const checkedIds = (await filterExperienceIds(service.id, { proof: 'checked' })).map(
+          (item) => item.id
+        )
+        const [all, checked] = await Promise.all([
+          prisma.comment.count({ where: listed }),
+          prisma.comment.count({
+            where: { ...listed, status: { not: 'WITHDRAWN' }, id: { in: checkedIds } },
+          }),
+        ])
+        return { all, checked }
+      },
+      null
+    )
+const [result, pendingCount, summary] = await Astro.locals.banners.tryMany([
+  [
+    'Failed to load discussion',
+    () =>
+      targetCommentId
+        ? loadCommentThread({
+            ...loadQuery,
+            commentId: targetCommentId,
+            page: params.page,
+            pageFromTarget: !Astro.url.searchParams.has('page'),
+          })
+        : loadCommentList({ ...loadQuery, page: params.page, filters: params }),
+    emptyResult as Awaited<ReturnType<typeof loadCommentList>>,
+  ],
+  [
+    'Failed to count pending comments',
+    () =>
+      canModerate
+        ? prisma.comment.count({ where: { serviceId: service.id, status: 'PENDING' } })
+        : Promise.resolve(0),
+    0,
+  ],
+  ['Failed to summarize experiences', () => experienceSummary(service.id, restrictedAuthorId), null],
+])
+const shownIds = result.comments.map((comment) => comment.id)
+const authorIds = [
+  ...new Set(result.comments.flatMap((comment) => (comment.authorId === null ? [] : [comment.authorId]))),
 ]
-
-const viewerIsAffiliated = user
-  ? !!(await prisma.serviceUser.findUnique({
-      where: { userId_serviceId: { userId: user.id, serviceId: service.id } },
-      select: { id: true },
-    }))
-  : false
-
-const [dbComments, pendingCommentsCount, activeRatingComment, upvotedRootCommentsCount] =
+const [watched, currentStates, replyPreviews, internalNotes, authorTrust] =
   await Astro.locals.banners.tryMany([
     [
-      'Failed to fetch comments',
-      async () =>
-        await prisma.comment.findMany(
-          await makeCommentsNestedQuery({
-            depth: MAX_COMMENT_DEPTH,
-            user,
-            showPending: params.showPending,
-            serviceId: service.id,
-            sort: activeSort,
-            highlightedCommentId: params.comment,
-          })
+      'Failed to load watched posts',
+      () =>
+        user && shownIds.length
+          ? prisma.notificationPreferences.findUnique({
+              where: { userId: user.id },
+              select: { watchedComments: { where: { id: { in: shownIds } }, select: { id: true } } },
+            })
+          : Promise.resolve(null),
+      null,
+    ],
+    [
+      'Failed to load experience updates',
+      () =>
+        currentExperienceStates(
+          result.comments.filter((comment) => comment.experience).map((comment) => comment.id)
         ),
       [],
     ],
     [
-      'Failed to count unmoderated comments',
-      async () =>
-        prisma.comment.count({
-          where: {
-            serviceId: service.id,
-            status: 'PENDING',
-          },
-        }),
-      0,
+      'Failed to load reply previews',
+      () =>
+        result.focused
+          ? Promise.resolve(new Map<number, CommentReplyPreviewGroup>())
+          : getCommentReplyPreviews(shownIds, service.id, restrictedAuthorId),
+      new Map<number, CommentReplyPreviewGroup>(),
     ],
     [
-      "Failed to fetch user's service rating",
-      async () =>
-        user
-          ? await prisma.comment.findFirst({
-              where: { serviceId: service.id, authorId: user.id, ratingActive: true },
-              orderBy: { createdAt: 'desc' },
-              select: {
-                id: true,
-                rating: true,
+      'Failed to load internal notes',
+      () =>
+        canModerate && shownIds.length
+          ? prisma.comment.findMany({
+              where: {
+                id: { in: shownIds },
+                adminNote: { not: null },
+                // Notes on their own posts stay hidden from moderators who aren't admins. A bare `not` on the id
+                // would also drop posts from deleted accounts, whose author is NULL.
+                ...(user && !user.admin ? { NOT: { authorId: { equals: user.id, not: null } } } : {}),
               },
+              select: { id: true, adminNote: true },
             })
-          : null,
-      null,
+          : Promise.resolve([]),
+      [],
     ],
-    [
-      'Failed to count upvoted comments',
-      async () =>
-        prisma.comment.count({
-          where: {
-            serviceId: service.id,
-            parentId: null,
-            status: { in: ['APPROVED', 'VERIFIED'] },
-            upvotes: { gt: 0 },
-          },
-        }),
-      0,
-    ],
+    ['Failed to load author facts', () => getTrustFacts(authorIds), new Map<number, TrustFacts>()],
   ])
-
-const notiPref = user
-  ? await getOrCreateNotificationPreferences(user.id, {
-      watchedComments: { select: { id: true } },
-    })
-  : null
-
-const populateComment = (comment: CommentWithReplies): CommentWithRepliesPopulated => ({
+const comments: ThreadComment[] = result.comments.map((comment) => ({
   ...comment,
-  isWatchingReplies: notiPref?.watchedComments.some((c) => c.id === comment.id) ?? false,
-  replies: comment.replies?.map(populateComment),
+  experience: comment.experience
+    ? { ...comment.experience, ...currentStates.find((state) => state.commentId === comment.id) }
+    : null,
+  isWatchingReplies: watched?.watchedComments.some((item) => item.id === comment.id) ?? false,
+  authorTrust: comment.authorId === null ? null : (authorTrust.get(comment.authorId) ?? null),
+}))
+const internalNoteById = new Map(internalNotes.map((note) => [note.id, note.adminNote]))
+const [threadRoot, ...threadReplies] = result.focused ? comments : []
+const replyTarget =
+  params.tool === 'reply'
+    ? threadReplies.find((reply) => reply.id === targetCommentId && isPublishedComment(reply.status))
+    : undefined
+const openToolFor = (commentId: number) =>
+  params.tool && params.tool !== 'reply' && targetCommentId === commentId ? params.tool : undefined
+const rootExperience =
+  threadRoot?.kind === 'EXPERIENCE' && threadRoot.authorId === user?.id ? threadRoot.experience : null
+const ownExperienceVerdict = rootExperience
+  ? {
+      sentimentLabel: rootExperience.sentiment
+        ? getExperienceSentimentInfo(rootExperience.sentiment).label
+        : null,
+      outcomeLabel:
+        rootExperience.outcome !== 'UNSPECIFIED'
+          ? experienceOutcomesByValue[rootExperience.outcome].label
+          : null,
+    }
+  : undefined
+const experienceFilterCount = [params.sentiment, params.evidence, params.problem, params.period].filter(
+  Boolean
+).length
+const filterUrl = (changes: Record<string, string | undefined>) => {
+  const url = new URL(Astro.url)
+  for (const name of ['comment', 'tool', 'page']) url.searchParams.delete(name)
+  return `${makeFilterUrl(url, changes)}#comments`
+}
+const proofFilters = [
+  { value: 'checked', label: 'Checked proof' },
+  { value: 'unproven', label: 'No checked proof' },
+] as const
+const clearExperienceFilters = filterUrl({
+  sentiment: undefined,
+  evidence: undefined,
+  problem: undefined,
+  period: undefined,
 })
-const comments = sinkSpamToBottom(dbComments.map(populateComment))
-const hasHelpfulSort = upvotedRootCommentsCount > 0
-const displayActiveSort = activeSort === 'upvotes' && !hasHelpfulSort ? 'newest' : activeSort
-const visibleSortOptions = sortOptions.filter(
-  (option) => (!option.adminOnly || canSortByStatus) && (option.id !== 'upvotes' || hasHelpfulSort)
-)
+const filterDisclosureName = Astro.locals.makeId('comment-filters')
+const activeFilters = [
+  { key: 'search', value: params.search, label: params.search, icon: 'ri:search-line' },
+  {
+    key: 'sentiment',
+    value: params.sentiment,
+    label: getExperienceSentimentInfo(params.sentiment).shortLabel,
+    icon: getExperienceSentimentInfo(params.sentiment).icon,
+  },
+  {
+    key: 'problem',
+    value: params.problem,
+    label:
+      params.problem && params.problem !== 'any'
+        ? getCommentIssueTypeInfo(params.problem).filterLabel
+        : 'Problem reported',
+    icon: undefined,
+  },
+  {
+    key: 'period',
+    value: params.period,
+    label: `Last ${String(summaryWindowDays)} days`,
+    icon: undefined,
+  },
+  {
+    key: 'evidence',
+    value: params.evidence === 'unproven' ? params.evidence : undefined,
+    label: params.evidence === 'unproven' ? 'No checked proof' : 'Checked proof',
+    icon: undefined,
+  },
+].filter((filter) => filter.value)
 ---
 
-<section class="mt-8" id="comments">
-  <Schema
-    item={{
-      '@context': 'https://schema.org',
-      '@type': 'DiscussionForumPosting',
-      url: absoluteSiteUrl(`/service/${service.slug}#comments`),
-      mainEntityOfPage: absoluteSiteUrl(`/service/${service.slug}#comments`),
-      datePublished: service.listedAt?.toISOString(),
-      dateCreated: service.createdAt.toISOString(),
-      headline: `${service.name} comments on KYCnot.me`,
-      text: service.description,
-      author: KYCNOTME_SCHEMA_MINI,
-      image: makeOgImageUrl({ template: 'generic', title: `${service.name} comments` }, siteOrigin),
-
-      commentCount: comments.length,
-    } as WithContext<DiscussionForumPosting>}
+<section id="comments" class="mt-10 scroll-mt-20">
+  <SectionHeading
+    title="User experiences"
+    links={[
+      ...(canModerate && pendingCount > 0
+        ? [
+            {
+              href: `/admin/comments?queue=all&status=PENDING&serviceId=${service.id.toString()}`,
+              text: `${pendingCount.toLocaleString()} pending review`,
+            },
+          ]
+        : []),
+      { href: '/docs/guidelines', text: 'How it works' },
+      { href: '/docs/guidelines#proof', text: 'Proof' },
+    ]}
+    class="mt-0"
   />
-  <CommentReply
-    serviceId={service.id}
-    activeRatingComment={activeRatingComment}
-    strictCommentingEnabled={service.strictCommentingEnabled}
-    commentSectionMessage={service.commentSectionMessage}
-    class="mb-2 xs:mb-4"
-  />
-
-  <div class="mb-6 flex flex-wrap items-center justify-between gap-2">
-    <div class="flex items-center">
-      <div class="flex flex-wrap items-center gap-1">
-        {
-          visibleSortOptions.map((option) => (
-            <a
-              href={getSortUrl(option.id)}
-              aria-label={option.accessibleLabel ? `Sort comments by ${option.accessibleLabel}` : undefined}
-              title={option.accessibleLabel}
-              class={cn([
-                'rounded-md px-2 py-1 text-sm',
-                displayActiveSort === option.id
-                  ? 'bg-blue-500/20 text-blue-400'
-                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300',
-              ])}
-            >
-              <Icon name={option.icon} class="mr-1 inline size-3.5" />
-              {option.label}
-            </a>
-          ))
-        }
-      </div>
-    </div>
-
-    <div class="flex items-center">
-      {
-        pendingCommentsCount > 0 && (
-          <div class="flex items-center">
-            <a
-              href={toggleUrl.toString()}
-              rel={params.showPending ? undefined : 'nofollow'}
-              class={cn([
-                'flex items-center gap-2 text-sm',
-                params.showPending ? 'text-yellow-500' : 'text-zinc-400 hover:text-zinc-300',
-              ])}
-            >
-              <div class="relative flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full bg-zinc-700 p-1 transition-colors duration-200 ease-in-out focus:outline-hidden">
-                <span
-                  class={cn([
-                    'absolute top-0.5 left-0.5 size-4 rounded-full bg-zinc-400 shadow-sm transition-transform duration-200 ease-in-out',
-                    params.showPending && 'translate-x-4 bg-yellow-500',
-                  ])}
-                />
-              </div>
-              <span>Show unmoderated ({pendingCommentsCount.toLocaleString()})</span>
-            </a>
-          </div>
-        )
-      }
-    </div>
-  </div>
-
-  <div class="space-y-4">
-    {
-      comments.length > 0 ? (
-        comments.map((comment) => (
-          <CommentItem
-            comment={comment}
-            highlightedCommentId={params.comment}
-            showPending={params.showPending}
-            serviceSlug={service.slug}
-            itemReviewedId={itemReviewedId}
+  {summary && <ExperienceSummary summary={summary} filterUrl={filterUrl} />}
+  {
+    result.focused ? (
+      <a
+        href={filterUrl({})}
+        class="mb-2 inline-flex items-center gap-1 text-sm text-day-300 hover:underline"
+      >
+        <Icon name="ri:arrow-left-line" class="size-4" />
+        All posts
+      </a>
+    ) : (
+      <>
+        <div class="mb-8">
+          <CommentReply
+            serviceId={service.id}
             strictCommentingEnabled={service.strictCommentingEnabled}
-            viewerIsAffiliated={viewerIsAffiliated}
+            proofHint={service.proofHint}
           />
-        ))
-      ) : (
-        <div class="my-16 text-center text-day-400">
-          {pendingCommentsCount > 0 ? (
-            <span>
-              No approved comments, but there are
-              <a href={toggleUrl.toString()} class="inline-flex items-center gap-1">
-                <span class="underline">{pendingCommentsCount.toLocaleString()} unmoderated comments</span>
-                <Icon name="ri:external-link-line" class="inline size-3.5 align-[-0.1em]" />
-              </a>
-            </span>
-          ) : (
-            'No comments yet'
+        </div>
+        <div class="mb-5 max-w-[720px] space-y-2">
+          <div class="grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-2">
+            <div class="relative col-start-2 row-start-2 flex items-center gap-1 sm:row-start-1">
+              <details name={filterDisclosureName} class="group/search">
+                <summary
+                  aria-label="Search posts"
+                  title="Search posts"
+                  class="flex cursor-pointer list-none rounded-lg focus-visible:ring-2 focus-visible:ring-green-500 [&::-webkit-details-marker]:hidden"
+                >
+                  <Button
+                    as="span"
+                    role="presentation"
+                    label="Search posts"
+                    icon="ri:search-line"
+                    iconOnly
+                    size="sm"
+                    class="w-8 border-transparent bg-transparent text-day-300 group-open/search:bg-night-800"
+                  />
+                </summary>
+                <form
+                  method="GET"
+                  action={`${Astro.url.pathname}#comments`}
+                  role="search"
+                  aria-label="Search posts"
+                  class="absolute right-0 z-20 mt-2 flex w-72 max-w-[calc(100vw-2rem)] items-end gap-2 rounded-lg border border-night-600 bg-night-800 p-3 shadow-lg"
+                >
+                  {params.sentiment && <input type="hidden" name="sentiment" value={params.sentiment} />}
+                  {params.evidence && <input type="hidden" name="evidence" value={params.evidence} />}
+                  {params.problem && <input type="hidden" name="problem" value={params.problem} />}
+                  {params.period && <input type="hidden" name="period" value={params.period} />}
+                  <InputText
+                    name="search"
+                    label="Search posts"
+                    class="flex-1"
+                    inputIcon="ri:search-line"
+                    inputIconClass="size-4 text-day-500"
+                    inputProps={{
+                      type: 'search',
+                      value: params.search,
+                      maxlength: 100,
+                      placeholder: 'Search these posts',
+                      'aria-label': 'Search posts',
+                      class: 'h-8 border-night-500 bg-night-800 pr-2 pl-8 text-sm',
+                    }}
+                  />
+                  <Button
+                    type="submit"
+                    label="Search posts"
+                    title="Search posts"
+                    icon="ri:search-line"
+                    iconOnly
+                    size="sm"
+                    class="w-8"
+                  />
+                </form>
+              </details>
+              <details name={filterDisclosureName} class="group/filters">
+                <summary class="flex cursor-pointer list-none rounded-lg focus-visible:ring-2 focus-visible:ring-green-500 [&::-webkit-details-marker]:hidden">
+                  <Button
+                    as="span"
+                    role="presentation"
+                    label={experienceFilterCount ? `Filters (${experienceFilterCount})` : 'Filters'}
+                    icon="ri:filter-3-line"
+                    size="sm"
+                    class={cn(
+                      'border-transparent bg-transparent px-1 group-open/filters:bg-night-800 sm:px-2',
+                      experienceFilterCount > 0 && 'text-green-300'
+                    )}
+                  />
+                </summary>
+                <nav
+                  aria-label="Experience filters"
+                  class="absolute right-0 z-20 mt-2 w-72 max-w-[calc(100vw-2rem)] space-y-3 rounded-lg border border-night-600 bg-night-800 p-3 shadow-lg"
+                >
+                  <div class="space-y-2">
+                    <p class="font-title text-xs font-medium text-day-300">Experience</p>
+                    <div class="flex flex-wrap gap-1.5">
+                      {experienceSentiments.map((item) => (
+                        <FilterPill
+                          href={filterUrl({
+                            sentiment: params.sentiment === item.value ? undefined : item.value,
+                          })}
+                          label={item.shortLabel}
+                          accessibleLabel={item.label}
+                          icon={item.icon}
+                          color={item.color}
+                          active={params.sentiment === item.value}
+                          nofollow
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div class="space-y-2">
+                    <p class="font-title text-xs font-medium text-day-300">Problems and proof</p>
+                    <div class="flex flex-wrap gap-1.5">
+                      <FilterPill
+                        href={filterUrl({ problem: params.problem ? undefined : 'any' })}
+                        label="Problem reported"
+                        color="yellow"
+                        active={!!params.problem}
+                        nofollow
+                      />
+                      {proofFilters.map((option) => (
+                        <FilterPill
+                          href={filterUrl({
+                            evidence: params.evidence === option.value ? undefined : option.value,
+                          })}
+                          label={option.label}
+                          color="green"
+                          active={params.evidence === option.value}
+                          nofollow
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  {experienceFilterCount > 0 && (
+                    <a
+                      href={clearExperienceFilters}
+                      class="self-center px-2 text-xs text-day-400 hover:text-day-200 hover:underline"
+                    >
+                      Clear filters
+                    </a>
+                  )}
+                </nav>
+              </details>
+            </div>
+            {switchCounts ? (
+              <nav
+                aria-label="Posts to show"
+                class="col-span-2 row-start-1 flex w-fit max-w-full gap-1 rounded-lg bg-night-800 p-1 sm:col-span-1"
+              >
+                {(
+                  [
+                    [undefined, 'All posts', switchCounts.all],
+                    ['checked', 'Checked proof', switchCounts.checked],
+                  ] as const
+                ).map(([evidence, label, count]) => (
+                  <Button
+                    as="a"
+                    role="link"
+                    href={filterUrl({ evidence })}
+                    label={`${label} ${count.toLocaleString()}`}
+                    size="sm"
+                    color={params.evidence === evidence ? 'success' : 'black'}
+                    variant={params.evidence === evidence ? 'faded' : 'solid'}
+                    class="h-auto min-h-8 rounded-md border-transparent px-2 py-1"
+                    aria-current={params.evidence === evidence ? 'page' : undefined}
+                    rel="nofollow"
+                  />
+                ))}
+              </nav>
+            ) : (
+              <span class="col-start-1 row-start-1 text-xs whitespace-nowrap text-day-400">
+                {countOf(result.count, 'post', 'posts')}
+              </span>
+            )}
+          </div>
+          {activeFilters.length > 0 && (
+            <div role="group" aria-label="Active filters" class="flex flex-wrap items-center gap-1.5">
+              {activeFilters.map((filter) => (
+                <Button
+                  as="a"
+                  role="link"
+                  href={filterUrl({ [filter.key]: undefined })}
+                  label={filter.label}
+                  aria-label={`Remove filter: ${filter.label}`}
+                  icon={filter.icon}
+                  endIcon="ri:close-line"
+                  size="sm"
+                  classNames={{ label: 'max-w-40 truncate' }}
+                  rel="nofollow"
+                />
+              ))}
+            </div>
           )}
         </div>
+      </>
+    )
+  }
+  {
+    result.focused && !threadRoot && (
+      <p class="py-8 text-center text-sm text-day-400">This post is not available.</p>
+    )
+  }
+  {
+    result.focused ? (
+      threadRoot && (
+        <div>
+          {showsAsPlaceholder(Astro.locals.user, threadRoot, canModerate) ? (
+            <CommentPlaceholder
+              comment={threadRoot}
+              serviceSlug={service.slug}
+              serviceName={service.name}
+              class="border-b-0"
+            />
+          ) : (
+            <CommentItem
+              comment={threadRoot}
+              internalNote={internalNoteById.get(threadRoot.id)}
+              canModerate={canModeratePost(threadRoot)}
+              readsUnpublished={canModerate}
+              serviceSlug={service.slug}
+              serviceName={service.name}
+              highlightedCommentId={targetCommentId}
+              class="border-b-0"
+              openTool={openToolFor(threadRoot.id)}
+            />
+          )}
+          <h3 class="mt-2 mb-1 text-xs font-medium text-day-400">
+            {result.count === 0 ? 'No replies yet' : countOf(result.count, 'reply', 'replies')}
+          </h3>
+          <div class="ml-3 border-l border-night-500 pl-3 sm:ml-4">
+            {threadReplies.map((reply) => (
+              <CommentItem
+                comment={reply}
+                internalNote={internalNoteById.get(reply.id)}
+                canModerate={canModeratePost(reply)}
+                readsUnpublished={canModerate}
+                serviceSlug={service.slug}
+                serviceName={service.name}
+                highlightedCommentId={targetCommentId}
+                class="py-3"
+                openTool={openToolFor(reply.id)}
+              />
+            ))}
+            {result.count > THREAD_PAGE_SIZE && (
+              <Pagination
+                class="my-6"
+                currentPage={result.page}
+                totalPages={Math.ceil(result.count / THREAD_PAGE_SIZE)}
+                hash="comments"
+              />
+            )}
+            {isPublishedComment(threadRoot.status) && (
+              <div id="reply-form" class="scroll-mt-20 py-3">
+                <CommentReply
+                  serviceId={service.id}
+                  parentId={replyTarget?.id ?? threadRoot.id}
+                  replyToName={replyTarget ? authorDisplayName(replyTarget.author) : undefined}
+                  cancelReplyUrl={
+                    replyTarget
+                      ? makeCommentUrl({ serviceSlug: service.slug, commentId: threadRoot.id, tool: 'reply' })
+                      : undefined
+                  }
+                  ownExperience={!replyTarget ? ownExperienceVerdict : undefined}
+                />
+              </div>
+            )}
+          </div>
+        </div>
       )
-    }
-  </div>
+    ) : (
+      <div>
+        {comments.map((comment) =>
+          showsAsPlaceholder(Astro.locals.user, comment, canModerate) ? (
+            <CommentPlaceholder
+              comment={comment}
+              serviceSlug={service.slug}
+              serviceName={service.name}
+              replyPreview={replyPreviews.get(comment.id)}
+              preview
+            />
+          ) : (
+            <CommentItem
+              comment={comment}
+              serviceSlug={service.slug}
+              serviceName={service.name}
+              replyPreview={replyPreviews.get(comment.id)}
+              internalNote={internalNoteById.get(comment.id)}
+              canModerate={canModeratePost(comment)}
+              readsUnpublished={canModerate}
+              preview
+            />
+          )
+        )}
+        {!comments.length && <p class="py-8 text-center text-sm text-day-400">No posts match this view.</p>}
+        {result.count > LIST_PAGE_SIZE && (
+          <Pagination
+            currentPage={params.page}
+            totalPages={Math.ceil(result.count / LIST_PAGE_SIZE)}
+            hash="comments"
+            class="my-6"
+          />
+        )}
+      </div>
+    )
+  }
 </section>
+
+{canModerate && <EvidenceCheckTextsScript />}

@@ -36,7 +36,7 @@ export const contactActions = {
           .string()
           .min(
             CONTACT_MESSAGE_MIN_LENGTH,
-            `Message must be at least ${CONTACT_MESSAGE_MIN_LENGTH} characters. Add enough context that we can act without follow-up.`
+            `Message must be at least ${CONTACT_MESSAGE_MIN_LENGTH.toString()} characters. Add enough context that we can act without follow-up.`
           )
           .max(
             CONTACT_MESSAGE_MAX_LENGTH,
@@ -122,8 +122,7 @@ export const contactActions = {
       const thread = await prisma.contactThread.create({
         data: {
           category: input.category,
-          requestedRole:
-            input.category === ContactCategory.ACCOUNT_VERIFICATION ? input.requestedRole : null,
+          requestedRole: input.category === ContactCategory.ACCOUNT_VERIFICATION ? input.requestedRole : null,
           authorId: user.id,
           status: 'AWAITING_STAFF',
           messages: {
@@ -149,77 +148,75 @@ export const contactActions = {
     handler: async (input, context) => {
       const user = context.locals.user
 
-      const thread = await prisma.contactThread.findUnique({
-        where: { id: input.threadId },
-        select: { id: true, authorId: true, status: true },
-      })
+      await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "User" WHERE id=${user.id} FOR UPDATE`
+        await tx.$queryRaw`SELECT id FROM "ContactThread" WHERE id=${input.threadId} FOR UPDATE`
+        const thread = await tx.contactThread.findUnique({
+          where: { id: input.threadId },
+          select: { id: true, authorId: true, status: true, category: true },
+        })
 
-      if (!thread || thread.authorId !== user.id) {
-        throw new ActionError({ code: 'NOT_FOUND', message: 'Conversation not found' })
-      }
-      if (thread.status === 'RESOLVED') {
-        throw new ActionError({
-          code: 'BAD_REQUEST',
-          message: 'This conversation is resolved. Start a new one if you still need help.',
-        })
-      }
-
-      // Turn-gate (admins exempt): cap consecutive messages with no staff reply
-      // in between, so a thread cannot be flooded with follow-up nagging.
-      if (!user.admin) {
-        const lastStaff = await prisma.contactMessage.findFirst({
-          where: { threadId: thread.id, fromStaff: true },
-          orderBy: { createdAt: 'desc' },
-          select: { createdAt: true },
-        })
-        const unansweredUserMessages = await prisma.contactMessage.count({
-          where: {
-            threadId: thread.id,
-            fromStaff: false,
-            ...(lastStaff ? { createdAt: { gt: lastStaff.createdAt } } : {}),
-          },
-        })
-        if (!canUserSendMessage({ status: thread.status, unansweredUserMessages })) {
+        if (thread?.authorId !== user.id) {
+          throw new ActionError({ code: 'NOT_FOUND', message: 'Conversation not found' })
+        }
+        if (thread.status === 'RESOLVED') {
           throw new ActionError({
-            code: 'TOO_MANY_REQUESTS',
-            message: 'Please wait for the team to reply before sending more messages.',
+            code: 'BAD_REQUEST',
+            message: 'This conversation is resolved. Start a new one if you still need help.',
           })
         }
-      }
 
-      // Rate limit (admins exempt), mirroring the suggestion chat.
-      if (!user.admin) {
-        const windowStart = new Date(
-          Date.now() - CONTACT_MESSAGE_RATE_LIMIT_WINDOW_MINUTES * 60 * 1000
-        )
-        const recentMessages = await prisma.contactMessage.findMany({
-          where: { authorId: user.id, fromStaff: false, createdAt: { gte: windowStart } },
-          select: { createdAt: true },
-          orderBy: { createdAt: 'asc' },
-        })
-        if (recentMessages.length >= MAX_CONTACT_MESSAGES_PER_WINDOW) {
-          const oldest = recentMessages[0]
-          const timeToWait = oldest
-            ? formatDistanceStrict(oldest.createdAt, windowStart)
-            : '1 minute'
-          throw new ActionError({
-            code: 'TOO_MANY_REQUESTS',
-            message: `Rate limit exceeded. Please wait ${timeToWait} before sending another message.`,
+        // Turn-gate (admins exempt): cap consecutive messages with no staff reply
+        // in between, so a thread cannot be flooded with follow-up nagging.
+        if (!user.admin) {
+          const lastStaff = await tx.contactMessage.findFirst({
+            where: { threadId: thread.id, fromStaff: true },
+            orderBy: { createdAt: 'desc' },
+            select: { createdAt: true },
           })
+          const unansweredUserMessages = await tx.contactMessage.count({
+            where: {
+              threadId: thread.id,
+              fromStaff: false,
+              ...(lastStaff ? { createdAt: { gt: lastStaff.createdAt } } : {}),
+            },
+          })
+          if (!canUserSendMessage({ status: thread.status, unansweredUserMessages })) {
+            throw new ActionError({
+              code: 'TOO_MANY_REQUESTS',
+              message: 'Please wait for the team to reply before sending more messages.',
+            })
+          }
         }
-      }
 
-      await prisma.$transaction([
-        prisma.contactMessage.create({
+        // Rate limit (admins exempt), mirroring the suggestion chat.
+        if (!user.admin) {
+          const windowStart = new Date(Date.now() - CONTACT_MESSAGE_RATE_LIMIT_WINDOW_MINUTES * 60 * 1000)
+          const recentMessages = await tx.contactMessage.findMany({
+            where: { authorId: user.id, fromStaff: false, createdAt: { gte: windowStart } },
+            select: { createdAt: true },
+            orderBy: { createdAt: 'asc' },
+          })
+          if (recentMessages.length >= MAX_CONTACT_MESSAGES_PER_WINDOW) {
+            const oldest = recentMessages[0]
+            const timeToWait = oldest ? formatDistanceStrict(oldest.createdAt, windowStart) : '1 minute'
+            throw new ActionError({
+              code: 'TOO_MANY_REQUESTS',
+              message: `Rate limit exceeded. Please wait ${timeToWait} before sending another message.`,
+            })
+          }
+        }
+
+        await tx.contactMessage.create({
           data: { threadId: thread.id, content: input.content, fromStaff: false, authorId: user.id },
-        }),
-        prisma.contactThread.update({
+        })
+        await tx.contactThread.update({
           where: { id: thread.id },
           data: { status: 'AWAITING_STAFF', readAt: null, lastMessageAt: new Date() },
-        }),
-      ])
+        })
+      })
 
-      sendContactChatMessageEvents(thread.id, user.id).catch(console.error)
+      sendContactChatMessageEvents(input.threadId, user.id).catch(console.error)
     },
   }),
 }

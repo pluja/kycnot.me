@@ -1,0 +1,106 @@
+---
+import { ServiceUserRole } from '@prisma/client'
+import { Icon } from 'astro-icon/components'
+import { format } from 'date-fns'
+
+import { getServiceUserRoleInfo } from '../constants/serviceUserRoles'
+import { authorDisplayName } from '../lib/authorName'
+import { cn } from '../lib/cn'
+import { makeCommentUrl } from '../lib/commentsWithReplies'
+import { postStaffRole, staffNameClasses } from '../lib/permissions'
+import { stripMarkdown } from '../lib/strings'
+
+import BadgeSmall from './BadgeSmall.astro'
+import Tooltip from './Tooltip.astro'
+
+import type { CommentReplyPreviewGroup } from '../lib/commentReplyPreviews'
+
+type Props = {
+  serviceSlug: string
+  serviceName: string
+  commentId: number
+  group: CommentReplyPreviewGroup
+}
+const { serviceSlug, serviceName, commentId, group } = Astro.props
+const teamLabel = (owner: boolean) => `${serviceName} ${owner ? 'owner' : 'team'}`
+---
+
+<div data-reply-preview class="mt-2 border-l border-night-500 pl-3">
+  <div class="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+    <a
+      href={makeCommentUrl({ serviceSlug, commentId })}
+      class="inline-flex items-center gap-1 font-medium text-day-300 hover:underline"
+    >
+      {
+        group.count > group.replies.length
+          ? `View all ${group.count.toLocaleString()} replies`
+          : 'Open conversation'
+      }
+      <Icon name="ri:arrow-right-s-line" class="size-3.5" />
+    </a>
+    {
+      group.staffReplied && (
+        <BadgeSmall text="Moderator replied" icon="ri:shield-line" color="teal" variant="faded" />
+      )
+    }
+    {
+      group.serviceReplied && (
+        <BadgeSmall text={`${teamLabel(group.ownerReplied)} replied`} color="cyan" variant="faded" />
+      )
+    }
+  </div>
+  {
+    group.replies.map((reply) => {
+      const affiliation = reply.author?.serviceAffiliations[0]
+      const name = authorDisplayName(reply.author)
+      const staffRole = postStaffRole(reply.author)
+      const roleInfo = affiliation ? getServiceUserRoleInfo(affiliation.role) : null
+      const fullDate = format(reply.createdAt, 'PPPpp')
+      return (
+        <a
+          href={makeCommentUrl({ serviceSlug, commentId: reply.id })}
+          data-reply-id={reply.id}
+          class={cn(
+            'flex min-w-0 items-center gap-2 py-1 text-xs text-day-400 hover:text-day-200',
+            staffRole && '-mx-1 rounded-sm bg-teal-500/10 px-1'
+          )}
+        >
+          <Tooltip text={fullDate} position="right" class="w-11 shrink-0 whitespace-nowrap text-day-500">
+            <time datetime={reply.createdAt.toISOString()} aria-label={fullDate}>
+              {format(reply.createdAt, 'MMM d')}
+            </time>
+          </Tooltip>
+          <span
+            class={cn(
+              'flex max-w-24 min-w-0 shrink-0 items-center gap-1 font-medium text-day-300 sm:max-w-32',
+              !reply.author && 'text-day-400',
+              affiliation && 'text-cyan-300',
+              staffRole && staffNameClasses[staffRole]
+            )}
+            title={
+              staffRole
+                ? `${name}: ${staffRole}`
+                : affiliation
+                  ? `${name}: ${teamLabel(affiliation.role === ServiceUserRole.OWNER)}`
+                  : name
+            }
+          >
+            {staffRole ? (
+              <Icon
+                name={reply.author?.admin ? 'ri:shield-star-line' : 'ri:shield-line'}
+                class="size-3 shrink-0"
+              />
+            ) : (
+              roleInfo && <Icon name={roleInfo.icon} class="size-3 shrink-0" />
+            )}
+            <span class="flex min-w-0">
+              <span class="min-w-0 truncate">{name}</span>
+              <span>:</span>
+            </span>
+          </span>
+          <span class="min-w-0 flex-1 truncate">{stripMarkdown(reply.content)}</span>
+        </a>
+      )
+    })
+  }
+</div>

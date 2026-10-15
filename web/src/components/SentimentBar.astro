@@ -1,0 +1,34 @@
+---
+import { experienceSentiments } from '../constants/experiences'
+import { cn } from '../lib/cn'
+
+import type { SentimentCounts } from '../lib/experienceQueries'
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = HTMLAttributes<'div'> & { counts: SentimentCounts }
+
+const { counts, class: className, ...divProps } = Astro.props
+const segments = experienceSentiments
+  .map((sentiment) => ({ sentiment, count: counts[sentiment.value.toLowerCase() as keyof SentimentCounts] }))
+  .filter(({ count }) => count > 0)
+const rated = segments.reduce((total, { count }) => total + count, 0)
+const description = segments
+  .map(({ sentiment, count }) => `${count.toLocaleString()} ${sentiment.shortLabel.toLowerCase()}`)
+  .join(', ')
+---
+
+{
+  rated > 0 && (
+    <div
+      role="img"
+      aria-label={description}
+      title={description}
+      class={cn('flex h-2 gap-0.5 overflow-hidden rounded-full', className)}
+      {...divProps}
+    >
+      {segments.map(({ sentiment, count }) => (
+        <span class={cn('h-full', sentiment.classNames.bar)} style={{ flexGrow: count }} />
+      ))}
+    </div>
+  )
+}

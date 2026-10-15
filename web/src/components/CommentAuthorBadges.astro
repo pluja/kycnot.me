@@ -1,7 +1,7 @@
 ---
-import { karmaUnlocksById } from '../constants/karmaUnlocks'
+import { differenceInCalendarDays } from 'date-fns'
+
 import { getServiceUserRoleInfo } from '../constants/serviceUserRoles'
-import { computeKarmaUnlocks } from '../lib/karmaUnlocks'
 import { staffBadgeLabel } from '../lib/permissions'
 
 import BadgeSmall from './BadgeSmall.astro'
@@ -9,124 +9,55 @@ import Tooltip from './Tooltip.astro'
 
 import type { CommentBadgeFields } from '../lib/commentsWithReplies'
 
-type Props = {
-  comment: CommentBadgeFields
-  serviceSlug: string
-}
-
+type Props = { comment: CommentBadgeFields; serviceSlug: string }
 const { comment, serviceSlug } = Astro.props
-const authorUnlocks = computeKarmaUnlocks(comment.author.totalKarma)
-const authorCommentCount = comment.author._count.comments
-const authorStatsText = `${authorCommentCount.toLocaleString()} ${authorCommentCount === 1 ? 'comment' : 'comments'}, ${comment.author.totalKarma.toLocaleString()} karma`
-
-const staffLabel = staffBadgeLabel(comment.author)
-
-const isNewUser =
-  new Date().getTime() - new Date(comment.author.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000
-const shouldShowNewUserAgeBadge = isNewUser && !comment.author.admin && !staffLabel
-const shouldShowSingleReviewBadge =
-  authorCommentCount === 1 &&
-  comment.rating !== null &&
-  !comment.parentId &&
-  !comment.author.admin &&
-  !staffLabel
-const isUserRatingTrustLabel = ['Active user', 'Trusted user'].includes(comment.ratingTrustLabel ?? '')
-const shouldShowUserRatingTrustBadge =
-  comment.rating !== null &&
-  !comment.parentId &&
-  !!comment.ratingTrustLabel &&
-  isUserRatingTrustLabel &&
-  !comment.author.admin &&
-  !staffLabel &&
-  !comment.author.verified
+const { author } = comment
+if (!author) return null
+const staffLabel = staffBadgeLabel(author)
+const affiliations = author.serviceAffiliations.filter((item) => item.service.slug === serviceSlug)
+const isTeam = author.admin || !!staffLabel || affiliations.length > 0
+const accountAgeDays = differenceInCalendarDays(comment.createdAt, author.createdAt)
+const newAccount = !isTeam && accountAgeDays < 30
+const onlyPost = !isTeam && !comment.parentId && author._count.comments === 1
+if (!isTeam && !newAccount && !onlyPost) return null
 ---
 
-<div class="flex w-min grow flex-wrap items-center gap-1">
+<div class="flex flex-wrap items-center gap-1.5">
+  {author.admin && <BadgeSmall icon="ri:shield-star-line" color="green" text="Admin" inlineIcon />}
   {
-    comment.author.admin && (
-      <BadgeSmall icon="ri:shield-star-fill" color="green" text="Admin" variant="faded" inlineIcon />
+    !author.admin && staffLabel && (
+      <BadgeSmall icon="ri:shield-line" color="teal" text={staffLabel} inlineIcon />
     )
   }
   {
-    !comment.author.admin && staffLabel && (
-      <BadgeSmall icon="ri:graduation-cap-fill" color="teal" text={staffLabel} variant="faded" inlineIcon />
-    )
-  }
-
-  {
-    shouldShowNewUserAgeBadge && (
-      <Tooltip text="Account created recently.">
-        <BadgeSmall icon="ri:user-add-fill" color="purple" text="New account" variant="faded" inlineIcon />
-      </Tooltip>
-    )
-  }
-  {
-    shouldShowSingleReviewBadge && (
-      <Tooltip text="The user has only made this comment.">
-        <BadgeSmall icon="ri:chat-new-line" color="purple" text="Single review" variant="faded" inlineIcon />
-      </Tooltip>
-    )
-  }
-  {
-    shouldShowUserRatingTrustBadge && comment.ratingTrustLabel === 'Active user' && (
-      <Tooltip text={authorStatsText}>
-        <BadgeSmall icon="ri:user-follow-line" color="lime" text="Active user" variant="faded" inlineIcon />
-      </Tooltip>
-    )
-  }
-  {
-    shouldShowUserRatingTrustBadge && comment.ratingTrustLabel === 'Trusted user' && (
-      <Tooltip text={authorStatsText}>
-        <BadgeSmall icon="ri:shield-star-line" color="lime" text="Trusted user" variant="faded" inlineIcon />
-      </Tooltip>
-    )
-  }
-  {
-    authorUnlocks.highKarmaBadge && !comment.author.admin && !staffLabel && (
+    affiliations.map((item) => (
       <BadgeSmall
-        icon={karmaUnlocksById.highKarmaBadge.icon}
-        color="lime"
-        text="High Karma"
-        variant="faded"
+        icon={getServiceUserRoleInfo(item.role).icon}
+        color="cyan"
+        text={`${item.service.name} team`}
         inlineIcon
       />
+    ))
+  }
+  {
+    newAccount && (
+      <Tooltip
+        size="sm"
+        text={
+          accountAgeDays < 1
+            ? 'Account created the same day.'
+            : `Account was ${accountAgeDays.toString()} ${accountAgeDays === 1 ? 'day' : 'days'} old.`
+        }
+      >
+        <BadgeSmall icon="ri:user-add-line" color="purple" text="New account" variant="faded" inlineIcon />
+      </Tooltip>
     )
   }
   {
-    authorUnlocks.negativeKarmaBadge && !authorUnlocks.untrustedBadge && (
-      <BadgeSmall
-        icon={karmaUnlocksById.negativeKarmaBadge.icon}
-        color="orange"
-        text="Negative Karma"
-        variant="faded"
-        inlineIcon
-      />
+    onlyPost && (
+      <Tooltip size="sm" text="The author's only post.">
+        <BadgeSmall icon="ri:chat-new-line" color="purple" text="Single post" variant="faded" inlineIcon />
+      </Tooltip>
     )
-  }
-
-  {
-    (authorUnlocks.untrustedBadge || comment.author.spammer) && (
-      <BadgeSmall
-        icon={karmaUnlocksById.untrustedBadge.icon}
-        color="red"
-        text="Untrusted User"
-        variant="faded"
-        inlineIcon
-      />
-    )
-  }
-
-  {
-    comment.author.serviceAffiliations
-      .filter((affiliation) => affiliation.service.slug === serviceSlug)
-      .map((affiliation) => {
-        const roleInfo = getServiceUserRoleInfo(affiliation.role)
-        return (
-          <BadgeSmall icon={roleInfo.icon} color={roleInfo.color} variant="faded" inlineIcon>
-            {roleInfo.label} at{' '}
-            <a href={`/service/${affiliation.service.slug}`}>{affiliation.service.name}</a>
-          </BadgeSmall>
-        )
-      })
   }
 </div>
