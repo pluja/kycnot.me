@@ -6,6 +6,7 @@
     "dev": "astro dev",
     "build": "npm run db-gen && npm run build:astro && npm run build:server-init",
     "build:astro": "astro build --remote",
+    "patch-deps": "patch-package --error-on-fail --error-on-warn",
     "build:server-init": "esbuild src/server-init.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server/server-init.js",
     "preview": "node dist/server/server-init.js & astro preview",
     "astro": "astro",
@@ -109,6 +110,7 @@
     "eslint-plugin-import": "2.32.0",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "globals": "17.4.0",
+    "patch-package": "8.0.1",
     "prettier": "3.8.1",
     "prettier-plugin-astro": "0.14.1",
     "prisma": "6.11.1",
@@ -123,5 +125,8 @@
     "vite-plugin-devtools-json": "1.0.0",
     "workbox-core": "7.4.0",
     "workbox-precaching": "7.4.0"
+  },
+  "overrides": {
+    "vite": "^6.4.2"
   }
 }

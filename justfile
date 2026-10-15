@@ -181,6 +181,10 @@ _deploy env mode ssh_var dir_var confirm image_tag:
 dev-database:
   docker compose -f docker-compose.yml -f docker-compose.dev.yml up database redis db-admin
 
+# Run every check a commit must pass (the pre-commit hook runs `scripts/check.sh --staged`)
+check:
+  scripts/check.sh
+
 # Create the throwaway database `npm run db-drift` replays migrations into (Prisma empties it but will not create it)
 db-shadow:
   #!/usr/bin/env bash

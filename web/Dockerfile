@@ -4,8 +4,10 @@ WORKDIR /app
 
 COPY web/package.json web/package-lock.json ./
 COPY web/.npmrc .npmrc
+COPY web/patches ./patches
 
-RUN npm ci
+# .npmrc turns off install scripts, so dependency patches are applied here.
+RUN npm ci && npm run patch-deps
 
 COPY web/ .
 

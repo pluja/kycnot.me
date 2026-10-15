@@ -138,11 +138,7 @@ export default defineConfig({
           // standard nofollow + security set on every external link.
           rel: (/** @type {{ properties?: { rel?: string | string[] } }} */ element) => {
             const existing = element.properties?.rel
-            const existingArray = Array.isArray(existing)
-              ? existing
-              : existing
-                ? [existing]
-                : []
+            const existingArray = Array.isArray(existing) ? existing : existing ? [existing] : []
             if (existingArray.includes('sponsored')) {
               return ['sponsored', 'noopener', 'noreferrer']
             }
@@ -219,6 +215,7 @@ export default defineConfig({
     // #endregion
 
     '/service/[...slug]/review': '/service/[...slug]#comments',
+    '/docs/karma': '/docs/trust',
   },
   env: {
     schema: {

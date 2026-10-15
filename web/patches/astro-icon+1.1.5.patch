@@ -1,0 +1,14 @@
+diff --git a/node_modules/astro-icon/components/Icon.astro b/node_modules/astro-icon/components/Icon.astro
+index 6c61882..0dd51b1 100644
+--- a/node_modules/astro-icon/components/Icon.astro
++++ b/node_modules/astro-icon/components/Icon.astro
+@@ -30,7 +30,8 @@ const req = Astro.request;
+ const { name = "", title, desc, "is:inline": inline = false, ...props } = Astro.props;
+ const map = cache.get(req) ?? new Map();
+ const i = map.get(name) ?? 0;
+-map.set(name, i + 1);
++// An inline icon writes no symbol, so it must not take the first use from a later sprite icon.
++if (!inline) map.set(name, i + 1);
+ cache.set(req, map);
+ 
+ const { include = {} } = config;

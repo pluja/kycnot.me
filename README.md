@@ -1,6 +1,11 @@
 # KYCnot.me
 
-[KYCnot.me](https://kycnot.me)
+[KYCnot.me](https://kycnot.me) lists cryptocurrency services that work without KYC, with scores, user reviews and the
+team's own checks.
+
+- **Source code:** [tig.cx/pluja/kycnotme](https://tig.cx/pluja/kycnotme)
+- **Mirror and issues:** [github.com/pluja/kycnot.me](https://github.com/pluja/kycnot.me). Report website bugs in
+  its [issue tracker](https://github.com/pluja/kycnot.me/issues).
 
 ## Development
 
@@ -22,6 +27,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --wait data
 cd web
 nvm install
 npm i
+npm run patch-deps
 cp -n .env.example .env
 npm run db-reset
 ```
