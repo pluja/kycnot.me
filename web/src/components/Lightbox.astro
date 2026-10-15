@@ -4,57 +4,80 @@ import { Icon } from 'astro-icon/components'
 
 <div
   class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Full size image"
   data-lightbox-overlay
 >
-  <button type="button" class="absolute inset-0 cursor-default" data-lightbox-close aria-label="Close"></button>
+  <button
+    type="button"
+    class="absolute inset-0 cursor-default"
+    data-lightbox-close
+    tabindex="-1"
+    aria-hidden="true"></button>
   <button
     type="button"
     class="absolute top-4 right-4 z-10 flex size-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
     data-lightbox-close
+    data-lightbox-close-button
     aria-label="Close"
   >
     <Icon name="ri:close-line" class="size-6" />
   </button>
-  <img
-    src=""
-    alt="Evidence at full size"
-    class="relative max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
-    data-lightbox-img
-  />
+  <img src="" alt="" class="relative max-h-[90vh] max-w-[90vw] rounded-lg object-contain" data-lightbox-img />
 </div>
 
 <script>
   ////////////////////////////////////////////////////////////
-  // Optional script for the evidence image lightbox.       //
-  // Any [data-lightbox-trigger] with a data-lightbox-src    //
-  // opens the shared overlay at full size.                 //
+  // Optional script for the image lightbox.                //
+  // A click on any [data-lightbox-trigger] link opens its  //
+  // image in the overlay instead of a new tab. Listening   //
+  // on the document covers images loaded later by htmx.    //
   ////////////////////////////////////////////////////////////
-  document.addEventListener('astro:page-load', () => {
-    const overlay = document.querySelector<HTMLDivElement>('[data-lightbox-overlay]')
-    const img = document.querySelector<HTMLImageElement>('[data-lightbox-img]')
-    if (!overlay || !img) return
+  const elements = () => ({
+    overlay: document.querySelector<HTMLDivElement>('[data-lightbox-overlay]'),
+    image: document.querySelector<HTMLImageElement>('[data-lightbox-img]'),
+  })
+  let opener: HTMLAnchorElement | null = null
 
-    document.querySelectorAll<HTMLButtonElement>('[data-lightbox-trigger]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const src = btn.dataset.lightboxSrc
-        if (!src) return
-        img.src = src
-        overlay.classList.remove('hidden')
-        overlay.classList.add('flex')
-        document.body.style.overflow = 'hidden'
-      })
-    })
+  const close = () => {
+    const { overlay, image } = elements()
+    if (!overlay || !image) return
+    overlay.classList.add('hidden')
+    overlay.classList.remove('flex')
+    image.src = ''
+    document.body.style.overflow = ''
+    opener?.focus()
+    opener = null
+  }
 
-    const close = () => {
-      overlay.classList.add('hidden')
-      overlay.classList.remove('flex')
-      img.src = ''
-      document.body.style.overflow = ''
+  document.addEventListener('click', (event) => {
+    if (!(event.target instanceof Element)) return
+    if (event.target.closest('[data-lightbox-close]')) {
+      close()
+      return
     }
+    const trigger = event.target.closest<HTMLAnchorElement>('a[data-lightbox-trigger]')
+    const { overlay, image } = elements()
+    if (!trigger || !overlay || !image || event.ctrlKey || event.metaKey) return
+    event.preventDefault()
+    opener = trigger
+    image.src = trigger.href
+    image.alt = trigger.querySelector('img')?.alt ?? ''
+    overlay.classList.remove('hidden')
+    overlay.classList.add('flex')
+    document.body.style.overflow = 'hidden'
+    overlay.querySelector<HTMLButtonElement>('[data-lightbox-close-button]')?.focus()
+  })
 
-    overlay.querySelectorAll('[data-lightbox-close]').forEach((el) => el.addEventListener('click', close))
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && !overlay.classList.contains('hidden')) close()
-    })
+  document.addEventListener('keydown', (event) => {
+    const overlay = elements().overlay
+    if (!overlay?.classList.contains('flex')) return
+    if (event.key === 'Escape') close()
+    // The close button is the dialog's only control, so Tab stays on it.
+    if (event.key === 'Tab') {
+      event.preventDefault()
+      overlay.querySelector<HTMLButtonElement>('[data-lightbox-close-button]')?.focus()
+    }
   })
 </script>

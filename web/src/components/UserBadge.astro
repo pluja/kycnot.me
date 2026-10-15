@@ -1,6 +1,8 @@
 ---
 import { tv, type VariantProps } from 'tailwind-variants'
 
+import { DELETED_ACCOUNT_LABEL } from '../lib/authorName'
+import { cn } from '../lib/cn'
 import { getSizePxFromTailwindClasses } from '../lib/tailwind'
 
 import MyPicture from './MyPicture.astro'
@@ -53,7 +55,6 @@ type UserBadgeUser = Prisma.UserGetPayload<{
     picture: true
   }
 }> & {
-  totalKarma?: number
   _count?: {
     comments?: number
   }
@@ -61,7 +62,7 @@ type UserBadgeUser = Prisma.UserGetPayload<{
 
 type Props = O.Optional<HTMLAttributes<'a'>, 'href'> &
   VariantProps<typeof userBadge> & {
-    user: UserBadgeUser
+    user: UserBadgeUser | null
     classNames?: {
       image?: string
       text?: string
@@ -79,32 +80,33 @@ const {
   title,
   ...htmlProps
 } = Astro.props
-const { base, image, text } = userBadge({ size, noLink })
+const isLinked = !noLink && !!user
+const { base, image, text } = userBadge({ size, noLink: !isLinked })
 
 const imageClassName = image({ class: classNames?.image })
 const imageSizePx = getSizePxFromTailwindClasses(imageClassName, 16)
 
-const commentCount = user._count?.comments
+const commentCount = user?._count?.comments
 const userStatsTitle =
-  typeof commentCount === 'number' && typeof user.totalKarma === 'number'
-    ? `${commentCount.toLocaleString()} ${commentCount === 1 ? 'comment' : 'comments'}, ${user.totalKarma.toLocaleString()} karma`
+  typeof commentCount === 'number'
+    ? `${commentCount.toLocaleString()} ${commentCount === 1 ? 'comment' : 'comments'}`
     : undefined
 
-const Tag = noLink ? 'span' : 'a'
+const Tag = isLinked ? 'a' : 'span'
 ---
 
 <Tag
-  href={Tag === 'a' ? (href ?? `/u/${user.name}`) : undefined}
+  href={isLinked ? (href ?? `/u/${user.name}`) : undefined}
   title={title ?? userStatsTitle}
-  class={base({ class: className })}
+  class={base({ class: cn(className, !user && 'text-day-400') })}
   {...htmlProps}
 >
   {
-    !!user.picture && (
+    !!user?.picture && (
       <MyPicture src={user.picture} height={imageSizePx} width={imageSizePx} class={imageClassName} alt="" />
     )
   }
   <span class={text({ class: classNames?.text })}>
-    {user.displayName ?? user.name}
+    {user ? (user.displayName ?? user.name) : DELETED_ACCOUNT_LABEL}
   </span>
 </Tag>

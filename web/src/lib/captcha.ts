@@ -27,10 +27,7 @@ function createCaptchaToken(payload: CaptchaTokenPayload): string {
   const iv = randomBytes(12)
   const cipher = createCipheriv(CAPTCHA_TOKEN_ALGORITHM, CAPTCHA_TOKEN_KEY, iv)
 
-  const encrypted = Buffer.concat([
-    cipher.update(JSON.stringify(payload), 'utf8'),
-    cipher.final(),
-  ])
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(payload), 'utf8'), cipher.final()])
   const authTag = cipher.getAuthTag()
 
   return `${iv.toString('base64url')}.${authTag.toString('base64url')}.${encrypted.toString('base64url')}`

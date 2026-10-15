@@ -5,21 +5,29 @@ import { hashApiKey } from './lib/apiKey'
 import { ErrorBanners, getMessagesFromUrl } from './lib/errorBanners'
 import { FORM_REPLAY_MARKER, FORM_REPLAY_MAX_CHARS, type ActionFormValues } from './lib/formReplay'
 import { getImpersonationInfo } from './lib/impersonation'
-import { makeUserWithKarmaUnlocks } from './lib/karmaUnlocks'
 import { adminRouteRequiredCapabilities, userCan, userCanAccessAdmin } from './lib/permissions'
 import { prisma } from './lib/prisma'
 import { makeLoginUrl, makeSafeRedirectUrl } from './lib/redirectUrls'
 import { getRedisActionsSessions } from './lib/redis/redisActionsSessions'
+import { makeUserWithTrust } from './lib/trust'
 import { browserOriginForUrl, cookieSecureForUrl } from './lib/urls'
 import { getUserFromCookies } from './lib/userCookies'
 
 const ACTION_SESSION_COOKIE = 'action-session-id'
 
+// showsFeedbackInline names the actions whose forms show their own result, so a page banner would repeat it.
+const showsFeedbackInline = (actionName: string) =>
+  actionName.startsWith('experience.') ||
+  actionName.startsWith('admin.experience.') ||
+  actionName === 'admin.service.deepScan.request' ||
+  actionName === 'comment.create'
+
 function addActionBannerIfNeeded(
   context: Parameters<Parameters<typeof defineMiddleware>[0]>[0],
+  actionName: string,
   error: Parameters<NonNullable<ReturnType<typeof getActionContext>['serializeActionResult']>>[0]['error']
 ) {
-  if (!error || isInputError(error)) return
+  if (!error || isInputError(error) || showsFeedbackInline(actionName)) return
 
   context.locals.banners.add({
     uiMessage: error.message,
@@ -73,7 +81,7 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
 
   if (session) {
     setActionResult(session.actionName, session.actionResult)
-    addActionBannerIfNeeded(context, session.deserializedActionResult.error)
+    addActionBannerIfNeeded(context, session.actionName, session.deserializedActionResult.error)
     context.locals.actionFormValues = session.formValues ?? null
 
     await redisActionsSessions.delete(sessionId)
@@ -91,7 +99,7 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
     const requestCloneForReplay = context.request.clone()
 
     const actionResult = await action.handler()
-    addActionBannerIfNeeded(context, actionResult.error)
+    addActionBannerIfNeeded(context, action.name, actionResult.error)
 
     const submittedFormValues = await readSubmittedFormValues(requestCloneForReplay)
 
@@ -121,6 +129,14 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
       maxAge: redisActionsSessions.expirationTime,
     })
 
+    // Forms that post to a URL with extra query params (an open thread, a
+    // queue filter) come back to that same view.
+    const returnParams = new URLSearchParams(context.url.search)
+    returnParams.delete('_action')
+    const returnQuery = returnParams.toString()
+    const safePathname = `/${context.originPathname.replace(/^[/\\]+/, '')}`
+    const returnPath = returnQuery ? `${safePathname}?${returnQuery}` : safePathname
+
     if (actionResult.error) {
       // Re-render the submitted form. Prefer a same-origin referer (so forms
       // that post to a different page than they live on go back to the form),
@@ -129,9 +145,9 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
       // origin in dev) instead of dropping the user on '/'.
       const referer = context.request.headers.get('Referer')
       const safeReferer = referer ? makeSafeRedirectUrl(referer, browserOriginForUrl(context.url)) : null
-      return context.redirect(safeReferer && safeReferer !== '/' ? safeReferer : context.originPathname)
+      return context.redirect(safeReferer && safeReferer !== '/' ? safeReferer : returnPath)
     }
-    return context.redirect(context.originPathname)
+    return context.redirect(returnPath)
   }
 
   return next()
@@ -139,7 +155,7 @@ const preventFormResubmitAndStoreActionErrors = defineMiddleware(async (context,
 
 const authenticate = defineMiddleware(async (context, next) => {
   const user = await getUserFromCookies(context.cookies)
-  context.locals.user = makeUserWithKarmaUnlocks(user)
+  context.locals.user = await makeUserWithTrust(user)
 
   return next()
 })
@@ -198,7 +214,7 @@ const impersonate = defineMiddleware(async (context, next) => {
 
       if (impersonatedUser) {
         context.locals.actualUser = user
-        context.locals.user = makeUserWithKarmaUnlocks(impersonatedUser)
+        context.locals.user = await makeUserWithTrust(impersonatedUser)
       }
     }
   }
@@ -264,8 +280,8 @@ const errors = defineMiddleware(async (context, next) => {
   return next()
 })
 
-// Slugs are stored lowercase, so a mixed-case service URL can only be a typo
-// or a link someone capitalised. Send it to the page it meant instead of a 404.
+// lowercaseServiceSlug sends a mixed-case service URL to the page it meant instead of a 404: slugs are stored
+// lowercase, so the URL can only be a typo or a link someone capitalised.
 const lowercaseServiceSlug = defineMiddleware(async (context, next) => {
   if (context.request.method !== 'GET' && context.request.method !== 'HEAD') return next()
   const [, slug, rest = ''] = /^\/service\/([^/]+)(\/.*)?$/.exec(context.url.pathname) ?? []

@@ -17,10 +17,7 @@
  */
 export function setPublicPageCacheHeaders(
   headers: Headers,
-  {
-    isAuthenticated,
-    hasErrors = false,
-  }: { isAuthenticated: boolean; hasErrors?: boolean }
+  { isAuthenticated, hasErrors = false }: { isAuthenticated: boolean; hasErrors?: boolean }
 ) {
   if (isAuthenticated || hasErrors) {
     headers.set('Cache-Control', 'private, no-store, no-cache, must-revalidate')

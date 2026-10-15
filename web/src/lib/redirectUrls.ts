@@ -6,7 +6,8 @@ export function makeSafeRedirectUrl(url: string | null | undefined, origin: stri
   if (!url) return '/'
   try {
     const parsed = new URL(url, origin)
-    if (parsed.origin !== origin) return '/'
+    // A path normalized to start with // or /\ is read by browsers as another host.
+    if (parsed.origin !== origin || /^\/[/\\]/.test(parsed.pathname)) return '/'
     return parsed.pathname + parsed.search + parsed.hash
   } catch {
     return '/'

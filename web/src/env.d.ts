@@ -4,15 +4,15 @@ import type { Capability } from './constants/capabilities'
 import type { ServiceEditListFieldId, ServiceEditTextFieldId } from './constants/serviceEditFields'
 import type { ErrorBanners } from './lib/errorBanners'
 import type { ActionFormValues } from './lib/formReplay'
-import type { KarmaUnlocks } from './lib/karmaUnlocks'
+import type { UserTrust } from './lib/trust'
 import type { Prisma } from '@prisma/client'
 import type htmx from 'htmx.org'
 
 declare global {
   namespace App {
     interface Locals {
-      user: (Prisma.UserGetPayload<true> & { karmaUnlocks: KarmaUnlocks }) | null
-      actualUser: (Prisma.UserGetPayload<true> & { karmaUnlocks: KarmaUnlocks }) | null
+      user: (Prisma.UserGetPayload<true> & { trust: UserTrust }) | null
+      actualUser: (Prisma.UserGetPayload<true> & { trust: UserTrust }) | null
       apiKeyAuthenticated: boolean
       banners: ErrorBanners
       userCan: (capability: Capability) => boolean

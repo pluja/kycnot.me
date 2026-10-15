@@ -11,9 +11,10 @@ const untypedServerEnvVariables = loadEnv(mode, process.cwd(), '')
 
 /** Only use when you can't import the variables from `astro:env/server` */
 export function getServerEnvVariable<T extends keyof typeof untypedServerEnvVariables>(
-  name: T
+  name: T,
+  fallback?: string
 ): NonNullable<(typeof untypedServerEnvVariables)[T]> {
-  const value = untypedServerEnvVariables[name]
+  const value = untypedServerEnvVariables[name] || fallback
   if (!value) throw new Error(`${name} environment variable is not set`)
   return value
 }

@@ -13,6 +13,10 @@ const normalize = (str: string): string => {
     .trim()
 }
 
+// xmlText drops the characters XML 1.0 cannot hold, any of which makes a feed fail to parse.
+export const xmlText = (text: string) =>
+  text.replace(/[^\t\n\r\u0020-\uD7FF\uE000-\uFFFD\u{10000}-\u{10FFFF}]/gu, '')
+
 /**
  * Flatten markdown to a single line of plain text, for excerpts and previews.
  * Link text survives, the target is dropped.
@@ -129,12 +133,9 @@ export const transformCase = <T extends string, C extends TransformCaseType>(
   }
 }
 
-/**
- * Trim a pasted block and drop the indentation every line shares. Markdown
- * turns four leading spaces into a code block, so a description pasted from
- * an indented source renders as monospace unless it is normalised on the way
- * in. Relative indentation survives, so nested lists stay nested.
- */
+// normalizeMultilineInput trims a pasted block and drops the indentation every line shares. Markdown turns
+// four leading spaces into a code block, so a description pasted from an indented source renders as
+// monospace unless it is normalised on the way in. Relative indentation survives, so nested lists stay nested.
 export const normalizeMultilineInput = (text: string): string => {
   const lines = text.replace(/\r\n?/g, '\n').split('\n')
   const indents = lines

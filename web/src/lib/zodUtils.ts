@@ -3,6 +3,10 @@ import { round } from 'lodash-es'
 
 import { safeHttpUrl } from './exchange/safeUrl'
 
+// emptyToUndefined treats null and '' as "not provided": Astro coerces empty or absent form fields to null
+// before zod runs.
+export const emptyToUndefined = (value: unknown) => (value === '' || value == null ? undefined : value)
+
 const addZodPipe = (schema: ZodTypeAny, zodPipe?: ZodTypeAny) => {
   return zodPipe ? schema.pipe(zodPipe) : schema
 }
@@ -33,6 +37,20 @@ const hasRenderableContactScheme = (value: string): boolean => {
     return false
   }
 }
+
+export const noControlCharacters = /^\P{Cc}*$/u
+
+export const DISPLAY_NAME_MAX_LENGTH = 50
+export const displayNameSchema = z
+  .string()
+  .max(DISPLAY_NAME_MAX_LENGTH, `Display name must be ${String(DISPLAY_NAME_MAX_LENGTH)} characters or less`)
+  .regex(noControlCharacters, 'Display name cannot contain control characters')
+
+export const httpUrlSchema = z
+  .string()
+  .url('Must be a valid URL')
+  .max(255, 'URL must be 255 characters or less')
+  .refine((value) => safeHttpUrl(value) !== null, 'URL must start with http:// or https://')
 
 export const zodUrlOptionalProtocol = z.preprocess(
   cleanUrl,
@@ -95,23 +113,26 @@ export const stringListOfSlugsSchemaRequired = z.preprocess(
   z.array(z.string().regex(/^[a-z0-9-_A-Z]+$/)).min(1)
 )
 
+// MAX_URLS_PER_LIST is well above any listing so far; the worker visits each site, so the list must stay bounded.
+const MAX_URLS_PER_LIST = 30
+
 export const stringListOfUrlsSchema = z.preprocess(
   stringToArrayFactory(/[\s,\n]+/),
-  z.array(zodUrlOptionalProtocol).default([])
+  z.array(zodUrlOptionalProtocol).max(MAX_URLS_PER_LIST).default([])
 )
 
 export const stringListOfUrlsSchemaRequired = z.preprocess(
   stringToArrayFactory(/[\s,\n]+/),
-  z.array(zodUrlOptionalProtocol).min(1)
+  z.array(zodUrlOptionalProtocol).min(1).max(MAX_URLS_PER_LIST)
 )
 
-// Split on line breaks only: a phone number contains spaces.
+// stringListOfContactMethodsSchema splits on line breaks only: a phone number contains spaces.
 export const stringListOfContactMethodsSchema = z.preprocess(
   stringToArrayFactory(/[\r\n]+/),
   z.array(zodContactMethod).default([])
 )
 
-export const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB
 
 export const ACCEPTED_IMAGE_TYPES = [
   'image/png',
@@ -135,3 +156,9 @@ export const imageFileSchema = z
   )
 
 export const imageFileSchemaRequired = imageFileSchema.refine((file) => !!file, 'Required')
+
+// formCheckbox reads an HTML checkbox: present ("on") is true, absent is false.
+export const formCheckbox = z.preprocess(
+  (value) => value === true || value === 'true' || value === 'on',
+  z.boolean()
+)

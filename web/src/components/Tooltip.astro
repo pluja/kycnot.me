@@ -13,6 +13,7 @@ type Props<Component extends AstroComponent | HTMLTag = 'span'> = PolymorphicCom
   color?: 'black' | 'white' | 'zinc-700'
   position?: 'bottom' | 'left' | 'right' | 'top'
   enabled?: boolean
+  size?: 'md' | 'sm'
 }
 
 const {
@@ -23,6 +24,7 @@ const {
   color = 'zinc-700',
   position = 'top',
   enabled = true,
+  size = 'md',
   ...htmlProps
 } = Astro.props
 ---
@@ -37,7 +39,8 @@ const {
         class={cn(
           'pointer-events-none hidden select-none group-hover/tooltip:flex',
           'scale-75 opacity-0 transition-all transition-discrete duration-100 ease-out-cubic group-hover/tooltip:scale-100 group-hover/tooltip:opacity-100 starting:group-hover/tooltip:scale-75 starting:group-hover/tooltip:opacity-0',
-          'z-1000 w-max max-w-sm rounded-lg px-3 py-2 font-sans text-sm font-normal tracking-normal text-pretty wrap-anywhere whitespace-pre-wrap',
+          'z-1000 w-max rounded-lg font-sans font-normal tracking-normal text-pretty wrap-anywhere whitespace-pre-wrap',
+          size === 'sm' ? 'max-w-xs px-2 py-1 text-xs' : 'max-w-sm px-3 py-2 text-sm',
           // Position classes
           {
             'absolute -top-2 left-1/2 origin-bottom -translate-x-1/2 translate-y-[calc(-100%+0.5rem)] text-center group-hover/tooltip:-translate-y-full starting:group-hover/tooltip:translate-y-[calc(-100%+0.25rem)]':

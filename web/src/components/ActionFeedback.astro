@@ -1,0 +1,27 @@
+---
+import { isInputError } from 'astro:actions'
+
+import { cn } from '../lib/cn'
+
+import type { ActionError } from 'astro:actions'
+
+type Props = {
+  feedback: { message: string; error?: ActionError } | null
+  class?: string
+}
+const { feedback, class: className } = Astro.props
+const error = feedback?.error
+---
+
+{
+  feedback &&
+    (error ? (
+      <p role="alert" class={cn('rounded-lg border border-red-800 p-3 text-sm text-red-300', className)}>
+        {isInputError(error) ? Object.values(error.fields).flat().join(' ') : error.message}
+      </p>
+    ) : (
+      <p role="status" class={cn('text-sm text-green-300', className)}>
+        {feedback.message}
+      </p>
+    ))
+}

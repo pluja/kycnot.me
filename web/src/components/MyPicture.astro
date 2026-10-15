@@ -35,10 +35,7 @@ const {
 const fallbackImage = fallback ? fallbackImages[fallback] : undefined
 
 const rawSrc = typeof src === 'string' ? src : (src ?? fallbackImage)
-const finalSrc =
-  typeof rawSrc === 'string' && rawSrc.startsWith('/')
-    ? `${siteOrigin}${rawSrc}`
-    : rawSrc
+const finalSrc = typeof rawSrc === 'string' && rawSrc.startsWith('/') ? `${siteOrigin}${rawSrc}` : rawSrc
 
 const isSvg =
   (typeof finalSrc === 'string' && finalSrc.toLowerCase().endsWith('.svg')) ||

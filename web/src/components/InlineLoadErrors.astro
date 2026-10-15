@@ -1,0 +1,12 @@
+---
+// Errors caught by Astro.locals.banners inside a component load after the layout has rendered its
+// banners, and htmx fragments never show them, so such components list them here.
+---
+
+{
+  Astro.locals.banners.errors.map((message) => (
+    <p role="alert" class="rounded-lg border border-red-800 p-3 text-sm text-red-300">
+      {message}
+    </p>
+  ))
+}

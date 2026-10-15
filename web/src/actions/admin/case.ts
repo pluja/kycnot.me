@@ -6,15 +6,12 @@ import { canParticipateInCase, isCaseStaff, isCasePublished } from '../../lib/ca
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { deleteFileLocally, saveFileLocally } from '../../lib/fileStorage'
 import { prisma } from '../../lib/prisma'
-import { imageFileSchema } from '../../lib/zodUtils'
+import { emptyToUndefined, imageFileSchema } from '../../lib/zodUtils'
 
 import type { Capability } from '../../constants/capabilities'
 
 const manageCases = { capability: 'cases:manage' } satisfies { capability: Capability }
 
-// Astro coerces empty/absent form fields to null before zod runs, so optional
-// fields must treat null (and '') as "not provided".
-const emptyToUndefined = (value: unknown) => (value === '' || value === null ? undefined : value)
 const optionalText = z.preprocess(emptyToUndefined, z.string().optional())
 const optionalPositiveInt = z.preprocess(emptyToUndefined, z.coerce.number().int().positive().optional())
 const optionalDate = z.preprocess(emptyToUndefined, z.coerce.date().optional())

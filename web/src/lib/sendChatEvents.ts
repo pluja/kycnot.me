@@ -6,15 +6,13 @@ import { getRedisServerEvents } from './redis/redisServerEvents'
 import type { Prisma } from '@prisma/client'
 
 async function sendNewChatMessage(
-  conversationType: 'suggestion' | 'contact',
+  conversationType: 'contact' | 'suggestion',
   id: number,
   recipientIds: number[]
 ) {
   const redisServerEvents = await getRedisServerEvents()
   await Promise.all(
-    recipientIds.map((userId) =>
-      redisServerEvents.send(userId, 'new-chat-message', { conversationType, id })
-    )
+    recipientIds.map((userId) => redisServerEvents.send(userId, 'new-chat-message', { conversationType, id }))
   )
 }
 
@@ -50,9 +48,7 @@ export async function sendContactChatMessageEvents(threadId: number, senderUserI
       ? { OR: [{ admin: true }, { capabilities: { hasSome: ['contact:manage', 'contact:manage-urgent'] } }] }
       : { OR: [{ admin: true }, { capabilities: { has: 'contact:manage' } }] }
 
-  const staffIds = (await prisma.user.findMany({ where: staffWhere, select: { id: true } })).map(
-    (u) => u.id
-  )
+  const staffIds = (await prisma.user.findMany({ where: staffWhere, select: { id: true } })).map((u) => u.id)
 
   const recipientIds = without(
     uniq([...(thread.authorId ? [thread.authorId] : []), ...staffIds]),

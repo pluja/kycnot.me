@@ -3,26 +3,20 @@ import { Icon } from 'astro-icon/components'
 
 import { cn } from '../lib/cn'
 
-type SectionLink = {
-  href: string
-  text: string
-  /** Rendered as an info pill. Defaults to true for links into /about. */
-  info?: boolean
-}
+type SectionLink = { href: string; text: string }
 
 type Props = {
   title: string
-  /** Anchor for the whole header row. */
   id?: string
   headingId?: string
-  /** Right-hand links, in order. Explainers into /about get the info pill, the rest a plain arrow link. */
+  // links go on the right, in order. Explainers into /docs get the info pill, the rest a plain arrow link.
   links?: SectionLink[]
   class?: string
 }
 
 const { title, id, headingId, links = [], class: className } = Astro.props
 
-const isInfo = (link: SectionLink) => link.info ?? link.href.startsWith('/about')
+const isInfo = (link: SectionLink) => link.href.startsWith('/docs')
 ---
 
 <div

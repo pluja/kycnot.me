@@ -11,6 +11,9 @@ type Props = HTMLAttributes<'nav'> & {
   totalPages: number
   currentUrl?: URL | string
   sortSeed?: string
+  hash?: string
+  // pageParam names the query parameter, for a page with more than one paged list.
+  pageParam?: string
 }
 
 const {
@@ -18,10 +21,14 @@ const {
   totalPages,
   currentUrl = Astro.url,
   sortSeed,
+  hash,
+  pageParam,
   class: className,
   ...navProps
 } = Astro.props
 
+const pageUrl = (page: number) =>
+  `${createPageUrl(page, currentUrl, { 'sort-seed': sortSeed }, pageParam)}${hash ? `#${hash}` : ''}`
 const prevPage = currentPage > 1 ? currentPage - 1 : null
 const nextPage = currentPage < totalPages ? currentPage + 1 : null
 
@@ -65,70 +72,56 @@ const getVisiblePages = () => {
 
   return pages
 }
-const PrevTag = prevPage ? 'a' : 'span'
-const NextTag = nextPage ? 'a' : 'span'
+const itemClass = 'flex size-8 items-center justify-center rounded-md tabular-nums'
+const linkClass = cn(itemClass, 'text-day-400 hover:bg-night-700 hover:text-day-100')
 ---
 
 <nav
   aria-label="Pagination"
   {...navProps}
-  class={cn('flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-lg sm:flex-nowrap', className)}
+  class={cn('flex flex-wrap items-center justify-center gap-1 text-sm', className)}
 >
-  <PrevTag
-    href={PrevTag === 'a' && prevPage
-      ? createPageUrl(prevPage, currentUrl, { 'sort-seed': sortSeed })
-      : undefined}
-    class={cn(
-      'flex w-[5.5ch] items-center justify-end text-green-500 hover:text-green-400',
-      !prevPage && 'pointer-events-none opacity-50'
-    )}
-    aria-label="Previous page"
-  >
-    <Icon name="ri:arrow-left-s-line" class="size-6 shrink-0" />
-    <span class="text-green-500">Prev</span>
-  </PrevTag>
-
-  <div class="order-first flex w-full items-center justify-center gap-4 sm:order-0 sm:w-auto">
-    {
-      getVisiblePages().map((page) => {
-        if (page === '...') {
-          return <span class="text-gray-400">...</span>
-        }
-
-        const isCurrentPage = page === currentPage
-        return isCurrentPage ? (
-          <button
-            class="flex size-10 items-center justify-center rounded-lg bg-green-500 text-white"
-            aria-current="page"
-            aria-label={`Page ${page.toLocaleString()}`}
-            disabled
-          >
-            {page}
-          </button>
-        ) : (
-          <a
-            href={createPageUrl(page, currentUrl, { 'sort-seed': sortSeed })}
-            class="text-white hover:text-gray-300"
-            aria-label={`Page ${page.toLocaleString()}`}
-          >
-            {page}
-          </a>
-        )
-      })
-    }
-  </div>
-
-  <NextTag
-    href={NextTag === 'a' && nextPage
-      ? createPageUrl(nextPage, currentUrl, { 'sort-seed': sortSeed })
-      : undefined}
-    class={cn(
-      'flex w-[5.5ch] items-center justify-start text-green-500 hover:text-green-400',
-      !nextPage && 'pointer-events-none opacity-50'
-    )}
-    aria-label="Next page"
-  >
-    <span class="text-green-500">Next</span>
-    <Icon name="ri:arrow-right-s-line" class="size-6 shrink-0" />
-  </NextTag>
+  {
+    prevPage ? (
+      <a href={pageUrl(prevPage)} class={linkClass} aria-label="Previous page" rel="prev">
+        <Icon name="ri:arrow-left-s-line" class="size-5" />
+      </a>
+    ) : (
+      <span class={cn(itemClass, 'text-day-600')} aria-hidden="true">
+        <Icon name="ri:arrow-left-s-line" class="size-5" />
+      </span>
+    )
+  }
+  {
+    getVisiblePages().map((page) =>
+      page === '...' ? (
+        <span class={cn(itemClass, 'text-day-500')} aria-hidden="true">
+          …
+        </span>
+      ) : page === currentPage ? (
+        <span
+          class={cn(itemClass, 'bg-green-500/15 font-medium text-green-300')}
+          aria-current="page"
+          aria-label={`Page ${page.toLocaleString()}`}
+        >
+          {page}
+        </span>
+      ) : (
+        <a href={pageUrl(page)} class={linkClass} aria-label={`Page ${page.toLocaleString()}`}>
+          {page}
+        </a>
+      )
+    )
+  }
+  {
+    nextPage ? (
+      <a href={pageUrl(nextPage)} class={linkClass} aria-label="Next page" rel="next">
+        <Icon name="ri:arrow-right-s-line" class="size-5" />
+      </a>
+    ) : (
+      <span class={cn(itemClass, 'text-day-600')} aria-hidden="true">
+        <Icon name="ri:arrow-right-s-line" class="size-5" />
+      </span>
+    )
+  }
 </nav>

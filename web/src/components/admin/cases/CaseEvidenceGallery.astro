@@ -12,6 +12,7 @@ import InputSelect from '../../InputSelect.astro'
 import InputSubmitButton from '../../InputSubmitButton.astro'
 import InputText from '../../InputText.astro'
 import InputTextArea from '../../InputTextArea.astro'
+import LightboxImage from '../../LightboxImage.astro'
 import TimeFormatted from '../../TimeFormatted.astro'
 import DeleteConfirmButton from '../DeleteConfirmButton.astro'
 
@@ -76,27 +77,17 @@ const textItems = evidence.filter((item) => !item.imageUrl)
                 </div>
               )}
 
-              <button
-                type="button"
-                class="block w-full cursor-zoom-in"
-                data-lightbox-trigger
-                data-lightbox-src={mediaUrl}
-              >
-                <img
-                  src={mediaUrl}
-                  alt={item.description ?? 'Case evidence'}
-                  width="220"
-                  height="220"
-                  loading="lazy"
-                  decoding="async"
-                  class="aspect-square w-full rounded-sm object-cover"
-                />
-              </button>
+              <LightboxImage src={mediaUrl} alt={item.description ?? 'Case evidence'} />
 
               <div class="mt-2 space-y-1">
                 <div class="flex flex-wrap items-center gap-1">
                   <BadgeSmall text={typeInfo.label} variant="faded" color="gray" icon={typeInfo.icon} />
-                  <BadgeSmall text={visInfo.label} variant="faded" color={visInfo.color} icon={visInfo.icon} />
+                  <BadgeSmall
+                    text={visInfo.label}
+                    variant="faded"
+                    color={visInfo.color}
+                    icon={visInfo.icon}
+                  />
                 </div>
                 {item.description && <p class="text-sm font-medium text-day-100">{item.description}</p>}
                 {item.bodyMd && (
@@ -130,8 +121,15 @@ const textItems = evidence.filter((item) => !item.imageUrl)
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="flex flex-wrap items-center gap-2">
                   <BadgeSmall text={typeInfo.label} variant="faded" color="gray" icon={typeInfo.icon} />
-                  <BadgeSmall text={visInfo.label} variant="faded" color={visInfo.color} icon={visInfo.icon} />
-                  {item.description && <span class="text-sm font-medium text-day-100">{item.description}</span>}
+                  <BadgeSmall
+                    text={visInfo.label}
+                    variant="faded"
+                    color={visInfo.color}
+                    icon={visInfo.icon}
+                  />
+                  {item.description && (
+                    <span class="text-sm font-medium text-day-100">{item.description}</span>
+                  )}
                 </div>
                 {canManage && (
                   <DeleteConfirmButton
@@ -163,11 +161,7 @@ const textItems = evidence.filter((item) => !item.imageUrl)
     )
   }
 
-  {
-    evidence.length === 0 && !canManage && (
-      <p class="text-sm text-day-400">No evidence attached.</p>
-    )
-  }
+  {evidence.length === 0 && !canManage && <p class="text-sm text-day-400">No evidence attached.</p>}
 
   {
     canManage && (

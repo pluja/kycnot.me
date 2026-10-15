@@ -37,7 +37,8 @@ export function absoluteSiteUrl(path: string): string {
 export const createPageUrl = (
   page: number,
   currentUrl: URL | string,
-  otherParams?: Record<string, string | null | undefined> | URLSearchParams
+  otherParams?: Record<string, string | null | undefined> | URLSearchParams,
+  pageParam = 'page'
 ) => {
   const url = new URL(currentUrl)
   if (otherParams) {
@@ -53,7 +54,7 @@ export const createPageUrl = (
       })
     }
   }
-  url.searchParams.set('page', page.toString())
+  url.searchParams.set(pageParam, page.toString())
 
   return url.pathname + url.search
 }
@@ -190,4 +191,14 @@ export function makeFilterUrl(currentUrl: URL, changes: Record<string, string | 
     else url.searchParams.set(key, value)
   }
   return `${url.pathname}${url.search}`
+}
+
+// actionInPlace targets an Astro form action while keeping the current query,
+// so the post-action redirect lands back on the same view.
+export function actionInPlace(action: { toString: () => string }, currentUrl: URL, anchor?: string) {
+  const params = new URLSearchParams(currentUrl.search)
+  new URLSearchParams(action.toString()).forEach((value, key) => {
+    params.set(key, value)
+  })
+  return `${currentUrl.pathname}?${params.toString()}${anchor ? `#${anchor}` : ''}`
 }

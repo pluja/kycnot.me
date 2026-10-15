@@ -14,7 +14,13 @@ import type { z } from 'astro/zod'
 
 type CapabilityPermission = { capability: Capability }
 type SpecialUserPermission = 'admin' | 'verified'
-type Permission = CapabilityPermission | SpecialUserPermission | 'guest' | 'not-spammer' | 'user'
+type Permission =
+  | CapabilityPermission
+  | SpecialUserPermission
+  | 'authenticated'
+  | 'guest'
+  | 'not-spammer'
+  | 'user'
 
 type ActionAPIContextWithUser = ActionAPIContext & {
   locals: {
@@ -31,7 +37,7 @@ type ActionHandlerWithUser<TInputSchema, TOutput> = TInputSchema extends z.ZodTy
     ) => MaybePromise<TOutput>
 
 export function defineProtectedAction<
-  P extends Permission | (CapabilityPermission | SpecialUserPermission)[],
+  P extends (CapabilityPermission | SpecialUserPermission)[] | Permission,
   TOutput,
   TAccept extends ActionAccept | undefined = undefined,
   TInputSchema extends z.ZodType | undefined = TAccept extends 'form' ? z.ZodType<FormData> : undefined,
@@ -68,6 +74,9 @@ export function defineProtectedAction<
       }
 
       const user = context.locals.user
+      if (permissions === 'authenticated') {
+        return handler(input, context as ActionAPIContextWithUser)
+      }
       if (user.spammer) {
         throw new ActionError({
           code: 'FORBIDDEN',

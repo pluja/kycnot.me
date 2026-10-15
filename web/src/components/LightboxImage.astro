@@ -1,0 +1,32 @@
+---
+import { cn } from '../lib/cn'
+
+type Props = {
+  src: string
+  alt: string
+  class?: string
+}
+
+// LightboxImage is a plain link, so without JS the image opens in a new tab; a page with <Lightbox />
+// shows it in place. It uses <img>, not the optimizer, because private case and proof images must not
+// reach the public /_image route.
+const { src, alt, class: className } = Astro.props
+---
+
+<a
+  href={src}
+  target="_blank"
+  rel="noopener noreferrer"
+  data-lightbox-trigger
+  class={cn('block cursor-zoom-in overflow-hidden rounded-sm', className)}
+>
+  <img
+    src={src}
+    alt={alt}
+    width="220"
+    height="220"
+    loading="lazy"
+    decoding="async"
+    class="aspect-square w-full object-cover"
+  />
+</a>

@@ -131,3 +131,7 @@ export function pluralizeAny(
   const name = count === 1 ? singular : plural
   return transformCase(name, caseType)
 }
+
+// countOf writes a number with the noun that fits it, such as "1 post" or "3 posts".
+export const countOf = (count: number, one: string, many: string) =>
+  `${count.toLocaleString()} ${count === 1 ? one : many}`
