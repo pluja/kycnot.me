@@ -45,8 +45,6 @@ type Props = {
   onionUrls: string[]
   i2pUrls: string[]
   activeEvents: ActiveEvent[]
-  averageUserRating: number | null
-  ratingsCount: number
   registrationCountry: CountryInfo | null
   registeredCompanyName: string | null
   verificationInfo: ReturnType<typeof getVerificationStatusInfo> | null
@@ -62,16 +60,11 @@ const {
   onionUrls,
   i2pUrls,
   activeEvents,
-  averageUserRating,
-  ratingsCount,
   registrationCountry,
   registeredCompanyName,
   verificationInfo,
   guaranteeSummaryLabel = null,
 } = Astro.props
-
-const showRating = ratingsCount > 0 && averageUserRating !== null
-const ratingLabel = showRating ? averageUserRating.toFixed(1) : null
 
 const shapedAttributes = kycAttributes.map((attr) => ({
   ...attr,
@@ -114,7 +107,6 @@ const hasServiceInfo =
   torSwapUrl !== null ||
   i2pUrl !== null ||
   activeEvents.length > 0 ||
-  showRating ||
   registrationCountry !== null
 
 function buildOverlaySwapUrl(overlayUrl: string, sourceUrl: string | null): string {
@@ -196,36 +188,6 @@ function buildOverlaySwapUrl(overlayUrl: string, sourceUrl: string | null): stri
               <span class="hidden text-day-400 sm:inline">Registered in</span>
               <span class="font-semibold text-day-100">{registrationCountry.name}</span>
             </span>
-          )}
-
-          {showRating && (
-            <a
-              href={`/service/${serviceSlug}#comments`}
-              target="_blank"
-              rel="noopener"
-              class="group/rating inline-flex h-7 items-center gap-1.5 rounded-md bg-yellow-500/[0.06] px-2 text-[11px] text-day-200 ring-1 ring-yellow-500/20 transition-colors ring-inset hover:bg-yellow-500/10 hover:ring-yellow-400/40"
-              title={`${ratingLabel}/5 from ${ratingsCount} user ${ratingsCount === 1 ? 'review' : 'reviews'}. Click to read reviews.`}
-            >
-              <Icon
-                name="ri:star-fill"
-                class="size-3.5 text-yellow-400 transition-transform group-hover/rating:scale-110"
-                aria-hidden="true"
-              />
-              <span class="font-semibold text-day-100 tabular-nums">{ratingLabel}</span>
-              <span class="hidden text-day-500 sm:inline">/5</span>
-              <span class="text-day-700" aria-hidden="true">
-                ·
-              </span>
-              <span class="text-day-400">
-                <span class="tabular-nums">{ratingsCount.toLocaleString()}</span>
-                <span class="hidden sm:inline"> {ratingsCount === 1 ? 'review' : 'reviews'}</span>
-              </span>
-              <Icon
-                name="ri:arrow-right-up-line"
-                class="size-3 text-day-600 transition-colors group-hover/rating:text-yellow-300"
-                aria-hidden="true"
-              />
-            </a>
           )}
 
           {torSwapUrl && (

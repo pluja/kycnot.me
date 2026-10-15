@@ -5,20 +5,9 @@
 import { KYCNOTME_SCHEMA_MINI } from '../schema'
 import { absoluteSiteUrl } from '../urls'
 
-import {
-  faqAnswerToPlainText,
-  FAQ_ITEMS,
-  formatCurrencyHumanName,
-  type SwapPair,
-} from './swapPageInfoCore'
+import { faqAnswerToPlainText, FAQ_ITEMS, formatCurrencyHumanName, type SwapPair } from './swapPageInfoCore'
 
-import type {
-  FAQPage,
-  Organization,
-  Question,
-  WebApplication,
-  WithContext,
-} from 'schema-dts'
+import type { FAQPage, Organization, Question, WebApplication, WithContext } from 'schema-dts'
 
 export * from './swapPageInfoCore'
 
@@ -83,10 +72,7 @@ export type BreadcrumbItem = { name: string; url?: string }
 // third level naming the curated pair.
 export function buildBreadcrumbs(pair: SwapPair | null): BreadcrumbItem[] {
   if (!pair) {
-    return [
-      { name: 'Home', url: '/' },
-      { name: 'Swap' },
-    ]
+    return [{ name: 'Home', url: '/' }, { name: 'Swap' }]
   }
   return [
     { name: 'Home', url: '/' },

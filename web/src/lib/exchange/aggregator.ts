@@ -1,4 +1,4 @@
-import { AttributeCategory, CommentStatus, EventType } from '@prisma/client'
+import { AttributeCategory, EventType } from '@prisma/client'
 
 import {
   AmountSide,
@@ -74,20 +74,6 @@ const displayServiceSelect = {
   i2pUrls: true,
   registrationCountryCode: true,
   registeredCompanyName: true,
-  averageUserRating: true,
-  trustWeightedUserRating: true,
-  _count: {
-    select: {
-      comments: {
-        where: {
-          ratingActive: true,
-          status: { in: [CommentStatus.APPROVED, CommentStatus.VERIFIED] },
-          parentId: null,
-          ratingMuted: false,
-        },
-      },
-    },
-  },
   attributes: {
     where: { attribute: { is: { category: AttributeCategory.KYC } } },
     select: {

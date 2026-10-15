@@ -45,10 +45,7 @@ test('every POPULAR_SWAP_PAIRS slug resolves via lookupLabel', () => {
       const label = lookupLabel(slug)
       assert.ok(label.code, `lookupLabel(${slug}) returned empty code`)
       assert.ok(label.name, `lookupLabel(${slug}) returned empty name`)
-      assert.ok(
-        formatCurrencyLabel(slug).length > 0,
-        `formatCurrencyLabel(${slug}) produced empty string`
-      )
+      assert.ok(formatCurrencyLabel(slug).length > 0, `formatCurrencyLabel(${slug}) produced empty string`)
     }
   }
 })

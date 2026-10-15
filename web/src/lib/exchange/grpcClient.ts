@@ -40,7 +40,10 @@ export function getQuotes(request: GetQuotesRequest): Promise<GetQuotesResponse>
   const options = { deadline: Date.now() + DEFAULT_DEADLINE_MS }
   return new Promise<GetQuotesResponse>((resolve, reject) => {
     client.getQuotes(request, authMetadata(), options, (error, response) => {
-      if (error) { reject(error); return; }
+      if (error) {
+        reject(error)
+        return
+      }
       resolve(response)
     })
   })
@@ -51,7 +54,10 @@ export function listCurrencies(): Promise<ListCurrenciesResponse> {
   const options = { deadline: Date.now() + DEFAULT_DEADLINE_MS }
   return new Promise<ListCurrenciesResponse>((resolve, reject) => {
     client.listCurrencies({}, authMetadata(), options, (error, response) => {
-      if (error) { reject(error); return; }
+      if (error) {
+        reject(error)
+        return
+      }
       resolve(response)
     })
   })
@@ -62,7 +68,10 @@ export function listSupportedProviders(): Promise<ListSupportedProvidersResponse
   const options = { deadline: Date.now() + DEFAULT_DEADLINE_MS }
   return new Promise<ListSupportedProvidersResponse>((resolve, reject) => {
     client.listSupportedProviders({}, authMetadata(), options, (error, response) => {
-      if (error) { reject(error); return; }
+      if (error) {
+        reject(error)
+        return
+      }
       resolve(response)
     })
   })

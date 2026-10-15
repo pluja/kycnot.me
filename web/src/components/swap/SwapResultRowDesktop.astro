@@ -42,8 +42,6 @@ const activeEvents = (service?.events ?? []).map((event) => ({
 const operatingSinceYear = service?.operatingSince ? service.operatingSince.getUTCFullYear() : null
 const onionUrls = service?.onionUrls ?? []
 const i2pUrls = service?.i2pUrls ?? []
-const ratingsCount = service?._count.comments ?? 0
-const averageUserRating = service?.trustWeightedUserRating ?? null
 const registrationCountry = service?.registrationCountryCode
   ? getCountryInfo(service.registrationCountryCode)
   : null
@@ -61,7 +59,6 @@ const hasDetailsPanel =
     operatingSinceYear !== null ||
     onionUrls.length > 0 ||
     i2pUrls.length > 0 ||
-    ratingsCount > 0 ||
     registrationCountry !== null)
 
 // Class order matters: stripe first so best/current bg-* overrides win, and
@@ -106,8 +103,6 @@ const innerClasses = cn(
           onionUrls={onionUrls}
           i2pUrls={i2pUrls}
           activeEvents={activeEvents}
-          averageUserRating={averageUserRating}
-          ratingsCount={ratingsCount}
           registrationCountry={registrationCountry}
           registeredCompanyName={registeredCompanyName}
           verificationInfo={verificationInfo}
