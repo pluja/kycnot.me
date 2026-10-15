@@ -1,0 +1,34 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../lib/cn'
+
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = HTMLAttributes<'a'> & {
+  icon: string
+  title: string
+  description?: string
+  // truncateDescription keeps a one-line description, such as a URL, from wrapping.
+  truncateDescription?: boolean
+}
+const { icon, title, description, truncateDescription = false, class: className, ...linkProps } = Astro.props
+---
+
+<a
+  {...linkProps}
+  class={cn(
+    'group grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1 rounded-xl border border-night-500 bg-night-800/40 px-4 py-3 transition-colors hover:border-green-700 hover:bg-night-800',
+    className
+  )}
+>
+  <Icon name={icon} class="size-5 shrink-0 text-green-500" />
+  <span class="font-semibold text-day-100 group-hover:text-green-400">{title}</span>
+  {
+    description && (
+      <span class={cn('col-start-2 text-sm text-day-400', truncateDescription && 'truncate')}>
+        {description}
+      </span>
+    )
+  }
+</a>

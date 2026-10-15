@@ -1,0 +1,92 @@
+---
+layout: ../../layouts/MarkdownLayout.astro
+title: Accounts and account trust
+pageTitle: Anonymous accounts, badges and account trust
+description: 'How KYCnot.me accounts work: anonymous sign-up with a login key, what accounts unlock, what each badge means and how services verify team accounts.'
+icon: 'ri:shield-check-line'
+order: 4
+updatedAt: 2026-10-18
+faq:
+  - question: How do I get the Veteran badge?
+    answer: "Reach 5 posts with checked proof or 20 published posts or 5 approved suggestions, and an account at least 180 days old. Suggestions only count on services you don't represent."
+  - question: What happened to karma?
+    answer: KYCnot.me used karma points until October 2026. Points were easy to farm and said little about whether someone shared real experiences, so they were replaced by the facts above. Old karma totals no longer count for anything.
+---
+
+import TrustUnlocksList from '../../components/TrustUnlocksList.astro'
+import { commentRules } from '../../constants/commentRules'
+
+Account trust on [KYCnot.me](https://kycnot.me) comes from what you have done on the site, not from a points score. Published posts, proof a moderator has checked, approved service suggestions and the age of your account unlock features. Recent rejections for breaking the rules limit what you can post.
+
+Your own numbers and unlocks are on your [account page](/account).
+
+## Creating an account
+
+You can [create an account](/account/generate) to suggest new services or share your feedback on service pages.
+
+User accounts do not require any personal information. Your username will be **randomly** generated to prevent impersonation and protect your privacy.
+
+When you create an account, you are given a **login key**. Login keys are **displayed only once**. Be sure to **store it securely**, as it **cannot be recovered** if lost. It is recommended to use a password manager like [Bitwarden](https://bitwarden.com) or [KeePassXC](https://keepassxc.org/).
+
+## What counts toward account trust
+
+- **Published posts:** experiences and discussions that are live on a service page. Replies don't count.
+- **Posts with checked proof:** published posts whose attached proof a moderator checked and accepted.
+- **Approved suggestions:** new services and edits you suggested that were approved. Suggestions on a service you represent don't count.
+- **Account age:** days since you created the account.
+
+## What account trust unlocks
+
+Each feature needs one of the listed facts and a minimum account age.
+
+<TrustUnlocksList />
+
+## Badges
+
+Badges next to a name tell you who is posting.
+
+| Badge          | What it means                                                                                   |
+| -------------- | ----------------------------------------------------------------------------------------------- |
+| Admin          | Runs KYCnot.me.                                                                                 |
+| Moderator      | Reviews posts and checks proof for KYCnot.me.                                                   |
+| _Service_ team | Works for that service. We confirmed it before adding the badge.                                |
+| Veteran        | An older account with a good record. It's earned, see [below](#how-do-i-get-the-veteran-badge). |
+| New account    | The account was less than 30 days old when it posted.                                           |
+| Single post    | The author has posted only once.                                                                |
+
+People who help us with one task, like reviewing cases, don't get a badge.
+
+## What limits your account
+
+A rejected post counts against you only when it broke one of these rules:
+
+<ul>
+  {commentRules
+    .filter((rule) => rule.penalizes)
+    .map((rule) => (
+      <li>{rule.label}</li>
+    ))}
+</ul>
+
+Rejections for other reasons, such as duplicates or off-topic posts, don't count. Neither do rejections older than 90 days.
+
+- **2 or more counting rejections in 90 days:** your new posts wait for a moderator before they go live.
+- **4 or more spam rejections in 90 days:** you can't post or reply.
+
+While either limit applies, every unlock above is paused. Both limits lift on their own once the older rejections pass 90 days. Accounts that moderators flag as spammers can't post at all.
+
+## Verified and affiliated users
+
+**Verified users** have proven their identity by linking their account to a specific website. This verification confirms they are legitimate representatives of that site, whether it's a personal website, blog, social media profile, or service page. You can request verification [in your profile](/account).
+
+**Affiliated users** are users who represent a service listed in the directory, such as owners, support staff, or team members. If you represent a service and want to become affiliated, you can request it [in your profile](/account).
+
+### Account verification
+
+To prove your account represents a listed service:
+
+1. Add a TXT record to the service's domain with the value `kycnotme-verify=<your-username>`, replacing `<your-username>` with your KYCnot.me username.
+2. [Send a verification request](/contact?category=ACCOUNT_VERIFICATION) including your KYCnot.me username and the domain where the TXT record is published.
+3. Once we confirm the TXT record matches your username, we'll mark your account as affiliated with the service.
+
+The TXT record can be removed after we confirm. The affiliation persists.

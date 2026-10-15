@@ -10,7 +10,7 @@ import type { AstroChildren } from '../lib/astro'
 import type { OgImagePublicTemplateWithProps } from '../lib/ogImageProps'
 import type { MarkdownLayoutProps } from 'astro'
 import type { ComponentProps } from 'astro/types'
-import type { Article, WithContext } from 'schema-dts'
+import type { Article, FAQPage, WithContext } from 'schema-dts'
 
 type Props = ComponentProps<typeof BaseLayout> &
   MarkdownLayoutProps<{
@@ -20,6 +20,8 @@ type Props = ComponentProps<typeof BaseLayout> &
     updatedAt?: string
     description: string
     icon?: string
+    // faq renders as a closing "Frequently asked questions" section and as FAQPage markup.
+    faq?: { question: string; answer: string }[]
   }>
 
 const { frontmatter, schemas, ...baseLayoutProps } = Astro.props
@@ -53,6 +55,19 @@ const ogImageTemplateData = {
         url: absoluteSiteUrl(Astro.url.pathname),
       },
     } satisfies WithContext<Article>,
+    ...(frontmatter.faq?.length
+      ? [
+          {
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            mainEntity: frontmatter.faq.map((item) => ({
+              '@type': 'Question',
+              name: item.question,
+              acceptedAnswer: { '@type': 'Answer', text: item.answer },
+            })),
+          } satisfies WithContext<FAQPage>,
+        ]
+      : []),
     ...(schemas ?? []),
   ]}
 >
@@ -70,6 +85,19 @@ const ogImageTemplateData = {
     }
 
     <slot />
+    {
+      !!frontmatter.faq?.length && (
+        <section>
+          <h2>Frequently asked questions</h2>
+          {frontmatter.faq.map((item) => (
+            <>
+              <h3>{item.question}</h3>
+              <p>{item.answer}</p>
+            </>
+          ))}
+        </section>
+      )
+    }
   </div>
 </BaseLayout>
 

@@ -1,0 +1,132 @@
+---
+layout: ../../layouts/MarkdownLayout.astro
+title: How services get listed and verified
+pageTitle: How services get listed and verified
+description: 'How a service gets listed on KYCnot.me: what it needs, how we review it before calling it Approved or Verified, and what each listing status means.'
+icon: 'ri:checkbox-circle-line'
+order: 2
+updatedAt: 2026-10-13
+---
+
+Every service on [KYCnot.me](https://kycnot.me) starts as a suggestion and goes through the same steps. Here is what a service needs to be listed, what we check before calling it **Approved** or **Verified**, and what each status means.
+
+## Suggesting a new listing
+
+Suggest a new listing by visiting the [service suggestion form](/service-suggestion/new). Provide the most accurate information for higher chances of getting approved.
+
+Once submitted, you will get a **unique tracking page** where you can monitor the suggestion status and communicate directly with moderators.
+
+## Listing requirements
+
+To list a new service, it must fulfill these requirements:
+
+- Provide a real crypto-related product, feature, or workflow that users actively use. Functional aggregators can qualify, but sites whose main purpose is listing, reviewing, ranking, or discussing other services do not.
+- Publicly available website explaining what the service is about
+- Terms of service or FAQ document
+- The service must have been operating for at least 6 months.
+
+KYCnot.me focuses on end-user services and tools, not meta-services. We avoid recursive directory-of-directories listings because they confuse users who come here to find a service.
+
+**Not eligible:**
+
+- A cryptocurrency project.
+- A cryptocurrency wallet.
+- A plain directory, review page, ranking site, or other website whose main purpose is listing other services.
+- A chat link, forum post, or similar page without any actual product or feature.
+
+## Suggestion review process
+
+When you submit a new service, it gets the `COMMUNITY_CONTRIBUTED` status and the `unlisted` visibility level. The service **will not appear in search results**, but it can be viewed with a direct link.
+
+> **Reviews are not on a schedule.** Approvals and upgrades happen when we are confident in the evidence, not on a fixed cadence. That can take weeks or months, and some stages may sit untouched until we decide to revisit them. Asking about timing does not move a service forward.
+
+### First review (Unlisted -> Public)
+
+- A member of the **KYCnot.me team** reviews the submission to ensure it isn't spam or inappropriate.
+- If the listing passes this initial check, it becomes **publicly visible** to all users.
+- At this stage, the listing is **Community Contributed** and will show a disclaimer.
+
+### Second review (Community Contributed -> Approved)
+
+**Approved** means we did a limited, recent review and found enough public history to treat the service as more than just an unknown listing. It does **not** mean the service is fully trusted, future-proof, or safe from a later exit scam.
+
+We are intentionally strict here. Approved services show more prominently and users naturally trust them more. Because of that, a clean-looking website is not enough, and a few recent successful tests are not enough either. If a service has little or no public history, it usually stays Community Contributed until more evidence exists.
+
+In short: Approved is for services that look real both on their own site and outside of it.
+
+A service is generally eligible for Approved when all of the following hold:
+
+- It meets the [listing requirements](#listing-requirements).
+- It has been operating for at least **6 months**.
+- Its public contact methods work, when contact is claimed or expected.
+- Its public information and ToS are clear enough to review and do not seriously contradict each other.
+- It has a real public track record over time: user feedback, public discussion, community mentions, or other independent signs that it is a real and active service.
+- We completed at least **3 successful core-service tests** on **3 non-consecutive dates**, spanning at least **14 days**.
+- Support replied satisfactorily at least once, when support exists.
+- There are no serious contradictions between our review results and the service's public reputation or user feedback.
+- There are no credible unresolved links to scams, stolen funds, abuse, or other serious public red flags.
+- There are no unresolved high-severity reports at review time.
+- Evidence for the checks is logged publicly in the service verification section.
+
+For swaps and exchanges these tests will usually be swaps; for VPNs, VPS providers, AI providers, and other categories the tests should match the core user workflow.
+
+Public wording for Approved:
+
+> Passed limited checks on specific dates and showed enough public history for approval. This does not guarantee future safety.
+
+### Final review (Approved -> Verified)
+
+**Verified** means the service showed consistent behavior over time and kept passing repeated checks. It does **not** mean the service is fully trusted, future-proof, or incapable of an exit scam later.
+
+This status is stricter than Approved. Approved means we saw enough evidence to move the service out of the "unknown" bucket. Verified means the service kept behaving consistently over a longer period, both in our own checks and in what we can observe publicly.
+
+A service is generally eligible for Verified when all of the following hold:
+
+- It is already Approved.
+- At least **90 days** have passed since initial approval.
+- We completed at least **6 successful core-service tests** across at least **4 distinct dates**, showing consistent behavior over time rather than one good period.
+- We had at least **2 successful support interactions** on separate dates, when support is offered or expected.
+- The service still shows ongoing public history, user feedback, or other independent signs of active operation.
+- There are no credible unresolved links to scams, stolen funds, abuse, blocked-funds patterns, or other serious public red flags.
+- There are no serious contradictions between our review results and public user feedback.
+- Review evidence was refreshed recently and is logged publicly.
+
+Verified is not permanent. If serious new evidence appears later, the status can be removed or downgraded.
+
+Public wording for Verified:
+
+> Passed repeated checks over time and kept showing consistent behavior. This is still not a guarantee.
+
+## Verification steps
+
+Services will usually show the verification steps that the admins took to reach the verified (or not) status. Each step will have a description and some evidence attached.
+
+## Listing statuses
+
+Each service has one status. Upgrade criteria for **Approved** and **Verified** live in [the review process](#suggestion-review-process); the descriptions below summarize what the status means for a reader.
+
+> **Legacy listings.** Some services were granted Approved or Verified under earlier standards, before the current check-publishing requirements existed. They remain listed because they have a long, clean public history. Published check history will be backfilled over time. Until then, treat the absence of evidence as missing information, not endorsement.
+
+### **Unlisted**
+
+Initial state after submission. The service does not appear in the list or search results and is only reachable via a direct link. We do an initial check for spam and basic eligibility before promoting it.
+
+### **Community Contributed**
+
+The service is listed but not yet reviewed by our team. The information may be inaccurate, incomplete, or fraudulent. Use with caution.
+
+### **Approved**
+
+The service passed a limited, recent review (see [criteria](#second-review-community-contributed---approved)). This reflects specific checks on specific dates, not a long-term safety guarantee.
+
+### **Verified**
+
+The service kept passing checks and showing consistent behavior over a longer period (see [criteria](#final-review-approved---verified)). Stronger than Approved, but still not a guarantee against future problems or exit scams.
+
+### **Scam**
+
+The service is a scam. User reports, negative reviews, failed internal testing, or other red flags were found. Evidence lives in the service page's verification section.
+
+### **Archived**
+
+The service is no longer available. It may have been shut down, acquired, or otherwise discontinued. Still visible in the directory for reference.

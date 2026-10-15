@@ -1,0 +1,34 @@
+---
+import IconLinkCard from './IconLinkCard.astro'
+
+type DocFrontmatter = { title: string; description: string; icon?: string; order?: number }
+
+const docs = Object.entries(
+  import.meta.glob<{ frontmatter: DocFrontmatter }>('../pages/docs/*.mdx', { eager: true })
+)
+  .map(([path, page]) => ({
+    href: `/docs/${
+      path
+        .split('/')
+        .pop()
+        ?.replace(/\.mdx$/, '') ?? ''
+    }`,
+    ...page.frontmatter,
+  }))
+  .sort((first, second) => (first.order ?? Infinity) - (second.order ?? Infinity))
+---
+
+<ul class="not-prose grid gap-3">
+  {
+    docs.map((doc) => (
+      <li>
+        <IconLinkCard
+          href={doc.href}
+          icon={doc.icon ?? 'ri:file-text-line'}
+          title={doc.title}
+          description={doc.description}
+        />
+      </li>
+    ))
+  }
+</ul>

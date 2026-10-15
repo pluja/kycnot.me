@@ -2,8 +2,10 @@
 layout: ../../layouts/MarkdownLayout.astro
 title: API
 updatedAt: 2026-04-09
-description: 'Access basic service data via our public API.'
+pageTitle: Public API for service data and KYC levels
+description: 'Look up a service by ID, slug or URL through the KYCnot.me API and get its KYC level, KYC policy, verification status, categories and links in JSON.'
 icon: 'ri:plug-line'
+order: 5
 ---
 
 import { SOURCE_CODE_URL } from 'astro:env/client'
@@ -49,11 +51,11 @@ Fetches details for a single service by various lookup criteria.
 
 ### Request Parameters
 
-| Parameter    | Type   | Required | Description                                                                 |
-| ------------ | ------ | -------- | --------------------------------------------------------------------------- |
-| `id`         | number | No\*     | Service ID                                                                  |
-| `slug`       | string | No\*     | Service URL slug (lowercase letters, numbers, and hyphens only)             |
-| `url`        | string | No\*     | Service URL. May be web, onion, or i2p. May just be a domain or a full URL. |
+| Parameter | Type   | Required | Description                                                                 |
+| --------- | ------ | -------- | --------------------------------------------------------------------------- |
+| `id`      | number | No\*     | Service ID                                                                  |
+| `slug`    | string | No\*     | Service URL slug (lowercase letters, numbers, and hyphens only)             |
+| `url`     | string | No\*     | Service URL. May be web, onion, or i2p. May just be a domain or a full URL. |
 
 \* At least one of the marked parameters is required.
 

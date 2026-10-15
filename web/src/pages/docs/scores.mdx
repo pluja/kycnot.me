@@ -1,0 +1,101 @@
+---
+layout: ../../layouts/MarkdownLayout.astro
+title: How service scores work
+pageTitle: Service scores, attributes and incidents
+description: 'How KYCnot.me scores services: privacy and trust attributes, the fixed rules behind each score, how security incidents lower trust, plus events and ToS reviews.'
+icon: 'ri:bar-chart-box-line'
+order: 3
+updatedAt: 2026-10-13
+---
+
+import { SOURCE_CODE_URL } from 'astro:env/client'
+
+Every service on [KYCnot.me](https://kycnot.me) has a Privacy, a Trust and an Overall score. They come from fixed rules, based on the service's attributes and security incidents. Nobody picks the numbers by hand. Reviews don't change them; they have their own [summary](/docs/guidelines#how-the-summary-is-calculated).
+
+## Service attributes
+
+An attribute is a feature of a service, categorized as:
+
+- **Good**: A positive feature
+- **Warning**: A potential concern
+- **Bad**: A significant drawback
+- **Information**: Neutral details
+
+You can view all available attributes on the [Attributes page](/attributes).
+
+Attributes are classified into two main types:
+
+1. **Privacy Attributes**: Related to data protection and anonymity.
+1. **Trust Attributes**: Related to reliability and security.
+
+These categories **directly influence** a service's Privacy and Trust scores, which contribute to its **overall rating**.
+
+## Service scores
+
+Scores are calculated **automatically** using clear, fixed rules based on the attributes of the service ([See all attributes](/attributes)). We do not change or adjust scores by hand. The scoring system is <a href={SOURCE_CODE_URL}><strong>open-source</strong></a> and anyone can review or suggest improvements.
+
+### Privacy score
+
+The privacy score measures how well a service protects user privacy, using a transparent, rules-based approach:
+
+1. **Base Score:** Every service starts with a neutral score of 50 points.
+1. **Privacy Attributes:** The privacy points of every attribute the service has are added to the score, whatever the attribute's category. [See all attributes](/attributes).
+1. **Final Score Range:** The final score is always kept between 0 and 100.
+
+### Trust score
+
+The trust score represents how reliable and trustworthy a service is, based on objective, transparent criteria.
+
+1. **Base Score:** Every service begins with a neutral score of 50 points.
+1. **Trust Attributes:** The trust points of every attribute the service has are added to the score, whatever the attribute's category. [See all attributes](/attributes).
+1. **Security Incidents:** A confirmed security incident lowers the score temporarily. The penalty fades back to zero over time, as explained in [Security Incidents](#security-incidents).
+1. **Final Score Range:** The final score is always kept between 0 and 100.
+
+### Security incidents
+
+A security incident is a confirmed event where a service put user funds or data at risk: an exchange hack, a smart contract exploit, a custodial breach, mass frozen withdrawals, or insolvency. Each confirmed incident lowers the service's trust score. The penalty is largest while the incident is unresolved and shrinks back to zero over time once the service fixes it.
+
+How many points an incident subtracts, and how long the penalty takes to fade, both depend on its severity:
+
+| Severity | Trust penalty | Fades to zero over |
+| -------- | ------------: | ------------------ |
+| Low      |            -5 | 90 days            |
+| Medium   |           -12 | 180 days           |
+| High     |           -22 | 365 days           |
+| Critical |           -35 | 540 days           |
+
+While an incident is **ongoing**, the full penalty applies and stays flat. Once a service **resolves** it, the penalty first steps down based on the outcome, then decays to zero across the window above, measured from the resolution date:
+
+| Resolution outcome | Penalty kept at resolution |
+| ------------------ | -------------------------: |
+| Funds recovered    |                        20% |
+| Users reimbursed   |                        30% |
+| Partial recovery   |                        50% |
+| Funds lost         |                        75% |
+| Unknown            |                        50% |
+
+So a critical incident where users were fully reimbursed keeps about 30% of its penalty the moment it is resolved, roughly -10 points, then fades to zero over the next eighteen months. An unresolved critical hack stays at the full -35 until the service addresses it.
+
+We assess each incident's severity and outcome from public reporting, and the fixed rules above do the rest. Every recorded incident shows its current trust impact on the service page and in the [incidents timeline](/events?view=incidents).
+
+### Overall score
+
+The overall score is `((privacy * 0.6) + (trust * 0.4)) / 10`, rounded to the nearest whole number, so it runs from 0 to 10. It combines privacy and trust in one figure.
+
+## Events
+
+Events fall into three kinds:
+
+- Automated events: Created by the system whenever something about a service changes, like its description, supported currencies, attributes, or verification status.
+- Manual events: Added by admins when there is important news, such as a service going offline, being acquired, shutting down, or other major updates.
+- Security incidents: Confirmed hacks, exploits, breaches, or frozen funds. These are the only events that move a service's score, see [Security Incidents](#security-incidents).
+
+You can take a look at the [global timeline](/events) where you will find every event sorted by date, or filter it down to [security incidents only](/events?view=incidents).
+
+## Terms of Service reviews
+
+KYCnot.me automatically reviews and summarizes the Terms of Service (ToS) for every service monthly using AI. You get simple, clear summaries that highlight the most important points, so you can quickly see what matters.
+
+We hash each ToS document and only review it again if it changes. Some services may go a long time without a new review, but we still check and scrape their ToS every month.
+
+We aim for accuracy, but the AI may sometimes miss details or highlight less relevant information. If you see any error, contact us.

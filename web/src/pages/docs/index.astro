@@ -1,0 +1,20 @@
+---
+import DocsList from '../../components/DocsList.astro'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+---
+
+<BaseLayout
+  pageTitle="Docs: reviews, listings, scores and API"
+  description="How KYCnot.me works: review guidelines, how services get listed and verified, how scores are calculated, how accounts and trust work, and the public API."
+  ogImage={{
+    template: 'generic',
+    title: 'Docs',
+    description: 'How KYCnot.me works',
+    icon: 'ri:book-open-line',
+  }}
+  widthClassName="max-w-3xl"
+>
+  <h1 class="mt-12 mb-2 font-title text-3xl font-bold text-day-100">How KYCnot.me works</h1>
+  <p class="mb-8 text-day-400">How listings, scores and reviews work, so you can check it yourself.</p>
+  <DocsList />
+</BaseLayout>

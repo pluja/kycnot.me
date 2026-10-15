@@ -1,8 +1,9 @@
 ---
-title: "Swapter review: cheap and liquid, but watch for shotgun KYC"
-summary: "Hands-on review of Swapter.io, an instant exchange with low fees and 1000+ coins, marred by shotgun KYC triggers and reliance on third-party liquidity."
+title: 'Swapter review: flagged as a scam after held swaps'
+summary: 'Our 2024 review of Swapter.io, an instant exchange we now flag as a scam: since late 2025 it has held large swaps for months without paying or refunding them.'
 author: pluja
 publishedAt: 2024-05-21T12:04:47Z
+updatedAt: 2026-10-18
 tags:
   - review
   - sponsored
@@ -21,7 +22,6 @@ These reviews are sponsored, yet the sponsorship does not influence the outcome 
 ## The review
 
 [Swapter.io](/service/swapter) is an all-purpose instant exchange. They entered the scene in the depths of the bear market about 2 years ago in June of 2022.
-
 
 | Pros            | Cons                               |
 | --------------- | ---------------------------------- |
@@ -53,7 +53,7 @@ The flip side to this is that Swapter **relies on 3rd party liquidity**. Aside f
 
 ### KYC & AML policies
 
-Swapter reserves the right to require its users to provide their full name, their date of birth, their address and government-issued ID. A practice known as "*shotgun KYC*". This should not happen often - in our testing it never did - however it's not clear when exactly it could happen. The AML & KYC policy provided on Swapter's website simply states they will put your trade on hold if their "risk scoring system [deems it] as suspicious".
+Swapter reserves the right to require its users to provide their full name, their date of birth, their address and government-issued ID. A practice known as "_shotgun KYC_". This should not happen often - in our testing it never did - however it's not clear when exactly it could happen. The AML & KYC policy provided on Swapter's website simply states they will put your trade on hold if their "risk scoring system [deems it] as suspicious".
 
 Worse yet, if they determine that "any of the information [the] customer provided is incorrect, false, outdated, or incomplete" then Swapter may decide to terminate all of the services they provide to the user. What exactly would happen to their funds in such a case remains unclear.
 
@@ -77,6 +77,6 @@ Swapter's team has a chat on their website, a support email address and a suppor
 
 ### Disclaimer
 
-*None of the above should be understood as investment or financial advice. The views are our own only and constitute a faithful representation of our experience in using and investigating this exchange. This review is not a guarantee of any kind on the services rendered by the exchange. Do your own research before using any service.*
+_None of the above should be understood as investment or financial advice. The views are our own only and constitute a faithful representation of our experience in using and investigating this exchange. This review is not a guarantee of any kind on the services rendered by the exchange. Do your own research before using any service._
 
 > Swapter's shotgun KYC policy makes the [5 rules for safely using crypto services](/blog/stay-safe-using-services) especially relevant. For a swap with a stricter no-KYC stance, see our [WizardSwap review](/blog/wizardswap-review).

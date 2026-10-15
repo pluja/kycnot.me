@@ -1,0 +1,190 @@
+---
+layout: ../../layouts/MarkdownLayout.astro
+title: Review guidelines
+pageTitle: Review guidelines and how moderation works
+description: 'Review guidelines for KYCnot.me: what makes a good review, when a review waits for a moderator, how proof and disputes work, and how the summary is calculated.'
+icon: 'ri:scales-3-line'
+order: 1
+updatedAt: 2026-10-14
+faq:
+  - question: Why was my post rejected for not enough detail?
+    answer: 'A review has to say what you used the service for or what happened. "Great service" or "total scam" alone tells readers nothing. This rejection does not count against your account. Just post again with the details.'
+  - question: Do I have to add proof?
+    answer: Only if you say the service asked you for KYC or held your funds. Otherwise proof is optional, but checked proof adds a badge and counts more in the summary.
+  - question: Who can see my proof?
+    answer: Only you and the moderators. It is never made public, never sent to AI and never shared with the service.
+  - question: Can a service remove a negative review?
+    answer: No. A service can reply publicly, or dispute a negative review that has no checked proof, which asks the author for proof. It cannot hide, edit or close a review.
+  - question: What does Unproven mean?
+    answer: 'The author was asked for proof and did not send any within a week. The review stays up, but it no longer counts in the summary or the problem filter.'
+---
+
+import { commentRules } from '../../constants/commentRules'
+import { evidenceFindings } from '../../constants/experiences'
+import { countsAsProof } from '../../lib/proofEvidence'
+import { summaryWindowDays } from '../../lib/experienceQueries'
+import { minimumCheckedBasis, minimumVerdictPosts } from '../../lib/experienceVerdict'
+import { MAX_DISPUTES_PER_SERVICE_PER_WEEK, PROOF_REQUEST_DAYS } from '../../lib/proofRequests'
+
+These are the rules every review on [KYCnot.me](https://kycnot.me) goes through. Our moderators follow the same steps. Positive and negative reviews get the exact same treatment. We never hold or reject a review because of what it says about a service.
+
+## Principles
+
+1. **Same rules both ways.** Sentiment never decides anything.
+2. **Proof outweighs numbers.** Once a service has {minimumCheckedBasis} reviews with checked proof, only those decide its verdict. Until then, a new account's first review counts half unless its proof is checked, and a wave of new accounts waits for a moderator.
+3. **Fast by default.** Most reviews go live after an automatic check. Only specific risks make one wait for a person.
+4. **Proof stays private.** Only moderators see it. Readers only see the result.
+5. **We always say why.** If we hold or reject your review, you see which rule it was.
+
+## How a review is checked
+
+Every review goes through these five steps, in this order. The automatic check runs them first. When a review is held, a moderator runs them again.
+
+1. **Does it break a hard rule?** Spam, scam contacts, harassment, slurs, private details or a made-up story. Rejected, and it counts against the author. Harassment and made-up stories are always decided by a person.
+2. **Is it first-hand and specific?** It has to say what you used the service for, or what happened. If not, it is rejected as **Not enough detail**. That one doesn't count against you. Same for off-topic posts and duplicates.
+3. **Does it claim harm?** If it says the service asked for KYC or held your funds, it needs proof. It goes live once a moderator accepts the proof.
+4. **Does something look off?** The review waits for a moderator if:
+   - the order ID was already used on someone else's review;
+   - the order ID doesn't match the format the service uses;
+   - many new accounts post the same kind of review about one service at once;
+   - the text looks generated or copied from a template;
+   - it looks coordinated, the author was recently penalized, or the service is in strict mode;
+   - the automatic check is unsure, or flags it as spam.
+5. **Otherwise, it goes live.**
+
+## Rules
+
+These are the only reasons we reject a review. Reports use the same list.
+
+<table>
+  <thead>
+    <tr>
+      <th>Rule</th>
+      <th>What it means</th>
+      <th>Counts against you</th>
+    </tr>
+  </thead>
+  <tbody>
+    {commentRules.map((rule) => (
+      <tr>
+        <td>{rule.label}</td>
+        <td>{rule.description}</td>
+        <td>{rule.penalizes ? 'Yes' : 'No'}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
+Rejections that count limit your account for 90 days. See [how account trust works](/docs/trust).
+
+## What a good review includes
+
+- What you used the service for: a swap, a VPN plan, a hosting order.
+- Roughly when, and what happened, in your own words.
+- Any problem. Tick "Asked me for KYC", "Held or blocked my funds" or "Other problem", and say if it got resolved.
+- Proof, if you have it. It's only required for KYC or held funds.
+
+"Swapped XMR to BTC in March, arrived in 20 minutes, no questions asked" is a good review. "Best service ever 10/10" is not. Nobody can tell anything from it.
+
+## Proof
+
+Send your order ID, a link to your order, or a screenshot with your personal details blurred. We never ask for receipts, wallet addresses or ID documents. Only you and the moderators see your proof. It's not shown to readers, not sent to AI and not shared with the service.
+
+A moderator checks your proof, usually on the service's own order lookup, and publishes one result. Results marked as counting add a badge to your review:
+
+<ul>
+  {evidenceFindings
+    .filter((finding) => finding.value !== 'LEGACY' && finding.guidance)
+    .map((finding) => (
+      <li>
+        <strong>{finding.shortLabel}:</strong> {finding.guidance}
+        {countsAsProof({ removedAt: null, checks: [{ finding: finding.value }] }) && ' Counts as proof.'}
+      </li>
+    ))}
+</ul>
+
+An "Order ID exists" result only shows the order exists. It doesn't prove who placed it, or that everything in the review is true. A transaction ID or wallet address can't be matched to an order, so it rarely proves much. Proof we accepted under our old process shows as **Proof checked**.
+
+Each review has one proof: a reference, a screenshot, or both. You can replace or remove it, unless a moderator checked it and it counts, or a moderator added it. Proof that counts stays, because it backs the result readers see. If you need it deleted, [contact us](/contact).
+
+Proof only delays your review if you report KYC or held funds, or if the order ID looks wrong or was already used. A KYC or held-funds review goes live once the proof is accepted.
+
+## Proof requests, disputes and Unproven
+
+A moderator can ask you for proof. A service can also dispute a review that is negative or reports a problem, if it has no accepted proof and none waiting for a check, by reporting it as not genuine. In both cases:
+
+1. You get a notification and have {PROOF_REQUEST_DAYS} days to add proof.
+2. Proof that is accepted, sent in time and still waiting for a check, or couldn't be checked counts as an answer. Our delays and broken lookups are never your problem. Proof sent after the deadline counts once it's accepted.
+3. If you don't answer, your review stays up but is marked **Unproven**. It stops counting in the summary and the problem filter.
+
+A service can dispute each review only once, only reviews from the last {summaryWindowDays} days, and at most {MAX_DISPUTES_PER_SERVICE_PER_WEEK} a week. If the moderators close the report without action, the dispute ends.
+
+## Reading reviews
+
+Reviews are what users tell us. Publishing one doesn't mean we confirmed what it says.
+
+You can filter reviews by positive, mixed or negative. The author picks the label. Older reviews may have one suggested by AI, or mapped from old star ratings. A positive label doesn't make a review more reliable.
+
+We keep old reviews, replies and dates. There is no star average or percentage. Reviews with checked proof have a badge, and one click shows only those. You can also filter by open problems.
+
+The **Privacy, Trust and Overall scores** come from [attributes and security incidents](/docs/scores). Reviews don't change them.
+
+## How the summary is calculated
+
+The summary above a service's reviews covers the last {summaryWindowDays} days.
+
+- Once {minimumCheckedBasis} or more reviews have checked proof, only those decide the verdict.
+- With fewer than {minimumVerdictPosts} rated reviews, there is no verdict, just the counts.
+- A first review from an account less than a week old counts half, unless its proof was checked.
+- Unproven and withdrawn reviews don't count.
+- If someone posts more than one review of a service, only their latest counts.
+- The verdict is **Mostly negative** if half or more are negative, **Mostly positive** if 70% or more are positive, and **Mixed** otherwise.
+
+We don't add up problem totals in the summary. People rarely come back to mark a problem as solved, so old totals would look like current warnings. Each review shows its own problem and whether it was solved.
+
+## For services
+
+- You can reply publicly to any review. Your replies show your service's team badge.
+- You can dispute a review that is negative or reports a problem, if it has no accepted proof and none waiting for a check, by reporting it as not genuine.
+- You can't hide, edit or close a review. Only the author can mark a problem as resolved.
+- Team members of a service never moderate reviews of that service.
+
+## Your reviews
+
+### Corrections and updates
+
+You can correct your review. The current version stays up until the correction is checked, and the edit history is public. Moderators can remove sensitive details. If something changes later, like a refund, reply to your own review. Any change to a review's sentiment, outcome or problems, by edit or by reply, waits for a moderator. So does an edit while the review has an open report, or one that rewrites most of a review with accepted proof.
+
+### Withdrawing a post or deleting your account
+
+You can withdraw any of your published or pending reviews. Only you and the moderators can read it then, along with your replies under it. A review that was published leaves a short "Post withdrawn by the author" note with the date, and other people's replies stay under it. You can usually restore it later. It goes back to review if it changed, or if it was still waiting for a moderator.
+
+If the service fixed your problem, don't withdraw. Reply to your review and mark it as resolved instead: your review stays and shows how it ended.
+
+Deleting your account doesn't remove what you published. Your reviews and replies that were ever public, withdrawn ones included, stay with their proof, shown as from a deleted account and no longer linked to you. Reviews that were never published or were rejected are deleted, along with your account and service suggestions. If you want something specific removed, [ask us](/contact) before you delete your account. Messages you sent through the contact page stay as moderation records.
+
+## Reports and removals
+
+A report asks a moderator to check a review against the rules. A report alone never hides or removes anything.
+
+We remove spam and ads, personal information, harassment and slurs, and scam links or contacts. We don't remove a review because it is negative or because a service disagrees with it.
+
+A service may not pay for, reward or pressure a change or removal of a review, for example by offering help only if the review goes. When we confirm it, we note it on the service's page. If a review has checked proof, a report saying it's not real needs evidence.
+
+Services can tell their side with a public reply. Readers see it under the review.
+
+Every report is closed as **Action taken** or **No action**, or as **Post withdrawn** when the author withdraws the post first. If no action was taken, the reporter sees why. Accounts whose reports keep needing no action are paused from reporting for a while. Removal requests that come with threats are recorded and may be published.
+
+To report a review, use **Report** on it. It opens a private [contact conversation](/contact). To question a decision about your own review, use the [contact page](/contact).
+
+Services under attack can be put in strict mode, where every new review and reply waits for a moderator.
+
+## For moderators
+
+Run the five steps above on every held review, in order, and write down the rule you used. If something isn't clear:
+
+- Not sure about the facts? Ask the author for proof. Don't reject.
+- Not sure which rule applies? Leave it held and add an internal note for another moderator.
+- A believable review with one first-hand detail goes live, whatever it says about the service.
+- Checking proof is separate from deciding on the review, with one exception: accepting the proof publishes a review that was held only for it. Open the service's lookup over Tor and pick the result that matches what you saw.
+- A note with no proof can be cleared in one click. If the review has a proof request, record a result instead.
