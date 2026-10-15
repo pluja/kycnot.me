@@ -3,8 +3,8 @@ import { VerificationStatus } from '@prisma/client'
 import { actions, isInputError } from 'astro:actions'
 import { orderBy } from 'lodash-es'
 
+import ServiceProofFields from '../../../components/admin/services/ServiceProofFields.astro'
 import InputCardGroup from '../../../components/InputCardGroup.astro'
-import InputCheckbox from '../../../components/InputCheckbox.astro'
 import InputCheckboxGroup from '../../../components/InputCheckboxGroup.astro'
 import InputImageFile from '../../../components/InputImageFile.astro'
 import InputSelect from '../../../components/InputSelect.astro'
@@ -303,23 +303,7 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
       error={inputErrors.internalNote}
     />
 
-    <InputCheckbox
-      label="Strict Commenting"
-      name="strictCommentingEnabled"
-      checked={false}
-      descriptionInline="Require proof of being a client for comments."
-      error={inputErrors.strictCommentingEnabled}
-    />
-
-    <InputTextArea
-      label="Comment Section Message"
-      name="commentSectionMessage"
-      description="Markdown supported. This message will be displayed in the comment section for root comments."
-      inputProps={{
-        rows: 4,
-      }}
-      error={inputErrors.commentSectionMessage}
-    />
+    <ServiceProofFields inputErrors={inputErrors} />
 
     <InputSubmitButton label="Create Service" icon="ri:add-line" hideCancel />
   </form>

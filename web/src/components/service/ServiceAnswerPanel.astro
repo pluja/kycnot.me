@@ -5,23 +5,33 @@ import { kycLevels, type getKycLevelInfo } from '../../constants/kycLevels'
 import { cn } from '../../lib/cn'
 import { markdownToInlineHtml } from '../../lib/markdown'
 import ScoreGauge from '../ScoreGauge.astro'
+import SentimentBar from '../SentimentBar.astro'
 import Tooltip from '../Tooltip.astro'
 
-import type { ServiceAnswer } from '../../lib/serviceAnswers'
+import type { makeUsersFact, ServiceAnswer } from '../../lib/serviceAnswers'
 
 type Props = {
   kyc: ServiceAnswer
   safety: ServiceAnswer
-  /** The level badge: the site's own vocabulary, next to the plain-English headline. */
   kycLevel: ReturnType<typeof getKycLevelInfo>
   privacyScore: number
   trustScore: number
   serviceName: string
-  /** Nobody has reviewed the listing: the scores are shown, but not vouched for. */
+  // unverified means nobody has reviewed the listing: the scores are shown, but not vouched for.
   unverified?: boolean
+  usersFact?: ReturnType<typeof makeUsersFact>
 }
 
-const { kyc, safety, kycLevel, privacyScore, trustScore, serviceName, unverified = false } = Astro.props
+const {
+  kyc,
+  safety,
+  usersFact,
+  kycLevel,
+  privacyScore,
+  trustScore,
+  serviceName,
+  unverified = false,
+} = Astro.props
 
 const toneClass = {
   good: 'text-green-400',
@@ -44,6 +54,7 @@ const questions = [
     unreviewedBadge: false,
     ...kyc,
     detailHtml: kyc.detailMd ? await markdownToInlineHtml(kyc.detailMd) : null,
+    usersFact: null,
   },
   {
     label: `Is ${serviceName} safe?`,
@@ -55,6 +66,7 @@ const questions = [
     unreviewedBadge: unverified,
     ...safety,
     detailHtml: null,
+    usersFact,
   },
 ]
 ---
@@ -101,7 +113,7 @@ const questions = [
                       class="inline-flex"
                     >
                       <a
-                        href="/about#listing-statuses"
+                        href="/docs/listings#listing-statuses"
                         class="inline-flex items-center gap-1 text-yellow-300"
                       >
                         <Icon name="ri:question-line" class="size-3.5" />
@@ -182,6 +194,24 @@ const questions = [
                 </li>
               )}
             </ul>
+          )}
+          {question.usersFact && (
+            <a href="#comments" class="group mt-3 flex items-center gap-2 text-sm">
+              <Icon name="ri:group-line" class="size-4 shrink-0 text-day-400" />
+              <span class="flex flex-wrap gap-x-1 text-day-400 group-hover:text-day-200">
+                {question.usersFact.verdict && (
+                  <span class={cn('font-semibold', toneClass[question.usersFact.verdict.tone])}>
+                    {question.usersFact.verdict.label}
+                  </span>
+                )}
+                <span>
+                  {question.usersFact.verdict
+                    ? `from ${question.usersFact.detail}`
+                    : question.usersFact.detail}
+                </span>
+              </span>
+              <SentimentBar counts={question.usersFact.counts} class="h-1.5 w-12 shrink-0" />
+            </a>
           )}
         </div>
       ))

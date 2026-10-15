@@ -1,15 +1,15 @@
 import { makeHelpersForOptions } from '../lib/makeHelpersForOptions'
 
-// Service URLs, ToS URLs and contact methods are left out on purpose: a swapped
-// link reads as harmless in a diff, and one misclick would publish a scam
-// address. Those changes go through the free-text reason and a manual edit.
+// ServiceEditFieldInfo leaves service URLs, ToS URLs and contact methods out on purpose: a swapped link reads
+// as harmless in a diff, and one misclick would publish a scam address. Those changes go through the
+// free-text reason and a manual edit.
 type ServiceEditFieldInfo<T extends string | null | undefined = string> = {
   id: T
   label: string
   icon: string
-  /** A list is compared as a set and applied as a delta, so it merges with edits made since. */
+  // kind 'list' is compared as a set and applied as a delta, so it merges with edits made since.
   kind: 'list' | 'text'
-  /** Identity fields start unticked, so applying them is always a deliberate choice. */
+  // preselected is false for identity fields, so applying them is always a deliberate choice.
   preselected: boolean
 }
 

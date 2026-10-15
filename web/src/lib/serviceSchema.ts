@@ -1,6 +1,6 @@
 import { normalizeTosHighlightRating } from './tosHighlights'
 
-import type { AggregateRating, ItemList, Organization, Review } from 'schema-dts'
+import type { ItemList, Organization, Review } from 'schema-dts'
 
 type Highlight = PrismaJson.TosReview['highlights'][number]
 
@@ -33,10 +33,8 @@ const notesList = (highlights: Highlight[], rating: Highlight['rating']): ItemLi
   }
 }
 
-/**
- * Our own verdict as one Review. A flagged scam says so before anything else,
- * so a snippet built from the body cannot read as an endorsement.
- */
+// makeServiceReview states our own verdict as one Review. A flagged scam says so before anything else,
+// so a snippet built from the body cannot read as an endorsement.
 export function makeServiceReview(input: ReviewInput): Review {
   const body = input.isFlaggedScam
     ? [`${input.name} is flagged as a scam on KYCnot.me.`, `${input.scamHeadline}.`]
@@ -60,26 +58,5 @@ export function makeServiceReview(input: ReviewInput): Review {
     negativeNotes: input.isFlaggedScam ? undefined : notesList(input.highlights, 'negative'),
     datePublished: input.listedAt?.toISOString(),
     dateModified: input.reviewedAt?.toISOString(),
-  }
-}
-
-type RatingInput = {
-  trustWeightedUserRating: number | null
-  userRatingCount: number
-  userRatingWeight: number
-  minTrustedWeight: number
-}
-
-/** The users' verdict, only once enough trusted weight stands behind the number shown under the stars. */
-export function makeUserAggregateRating(input: RatingInput): AggregateRating | undefined {
-  if (input.trustWeightedUserRating === null || input.userRatingWeight < input.minTrustedWeight) {
-    return undefined
-  }
-  return {
-    '@type': 'AggregateRating',
-    ratingValue: Math.round(input.trustWeightedUserRating * 10) / 10,
-    bestRating: 5,
-    worstRating: 1,
-    ratingCount: input.userRatingCount,
   }
 }

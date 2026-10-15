@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { makeServiceReview, makeUserAggregateRating } from './serviceSchema'
+import { makeServiceReview } from './serviceSchema'
 
 import type { ItemList } from 'schema-dts'
 
@@ -63,38 +63,4 @@ void test('a scam leads with the flag and keeps no notes, whatever the terms say
   )
   assert.equal(review.positiveNotes, undefined)
   assert.equal((review.reviewRating as { ratingValue: number }).ratingValue, 1)
-})
-
-void test('the aggregate rating needs enough trusted weight and is rounded to one decimal', () => {
-  const rating = makeUserAggregateRating({
-    trustWeightedUserRating: 4.806403574087866,
-    userRatingCount: 90,
-    userRatingWeight: 12,
-    minTrustedWeight: 3,
-  })
-  assert.deepEqual(rating, {
-    '@type': 'AggregateRating',
-    ratingValue: 4.8,
-    bestRating: 5,
-    worstRating: 1,
-    ratingCount: 90,
-  })
-  assert.equal(
-    makeUserAggregateRating({
-      trustWeightedUserRating: 4.8,
-      userRatingCount: 2,
-      userRatingWeight: 1,
-      minTrustedWeight: 3,
-    }),
-    undefined
-  )
-  assert.equal(
-    makeUserAggregateRating({
-      trustWeightedUserRating: null,
-      userRatingCount: 0,
-      userRatingWeight: 0,
-      minTrustedWeight: 3,
-    }),
-    undefined
-  )
 })

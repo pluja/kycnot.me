@@ -1,24 +1,17 @@
 ---
-import { proposalJobKind } from '../../../../lib/scanJobs'
+import { actions } from 'astro:actions'
+
+import { jobsId, proposalJobKind } from '../../../../lib/scanJobs'
 import FormSection from '../../../FormSection.astro'
 import FormSubSection from '../../../FormSubSection.astro'
+
 import JobCard from './JobCard.astro'
 
+import type { ScanJob } from '../../../../constants/scanJobs'
 import type { Prisma, ServiceScanJobKind } from '@prisma/client'
 
 type Suggestion = Prisma.ServiceSuggestionGetPayload<{
   select: { id: true; proposedEdits: true }
-}>
-
-type ScanJob = Prisma.ServiceScanJobGetPayload<{
-  select: {
-    id: true
-    kind: true
-    createdAt: true
-    claimedAt: true
-    processedAt: true
-    error: true
-  }
 }>
 
 type Props = {
@@ -31,6 +24,9 @@ type Props = {
 
 const { service, scanJob, descriptionJob, pendingSuggestions, id = 'tasks' } = Astro.props
 
+// A request swaps only the job cards, so its error is shown here rather than in the page banners.
+const requestError = Astro.getActionResult(actions.admin.service.deepScan.request)?.error?.message
+
 const pendingFor = (kind: ServiceScanJobKind) =>
   pendingSuggestions.find((s) => s.proposedEdits && proposalJobKind(s.proposedEdits) === kind) ?? null
 ---
@@ -40,7 +36,8 @@ const pendingFor = (kind: ServiceScanJobKind) =>
     title="Jobs"
     subtitle="Each job proposes edits for a person to review. A job cannot run again until its proposal is reviewed or dismissed."
   >
-    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+    <div id={jobsId(id)} class="grid grid-cols-1 gap-3 md:grid-cols-2">
+      {requestError && <p class="text-sm text-red-300 md:col-span-2">{requestError}</p>}
       <JobCard
         serviceId={service.id}
         kind="DEEP_SCAN"

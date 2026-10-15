@@ -17,6 +17,7 @@ import InputTextArea from '../../components/InputTextArea.astro'
 import ServiceCard from '../../components/ServiceCard.astro'
 import ServiceSuggestionFields from '../../components/ServiceSuggestionFields.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import { isServicePubliclyReadable } from '../../lib/experiences'
 import { getFormReplay } from '../../lib/formReplay'
 import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
 import { prisma } from '../../lib/prisma'
@@ -89,7 +90,12 @@ const [service, categories, attributes] = await Astro.locals.banners.tryMany([
   ],
 ])
 
-if (!service) return Astro.rewrite('/404')
+if (
+  !service ||
+  (!isServicePubliclyReadable(service.serviceVisibility) && !Astro.locals.userCan('services:edit'))
+) {
+  return Astro.rewrite('/404')
+}
 
 const values = serviceFieldValues(service)
 ---
@@ -141,8 +147,8 @@ const values = serviceFieldValues(service)
       error={inputErrors.notes}
     />
 
-    <div class="flex items-center gap-3 pt-4" role="separator">
-      <div class="h-px flex-1 bg-night-400"></div>
+    <div class="flex items-center gap-3 pt-4">
+      <div class="h-px flex-1 bg-night-400" aria-hidden="true"></div>
       <div class="text-center">
         <h2 class="inline-flex items-center gap-2 font-title text-lg font-semibold text-day-100">
           <Icon name="ri:edit-2-line" class="size-5 text-day-400" />
@@ -150,7 +156,7 @@ const values = serviceFieldValues(service)
         </h2>
         <p class="text-xs text-day-500">Change only what is wrong. Leave the rest as it is.</p>
       </div>
-      <div class="h-px flex-1 bg-night-400"></div>
+      <div class="h-px flex-1 bg-night-400" aria-hidden="true"></div>
     </div>
 
     <InputText

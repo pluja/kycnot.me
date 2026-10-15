@@ -276,40 +276,6 @@ const {
     </div>
   </fieldset>
 
-  <!-- User Score Filter -->
-  <fieldset class="mb-6">
-    <legend class="mb-3 font-title leading-none text-green-500">
-      <label for="user-rating">User Rating (min)</label>
-    </legend>
-    <div class="flex items-center gap-2">
-      <input
-        type="range"
-        min={0}
-        max={4}
-        name="user-rating"
-        id="user-rating"
-        value={filters['user-rating']}
-        class="w-full accent-green-500"
-        data-trigger-on-change
-      />
-    </div>
-    <div class="mt-1 flex justify-between px-2 text-xs text-day-400">
-      <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">-</span>
-      <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">
-        1<Icon name="ri:star-line" class="size-3 shrink-0" />
-      </span>
-      <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">
-        2<Icon name="ri:star-line" class="size-3 shrink-0" />
-      </span>
-      <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">
-        3<Icon name="ri:star-line" class="size-3 shrink-0" />
-      </span>
-      <span class="flex w-0 items-center justify-center text-center whitespace-nowrap">
-        4<Icon name="ri:star-line" class="size-3 shrink-0" />
-      </span>
-    </div>
-  </fieldset>
-
   <!-- Attributes Filter -->
   <fieldset class="mb-6 min-w-0 space-y-2">
     <div class="mb-3 flex items-center justify-between">

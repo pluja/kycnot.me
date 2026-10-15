@@ -34,15 +34,15 @@ export type BadgeSize = (typeof badgeSizes)[number]['id']
 
 export type BadgeOptions = {
   score: boolean
-  rating: boolean
   kyc: boolean
+  verdict: boolean
   light: boolean
 }
 
 export const defaultBadgeOptions = {
   score: true,
-  rating: true,
   kyc: true,
+  verdict: false,
   light: false,
 } as const satisfies BadgeOptions
 
@@ -88,8 +88,8 @@ export function getServiceBadgeImageUrl(
 
   if (size.supportsDetails) {
     if (options.score) params.set('score', '1')
-    if (options.rating) params.set('rating', '1')
     if (options.kyc) params.set('kyc', '1')
+    if (options.verdict) params.set('verdict', '1')
   }
 
   return `${siteOrigin}/badge/${serviceSlug}.png?${params.toString()}`

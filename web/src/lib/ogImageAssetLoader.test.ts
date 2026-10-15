@@ -57,7 +57,12 @@ void test('shares one in-flight request per segment', async () => {
   assert.equal(results[0], results[1])
 })
 
-void test('aborts a stalled asset request and negative-caches the failure', async () => {
+void test('aborts a stalled asset request and negative-caches the failure', async (context) => {
+  // AbortSignal.timeout is unref'd; the mock has no socket to keep the event loop alive.
+  const pendingRequest = setInterval(() => undefined, 1000)
+  context.after(() => {
+    clearInterval(pendingRequest)
+  })
   let requests = 0
   const loadAsset = createOgImageAssetLoader({
     timeoutMs: 10,

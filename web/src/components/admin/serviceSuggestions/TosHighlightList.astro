@@ -6,17 +6,9 @@ import { cn } from '../../../lib/cn'
 import Markdown from '../../Markdown.astro'
 import QuotedClause from '../../QuotedClause.astro'
 
-import type { MarkdownString } from '../../../lib/markdown'
+import type { TosReview } from '../../../lib/tosHighlights'
 
-type Props = {
-  highlights: {
-    title: string
-    content: MarkdownString
-    rating: 'negative' | 'neutral' | 'positive'
-    evidence?: string
-    sourceUrl?: string
-  }[]
-}
+type Props = Pick<TosReview, 'highlights'>
 
 const { highlights } = Astro.props
 ---

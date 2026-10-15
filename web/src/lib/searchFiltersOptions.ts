@@ -30,22 +30,6 @@ export const sortOptions = [
     },
   },
   {
-    value: 'rating-desc',
-    label: 'User rating (High → Low)',
-    orderBy: {
-      key: 'trustWeightedUserRating',
-      direction: 'desc',
-    },
-  },
-  {
-    value: 'rating-asc',
-    label: 'User rating (Low → High)',
-    orderBy: {
-      key: 'trustWeightedUserRating',
-      direction: 'asc',
-    },
-  },
-  {
     value: 'kyc-asc',
     label: 'KYC (Low → High)',
     orderBy: {

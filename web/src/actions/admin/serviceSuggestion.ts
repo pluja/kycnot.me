@@ -17,10 +17,13 @@ import {
 } from '../../lib/serviceFieldEdits'
 import {
   assertCanReviewSuggestion,
+  assertOpenSuggestion,
+  releaseSuggestion,
+  seenAssigneeIdSchema,
   selfReviewNote,
+  suggestionStatusLabel,
   transitionSuggestion,
 } from '../../lib/serviceSuggestionReview'
-import { transformCase } from '../../lib/strings'
 
 export const adminServiceSuggestionActions = {
   update: defineProtectedAction({
@@ -29,6 +32,8 @@ export const adminServiceSuggestionActions = {
     input: z.object({
       suggestionId: z.coerce.number().int().positive(),
       status: z.nativeEnum(ServiceSuggestionStatus),
+      seenStatus: z.nativeEnum(ServiceSuggestionStatus),
+      seenAssigneeId: seenAssigneeIdSchema,
     }),
     handler: async (input, { locals }) => {
       const suggestion = await prisma.serviceSuggestion.findUnique({
@@ -38,6 +43,7 @@ export const adminServiceSuggestionActions = {
           serviceId: true,
           userId: true,
           fieldEdits: true,
+          assignedTo: { select: { id: true, name: true } },
         },
         where: { id: input.suggestionId },
       })
@@ -63,6 +69,15 @@ export const adminServiceSuggestionActions = {
           message: 'Only an admin can change an approved suggestion.',
         })
       }
+      if (input.status === input.seenStatus) {
+        throw new ActionError({
+          code: 'BAD_REQUEST',
+          message: `It is already ${suggestionStatusLabel(input.status)}. To claim it, use Take over.`,
+        })
+      }
+      if (input.status === 'UNDER_REVIEW') {
+        assertCanReviewSuggestion(suggestion, locals.user, { applyingFieldEdits: false })
+      }
       if (input.status === 'APPROVED') {
         assertCanReviewSuggestion(suggestion, locals.user, { applyingFieldEdits: false })
         // Approving here would credit the author with an edit that was never made.
@@ -74,14 +89,92 @@ export const adminServiceSuggestionActions = {
         }
       }
 
+      const otherAssignee =
+        suggestion.assignedTo && suggestion.assignedTo.id !== locals.user.id ? suggestion.assignedTo : null
+      const claimNote = !otherAssignee
+        ? ''
+        : input.status === 'PENDING'
+          ? `, releasing @${otherAssignee.name}'s claim`
+          : `, claimed by @${otherAssignee.name}`
+
       await prisma.$transaction(async (tx) => {
-        await transitionSuggestion(tx, suggestion.id, input.status, [suggestion.status])
+        await transitionSuggestion(tx, suggestion.id, input.status, locals.user.id, {
+          from: [input.seenStatus],
+          seenAssigneeId: input.seenAssigneeId ?? null,
+        })
         await recordAuditLog(tx, {
           actorId: locals.user.id,
           action: 'STATUS_CHANGED',
           targetType: 'SERVICE_SUGGESTION',
           targetId: suggestion.id,
-          summary: `Status set to ${transformCase(input.status.replace('_', ' '), 'lower')}, from ${transformCase(suggestion.status.replace('_', ' '), 'lower')}${selfReviewNote(suggestion, locals.user)}`,
+          summary: `Status set to ${suggestionStatusLabel(input.status)}, from ${suggestionStatusLabel(input.seenStatus)}${claimNote}${selfReviewNote(suggestion, locals.user)}`,
+        })
+      })
+    },
+  }),
+
+  assign: defineProtectedAction({
+    accept: 'form',
+    permissions: cap('suggestions:manage'),
+    input: z.object({
+      suggestionId: z.coerce.number().int().positive(),
+      intent: z.enum(['take', 'release']),
+      seenAssigneeId: seenAssigneeIdSchema,
+    }),
+    handler: async (input, { locals }) => {
+      const suggestion = await prisma.serviceSuggestion.findUnique({
+        where: { id: input.suggestionId },
+        select: {
+          id: true,
+          status: true,
+          userId: true,
+          assignedTo: { select: { id: true, name: true } },
+        },
+      })
+
+      if (!suggestion) {
+        throw new ActionError({ code: 'NOT_FOUND', message: 'Suggestion not found' })
+      }
+      assertOpenSuggestion(suggestion)
+      const assignee = suggestion.assignedTo
+      if ((assignee?.id ?? undefined) !== input.seenAssigneeId) {
+        throw new ActionError({
+          code: 'CONFLICT',
+          message: assignee
+            ? `@${assignee.name} took this suggestion in the meantime.`
+            : 'This suggestion was released in the meantime.',
+        })
+      }
+      const otherAssignee = assignee && assignee.id !== locals.user.id ? assignee : null
+
+      if (input.intent === 'release') {
+        if (!assignee) {
+          throw new ActionError({ code: 'BAD_REQUEST', message: 'Nobody holds this suggestion.' })
+        }
+        await prisma.$transaction(async (tx) => {
+          await releaseSuggestion(tx, suggestion.id, assignee.id)
+          await recordAuditLog(tx, {
+            actorId: locals.user.id,
+            action: 'UPDATED',
+            targetType: 'SERVICE_SUGGESTION',
+            targetId: suggestion.id,
+            summary: otherAssignee ? `Released @${otherAssignee.name}'s claim` : 'Released it',
+          })
+        })
+        return
+      }
+
+      assertCanReviewSuggestion(suggestion, locals.user, { applyingFieldEdits: false })
+      await prisma.$transaction(async (tx) => {
+        await transitionSuggestion(tx, suggestion.id, 'UNDER_REVIEW', locals.user.id, {
+          seenAssigneeId: assignee?.id ?? null,
+        })
+        await recordAuditLog(tx, {
+          actorId: locals.user.id,
+          action: suggestion.status === 'UNDER_REVIEW' ? 'UPDATED' : 'STATUS_CHANGED',
+          targetType: 'SERVICE_SUGGESTION',
+          targetId: suggestion.id,
+          summary: otherAssignee ? `Took it over from @${otherAssignee.name}` : 'Took it for review',
         })
       })
     },
@@ -94,6 +187,7 @@ export const adminServiceSuggestionActions = {
       suggestionId: z.coerce.number().int().positive(),
       fields: z.array(serviceEditFieldsZodEnumById),
       intent: z.enum(['apply', 'reject']).default('apply'),
+      seenAssigneeId: seenAssigneeIdSchema,
     }),
     handler: async (input, { locals }) => {
       const suggestion = await prisma.serviceSuggestion.findUnique({
@@ -113,17 +207,14 @@ export const adminServiceSuggestionActions = {
       if (!suggestion.fieldEdits) {
         throw new ActionError({ code: 'BAD_REQUEST', message: 'Suggestion has no field edits to apply.' })
       }
-      if (suggestion.status !== 'PENDING' && suggestion.status !== 'UNDER_REVIEW') {
-        throw new ActionError({
-          code: 'BAD_REQUEST',
-          message: `Suggestion is already ${suggestion.status.toLowerCase()}.`,
-        })
-      }
+      assertOpenSuggestion(suggestion)
       assertCanReviewSuggestion(suggestion, locals.user, { applyingFieldEdits: true })
 
       if (input.intent === 'reject') {
         await prisma.$transaction(async (tx) => {
-          await transitionSuggestion(tx, suggestion.id, 'REJECTED')
+          await transitionSuggestion(tx, suggestion.id, 'REJECTED', locals.user.id, {
+            seenAssigneeId: input.seenAssigneeId ?? null,
+          })
           await recordAuditLog(tx, {
             actorId: locals.user.id,
             action: 'STATUS_CHANGED',
@@ -172,7 +263,9 @@ export const adminServiceSuggestionActions = {
           .join('; ') + selfReviewNote(suggestion, locals.user)
 
       await prisma.$transaction(async (tx) => {
-        await transitionSuggestion(tx, suggestion.id, 'APPROVED')
+        await transitionSuggestion(tx, suggestion.id, 'APPROVED', locals.user.id, {
+          seenAssigneeId: input.seenAssigneeId ?? null,
+        })
 
         const liveService = await tx.service.findUniqueOrThrow({
           where: { id: suggestion.serviceId },

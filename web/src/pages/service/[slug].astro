@@ -10,7 +10,6 @@ import AttributeCard from '../../components/AttributeCard.astro'
 import BadgeStandard from '../../components/BadgeStandard.astro'
 import Button from '../../components/Button.astro'
 import CommentSection from '../../components/CommentSection.astro'
-import CommentSummary from '../../components/CommentSummary.astro'
 import DropdownButton from '../../components/DropdownButton.astro'
 import DropdownButtonItemForm from '../../components/DropdownButtonItemForm.astro'
 import DropdownButtonItemLink from '../../components/DropdownButtonItemLink.astro'
@@ -18,7 +17,6 @@ import InputSubmitButton from '../../components/InputSubmitButton.astro'
 import InputTextArea from '../../components/InputTextArea.astro'
 import Markdown from '../../components/Markdown.astro'
 import MyPicture from '../../components/MyPicture.astro'
-import RatingBadge from '../../components/RatingBadge.astro'
 import ScoreSquare from '../../components/ScoreSquare.astro'
 import SectionHeading from '../../components/SectionHeading.astro'
 import AcceptedCurrencies from '../../components/service/AcceptedCurrencies.astro'
@@ -38,10 +36,8 @@ import { baseScoreType, getAttributeTypeInfo } from '../../constants/attributeTy
 import { formatContactMethod } from '../../constants/contactMethods'
 import { getCountryInfo } from '../../constants/countries'
 import { currencies, getCurrencyInfo } from '../../constants/currencies'
-import { MIN_TRUSTED_RATING_WEIGHT } from '../../constants/karmaUnlocks'
 import { getKycLevelInfo } from '../../constants/kycLevels'
 import { getServiceVisibilityInfo } from '../../constants/serviceVisibility'
-import { getUserSentimentInfo } from '../../constants/userSentiment'
 import { getVerificationStatusInfo } from '../../constants/verificationStatus'
 import { getVerificationStepStatusInfo } from '../../constants/verificationStepStatus'
 import BaseLayout from '../../layouts/BaseLayout.astro'
@@ -50,6 +46,8 @@ import { makeNonDbAttributes, sortAttributes } from '../../lib/attributes'
 import { cn } from '../../lib/cn'
 import { eventToDisplayKind, getEventDisplay, isEventOpen, pickPrimaryEvent } from '../../lib/eventKind'
 import { getSupportedProviderSlugs } from '../../lib/exchange/supportedProviders'
+import { experienceSummary, summaryWindowDays } from '../../lib/experienceQueries'
+import { isServicePubliclyReadable } from '../../lib/experiences'
 import { computeIncidentTrustPenalty, totalIncidentTrustPenalty } from '../../lib/incidentPenalty'
 import { fitSentences } from '../../lib/metaDescription'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
@@ -66,11 +64,12 @@ import {
   hasBeenReviewed,
   makeKycAnswer,
   makeSafetyAnswer,
+  makeUsersFact,
   pickCaveats,
 } from '../../lib/serviceAnswers'
 import { isEmbeddableBadgeStatus } from '../../lib/serviceBadges'
 import { serviceDetailSelect } from '../../lib/serviceDetail'
-import { makeServiceReview, makeUserAggregateRating } from '../../lib/serviceSchema'
+import { makeServiceReview } from '../../lib/serviceSchema'
 import { getServiceVerificationOverview } from '../../lib/serviceVerification'
 import { transformCase } from '../../lib/strings'
 import { formatDateShort } from '../../lib/timeAgo'
@@ -155,6 +154,9 @@ if (!visibleStatuses.includes(service.serviceVisibility)) {
   return Astro.rewrite('/404')
 }
 
+const commentReportResult = Astro.getActionResult(actions.experience.report)
+if (commentReportResult?.data) return Astro.redirect(`/contact/${commentReportResult.data.thread.id}`)
+
 // Set after the 404/redirect returns above so only a real service page is
 // cached. Signed-in visitors get `no-store`, which is also what keeps a
 // HIDDEN service (visible only via `services:edit`) out of a shared cache.
@@ -162,6 +164,9 @@ setPublicPageCacheHeaders(Astro.response.headers, {
   isAuthenticated: user !== null,
   hasErrors: Astro.locals.banners.errors.length > 0,
 })
+// An open thread can show a post that is still waiting for review to its author,
+// and its state changes as soon as a moderator decides, so it is never shared.
+if (Astro.url.searchParams.has('comment')) Astro.response.headers.set('Cache-Control', 'private, no-store')
 
 const makeWatchingDetails = (
   dbNotificationPreferences: Prisma.NotificationPreferencesGetPayload<{
@@ -206,21 +211,6 @@ const serviceLinks = [...service.serviceUrls, ...service.onionUrls, ...service.i
 const primaryCategory = service.categories[0]
 
 const kycLevelInfo = getKycLevelInfo(`${service.kycLevel}`)
-
-const userSentiment = service.userSentiment
-  ? (() => {
-      return {
-        ...service.userSentiment,
-        whatUsersLike: Array.isArray(service.userSentiment.whatUsersLike)
-          ? service.userSentiment.whatUsersLike
-          : [],
-        whatUsersDislike: Array.isArray(service.userSentiment.whatUsersDislike)
-          ? service.userSentiment.whatUsersDislike
-          : [],
-        info: getUserSentimentInfo(service.userSentiment.sentiment),
-      }
-    })()
-  : null
 
 const attributes = sortAttributes([
   ...makeNonDbAttributes(service, { filter: true }),
@@ -308,15 +298,6 @@ const formatRating = (rating: number) => {
   const rounded = Math.round(rating * 10) / 10
   return Number.isInteger(rounded) ? rounded.toLocaleString() : rounded.toFixed(1)
 }
-// Starts with the badge's visible text ("4 (22)") so the accessible name
-// contains the label, as WCAG 2.5.3 requires for voice control.
-const formatRatingLabel = ({ value, count }: { value: number | null; count: number }) => {
-  const visible = `${value !== null ? formatRating(value) : '-'} (${count.toLocaleString()})`
-  const ratings = `${count.toLocaleString()} ${pluralize('rating', count)}`
-  return value === null
-    ? `${visible}: ${ratings}`
-    : `${visible}: average ${formatRating(value)} out of 5 from ${ratings}`
-}
 const formatLimitedList = (values: string[], maxVisible = 4) => {
   if (values.length <= maxVisible) return sentenceListFormatter.format(values)
   const hiddenCount = values.length - maxVisible
@@ -343,15 +324,6 @@ const getKycPolicySummary = (kycLevel: number) => {
   }
 }
 
-// The users' number is the trust-weighted one shown under the stars, so the
-// description, the schema and the page agree.
-const userAggregateRating = makeUserAggregateRating({
-  trustWeightedUserRating: service.trustWeightedUserRating,
-  userRatingCount: service.userRatingCount,
-  userRatingWeight: service.userRatingWeight,
-  minTrustedWeight: MIN_TRUSTED_RATING_WEIGHT,
-})
-
 // Acronym category names (VPN, VPS, SMS, DEX) must survive the lowercasing
 // that makes the rest read as prose.
 const asProseCategory = (name: string) => (name === name.toUpperCase() ? name : name.toLowerCase())
@@ -375,12 +347,8 @@ const serviceIntroVariants = [
 const scoreSummary = isFlaggedScam
   ? `It has a score of ${formatRating(service.overallScore)}/10.`
   : `It ${getKycPolicySummary(kycLevelInfo.value)} and has a score of ${formatRating(service.overallScore)}/10.`
-const ratingsSummary = userAggregateRating
-  ? `There ${service.userRatingCount === 1 ? 'is' : 'are'} ${service.userRatingCount.toLocaleString()} user ${pluralize('rating', service.userRatingCount)} averaging ${formatRating(userAggregateRating.ratingValue as number)}/5.`
-  : null
 const pageDescription = transformCase(
-  fitSentences([scamVerdict, serviceIntroVariants, scoreSummary, ratingsSummary]) ||
-    `${service.name} review on KYCnot.me.`,
+  fitSentences([scamVerdict, serviceIntroVariants, scoreSummary]) || `${service.name} review on KYCnot.me.`,
   'first-upper'
 )
 
@@ -500,7 +468,7 @@ const stepDotClass = {
 
 const sortedVerificationSteps = orderBy(
   service.verificationSteps,
-  [(step) => getVerificationStepPriority(step.status), (step) => step.updatedAt],
+  [(step) => getVerificationStepPriority(step.status), (step) => step.createdAt],
   ['asc', 'desc'] // Priority ascending (failed first), date descending (newest first)
 )
 
@@ -541,6 +509,15 @@ const openWarnings = service.events.filter((event) => {
   const kind = eventToDisplayKind(event)
   return kind === 'WARNING' || kind === 'ALERT'
 })
+// Services that aren't publicly readable keep their posts private, so their counts stay private too.
+const userReports = isServicePubliclyReadable(service.serviceVisibility)
+  ? await Astro.locals.banners.try(
+      'Failed to summarize user experiences',
+      () => experienceSummary(service.id),
+      null
+    )
+  : null
+const usersFact = userReports ? makeUsersFact(userReports, summaryWindowDays) : null
 const safetyAnswer = makeSafetyAnswer({
   verificationStatus: service.verificationStatus,
   incidents: activeIncidents.map((entry) => ({
@@ -554,8 +531,8 @@ const safetyAnswer = makeSafetyAnswer({
   checks: flaggedChecks,
   recentlyApprovedAt: service.isRecentlyApproved ? service.approvedAt : null,
 })
-// One Review from us and one AggregateRating from users, on the Organization
-// itself. An unreviewed listing gets no Review: nobody has looked at it yet.
+// The Review sits on the Organization itself. An unreviewed listing gets no
+// Review: nobody has looked at it yet.
 const serviceReview = isReviewed
   ? makeServiceReview({
       name: service.name,
@@ -576,27 +553,14 @@ const serviceReview = isReviewed
 const registrationCountry = service.registrationCountryCode
   ? getCountryInfo(service.registrationCountryCode)
   : null
-type ServiceFact = {
-  text?: string
-  href?: string
-  icon?: string
-  rating?: { value: number | null; count: number }
-  /** Least important: on phones it is shown only when it fits the single row. */
-  optional?: boolean
-}
+type ServiceFact = { text: string; icon: string }
+// The country goes last: on phones the row is cut to one line, and it is the fact to lose.
 const serviceFactCandidates: (ServiceFact | false | null)[] = [
-  registrationCountry && { text: registrationCountry.name, icon: 'ri:map-pin-line', optional: true },
   service.operatingSince && {
     text: formatDistanceToNowStrict(service.operatingSince, { roundingMethod: 'floor' }),
     icon: 'ri:cake-2-line',
   },
-  service.userRatingCount > 0 && {
-    href: '#comments',
-    rating: {
-      value: service.trustWeightedUserRating ?? service.averageUserRating,
-      count: service.userRatingCount,
-    },
-  },
+  registrationCountry && { text: registrationCountry.name, icon: 'ri:map-pin-line' },
 ]
 const serviceFacts = serviceFactCandidates.filter((fact): fact is ServiceFact => !!fact)
 // Logo, name row and badge row share fixed heights so the logo's edges line up with
@@ -650,9 +614,8 @@ const verificationStatusDate =
       ? service.approvedAt
       : service.listedAt
 
-// The thread below can be asked to include comments no moderator has seen yet.
-// That view is worth offering a reader and not worth handing to a crawler.
-const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === 'true'
+// A single open thread repeats content already on the canonical page.
+const showsSingleThread = Astro.url.searchParams.has('comment')
 ---
 
 <BaseLayout
@@ -663,7 +626,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
   classNames={{ main: 'sm:mt-12' }}
   noindex={serviceVisibilityInfo.value === 'UNLISTED' ||
     serviceVisibilityInfo.value === 'HIDDEN' ||
-    showsUnmoderatedComments}
+    showsSingleThread}
   htmx
   schemas={[
     {
@@ -678,7 +641,6 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
       logo: service.imageUrl ? absoluteSiteUrl(service.imageUrl) : undefined,
       mainEntityOfPage: pageUrl,
       review: serviceReview,
-      aggregateRating: userAggregateRating,
       contactPoint: undefinedIfEmpty(
         service.contactMethods
           .map((method) => ({
@@ -759,7 +721,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
     ) : (
       !isReviewed && (
         <div class="mb-4">
-          <UnreviewedNotice serviceName={service.name} />
+          <UnreviewedNotice />
         </div>
       )
     )
@@ -965,9 +927,18 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
           />
           <DropdownButtonItemLink
             href={`/service/${service.slug}#comments`}
-            label="Review"
-            icon="ri:star-line"
+            label="Share an experience"
+            icon="ri:chat-new-line"
           />
+          {
+            canEmbedServiceBadge && (
+              <DropdownButtonItemLink
+                href={`/service/${service.slug}/badge`}
+                label="Embed badge on your site"
+                icon="ri:code-s-slash-line"
+              />
+            )
+          }
           <AdminOnly>
             <DropdownButtonItemLink
               href={`/admin/services/${service.slug}/edit`}
@@ -1000,29 +971,18 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
           class="order-first mt-3 flex max-h-6 flex-wrap items-center gap-y-6 overflow-hidden text-sm text-day-400 sm:order-none sm:max-h-none sm:gap-y-1.5 sm:overflow-visible [&>li]:before:mx-2.5 [&>li]:before:text-day-600 [&>li]:before:content-['·'] [&>li:first-child]:before:hidden"
           aria-label="Key facts"
         >
-          <li class="flex shrink-0">
-            <AcceptedCurrencies
-              accepted={service.acceptedCurrencies}
-              class="max-sm:gap-1.5 max-sm:[&_svg]:size-4"
-            />
-          </li>
+          {acceptedCurrencies.length > 0 && (
+            <li class="flex shrink-0">
+              <AcceptedCurrencies
+                accepted={service.acceptedCurrencies}
+                class="max-sm:gap-1.5 max-sm:[&_svg]:size-4"
+              />
+            </li>
+          )}
           {serviceFacts.map((fact) => (
-            <li class={cn('flex shrink-0 items-center gap-1.5', fact.optional && 'max-sm:order-last')}>
-              {fact.icon && <Icon name={fact.icon} class="size-4 shrink-0 text-day-500" />}
-              {fact.rating ? (
-                <a href={fact.href} class="hover:text-day-200" aria-label={formatRatingLabel(fact.rating)}>
-                  <RatingBadge rating={fact.rating.value} count={fact.rating.count} />
-                </a>
-              ) : fact.href ? (
-                <a
-                  href={fact.href}
-                  class="underline decoration-day-700 underline-offset-4 hover:text-day-200"
-                >
-                  {fact.text}
-                </a>
-              ) : (
-                fact.text
-              )}
+            <li class="flex shrink-0 items-center gap-1.5">
+              <Icon name={fact.icon} class="size-4 shrink-0 text-day-500" />
+              {fact.text}
             </li>
           ))}
         </ul>
@@ -1039,6 +999,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
               url={url}
               referral={service.referral}
               isScam={service.verificationStatus === 'VERIFICATION_FAILED'}
+              archived={service.serviceVisibility === 'ARCHIVED'}
             />
           </li>
         ))}
@@ -1078,6 +1039,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
     <ServiceAnswerPanel
       kyc={kycAnswer}
       safety={safetyAnswer}
+      usersFact={usersFact}
       kycLevel={kycLevelInfo}
       privacyScore={service.privacyScore}
       trustScore={service.trustScore}
@@ -1154,7 +1116,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
     <SectionHeading
       title="Attributes"
       links={[
-        { href: '/about#service-scores', text: 'Scores' },
+        { href: '/docs/scores#service-scores', text: 'Scores' },
         { href: '/attributes', text: 'All attributes' },
       ]}
       class="mt-0"
@@ -1226,8 +1188,8 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
     id="verification"
     title="Evidence"
     links={[
-      { href: '/about#listing-statuses', text: 'Statuses' },
-      { href: '/about#suggestion-review-process', text: 'Review process' },
+      { href: '/docs/listings#listing-statuses', text: 'Statuses' },
+      { href: '/docs/listings#suggestion-review-process', text: 'Review process' },
     ]}
   />
 
@@ -1391,7 +1353,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
                   )}
                 />
                 <p class="flex flex-wrap items-center gap-x-2 text-xs text-day-500">
-                  <TimeFormatted date={step.updatedAt} prefix={false} />
+                  <TimeFormatted date={step.createdAt} prefix={false} />
                   <span aria-hidden="true" class="text-day-700">
                     ·
                   </span>
@@ -1417,113 +1379,7 @@ const showsUnmoderatedComments = Astro.url.searchParams.get('showPending') === '
       </>
     )
   }
-  <SectionHeading
-    id="comments"
-    title="Comments"
-    links={[{ href: `/comments?service=${service.slug}`, text: 'In the feed' }]}
-  />
-  <div
-    id="discuss"
-    class='grid grid-cols-1 gap-8 [grid-template-areas:"about""rating""ai"] sm:grid-cols-[1fr_1fr] sm:gap-4 sm:[grid-template-areas:"about_ai""rating_ai"]'
-  >
-    <div class="relative rounded-md bg-orange-400/10 p-2 px-2.5 text-xs text-orange-100/70 [grid-area:about]">
-      <p class="font-bold">About comments</p>
-      <ul class="list-disc pl-4">
-        <li>Comments are visible after approval.</li>
-        <li>Moderation is light.</li>
-        <li>Double-check before trusting.</li>
-      </ul>
-
-      {
-        service.strictCommentingEnabled && (
-          <p class="mt-2">
-            <Icon
-              name="ri:verified-badge-fill"
-              class="me-0.5 inline-block size-4 align-[-0.3em] text-orange-100/95"
-            />
-            <span class="font-medium text-orange-100/95">Proof of being a client required</span>, for this
-            service.
-          </p>
-        )
-      }
-
-      <div class="absolute inset-y-2 right-2 flex flex-col justify-center">
-        <Icon name="ri:alert-line" class="h-full max-h-16 w-auto opacity-10 xs:opacity-20" />
-      </div>
-    </div>
-    <CommentSummary
-      serviceId={service.id}
-      averageUserRating={service.averageUserRating}
-      trustWeightedUserRating={service.trustWeightedUserRating}
-      userRatingCount={service.userRatingCount}
-      trustedUserRatingCount={service.trustedUserRatingCount}
-      userRatingWeight={service.userRatingWeight}
-      class="grow [grid-area:rating]"
-    />
-
-    <div class="flex flex-1 grow-3 basis-64 flex-col gap-2 rounded-lg bg-night-800 p-3 [grid-area:ai]">
-      <div class="flex flex-row justify-between">
-        <h3 class="font-title leading-none font-bold">
-          <Icon name="ri:sparkling-2-line" class="me-1 inline-block size-4 align-[-0.1em]" />AI Summary
-        </h3>
-        {
-          service.userSentimentAt && (
-            <div class="text-right text-xs text-day-500">
-              Updated
-              <TimeFormatted date={service.userSentimentAt} hourPrecision />
-            </div>
-          )
-        }
-      </div>
-
-      {
-        userSentiment ? (
-          <>
-            <div class="prose prose-sm max-w-none text-sm prose-invert">
-              <Markdown content={userSentiment.summary} />
-            </div>
-
-            <div class="flex grow items-center justify-evenly">
-              <ul class="inline-grid list-inside list-disc place-items-center text-sm text-day-300 marker:text-green-400 marker:content-['+_']">
-                {userSentiment.whatUsersLike.map((item) => (
-                  <li class="w-full">
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <ul class="inline-grid list-inside list-disc place-items-center text-sm text-day-300 marker:text-red-400 marker:content-['-_']">
-                {userSentiment.whatUsersDislike.map((item) => (
-                  <li class="w-full">
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </>
-        ) : (
-          <p class="my-2 flex flex-1 items-center justify-center text-center text-xs text-day-400">
-            Not reviewed yet
-          </p>
-        )
-      }
-    </div>
-  </div>
-  {
-    canEmbedServiceBadge && (
-      <div class="mt-8 mb-12 flex justify-center">
-        <a
-          href={`/service/${service.slug}/badge`}
-          class="inline-flex items-center gap-2 rounded-md border border-day-500/10 px-3 py-1.5 text-xs text-day-500 transition-colors hover:border-day-500/20 hover:text-day-300"
-        >
-          <Icon name="ri:code-s-slash-line" class="size-3.5 shrink-0" />
-          <span>Embed badge on your site</span>
-          <Icon name="ri:arrow-right-s-line" class="size-3.5 shrink-0" />
-        </a>
-      </div>
-    )
-  }
-  <CommentSection itemReviewedId={itemReviewedId} service={service} />
+  <CommentSection service={service} viewerIsAffiliated={service.affiliatedUsers.length > 0} />
 </BaseLayout>
 
 <script>

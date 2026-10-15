@@ -1,0 +1,47 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../../lib/cn'
+import { STALE_CLAIM_DAYS } from '../../../lib/suggestionAssignment'
+import { formatDateShort } from '../../../lib/timeAgo'
+import MyPicture from '../../MyPicture.astro'
+import Tooltip from '../../Tooltip.astro'
+
+import type { Prisma } from '@prisma/client'
+
+type Props = {
+  assignee: Prisma.UserGetPayload<{ select: { name: true; displayName: true; picture: true } }>
+  assignedAt: Date | null
+  stale: boolean
+  class?: string
+}
+
+const { assignee, assignedAt, stale, class: className } = Astro.props
+
+const label = [
+  `@${assignee.name}`,
+  assignedAt && `claimed ${formatDateShort(assignedAt)}`,
+  stale && `stale, no activity for ${String(STALE_CLAIM_DAYS)} days`,
+]
+  .filter(Boolean)
+  .join(' · ')
+---
+
+<Tooltip text={label} class={cn('inline-flex', className)}>
+  <a
+    href={`/u/${assignee.name}`}
+    class={cn(
+      'inline-flex size-6 items-center justify-center overflow-hidden rounded-full bg-night-600',
+      stale && 'opacity-60 ring-2 ring-yellow-500'
+    )}
+  >
+    {
+      assignee.picture ? (
+        <MyPicture src={assignee.picture} width={24} height={24} alt="" class="size-6 object-cover" />
+      ) : (
+        <Icon name="ri:user-line" class="size-4 text-day-300" />
+      )
+    }
+    <span class="sr-only">{label}</span>
+  </a>
+</Tooltip>

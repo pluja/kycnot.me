@@ -16,7 +16,6 @@ const MAX_SUMMARIZED_ISSUES = 8
 
 const verificationStatusSchema = z.nativeEnum(VerificationStatus).nullable()
 const scoreSchema = z.number().finite().int().min(OG_IMAGE_LIMITS.score.min).max(OG_IMAGE_LIMITS.score.max)
-const ratingSchema = z.number().finite().min(OG_IMAGE_LIMITS.rating.min).max(OG_IMAGE_LIMITS.rating.max)
 const kycLevelSchema = z
   .number()
   .finite()
@@ -38,13 +37,14 @@ const requiredTextSchema = (maxLength: number) => optionalTextSchema(maxLength).
 
 const badgePropsSchema = z
   .object({
-    verificationStatus: verificationStatusSchema,
+    // Badges only exist for listed services, so the status is always known.
+    verificationStatus: z.nativeEnum(VerificationStatus),
     overallScore: scoreSchema.nullable(),
-    averageUserRating: ratingSchema.nullable(),
     kycLevel: kycLevelSchema.nullable(),
     showScore: z.boolean(),
-    showRating: z.boolean(),
     showKycLevel: z.boolean(),
+    // verdict is the tone of the experience summary's verdict, or null when not asked for or not enough posts back it.
+    verdict: z.enum(['good', 'caution', 'bad']).nullable(),
     theme: z.enum(badgeThemes),
   })
   .strict()
@@ -108,7 +108,8 @@ export const publicOgImagePropsSchemas = {
 } as const satisfies Record<string, z.ZodType>
 
 export const badgeOgImagePropsSchemas = {
-  'badge-lg': badgePropsSchema.extend({ name: requiredTextSchema(OG_IMAGE_LIMITS.badge.name) }).strict(),
+  // site is the service's domain rather than its name: anyone can copy a name onto their own badge, not a domain.
+  'badge-lg': badgePropsSchema.extend({ site: requiredTextSchema(OG_IMAGE_LIMITS.badge.site) }).strict(),
   'badge-sm': badgePropsSchema,
   'badge-xs': badgePropsSchema.pick({ theme: true, verificationStatus: true }).strict(),
 } as const satisfies Record<string, z.ZodType>

@@ -14,8 +14,8 @@ export const serviceListItemSelect = {
   acceptedCurrencies: true,
   serviceVisibility: true,
   serviceUrls: true,
+  referral: true,
   onionUrls: true,
-  trustWeightedUserRating: true,
   categories: {
     select: {
       name: true,

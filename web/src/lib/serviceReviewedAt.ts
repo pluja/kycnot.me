@@ -6,12 +6,9 @@ type ReviewedAtInput = {
   verificationSteps: { updatedAt: Date }[]
 }
 
-/**
- * When we last touched the listing: an approval, a verification, a terms
- * review, or an event written or edited (attribute changes write one too).
- * Counters, scores and comments do not count, which is why `updatedAt` is not
- * used.
- */
+// latestReviewedAt is when we last touched the listing: an approval, a verification, a terms review, or an
+// event written or edited (attribute changes write one too). Counters, scores and comments do not count,
+// which is why `updatedAt` is not used.
 export function latestReviewedAt(input: ReviewedAtInput): Date | null {
   const dates = [
     input.approvedAt,

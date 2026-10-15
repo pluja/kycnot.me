@@ -1,12 +1,9 @@
-// Search results cut descriptions at about 160 characters, mid-word.
-export const META_DESCRIPTION_MAX_LENGTH = 160
+// META_DESCRIPTION_MAX_LENGTH is about where search results cut a description, mid-word.
+const META_DESCRIPTION_MAX_LENGTH = 160
 
-/**
- * Joins whole sentences while the total stays within maxLength. A slot may
- * list variants from longest to shortest; the first that fits is used. The
- * first slot that fits in no variant ends the description, so a later
- * sentence never appears without the one it refers to.
- */
+// fitSentences joins whole sentences while the total stays within maxLength. A slot may list variants
+// from longest to shortest; the first that fits is used. The first slot that fits in no variant ends the
+// description, so a later sentence never appears without the one it refers to.
 export const fitSentences = (
   slots: (string[] | string | null | undefined)[],
   maxLength = META_DESCRIPTION_MAX_LENGTH

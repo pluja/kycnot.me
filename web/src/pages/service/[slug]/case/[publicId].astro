@@ -1,4 +1,5 @@
 ---
+import { makeCommentUrl } from '../../../../lib/commentsWithReplies'
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 
@@ -77,6 +78,7 @@ const caseRow = await Astro.locals.banners.try(
         issueType: true,
         status: true,
         summaryMd: true,
+        sourceCommentId: true,
         amountText: true,
         externalSource: true,
         occurredAt: true,
@@ -236,6 +238,16 @@ const sourceUrl =
 
     <div class="prose prose-sm mt-4 max-w-none text-pretty wrap-anywhere text-day-200 prose-invert">
       <Markdown content={caseRow.summaryMd} />
+      {
+        caseRow.sourceCommentId && (
+          <a
+            class="mt-3 block text-sm text-green-300 underline"
+            href={makeCommentUrl({ serviceSlug: caseRow.service.slug, commentId: caseRow.sourceCommentId })}
+          >
+            Read the original user experience
+          </a>
+        )
+      }
     </div>
 
     {
@@ -283,8 +295,8 @@ const sourceUrl =
         </div>
 
         <p class="mt-2 text-xs text-day-400">
-          Moderators found this report to be credible evidence for the incident above. The trust penalty applies
-          once to the incident, not once per report.
+          Moderators found this report to be credible evidence for the incident above. The trust penalty
+          applies once to the incident, not once per report.
         </p>
 
         <CaseReportsStrip

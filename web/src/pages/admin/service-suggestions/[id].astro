@@ -3,6 +3,8 @@ import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 
 import AuditLogTimeline from '../../../components/admin/AuditLogTimeline.astro'
+import AssignButton from '../../../components/admin/serviceSuggestions/AssignButton.astro'
+import AssigneeAvatar from '../../../components/admin/serviceSuggestions/AssigneeAvatar.astro'
 import ProposedEditsReview from '../../../components/admin/serviceSuggestions/ProposedEditsReview.astro'
 import BadgeSmall from '../../../components/BadgeSmall.astro'
 import Button from '../../../components/Button.astro'
@@ -22,7 +24,12 @@ import { parseIntWithFallback } from '../../../lib/numbers'
 import { canReviewSuggestion } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
 import { makeLoginUrl } from '../../../lib/redirectUrls'
-import { serviceEditableSelect, serviceFieldValues } from '../../../lib/serviceFieldEdits'
+import {
+  proposalAttributeSelect,
+  serviceEditableSelect,
+  serviceFieldValues,
+} from '../../../lib/serviceFieldEdits'
+import { isStaleClaim, openSuggestionStatuses, staffMessageWhere } from '../../../lib/suggestionAssignment'
 import { formatDateShort } from '../../../lib/timeAgo'
 
 const user = Astro.locals.user
@@ -35,6 +42,9 @@ Astro.locals.banners.addIfSuccess(serviceSuggestionUpdateResult, 'Service sugges
 const serviceSuggestionUpdateInputErrors = isInputError(serviceSuggestionUpdateResult?.error)
   ? serviceSuggestionUpdateResult.error.fields
   : {}
+
+const assignResult = Astro.getActionResult(actions.admin.serviceSuggestions.assign)
+Astro.locals.banners.addIfSuccess(assignResult, 'Assignment updated')
 
 const deepScanApplyResult = Astro.getActionResult(actions.admin.service.deepScan.apply)
 Astro.locals.banners.addIfSuccess(deepScanApplyResult, 'Proposed edits applied')
@@ -64,6 +74,15 @@ const serviceSuggestion = await Astro.locals.banners.try('Error fetching service
       fieldEdits: true,
       createdAt: true,
       type: true,
+      assignedAt: true,
+      assignedTo: {
+        select: {
+          id: true,
+          name: true,
+          displayName: true,
+          picture: true,
+        },
+      },
       user: {
         select: {
           id: true,
@@ -139,15 +158,7 @@ const [attributes, categories] = hasStructuredEdits
         'Error fetching attributes',
         () =>
           prisma.attribute.findMany({
-            select: {
-              id: true,
-              title: true,
-              description: true,
-              category: true,
-              type: true,
-              privacyPoints: true,
-              trustPoints: true,
-            },
+            select: proposalAttributeSelect,
             orderBy: [{ category: 'asc' }, { title: 'asc' }],
           }),
         [],
@@ -156,7 +167,29 @@ const [attributes, categories] = hasStructuredEdits
     ])
   : [[], []]
 
+const lastStaffMessage = await Astro.locals.banners.try(
+  'Error fetching the last staff message',
+  () =>
+    prisma.serviceSuggestionMessage.findFirst({
+      where: { suggestionId: serviceSuggestion.id, ...staffMessageWhere },
+      select: { createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+  null
+)
+
 const statusInfo = getServiceSuggestionStatusInfo(serviceSuggestion.status)
+const isOpen = openSuggestionStatuses.includes(serviceSuggestion.status)
+const assignee = serviceSuggestion.assignedTo
+const staleClaim = isStaleClaim({
+  status: serviceSuggestion.status,
+  assignedAt: serviceSuggestion.assignedAt,
+  lastStaffMessageAt: lastStaffMessage?.createdAt ?? null,
+})
+const canTake =
+  isOpen &&
+  assignee?.id !== user.id &&
+  canReviewSuggestion({ userId: serviceSuggestion.user.id }, user, { applyingFieldEdits: false })
 const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
 ---
 
@@ -201,6 +234,38 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
+        <span class="font-title font-bold">{isOpen ? 'Assigned:' : 'Handled by:'}</span>
+        {
+          assignee ? (
+            <span class="inline-flex items-center gap-1.5">
+              <AssigneeAvatar
+                assignee={assignee}
+                assignedAt={serviceSuggestion.assignedAt}
+                stale={staleClaim}
+              />
+              {assignee.id === user.id ? 'You' : (assignee.displayName ?? assignee.name)}
+            </span>
+          ) : (
+            <span class="text-day-400">Nobody</span>
+          )
+        }
+        {
+          canTake && (
+            <AssignButton
+              suggestionId={serviceSuggestion.id}
+              assigneeId={assignee?.id ?? null}
+              intent="take"
+            />
+          )
+        }
+        {
+          isOpen && assignee && (
+            <AssignButton suggestionId={serviceSuggestion.id} assigneeId={assignee.id} intent="release" />
+          )
+        }
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
         <span class="font-title font-bold">Service:</span>
         <a href={`/service/${serviceSuggestion.service.slug}`} class="text-green-400 hover:text-day-200">
           Open <Icon name="ri:external-link-line" class="ml-0.5 inline-block size-3 align-[-0.05em]" />
@@ -229,6 +294,7 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
           suggestion={serviceSuggestion}
           service={serviceSuggestion.service}
           attributes={attributes}
+          seenAssigneeId={assignee?.id ?? null}
           class="mt-6"
         />
       )
@@ -245,6 +311,7 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
           reviewable={canReviewSuggestion({ userId: serviceSuggestion.user.id }, user, {
             applyingFieldEdits: true,
           })}
+          seenAssigneeId={assignee?.id ?? null}
           class="mt-6"
         />
       )
@@ -258,6 +325,8 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
           class="mt-6 flex items-end gap-2"
         >
           <input type="hidden" name="suggestionId" value={serviceSuggestion.id} />
+          <input type="hidden" name="seenStatus" value={serviceSuggestion.status} />
+          <input type="hidden" name="seenAssigneeId" value={assignee?.id ?? ''} />
           <InputSelect
             name="status"
             label="Update status"

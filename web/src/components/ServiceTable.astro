@@ -6,6 +6,7 @@ import { getKycLevelInfo } from '../constants/kycLevels'
 import { serviceVisibilitiesById } from '../constants/serviceVisibility'
 import { getServiceStatusIcon } from '../constants/verificationStatus'
 import { cn } from '../lib/cn'
+import { buildGoHref, serviceOutboundUrl } from '../lib/goLink'
 import { makeOverallScoreInfo } from '../lib/overallScore'
 import { defaultSortOption } from '../lib/searchFiltersOptions'
 import { createPageUrl, urlWithParams } from '../lib/urls'
@@ -83,7 +84,7 @@ const headers = {
 <div class="relative mt-2 overflow-x-auto rounded-xl border border-night-600 sm:mt-6 sm:overflow-visible">
   <table
     aria-label="Services comparison"
-    class="w-full border-separate border-spacing-0 text-left text-sm whitespace-nowrap [&_thead_tr>:first-child]:rounded-tl-xl [&_thead_tr>:last-child]:rounded-tr-xl [&_tbody_tr:last-child>:first-child]:rounded-bl-xl [&_tbody_tr:last-child>:last-child]:rounded-br-xl"
+    class="w-full border-separate border-spacing-0 text-left text-sm whitespace-nowrap [&_tbody_tr:last-child>:first-child]:rounded-bl-xl [&_tbody_tr:last-child>:last-child]:rounded-br-xl [&_thead_tr>:first-child]:rounded-tl-xl [&_thead_tr>:last-child]:rounded-tr-xl"
   >
     <thead>
       <tr>
@@ -137,10 +138,11 @@ const headers = {
           const onionUrl = service.onionUrls.find(
             (url) => url.startsWith('http://') || url.startsWith('https://')
           )
-          const hasTor = onionUrl !== undefined
-          const hasOutboundUrl = service.serviceUrls.length > 0
           const isScam = service.verificationStatus === 'VERIFICATION_FAILED'
           const isArchived = service.serviceVisibility === 'ARCHIVED'
+          // An archived service's links go through its page, which warns that the domain may have changed hands.
+          const hasTor = onionUrl !== undefined && !isArchived
+          const websiteUrl = isArchived ? undefined : service.serviceUrls[0]
           const statusIcon = getServiceStatusIcon(service.verificationStatus)
 
           return (
@@ -271,10 +273,13 @@ const headers = {
                       <Icon name="ri:information-line" class="size-4" is:inline={inlineIcons} />
                     </a>
                   </Tooltip>
-                  {hasOutboundUrl ? (
+                  {websiteUrl ? (
                     <Tooltip text="Visit website">
                       <a
-                        href={`/go/${service.slug}`}
+                        href={buildGoHref({
+                          slug: service.slug,
+                          deepLinkUrl: serviceOutboundUrl(websiteUrl, service),
+                        })}
                         target="_blank"
                         rel="noopener noreferrer nofollow"
                         aria-label={`Visit ${service.name} website`}

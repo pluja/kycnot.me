@@ -5,6 +5,16 @@ import { ActionError } from 'astro:actions'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
+import { emptyToUndefined } from '../../lib/zodUtils'
+
+// performedAt is stored as createdAt: tests are often written up days after they ran.
+const performedAt = z.preprocess(
+  emptyToUndefined,
+  z.coerce
+    .date()
+    .refine((date) => date <= new Date(), 'The test date cannot be in the future')
+    .optional()
+)
 
 const verificationStepSchemaBase = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -16,6 +26,7 @@ const verificationStepSchemaBase = z.object({
   serviceId: z.coerce.number().int().positive(),
   evidenceMd: z.string().optional().nullable().default(null),
   showBanner: z.boolean().optional().default(false),
+  performedAt,
 })
 
 const verificationStepUpdateSchema = z.object({
@@ -29,6 +40,7 @@ const verificationStepUpdateSchema = z.object({
   status: z.nativeEnum(VerificationStepStatus).optional(),
   evidenceMd: z.string().optional().nullable(),
   showBanner: z.boolean().optional().default(false),
+  performedAt,
 })
 
 const verificationStepIdSchema = z.object({
@@ -41,7 +53,7 @@ export const verificationStep = {
     permissions: cap('services:edit'),
     input: verificationStepSchemaBase,
     handler: async (input) => {
-      const { serviceId, title, description, status, evidenceMd, showBanner } = input
+      const { serviceId, title, description, status, evidenceMd, showBanner, performedAt } = input
 
       const service = await prisma.service.findUnique({
         where: { id: serviceId },
@@ -61,6 +73,7 @@ export const verificationStep = {
           status,
           evidenceMd,
           showBanner,
+          createdAt: performedAt,
           service: {
             connect: { id: serviceId },
           },
@@ -76,10 +89,11 @@ export const verificationStep = {
     permissions: cap('services:edit'),
     input: verificationStepUpdateSchema,
     handler: async (input) => {
-      const { id, ...dataToUpdate } = input
+      const { id, performedAt, ...dataToUpdate } = input
 
       const existingStep = await prisma.verificationStep.findUnique({
         where: { id },
+        select: { createdAt: true },
       })
 
       if (!existingStep) {
@@ -89,9 +103,12 @@ export const verificationStep = {
         })
       }
 
+      // The form only holds a day: keep the stored time unless the day itself changed.
+      const sameDay =
+        performedAt?.toISOString().slice(0, 10) === existingStep.createdAt.toISOString().slice(0, 10)
       const updatedVerificationStep = await prisma.verificationStep.update({
         where: { id },
-        data: dataToUpdate,
+        data: { ...dataToUpdate, ...(sameDay ? {} : { createdAt: performedAt }) },
       })
 
       return { verificationStep: updatedVerificationStep }

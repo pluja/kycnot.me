@@ -15,9 +15,11 @@ import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
 import EditableListItem from '../../EditableListItem.astro'
 import EditToggleButton from '../../EditToggleButton.astro'
 
+import type { TosReview } from '../../../../lib/tosHighlights'
+
 type Props = {
   serviceId: number
-  tosReview: Pick<PrismaJson.TosReview, 'highlights'> | null
+  tosReview: Pick<TosReview, 'highlights'> | null
   addInputErrors: Record<string, string[] | undefined>
   updateInputErrors: Record<string, string[] | undefined>
   id?: string

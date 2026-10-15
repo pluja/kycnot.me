@@ -1,10 +1,9 @@
 import { badgeOgImageTemplates } from '../../components/OgImage'
+import { experienceSummary } from '../../lib/experienceQueries'
+import { summaryVerdict } from '../../lib/experienceVerdict'
+import { normalizeHost } from '../../lib/goLink'
 import { createOgImageTextNormalizer, OG_IMAGE_LIMITS } from '../../lib/ogImageInput'
-import {
-  normalizeOgImageKycLevel,
-  normalizeOgImageRating,
-  normalizeOgImageScore,
-} from '../../lib/ogImageNormalize'
+import { normalizeOgImageKycLevel, normalizeOgImageScore } from '../../lib/ogImageNormalize'
 import { badgeOgImagePropsSchemas } from '../../lib/ogImageProps'
 import { ogRenderSemaphore } from '../../lib/ogImageRenderQueue'
 import { prisma } from '../../lib/prisma'
@@ -71,17 +70,17 @@ function makeBadgeCacheKey({
   size,
   theme,
   showScore,
-  showRating,
   showKycLevel,
+  showVerdict,
 }: {
   slug: string
   size: BadgeSize
   theme: BadgeTheme
   showScore: boolean
-  showRating: boolean
   showKycLevel: boolean
+  showVerdict: boolean
 }) {
-  const details = size === 'xs' ? 'compact' : [showScore, showRating, showKycLevel].map(Number).join('')
+  const details = size === 'xs' ? 'compact' : [showScore, showKycLevel, showVerdict].map(Number).join('')
   return [slug, size, theme, details].join('|')
 }
 
@@ -148,14 +147,15 @@ export const GET: APIRoute = async (context) => {
   const themeParam = context.url.searchParams.get('theme') ?? 'dark'
   const theme = isBadgeTheme(themeParam) ? themeParam : 'dark'
   const showScore = context.url.searchParams.get('score') === '1'
-  const showRating = context.url.searchParams.get('rating') === '1'
   const showKycLevel = context.url.searchParams.get('kyc') === '1'
-  const cacheKey = makeBadgeCacheKey({ slug, size, theme, showScore, showRating, showKycLevel })
+  // Not `rating`: older embeds carry rating=1 from the removed star rating, and must not start showing a verdict.
+  const showVerdict = context.url.searchParams.get('verdict') === '1'
+  const cacheKey = makeBadgeCacheKey({ slug, size, theme, showScore, showKycLevel, showVerdict })
 
   const cachedResponse = getCachedBadgeResponse(cacheKey)
   if (cachedResponse) return cachedResponse
 
-  const options = { showKycLevel, showRating, showScore, size, slug, theme }
+  const options = { showKycLevel, showScore, showVerdict, size, slug, theme }
   let pending = pendingBadgeRenders.get(cacheKey)
   if (!pending) {
     pending = renderBadge(cacheKey, options, context).finally(() => pendingBadgeRenders.delete(cacheKey))
@@ -173,10 +173,19 @@ export const GET: APIRoute = async (context) => {
   }
 }
 
+const homepageHost = (url: string) => {
+  try {
+    const { pathname, search } = new URL(url)
+    return pathname.replace(/\/$/, '') === '' && search === '' ? normalizeHost(url) : null
+  } catch {
+    return null
+  }
+}
+
 type BadgeRenderOptions = {
   showKycLevel: boolean
-  showRating: boolean
   showScore: boolean
+  showVerdict: boolean
   size: BadgeSize
   slug: string
   theme: BadgeTheme
@@ -184,15 +193,17 @@ type BadgeRenderOptions = {
 
 async function renderBadge(
   cacheKey: string,
-  { showKycLevel, showRating, showScore, size, slug, theme }: BadgeRenderOptions,
+  { showKycLevel, showScore, showVerdict, size, slug, theme }: BadgeRenderOptions,
   context: APIContext
 ): Promise<BadgeRenderOutcome> {
   const service = await prisma.service.findUnique({
     where: { slug, serviceVisibility: 'PUBLIC' },
     select: {
+      id: true,
       name: true,
+      serviceUrls: true,
+      onionUrls: true,
       overallScore: true,
-      trustWeightedUserRating: true,
       verificationStatus: true,
       kycLevel: true,
     },
@@ -203,14 +214,22 @@ async function renderBadge(
   const baseProps = { verificationStatus: service.verificationStatus, theme }
   const metricProps = {
     overallScore: normalizeOgImageScore(service.overallScore),
-    averageUserRating: normalizeOgImageRating(service.trustWeightedUserRating),
     kycLevel: normalizeOgImageKycLevel(service.kycLevel),
+    verdict:
+      showVerdict && size !== 'xs'
+        ? (summaryVerdict(await experienceSummary(service.id))?.tone ?? null)
+        : null,
   }
-  const normalizeBadgeText = createOgImageTextNormalizer(OG_IMAGE_LIMITS.badge.name)
-  // Normalising can empty a name made only of emoji, and the schema requires a
-  // non-empty one. This route has no default card to fall back to, so without
-  // the slug such a service would serve 500 for its badge forever.
-  const badgeName = normalizeBadgeText(service.name, OG_IMAGE_LIMITS.badge.name).trim() || slug
+  // A domain names the service only when the link is its homepage: a thread or channel on a shared platform says
+  // nothing about who runs it, so those services keep their name. Normalising can empty a name made only of
+  // emoji, and the slug keeps such a badge from failing.
+  const badgeSite =
+    [...service.serviceUrls, ...service.onionUrls].map(homepageHost).find((host) => host !== null) ??
+    (createOgImageTextNormalizer(OG_IMAGE_LIMITS.badge.site)(
+      service.name,
+      OG_IMAGE_LIMITS.badge.site
+    ).trim() ||
+      slug)
 
   // The template call is the CPU-heavy part, so only it takes a render slot.
   // The lookup above stays outside: holding a slot across database I/O would
@@ -222,9 +241,8 @@ async function renderBadge(
           badgeOgImagePropsSchemas['badge-lg'].parse({
             ...baseProps,
             ...metricProps,
-            name: badgeName,
+            site: badgeSite,
             showScore,
-            showRating,
             showKycLevel,
           }),
           context
@@ -235,7 +253,6 @@ async function renderBadge(
             ...baseProps,
             ...metricProps,
             showScore,
-            showRating,
             showKycLevel,
           }),
           context

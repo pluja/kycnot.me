@@ -1,0 +1,193 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../../lib/cn'
+import BadgeSmall from '../../BadgeSmall.astro'
+import Button from '../../Button.astro'
+import SortArrowIcon from '../../SortArrowIcon.astro'
+import TimeFormatted from '../../TimeFormatted.astro'
+import Tooltip from '../../Tooltip.astro'
+import UserBadge from '../../UserBadge.astro'
+
+import AssignButton from './AssignButton.astro'
+import AssigneeAvatar from './AssigneeAvatar.astro'
+
+import type { getServiceSuggestionStatusInfo } from '../../../constants/serviceSuggestionStatus'
+import type { getServiceSuggestionTypeInfo } from '../../../constants/serviceSuggestionType'
+import type { Prisma } from '@prisma/client'
+
+type Row = Prisma.ServiceSuggestionGetPayload<{
+  select: {
+    id: true
+    createdAt: true
+    assignedAt: true
+    user: { select: { name: true; displayName: true; picture: true } }
+    assignedTo: { select: { id: true; name: true; displayName: true; picture: true } }
+    service: { select: { name: true; slug: true; description: true } }
+  }
+}> & {
+  statusInfo: ReturnType<typeof getServiceSuggestionStatusInfo>
+  typeInfo: ReturnType<typeof getServiceSuggestionTypeInfo>
+  messageCount: number
+  staleClaim: boolean
+  canTake: boolean
+}
+
+type SortSlug = 'createdAt' | 'messageCount' | 'service' | 'status' | 'type' | 'user'
+
+type Props = {
+  suggestions: Row[]
+  priority: boolean
+  sortBy: SortSlug
+  sortOrder: 'asc' | 'desc'
+  sortUrls: Record<SortSlug, string>
+}
+
+const { suggestions, priority, sortBy, sortOrder, sortUrls } = Astro.props
+
+const columns = [
+  { slug: 'service', label: 'Service', width: 'w-[20%]' },
+  { slug: 'user', label: 'User', width: 'w-[12%]' },
+  { slug: 'type', label: 'Type', width: 'w-[10%]' },
+  { slug: 'status', label: 'Status', width: 'w-[13%]' },
+  { slug: null, label: 'Assigned', width: 'w-[8%]' },
+  { slug: 'createdAt', label: 'Created', width: 'w-[15%]' },
+  { slug: 'messageCount', label: 'Messages', width: 'w-[10%] text-center' },
+] as const satisfies { slug: SortSlug | null; label: string; width: string }[]
+
+const tone = priority
+  ? {
+      divider: 'divide-amber-700/30',
+      head: 'bg-amber-950/30 text-amber-300',
+      headLink: 'hover:text-amber-200',
+      body: 'bg-amber-950/10',
+      row: 'hover:bg-amber-700/20',
+      serviceLink: 'hover:text-amber-400',
+    }
+  : {
+      divider: 'divide-zinc-700',
+      head: 'bg-zinc-900/30 text-zinc-400',
+      headLink: 'hover:text-zinc-200',
+      body: 'bg-zinc-800/10',
+      row: 'hover:bg-zinc-700/30',
+      serviceLink: 'hover:text-green-500',
+    }
+---
+
+<table class={cn('w-full divide-y', tone.divider)}>
+  <thead class={tone.head}>
+    <tr>
+      {
+        columns.map((column) => (
+          <th class={cn(column.width, 'px-4 py-3 text-left text-xs font-medium tracking-wider uppercase')}>
+            {column.slug ? (
+              <a
+                href={sortUrls[column.slug]}
+                class={cn(
+                  'flex items-center',
+                  column.slug === 'messageCount' && 'justify-center',
+                  tone.headLink
+                )}
+              >
+                {column.label} <SortArrowIcon active={sortBy === column.slug} sortOrder={sortOrder} />
+              </a>
+            ) : (
+              column.label
+            )}
+          </th>
+        ))
+      }
+      <th class="w-[12%] px-4 py-3 text-right text-xs font-medium tracking-wider uppercase">Actions</th>
+    </tr>
+  </thead>
+  <tbody class={cn('divide-y', tone.divider, tone.body)}>
+    {
+      suggestions.map((suggestion) => (
+        <tr id={`suggestion-${String(suggestion.id)}`} class={cn('group', tone.row)}>
+          <td class="px-4 py-3 text-sm font-medium text-zinc-200">
+            <div class="truncate" title={suggestion.service.name}>
+              <a
+                href={`/service/${suggestion.service.slug}`}
+                class={cn('flex items-center gap-1', tone.serviceLink)}
+              >
+                {suggestion.service.name}
+                <Icon name="ri:external-link-line" class="inline-block size-4 align-[-0.05em]" />
+              </a>
+            </div>
+            <div class="max-w-[220px] truncate text-2xs text-zinc-500" title={suggestion.service.description}>
+              {suggestion.service.description}
+            </div>
+          </td>
+          <td class="px-4 py-3">
+            <UserBadge user={suggestion.user} size="md" />
+          </td>
+          <td class="px-4 py-3">
+            <BadgeSmall
+              color={suggestion.typeInfo.color}
+              text={suggestion.typeInfo.label}
+              icon={suggestion.typeInfo.icon}
+            />
+          </td>
+          <td class="px-4 py-3">
+            <BadgeSmall
+              color={suggestion.statusInfo.color}
+              text={suggestion.statusInfo.label}
+              icon={suggestion.statusInfo.icon}
+            />
+          </td>
+          <td class="px-4 py-3">
+            {suggestion.assignedTo ? (
+              <AssigneeAvatar
+                assignee={suggestion.assignedTo}
+                assignedAt={suggestion.assignedAt}
+                stale={suggestion.staleClaim}
+              />
+            ) : (
+              <span class="text-xs text-zinc-500">None</span>
+            )}
+          </td>
+          <td class="px-4 py-3 text-sm">
+            <TimeFormatted date={suggestion.createdAt} hourPrecision />
+          </td>
+          <td class="px-4 py-3 text-center">
+            <span class="inline-flex items-center rounded-full bg-zinc-700 px-2.5 py-0.5 text-xs font-medium text-zinc-300">
+              {suggestion.messageCount}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-right">
+            <div class="flex justify-end gap-1">
+              {suggestion.canTake && (
+                <AssignButton
+                  suggestionId={suggestion.id}
+                  assigneeId={suggestion.assignedTo?.id ?? null}
+                  intent="take"
+                  iconOnly
+                  tooltipPosition="left"
+                />
+              )}
+              <Tooltip text="Manage" position="left">
+                <Button
+                  as="a"
+                  href={`/admin/service-suggestions/${String(suggestion.id)}`}
+                  color="success"
+                  variant="faded"
+                  size="sm"
+                  iconOnly
+                  icon="ri:arrow-right-line"
+                  label="Manage"
+                />
+              </Tooltip>
+            </div>
+          </td>
+        </tr>
+      ))
+    }
+  </tbody>
+</table>
+
+<style>
+  .text-2xs {
+    font-size: 0.6875rem;
+    line-height: 1rem;
+  }
+</style>

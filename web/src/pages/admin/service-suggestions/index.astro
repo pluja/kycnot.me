@@ -1,15 +1,11 @@
 ---
 import { Icon } from 'astro-icon/components'
-import { actions } from 'astro:actions'
 import { z } from 'astro:content'
-import { orderBy } from 'lodash-es'
+import { orderBy, uniq } from 'lodash-es'
 
-import BadgeSmall from '../../../components/BadgeSmall.astro'
+import SuggestionsTable from '../../../components/admin/serviceSuggestions/SuggestionsTable.astro'
 import Button from '../../../components/Button.astro'
-import SortArrowIcon from '../../../components/SortArrowIcon.astro'
-import TimeFormatted from '../../../components/TimeFormatted.astro'
-import Tooltip from '../../../components/Tooltip.astro'
-import UserBadge from '../../../components/UserBadge.astro'
+import Pagination from '../../../components/Pagination.astro'
 import {
   getServiceSuggestionStatusInfo,
   serviceSuggestionStatuses,
@@ -22,16 +18,23 @@ import {
   serviceSuggestionTypeSlugToId,
   serviceSuggestionTypesZodEnumBySlug,
 } from '../../../constants/serviceSuggestionType'
+import { getVerificationStatusInfo } from '../../../constants/verificationStatus'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { cn } from '../../../lib/cn'
 import { zodParseQueryParamsStoringErrors } from '../../../lib/parseUrlFilters'
+import { canReviewSuggestion } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
 import { makeLoginUrl } from '../../../lib/redirectUrls'
+import { isStaleClaim, openSuggestionStatuses, staffMessageWhere } from '../../../lib/suggestionAssignment'
 
 import type { Prisma } from '@prisma/client'
 
-if (!Astro.locals.userCan('suggestions:manage')) {
+const user = Astro.locals.user
+if (!user || !Astro.locals.userCan('suggestions:manage')) {
   return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Admin access required' }))
 }
+
+const sortSlugs = ['service', 'status', 'type', 'user', 'createdAt', 'messageCount'] as const
 
 const { data: filters } = zodParseQueryParamsStoringErrors(
   {
@@ -41,9 +44,9 @@ const { data: filters } = zodParseQueryParamsStoringErrors(
       .or(z.literal('pending-review'))
       .default('pending-review'),
     type: serviceSuggestionTypesZodEnumBySlug.or(z.literal('all')).optional(),
-    'sort-by': z
-      .enum(['service', 'status', 'type', 'user', 'createdAt', 'messageCount'])
-      .default('createdAt'),
+    // 'unassigned', 'me', 'assigned', 'all', or '@' and a moderator's username.
+    assignee: z.string().max(64).default('unassigned'),
+    'sort-by': z.enum(sortSlugs).default('createdAt'),
     'sort-order': z.enum(['asc', 'desc']).default('desc'),
     page: z.coerce.number().int().positive().default(1),
     'page-size': z.enum(['25', '50', '100']).default('25'),
@@ -56,7 +59,7 @@ const statusFilter: Prisma.ServiceSuggestionWhereInput['status'] =
   filters.status === 'all'
     ? undefined
     : filters.status === 'pending-review'
-      ? { in: ['PENDING', 'UNDER_REVIEW'] }
+      ? { in: openSuggestionStatuses }
       : serviceSuggestionStatusSlugToId(filters.status)
 
 const typeFilter =
@@ -86,8 +89,9 @@ let suggestions = await prisma.serviceSuggestion.findMany({
     id: true,
     type: true,
     status: true,
-    notes: true,
+    userId: true,
     createdAt: true,
+    assignedAt: true,
     user: {
       select: {
         displayName: true,
@@ -95,37 +99,26 @@ let suggestions = await prisma.serviceSuggestion.findMany({
         picture: true,
       },
     },
-    service: {
+    assignedTo: {
       select: {
         id: true,
         name: true,
+        displayName: true,
+        picture: true,
+      },
+    },
+    service: {
+      select: {
+        name: true,
         slug: true,
         description: true,
-        imageUrl: true,
         verificationStatus: true,
-        categories: {
-          select: {
-            name: true,
-            icon: true,
-          },
-        },
       },
     },
     messages: {
-      select: {
-        id: true,
-        content: true,
-        createdAt: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      where: staffMessageWhere,
+      select: { createdAt: true },
+      orderBy: { createdAt: 'desc' },
       take: 1,
     },
     _count: {
@@ -136,13 +129,67 @@ let suggestions = await prisma.serviceSuggestion.findMany({
   },
 })
 
-let suggestionsWithDetails = suggestions.map((s) => ({
-  ...s,
-  statusInfo: getServiceSuggestionStatusInfo(s.status),
-  typeInfo: getServiceSuggestionTypeInfo(s.type),
-  messageCount: s._count.messages,
-  lastMessage: s.messages[0],
+const suggestionsWithAssignment = suggestions.map((s) => {
+  const isOpen = openSuggestionStatuses.includes(s.status)
+  const staleClaim = isStaleClaim({
+    status: s.status,
+    assignedAt: s.assignedAt,
+    lastStaffMessageAt: s.messages[0]?.createdAt ?? null,
+  })
+  return {
+    ...s,
+    statusInfo: getServiceSuggestionStatusInfo(s.status),
+    typeInfo: getServiceSuggestionTypeInfo(s.type),
+    messageCount: s._count.messages,
+    isOpen,
+    staleClaim,
+    canTake:
+      isOpen && (!s.assignedTo || staleClaim) && canReviewSuggestion(s, user, { applyingFieldEdits: false }),
+  }
+})
+
+// Claims only exist on open suggestions, so closed ones pass the Unassigned and Assigned views: filtering by a
+// closed status never comes back empty because of the view.
+const matchesAssignee = (s: (typeof suggestionsWithAssignment)[number], assignee: string) => {
+  switch (assignee) {
+    case 'all':
+      return true
+    case 'unassigned':
+      return !s.isOpen || !s.assignedTo || s.staleClaim
+    case 'me':
+      return s.assignedTo?.id === user.id
+    case 'assigned':
+      return !s.isOpen || !!s.assignedTo
+    default:
+      return `@${s.assignedTo?.name ?? ''}` === assignee
+  }
+}
+
+const moderatorNames = uniq(
+  suggestionsWithAssignment.flatMap((s) => (s.assignedTo && s.isOpen ? [s.assignedTo.name] : []))
+)
+  .filter((name) => name !== user.name)
+  .sort()
+const assigneeTabs = [
+  { value: 'unassigned', label: 'Unassigned', icon: 'ri:inbox-line' },
+  { value: 'me', label: 'Mine', icon: 'ri:user-follow-line' },
+  { value: 'assigned', label: 'Assigned', icon: 'ri:team-line' },
+  { value: 'all', label: 'All', icon: 'ri:list-check' },
+  ...moderatorNames.map((name) => ({ value: `@${name}`, label: `@${name}`, icon: 'ri:user-line' })),
+].map((tab) => ({
+  ...tab,
+  count: suggestionsWithAssignment.filter((s) => matchesAssignee(s, tab.value)).length,
 }))
+
+const makeAssigneeUrl = (assignee: string) => {
+  const searchParams = new URLSearchParams(Astro.url.search)
+  searchParams.set('assignee', assignee)
+  searchParams.delete('page')
+  searchParams.delete('priority-page')
+  return `/admin/service-suggestions?${searchParams.toString()}`
+}
+
+let suggestionsWithDetails = suggestionsWithAssignment.filter((s) => matchesAssignee(s, filters.assignee))
 
 if (filters['sort-by'] === 'service') {
   suggestionsWithDetails = orderBy(
@@ -168,25 +215,11 @@ if (filters['sort-by'] === 'service') {
   suggestionsWithDetails = orderBy(suggestionsWithDetails, ['messageCount'], [filters['sort-order']])
 }
 
-// Separate priority suggestions: Edit suggestions from LISTED services (APPROVED or VERIFICATION_SUCCESS)
-// that are in 'Pending' or 'Under Review' status
-const prioritySuggestions = suggestionsWithDetails.filter(
-  (s) =>
-    s.typeInfo.slug === 'edit' &&
-    (s.service.verificationStatus === 'APPROVED' ||
-      s.service.verificationStatus === 'VERIFICATION_SUCCESS') &&
-    (s.status === 'PENDING' || s.status === 'UNDER_REVIEW')
-)
-
-const regularSuggestions = suggestionsWithDetails.filter(
-  (s) =>
-    !(
-      s.typeInfo.slug === 'edit' &&
-      (s.service.verificationStatus === 'APPROVED' ||
-        s.service.verificationStatus === 'VERIFICATION_SUCCESS') &&
-      (s.status === 'PENDING' || s.status === 'UNDER_REVIEW')
-    )
-)
+// Edits to listed services that are still open come first.
+const isPriority = (s: (typeof suggestionsWithDetails)[number]) =>
+  s.typeInfo.slug === 'edit' && getVerificationStatusInfo(s.service.verificationStatus).listed && s.isOpen
+const prioritySuggestions = suggestionsWithDetails.filter(isPriority)
+const regularSuggestions = suggestionsWithDetails.filter((s) => !isPriority(s))
 
 const suggestionCount = suggestionsWithDetails.length
 
@@ -209,7 +242,7 @@ const regularStartIndex = (regularValidPage - 1) * pageSize
 const regularEndIndex = regularStartIndex + pageSize
 const paginatedRegularSuggestions = regularSuggestions.slice(regularStartIndex, regularEndIndex)
 
-const makeSortUrl = (slug: string) => {
+const makeSortUrl = (slug: (typeof sortSlugs)[number]) => {
   const currentSortBy = filters['sort-by']
   const currentSortOrder = filters['sort-order']
   const newSortOrder = currentSortBy === slug && currentSortOrder === 'asc' ? 'desc' : 'asc'
@@ -219,15 +252,10 @@ const makeSortUrl = (slug: string) => {
   return `/admin/service-suggestions?${searchParams.toString()}`
 }
 
-const makePageUrl = (page: number, isPriority = false) => {
-  const searchParams = new URLSearchParams(Astro.url.search)
-  if (isPriority) {
-    searchParams.set('priority-page', page.toString())
-  } else {
-    searchParams.set('page', page.toString())
-  }
-  return `/admin/service-suggestions?${searchParams.toString()}`
-}
+const sortUrls = Object.fromEntries(sortSlugs.map((slug) => [slug, makeSortUrl(slug)])) as Record<
+  (typeof sortSlugs)[number],
+  string
+>
 
 const makePageSizeUrl = (size: string) => {
   const searchParams = new URLSearchParams(Astro.url.search)
@@ -253,8 +281,39 @@ const makePageSizeUrl = (size: string) => {
     </div>
   </div>
 
+  <nav class="mb-4 flex flex-wrap gap-1" aria-label="Assigned to">
+    {
+      assigneeTabs.map((tab) => {
+        const active = filters.assignee === tab.value
+        return (
+          <a
+            href={makeAssigneeUrl(tab.value)}
+            aria-current={active ? 'page' : undefined}
+            class={cn(
+              'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm',
+              active
+                ? 'border-blue-500/60 bg-blue-500/10 text-zinc-100'
+                : 'border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
+            )}
+          >
+            <Icon name={tab.icon} class="size-4" />
+            {tab.label}
+            <span
+              class={cn(
+                'rounded-sm px-1 text-xs tabular-nums',
+                tab.count > 0 ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500'
+              )}
+            >
+              {tab.count.toLocaleString()}
+            </span>
+          </a>
+        )
+      })
+    }
+  </nav>
+
   <div class="mb-6 rounded-lg border border-zinc-700 bg-zinc-800/50 p-4 shadow-lg">
-    <form method="GET" class="grid gap-3 md:grid-cols-2 lg:grid-cols-5" autocomplete="off">
+    <form method="GET" class="grid gap-3 md:grid-cols-2 lg:grid-cols-6" autocomplete="off">
       <div class="lg:col-span-2">
         <label for="search" class="block text-xs font-medium text-zinc-400">Search</label>
         <input
@@ -263,7 +322,7 @@ const makePageSizeUrl = (size: string) => {
           id="search"
           value={filters.search}
           placeholder="Search by service, user, notes..."
-          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-hidden"
         />
       </div>
       <div>
@@ -271,7 +330,7 @@ const makePageSizeUrl = (size: string) => {
         <select
           name="status"
           id="status-filter"
-          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-hidden"
         >
           <option value="pending-review" selected={filters.status === 'pending-review'}
             >Pending + Review</option
@@ -291,13 +350,29 @@ const makePageSizeUrl = (size: string) => {
         <select
           name="type"
           id="type-filter"
-          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-hidden"
         >
           <option value="all" selected={!filters.type || filters.type === 'all'}>All Types</option>
           {
             serviceSuggestionTypes.map((type) => (
               <option value={type.slug} selected={filters.type === type.slug}>
                 {type.label}
+              </option>
+            ))
+          }
+        </select>
+      </div>
+      <div>
+        <label for="assignee-filter" class="block text-xs font-medium text-zinc-400">Assigned to</label>
+        <select
+          name="assignee"
+          id="assignee-filter"
+          class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-hidden"
+        >
+          {
+            assigneeTabs.map((tab) => (
+              <option value={tab.value} selected={filters.assignee === tab.value}>
+                {tab.label}
               </option>
             ))
           }
@@ -359,147 +434,13 @@ const makePageSizeUrl = (size: string) => {
         </div>
         <div class="max-w-full overflow-x-auto">
           <div class="min-w-[900px]">
-            <table class="w-full divide-y divide-amber-700/30">
-              <thead class="bg-amber-950/30">
-                <tr>
-                  <th class="w-[20%] px-4 py-3 text-left text-xs font-medium tracking-wider text-amber-300 uppercase">
-                    <a href={makeSortUrl('service')} class="flex items-center hover:text-amber-200">
-                      Service{' '}
-                      <SortArrowIcon
-                        active={filters['sort-by'] === 'service'}
-                        sortOrder={filters['sort-order']}
-                      />
-                    </a>
-                  </th>
-                  <th class="w-[12%] px-4 py-3 text-left text-xs font-medium tracking-wider text-amber-300 uppercase">
-                    <a href={makeSortUrl('user')} class="flex items-center hover:text-amber-200">
-                      User{' '}
-                      <SortArrowIcon
-                        active={filters['sort-by'] === 'user'}
-                        sortOrder={filters['sort-order']}
-                      />
-                    </a>
-                  </th>
-                  <th class="w-[10%] px-4 py-3 text-left text-xs font-medium tracking-wider text-amber-300 uppercase">
-                    <a href={makeSortUrl('type')} class="flex items-center hover:text-amber-200">
-                      Type{' '}
-                      <SortArrowIcon
-                        active={filters['sort-by'] === 'type'}
-                        sortOrder={filters['sort-order']}
-                      />
-                    </a>
-                  </th>
-                  <th class="w-[13%] px-4 py-3 text-left text-xs font-medium tracking-wider text-amber-300 uppercase">
-                    <a href={makeSortUrl('status')} class="flex items-center hover:text-amber-200">
-                      Status{' '}
-                      <SortArrowIcon
-                        active={filters['sort-by'] === 'status'}
-                        sortOrder={filters['sort-order']}
-                      />
-                    </a>
-                  </th>
-                  <th class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-amber-300 uppercase">
-                    <a href={makeSortUrl('createdAt')} class="flex items-center hover:text-amber-200">
-                      Created{' '}
-                      <SortArrowIcon
-                        active={filters['sort-by'] === 'createdAt'}
-                        sortOrder={filters['sort-order']}
-                      />
-                    </a>
-                  </th>
-                  <th class="w-[10%] px-4 py-3 text-center text-xs font-medium tracking-wider text-amber-300 uppercase">
-                    <a
-                      href={makeSortUrl('messageCount')}
-                      class="flex items-center justify-center hover:text-amber-200"
-                    >
-                      Messages{' '}
-                      <SortArrowIcon
-                        active={filters['sort-by'] === 'messageCount'}
-                        sortOrder={filters['sort-order']}
-                      />
-                    </a>
-                  </th>
-                  <th class="w-[20%] px-4 py-3 text-right text-xs font-medium tracking-wider text-amber-300 uppercase">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-amber-700/30 bg-amber-950/10">
-                {paginatedPrioritySuggestions.map((suggestion) => (
-                  <tr id={`suggestion-${suggestion.id}`} class="group hover:bg-amber-700/20">
-                    <td class="px-4 py-3 text-sm font-medium text-zinc-200">
-                      <div class="truncate" title={suggestion.service.name}>
-                        <a
-                          href={`/service/${suggestion.service.slug}`}
-                          class="flex items-center gap-1 hover:text-amber-400"
-                        >
-                          {suggestion.service.name}
-                          <Icon name="ri:external-link-line" class="inline-block size-4 align-[-0.05em]" />
-                        </a>
-                      </div>
-                      <div
-                        class="max-w-[220px] truncate text-2xs text-zinc-500"
-                        title={suggestion.service.description}
-                      >
-                        {suggestion.service.description}
-                      </div>
-                    </td>
-                    <td class="px-4 py-3">
-                      <UserBadge user={suggestion.user} size="md" />
-                    </td>
-                    <td class="px-4 py-3">
-                      <BadgeSmall
-                        color={suggestion.typeInfo.color}
-                        text={suggestion.typeInfo.label}
-                        icon={suggestion.typeInfo.icon}
-                      />
-                    </td>
-                    <td class="px-4 py-3">
-                      <form method="POST" action={actions.admin.serviceSuggestions.update}>
-                        <input type="hidden" name="suggestionId" value={suggestion.id} />
-                        <select
-                          name="status"
-                          class="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
-                          value={suggestion.status}
-                          onchange="this.form.submit()"
-                          title="Change status"
-                        >
-                          {serviceSuggestionStatuses.map((status) => (
-                            <option value={status.value} selected={suggestion.status === status.value}>
-                              {status.label}
-                            </option>
-                          ))}
-                        </select>
-                      </form>
-                    </td>
-                    <td class="px-4 py-3 text-sm">
-                      <TimeFormatted date={suggestion.createdAt} hourPrecision />
-                    </td>
-                    <td class="px-4 py-3 text-center">
-                      <span class="inline-flex items-center rounded-full bg-zinc-700 px-2.5 py-0.5 text-xs font-medium text-zinc-300">
-                        {suggestion.messageCount}
-                      </span>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                      <div class="flex justify-end gap-1">
-                        <Tooltip text="Manage">
-                          <Button
-                            as="a"
-                            href={`/admin/service-suggestions/${suggestion.id}`}
-                            color="success"
-                            variant="faded"
-                            size="sm"
-                            iconOnly
-                            icon="ri:arrow-right-line"
-                            label="Manage"
-                          />
-                        </Tooltip>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SuggestionsTable
+              suggestions={paginatedPrioritySuggestions}
+              priority
+              sortBy={filters['sort-by']}
+              sortOrder={filters['sort-order']}
+              sortUrls={sortUrls}
+            />
           </div>
         </div>
         {priorityTotalPages > 1 && (
@@ -509,52 +450,11 @@ const makePageSizeUrl = (size: string) => {
                 Showing {priorityStartIndex + 1} to {Math.min(priorityEndIndex, prioritySuggestions.length)}{' '}
                 of {prioritySuggestions.length} priority suggestions
               </div>
-              <div class="flex gap-1">
-                {priorityValidPage > 1 && (
-                  <a
-                    href={makePageUrl(priorityValidPage - 1, true)}
-                    class="rounded-md bg-amber-800 px-3 py-1.5 text-sm font-medium text-amber-200 transition-colors hover:bg-amber-700"
-                  >
-                    <Icon name="ri:arrow-left-s-line" class="inline-block size-4 align-[-0.125em]" />
-                    Previous
-                  </a>
-                )}
-                <div class="flex gap-1">
-                  {Array.from({ length: priorityTotalPages }, (_, i) => i + 1)
-                    .filter(
-                      (page) =>
-                        page === 1 ||
-                        page === priorityTotalPages ||
-                        (page >= priorityValidPage - 1 && page <= priorityValidPage + 1)
-                    )
-                    .map((page, index, array) => (
-                      <>
-                        {index > 0 && array[index - 1] !== page - 1 && (
-                          <span class="flex items-center px-2 text-amber-400">...</span>
-                        )}
-                        <a
-                          href={makePageUrl(page, true)}
-                          class={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                            page === priorityValidPage
-                              ? 'bg-amber-500 text-amber-950'
-                              : 'bg-amber-800 text-amber-200 hover:bg-amber-700'
-                          }`}
-                        >
-                          {page}
-                        </a>
-                      </>
-                    ))}
-                </div>
-                {priorityValidPage < priorityTotalPages && (
-                  <a
-                    href={makePageUrl(priorityValidPage + 1, true)}
-                    class="rounded-md bg-amber-800 px-3 py-1.5 text-sm font-medium text-amber-200 transition-colors hover:bg-amber-700"
-                  >
-                    Next
-                    <Icon name="ri:arrow-right-s-line" class="inline-block size-4 align-[-0.125em]" />
-                  </a>
-                )}
-              </div>
+              <Pagination
+                currentPage={priorityValidPage}
+                totalPages={priorityTotalPages}
+                pageParam="priority-page"
+              />
             </div>
           </div>
         )}
@@ -583,147 +483,13 @@ const makePageSizeUrl = (size: string) => {
         </div>
         <div class="max-w-full overflow-x-auto">
           <div class="min-w-[900px]">
-            <table class="w-full divide-y divide-zinc-700">
-              <thead class="bg-zinc-900/30">
-                <tr>
-                  <th class="w-[20%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase">
-                    <a href={makeSortUrl('service')} class="flex items-center hover:text-zinc-200">
-                      Service{' '}
-                      <SortArrowIcon
-                        active={filters['sort-by'] === 'service'}
-                        sortOrder={filters['sort-order']}
-                      />
-                    </a>
-                  </th>
-                  <th class="w-[12%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase">
-                    <a href={makeSortUrl('user')} class="flex items-center hover:text-zinc-200">
-                      User{' '}
-                      <SortArrowIcon
-                        active={filters['sort-by'] === 'user'}
-                        sortOrder={filters['sort-order']}
-                      />
-                    </a>
-                  </th>
-                  <th class="w-[10%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase">
-                    <a href={makeSortUrl('type')} class="flex items-center hover:text-zinc-200">
-                      Type{' '}
-                      <SortArrowIcon
-                        active={filters['sort-by'] === 'type'}
-                        sortOrder={filters['sort-order']}
-                      />
-                    </a>
-                  </th>
-                  <th class="w-[13%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase">
-                    <a href={makeSortUrl('status')} class="flex items-center hover:text-zinc-200">
-                      Status{' '}
-                      <SortArrowIcon
-                        active={filters['sort-by'] === 'status'}
-                        sortOrder={filters['sort-order']}
-                      />
-                    </a>
-                  </th>
-                  <th class="w-[15%] px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-400 uppercase">
-                    <a href={makeSortUrl('createdAt')} class="flex items-center hover:text-zinc-200">
-                      Created{' '}
-                      <SortArrowIcon
-                        active={filters['sort-by'] === 'createdAt'}
-                        sortOrder={filters['sort-order']}
-                      />
-                    </a>
-                  </th>
-                  <th class="w-[10%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase">
-                    <a
-                      href={makeSortUrl('messageCount')}
-                      class="flex items-center justify-center hover:text-zinc-200"
-                    >
-                      Messages{' '}
-                      <SortArrowIcon
-                        active={filters['sort-by'] === 'messageCount'}
-                        sortOrder={filters['sort-order']}
-                      />
-                    </a>
-                  </th>
-                  <th class="w-[20%] px-4 py-3 text-right text-xs font-medium tracking-wider text-zinc-400 uppercase">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-zinc-700 bg-zinc-800/10">
-                {paginatedRegularSuggestions.map((suggestion) => (
-                  <tr id={`suggestion-${suggestion.id}`} class="group hover:bg-zinc-700/30">
-                    <td class="px-4 py-3 text-sm font-medium text-zinc-200">
-                      <div class="truncate" title={suggestion.service.name}>
-                        <a
-                          href={`/service/${suggestion.service.slug}`}
-                          class="flex items-center gap-1 hover:text-green-500"
-                        >
-                          {suggestion.service.name}
-                          <Icon name="ri:external-link-line" class="inline-block size-4 align-[-0.05em]" />
-                        </a>
-                      </div>
-                      <div
-                        class="max-w-[220px] truncate text-2xs text-zinc-500"
-                        title={suggestion.service.description}
-                      >
-                        {suggestion.service.description}
-                      </div>
-                    </td>
-                    <td class="px-4 py-3">
-                      <UserBadge user={suggestion.user} size="md" />
-                    </td>
-                    <td class="px-4 py-3">
-                      <BadgeSmall
-                        color={suggestion.typeInfo.color}
-                        text={suggestion.typeInfo.label}
-                        icon={suggestion.typeInfo.icon}
-                      />
-                    </td>
-                    <td class="px-4 py-3">
-                      <form method="POST" action={actions.admin.serviceSuggestions.update}>
-                        <input type="hidden" name="suggestionId" value={suggestion.id} />
-                        <select
-                          name="status"
-                          class="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
-                          value={suggestion.status}
-                          onchange="this.form.submit()"
-                          title="Change status"
-                        >
-                          {serviceSuggestionStatuses.map((status) => (
-                            <option value={status.value} selected={suggestion.status === status.value}>
-                              {status.label}
-                            </option>
-                          ))}
-                        </select>
-                      </form>
-                    </td>
-                    <td class="px-4 py-3 text-sm">
-                      <TimeFormatted date={suggestion.createdAt} hourPrecision />
-                    </td>
-                    <td class="px-4 py-3 text-center">
-                      <span class="inline-flex items-center rounded-full bg-zinc-700 px-2.5 py-0.5 text-xs font-medium text-zinc-300">
-                        {suggestion.messageCount}
-                      </span>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                      <div class="flex justify-end gap-1">
-                        <Tooltip text="Manage">
-                          <Button
-                            as="a"
-                            href={`/admin/service-suggestions/${suggestion.id}`}
-                            color="success"
-                            variant="faded"
-                            size="sm"
-                            iconOnly
-                            icon="ri:arrow-right-line"
-                            label="Manage"
-                          />
-                        </Tooltip>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SuggestionsTable
+              suggestions={paginatedRegularSuggestions}
+              priority={false}
+              sortBy={filters['sort-by']}
+              sortOrder={filters['sort-order']}
+              sortUrls={sortUrls}
+            />
           </div>
         </div>
         {regularTotalPages > 1 && (
@@ -733,52 +499,7 @@ const makePageSizeUrl = (size: string) => {
                 Showing {regularStartIndex + 1} to {Math.min(regularEndIndex, regularSuggestions.length)} of{' '}
                 {regularSuggestions.length} suggestions
               </div>
-              <div class="flex gap-1">
-                {regularValidPage > 1 && (
-                  <a
-                    href={makePageUrl(regularValidPage - 1, false)}
-                    class="rounded-md bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-600"
-                  >
-                    <Icon name="ri:arrow-left-s-line" class="inline-block size-4 align-[-0.125em]" />
-                    Previous
-                  </a>
-                )}
-                <div class="flex gap-1">
-                  {Array.from({ length: regularTotalPages }, (_, i) => i + 1)
-                    .filter(
-                      (page) =>
-                        page === 1 ||
-                        page === regularTotalPages ||
-                        (page >= regularValidPage - 1 && page <= regularValidPage + 1)
-                    )
-                    .map((page, index, array) => (
-                      <>
-                        {index > 0 && array[index - 1] !== page - 1 && (
-                          <span class="flex items-center px-2 text-zinc-500">...</span>
-                        )}
-                        <a
-                          href={makePageUrl(page, false)}
-                          class={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                            page === regularValidPage
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
-                          }`}
-                        >
-                          {page}
-                        </a>
-                      </>
-                    ))}
-                </div>
-                {regularValidPage < regularTotalPages && (
-                  <a
-                    href={makePageUrl(regularValidPage + 1, false)}
-                    class="rounded-md bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-600"
-                  >
-                    Next
-                    <Icon name="ri:arrow-right-s-line" class="inline-block size-4 align-[-0.125em]" />
-                  </a>
-                )}
-              </div>
+              <Pagination currentPage={regularValidPage} totalPages={regularTotalPages} />
             </div>
           </div>
         )}
@@ -806,9 +527,5 @@ const makePageSizeUrl = (size: string) => {
     100% {
       background-color: transparent;
     }
-  }
-  .text-2xs {
-    font-size: 0.6875rem;
-    line-height: 1rem;
   }
 </style>

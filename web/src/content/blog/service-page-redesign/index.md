@@ -58,4 +58,4 @@ A person reviews every proposal before it is published.
 - A link to a service with capital letters in it now redirects to the correct page instead of a 404.
 - The repository moved from codeberg, since they no longer allow crypto-related projects, nor projects that use AI assistance for the code. For this, I am hosting my own Forgejo instance at [tig.cx](https://tig.cx)
 
-Everything here is in the [source code](https://tig.cx/pluja/kycnotme). If a card or a number on a service page looks wrong, [report it](/about#suggestion-review-process).
+Everything here is in the [source code](https://tig.cx/pluja/kycnotme). If a card or a number on a service page looks wrong, [report it](/docs/listings#suggestion-review-process).

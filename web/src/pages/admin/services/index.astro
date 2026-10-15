@@ -5,6 +5,7 @@ import { Icon } from 'astro-icon/components'
 
 import Button from '../../../components/Button.astro'
 import MyPicture from '../../../components/MyPicture.astro'
+import Pagination from '../../../components/Pagination.astro'
 import SortArrowIcon from '../../../components/SortArrowIcon.astro'
 import Tooltip from '../../../components/Tooltip.astro'
 import { getKycLevelInfo } from '../../../constants/kycLevels'
@@ -156,12 +157,6 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort']>) => {
   searchParams.set('sort', slug)
   searchParams.set('order', newOrder)
   return `/admin/services?${searchParams.toString()}`
-}
-
-const getPaginationUrl = (pageNum: number) => {
-  const url = new URL(Astro.url)
-  url.searchParams.set('page', pageNum.toString())
-  return url.pathname + url.search
 }
 
 const truncate = (text: string, length: number) => {
@@ -501,101 +496,7 @@ const truncate = (text: string, length: number) => {
           of {totalServicesCount} services
         </div>
 
-        <nav class="inline-flex rounded-md shadow-sm" aria-label="Pagination">
-          {validPage > 1 && (
-            <a
-              href={getPaginationUrl(validPage - 1)}
-              class="inline-flex items-center rounded-l-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm font-medium text-zinc-300 hover:bg-zinc-700"
-            >
-              <Icon name="ri:arrow-left-s-line" class="size-5" />
-              <span class="sr-only">Previous</span>
-            </a>
-          )}
-
-          {validPage > 3 && (
-            <a
-              href={getPaginationUrl(1)}
-              class="inline-flex items-center border border-zinc-700 bg-zinc-800 px-3 py-1 text-sm font-medium text-zinc-300 hover:bg-zinc-700"
-            >
-              1
-            </a>
-          )}
-
-          {validPage > 4 && (
-            <span class="inline-flex items-center border border-zinc-700 bg-zinc-800 px-3 py-1 text-sm font-medium text-zinc-500">
-              ...
-            </span>
-          )}
-
-          {validPage > 2 && (
-            <a
-              href={getPaginationUrl(validPage - 2)}
-              class="hidden items-center border border-zinc-700 bg-zinc-800 px-3 py-1 text-sm font-medium text-zinc-300 hover:bg-zinc-700 md:inline-flex"
-            >
-              {validPage - 2}
-            </a>
-          )}
-
-          {validPage > 1 && (
-            <a
-              href={getPaginationUrl(validPage - 1)}
-              class="inline-flex items-center border border-zinc-700 bg-zinc-800 px-3 py-1 text-sm font-medium text-zinc-300 hover:bg-zinc-700"
-            >
-              {validPage - 1}
-            </a>
-          )}
-
-          <a
-            href={getPaginationUrl(validPage)}
-            class="inline-flex items-center border border-blue-500 bg-blue-500/20 px-3 py-1 text-sm font-medium text-blue-400"
-            aria-current="page"
-          >
-            {validPage}
-          </a>
-
-          {validPage < totalPages && (
-            <a
-              href={getPaginationUrl(validPage + 1)}
-              class="inline-flex items-center border border-zinc-700 bg-zinc-800 px-3 py-1 text-sm font-medium text-zinc-300 hover:bg-zinc-700"
-            >
-              {validPage + 1}
-            </a>
-          )}
-
-          {validPage < totalPages - 1 && (
-            <a
-              href={getPaginationUrl(validPage + 2)}
-              class="hidden items-center border border-zinc-700 bg-zinc-800 px-3 py-1 text-sm font-medium text-zinc-300 hover:bg-zinc-700 md:inline-flex"
-            >
-              {validPage + 2}
-            </a>
-          )}
-
-          {validPage < totalPages - 3 && (
-            <span class="inline-flex items-center border border-zinc-700 bg-zinc-800 px-3 py-1 text-sm font-medium text-zinc-500">
-              ...
-            </span>
-          )}
-
-          {validPage < totalPages - 2 && (
-            <a
-              href={getPaginationUrl(totalPages)}
-              class="inline-flex items-center border border-zinc-700 bg-zinc-800 px-3 py-1 text-sm font-medium text-zinc-300 hover:bg-zinc-700"
-            >
-              {totalPages}
-            </a>
-          )}
-
-          {validPage < totalPages && (
-            <a
-              href={getPaginationUrl(validPage + 1)}
-              class="inline-flex items-center rounded-r-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm font-medium text-zinc-300 hover:bg-zinc-700"
-            >
-              <Icon name="ri:arrow-right-s-line" class="size-5" />
-              <span class="sr-only">Next</span>
-            </a>
-          )}
-        </nav>
+        <Pagination currentPage={validPage} totalPages={totalPages} />
       </div>
     )
   }

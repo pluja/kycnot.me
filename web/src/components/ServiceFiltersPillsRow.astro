@@ -123,16 +123,7 @@ const {
       />
     )
   }
-  {
-    filters['user-rating'] > 0 && (
-      <ServiceFiltersPill
-        text={`Rating ≥ ${filters['user-rating'].toLocaleString()}★`}
-        icon="ri:star-fill"
-        searchParamName="user-rating"
-        inlineIcons={inlineIcons}
-      />
-    )
-  }
+
   {
     filters['min-score'] > 0 && (
       <ServiceFiltersPill

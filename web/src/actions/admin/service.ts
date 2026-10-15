@@ -5,6 +5,8 @@ import { uniq } from 'lodash-es'
 import slugify from 'slugify'
 
 import { countriesZodEnumByCode } from '../../constants/countries'
+import { recordAuditLog } from '../../lib/auditLog'
+import { reclassifyServiceProof } from '../../lib/commentProof'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import {
   checkDescription,
@@ -15,6 +17,8 @@ import {
 import { saveFileLocally, deleteFileLocally } from '../../lib/fileStorage'
 import { cap, userCan } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
+import { proofIdRegex } from '../../lib/proofEvidence'
+import { normalizeText } from '../../lib/serviceFieldEdits'
 import { separateServiceUrlsByType } from '../../lib/urls'
 import {
   imageFileSchema,
@@ -87,7 +91,23 @@ const serviceSchemaBase = z.object({
   serviceVisibility: z.nativeEnum(ServiceVisibility),
   internalNote: z.string().optional(),
   strictCommentingEnabled: z.boolean().optional().default(false),
-  commentSectionMessage: z.string().trim().min(3).max(1000).optional().nullable().default(null),
+  proofHint: z.string().trim().max(300).nullish(),
+  proofLookupUrl: z
+    .string()
+    .trim()
+    .max(300)
+    .refine((value) => /^https:\/\/[^\s{}]+\{id\}[^\s{}]*$/.test(value), {
+      message: 'Use an https URL with a single {id} placeholder.',
+    })
+    .nullish(),
+  proofIdPattern: z
+    .string()
+    .trim()
+    .max(200)
+    .refine((value) => proofIdRegex(value) !== null, {
+      message: 'Use a valid pattern without groups, e.g. [A-Z0-9]{6} or [A-Z]{6}|[0-9]{8}.',
+    })
+    .nullish(),
 })
 
 // Define schema for the create action input
@@ -114,7 +134,7 @@ const evidenceImageAddSchema = z.object({
 })
 
 const evidenceImageDeleteSchema = z.object({
-  fileUrl: z.string().startsWith('/files/evidence/', 'Must be a valid evidence file URL'),
+  fileUrl: z.string().regex(/^\/files\/evidence\/[\w-]+\/\w[\w.-]*$/, 'Must be a valid evidence file URL'),
 })
 
 export const adminServiceActions = {
@@ -168,7 +188,9 @@ export const adminServiceActions = {
           verificationProofMd: input.verificationProofMd,
           acceptedCurrencies: input.acceptedCurrencies,
           strictCommentingEnabled: input.strictCommentingEnabled,
-          commentSectionMessage: input.commentSectionMessage,
+          proofHint: input.proofHint || null,
+          proofLookupUrl: input.proofLookupUrl || null,
+          proofIdPattern: input.proofIdPattern || null,
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
           referral: input.referral || null,
           serviceVisibility: input.serviceVisibility,
@@ -236,6 +258,8 @@ export const adminServiceActions = {
           slug: true,
           description: true,
           previousSlugs: true,
+          proofLookupUrl: true,
+          proofIdPattern: true,
           categories: {
             select: {
               id: true,
@@ -261,7 +285,7 @@ export const adminServiceActions = {
         })
       }
 
-      if (input.description !== existingService.description) {
+      if (normalizeText(input.description) !== normalizeText(existingService.description)) {
         const broken = describeViolations(checkDescription(input.description, input.name))
         if (broken.length > 0) {
           throw new ActionError({ code: 'BAD_REQUEST', message: `Description: ${broken.join(' ')}` })
@@ -316,7 +340,9 @@ export const adminServiceActions = {
           verificationProofMd: input.verificationProofMd,
           acceptedCurrencies: input.acceptedCurrencies,
           strictCommentingEnabled: input.strictCommentingEnabled,
-          commentSectionMessage: input.commentSectionMessage,
+          proofHint: input.proofHint || null,
+          proofLookupUrl: input.proofLookupUrl || null,
+          proofIdPattern: input.proofIdPattern || null,
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
           referral: input.referral || null,
           serviceVisibility: input.serviceVisibility,
@@ -359,6 +385,12 @@ export const adminServiceActions = {
           slug: true,
         },
       })
+      if (
+        (input.proofLookupUrl || null) !== existingService.proofLookupUrl ||
+        (input.proofIdPattern || null) !== existingService.proofIdPattern
+      ) {
+        await reclassifyServiceProof(input.id)
+      }
 
       return { service }
     },
@@ -545,8 +577,18 @@ export const adminServiceActions = {
       accept: 'form',
       permissions: cap('services:edit'),
       input: evidenceImageDeleteSchema,
-      handler: async (input) => {
+      handler: async (input, context) => {
+        const slug = input.fileUrl.split('/')[3]
+        const service = await prisma.service.findUnique({ where: { slug }, select: { id: true } })
+        if (!service) throw new ActionError({ code: 'NOT_FOUND', message: 'Service not found' })
         await deleteFileLocally(input.fileUrl)
+        await recordAuditLog(prisma, {
+          actorId: context.locals.user.id,
+          action: 'DELETED',
+          targetType: 'SERVICE',
+          targetId: service.id,
+          summary: `Deleted evidence image ${input.fileUrl.split('/').at(-1) ?? ''}`,
+        })
       },
     }),
   },

@@ -21,25 +21,17 @@ type Props = {
   name?: string
   /** Filters to carry through the search, since a GET form replaces the query. */
   keep?: Record<string, string | undefined>
-  /** Fragment a pick lands on, for a picker that sits far down a page. */
+  // anchor is the fragment a pick lands on, for a picker that sits far down a page.
   anchor?: string
-  /**
-   * Id of a GET form that sits outside any other form. The search
-   * input joins it through its `form` attribute instead of a form of its own,
-   * which is what lets the picker sit inside a form without nesting one.
-   */
+  // searchForm is the id of a GET form outside any other form. The search input joins it through its
+  // `form` attribute instead of a form of its own, which lets the picker sit inside a form without nesting one.
   searchForm?: string
-  /**
-   * Name of a hidden input the pick fills, for a picker that is a form field.
-   * With scripting a pick writes the service id there and closes the panel;
-   * without it the pick reloads the page through the query, like a filter.
-   */
+  // field names a hidden input the pick fills, for a picker that is a form field. With scripting a pick
+  // writes the service id there and closes the panel; without it the pick reloads the page through the query.
   field?: string
   clearHref?: string
   class?: string
-  /** Extra classes for the trigger, to match a row of fields around it. */
   buttonClass?: string
-  /** Visible label for a picker used as a form field. */
   label?: string
   error?: string[]
 }

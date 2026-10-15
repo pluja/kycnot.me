@@ -106,11 +106,6 @@ export function normalizeOgImageScore(value: number): number {
     : OG_IMAGE_LIMITS.score.min
 }
 
-export function normalizeOgImageRating(value: number | null): number | null {
-  if (value === null || !Number.isFinite(value)) return null
-  return Math.min(OG_IMAGE_LIMITS.rating.max, Math.max(OG_IMAGE_LIMITS.rating.min, value))
-}
-
 export function normalizeOgImageKycLevel(value: number | null): number | null {
   if (value === null || !Number.isFinite(value)) return null
   return Math.min(OG_IMAGE_LIMITS.kycLevel.max, Math.max(OG_IMAGE_LIMITS.kycLevel.min, Math.round(value)))

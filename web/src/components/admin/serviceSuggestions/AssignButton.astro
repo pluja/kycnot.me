@@ -1,0 +1,42 @@
+---
+import { actions } from 'astro:actions'
+
+import Button from '../../Button.astro'
+import Tooltip from '../../Tooltip.astro'
+
+type Props = {
+  suggestionId: number
+  assigneeId: number | null
+  intent: 'release' | 'take'
+  iconOnly?: boolean
+  tooltipPosition?: 'left' | 'top'
+}
+
+const { suggestionId, assigneeId, intent, iconOnly = false, tooltipPosition = 'top' } = Astro.props
+
+const label = intent === 'release' ? 'Release' : assigneeId ? 'Take over' : 'Take'
+const description =
+  intent === 'release' ? 'Put it back in the unassigned list' : 'Mark it under review and assign it to you'
+---
+
+<form
+  method="POST"
+  action={`/admin/service-suggestions/${String(suggestionId)}${actions.admin.serviceSuggestions.assign}`}
+  class="contents"
+>
+  <input type="hidden" name="suggestionId" value={suggestionId} />
+  <input type="hidden" name="intent" value={intent} />
+  <input type="hidden" name="seenAssigneeId" value={assigneeId ?? ''} />
+  <Tooltip text={description} position={tooltipPosition}>
+    <Button
+      as="button"
+      type="submit"
+      color={intent === 'release' ? 'gray' : 'info'}
+      variant="faded"
+      size="sm"
+      iconOnly={iconOnly}
+      icon={intent === 'release' ? 'ri:user-unfollow-line' : 'ri:user-add-line'}
+      label={label}
+    />
+  </Tooltip>
+</form>

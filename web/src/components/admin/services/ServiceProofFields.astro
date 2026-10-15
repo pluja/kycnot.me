@@ -1,0 +1,73 @@
+---
+import { cn } from '../../../lib/cn'
+import { countOf } from '../../../lib/pluralize'
+import { defaultProofHint } from '../../../lib/proofEvidence'
+import InputCheckbox from '../../InputCheckbox.astro'
+import InputText from '../../InputText.astro'
+
+import type { proofIdPatternHealth } from '../../../lib/commentProof'
+
+type Props = {
+  service?: {
+    strictCommentingEnabled: boolean
+    proofHint: string | null
+    proofLookupUrl: string | null
+    proofIdPattern: string | null
+  }
+  inputErrors: Partial<Record<string, string[]>>
+  patternHealth?: Awaited<ReturnType<typeof proofIdPatternHealth>> | null
+}
+const { service, inputErrors, patternHealth } = Astro.props
+---
+
+<InputCheckbox
+  label="Strict mode"
+  name="strictCommentingEnabled"
+  checked={service?.strictCommentingEnabled ?? false}
+  descriptionInline="Hold every new post and reply for a moderator, for services under attack."
+  error={inputErrors.strictCommentingEnabled}
+/>
+<InputText
+  label="Proof hint"
+  name="proofHint"
+  description={`Replaces '${defaultProofHint}' under the proof field. One short sentence, e.g. 'Your order ID from the exchange page, like IXHUTQ.' Markdown links work.`}
+  inputProps={{ maxlength: 300, value: service?.proofHint ?? '' }}
+  error={inputErrors.proofHint}
+/>
+<InputText
+  label="Order lookup URL"
+  name="proofLookupUrl"
+  description="The order page URL, with {id} where the ID goes. Example: `https://example.com/order/{id}`."
+  inputProps={{ maxlength: 300, value: service?.proofLookupUrl ?? '', placeholder: 'https://…/{id}' }}
+  error={inputErrors.proofLookupUrl}
+/>
+<InputText
+  label="Order ID pattern"
+  name="proofIdPattern"
+  description="A [regex](https://regex101.com) the ID must match. Example: `[A-Za-z0-9]{10}`."
+  inputProps={{ maxlength: 200, value: service?.proofIdPattern ?? '', class: 'font-mono' }}
+  error={inputErrors.proofIdPattern}
+/>
+{
+  patternHealth && (
+    <div class="-mt-3 space-y-1 text-xs text-day-400">
+      {patternHealth.suggestedPattern &&
+        patternHealth.suggestedPattern.pattern !== service?.proofIdPattern && (
+          <p class={cn(patternHealth.suggestedPattern.loose && 'text-yellow-300')}>
+            Suggested: <code class="text-day-200">{patternHealth.suggestedPattern.pattern}</code>
+            {patternHealth.suggestedPattern.loose
+              ? ', too loose: accepted IDs come in more than one format.'
+              : `, fits the ${countOf(patternHealth.acceptedIds, 'accepted ID', 'accepted IDs')}.`}
+          </p>
+        )}
+      {patternHealth.acceptedNotMatching > 0 && (
+        <p class="text-yellow-300">
+          {`${countOf(patternHealth.acceptedNotMatching, 'accepted ID fails', 'accepted IDs fail')} this pattern. The service may have changed its format.`}
+        </p>
+      )}
+      {service?.proofIdPattern && patternHealth.recentIds > 0 && (
+        <p>{`Last 90 days: ${patternHealth.recentMatching.toLocaleString()} of ${patternHealth.recentIds.toLocaleString()} IDs match.`}</p>
+      )}
+    </div>
+  )
+}

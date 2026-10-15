@@ -2,6 +2,7 @@ import { Currency } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError, ActionInputError } from 'astro:actions'
 import { formatDistanceStrict } from 'date-fns'
+import { omit } from 'lodash-es'
 
 import { countriesZodEnumByCode } from '../constants/countries'
 import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../lib/captchaValidation'
@@ -12,6 +13,7 @@ import {
   descriptionOpeningRefinement,
   descriptionSchema,
 } from '../lib/descriptionRules'
+import { isServicePubliclyReadable } from '../lib/experiences'
 import { saveFileLocally } from '../lib/fileStorage'
 import { findServicesBySimilarity } from '../lib/findServicesBySimilarity'
 import { prisma } from '../lib/prisma'
@@ -38,8 +40,8 @@ const MAX_SUGGESTION_MESSAGES_PER_WINDOW = 5
 
 export const SUGGESTION_NOTES_MAX_LENGTH = 1000
 const SUGGESTION_EDIT_SERVICE_NOTES_MIN_LENGTH = 50
-// Lenient on purpose: an untouched description may predate the current length
-// rule, and a changed one is checked against the rule separately.
+// SUGGESTION_EDIT_DESCRIPTION_MAX_LENGTH is lenient on purpose: an untouched description may predate the
+// current length rule, and a changed one is checked against the rule separately.
 const SUGGESTION_EDIT_DESCRIPTION_MAX_LENGTH = 2000
 export const SUGGESTION_EDIT_REASON_MIN_LENGTH = 10
 export const SERVICE_NAME_MAX_LENGTH = 40
@@ -47,9 +49,9 @@ export const SUGGESTION_NAME_MAX_LENGTH = 20
 export const SUGGESTION_SLUG_MAX_LENGTH = 20
 export const SUGGESTION_MESSAGE_CONTENT_MAX_LENGTH = 1000
 
-// Fields both forms share. Name and description differ: a new listing is held
-// to the full rules, while an edit only has to pass them if it changes them.
-// Links and contacts are create-only, see serviceEditFields.
+// serviceSuggestionFieldsSchema holds the fields both forms share. Name and description differ: a new listing
+// is held to the full rules, while an edit only has to pass them if it changes them. Links and contacts are
+// create-only, see serviceEditFields.
 const serviceSuggestionFieldsSchema = {
   kycLevel: zodCohercedNumber(z.coerce.number().int().min(0).max(4)),
   attributes: z.array(z.coerce.number().int().positive()).max(200),
@@ -166,11 +168,14 @@ export const serviceSuggestionActions = {
       })
 
       const service = await prisma.service.findUnique({
-        select: { id: true, ...serviceEditableSelect },
+        select: { id: true, serviceVisibility: true, ...serviceEditableSelect },
         where: { id: input.serviceId },
       })
 
-      if (!service) {
+      if (
+        !service ||
+        (!isServicePubliclyReadable(service.serviceVisibility) && !context.locals.userCan('services:edit'))
+      ) {
         throw new ActionError({
           message: 'Service not found',
           code: 'BAD_REQUEST',
@@ -269,13 +274,21 @@ export const serviceSuggestionActions = {
       })
 
       const serviceWithSameSlug = await prisma.service.findUnique({
-        select: { id: true, name: true, slug: true, description: true },
+        select: { id: true, name: true, slug: true, description: true, serviceVisibility: true },
         where: { slug: input.slug },
       })
+      const slugInUse = new ActionError({
+        message: 'Slug already in use, try a different one',
+        code: 'BAD_REQUEST',
+      })
+      // A hidden service only reveals that its slug is taken, never its name or description.
+      if (serviceWithSameSlug && !isServicePubliclyReadable(serviceWithSameSlug.serviceVisibility)) {
+        throw slugInUse
+      }
 
       if (!input.skipDuplicateCheck) {
         const possibleDuplicates = [
-          ...(serviceWithSameSlug ? [serviceWithSameSlug] : []),
+          ...(serviceWithSameSlug ? [omit(serviceWithSameSlug, 'serviceVisibility')] : []),
           ...(await findPossibleDuplicates(input)),
         ]
 
@@ -319,12 +332,7 @@ export const serviceSuggestionActions = {
           } as const
         }
       } else {
-        if (serviceWithSameSlug) {
-          throw new ActionError({
-            message: 'Slug already in use, try a different one',
-            code: 'BAD_REQUEST',
-          })
-        }
+        if (serviceWithSameSlug) throw slugInUse
       }
 
       const imageUrl = await saveFileLocally(input.imageFile, input.imageFile.name)

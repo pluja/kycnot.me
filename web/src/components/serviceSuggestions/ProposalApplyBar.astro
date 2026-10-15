@@ -7,10 +7,10 @@ import Button from '../Button.astro'
 import Tooltip from '../Tooltip.astro'
 
 type Props = {
-  /** One per offered checkbox, matched to it by name and value. */
+  // items holds one entry per offered checkbox, matched to it by name and value.
   items: { name: string; value: number | string; icon: string; label: string; detail: string }[]
   note: string
-  /** Replaces Apply when nothing is ticked. */
+  // emptyButton replaces Apply when nothing is ticked.
   emptyButton: {
     label: string
     icon: string
@@ -19,7 +19,7 @@ type Props = {
     formaction?: string
     color?: 'danger' | 'gray'
   }
-  /** Closes the suggestion without applying or recording anything. */
+  // discardButton closes the suggestion without applying or recording anything.
   discardButton?: {
     formaction: string
     tooltip: string

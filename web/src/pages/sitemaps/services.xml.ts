@@ -1,35 +1,62 @@
+import { ServiceVisibility } from '@prisma/client'
 import he from 'he'
+import { orderBy } from 'lodash-es'
 
 import { prisma } from '../../lib/prisma'
+import { latestReviewedAt } from '../../lib/serviceReviewedAt'
 
 import type { APIRoute } from 'astro'
-
-type SitemapRow = { slug: string; reviewedAt: Date | null; listedAt: Date | null; createdAt: Date }
 
 export const GET: APIRoute = async ({ site }) => {
   if (!site) return new Response('Site URL not configured', { status: 500 })
 
   try {
-    // Same inputs as latestReviewedAt in lib/serviceReviewedAt.ts, in SQL so
-    // the sitemap does not load every service's events. Keep the two in step.
-    const services = await prisma.$queryRaw<SitemapRow[]>`
-      SELECT s.slug, s."listedAt", s."createdAt",
-        GREATEST(
-          s."approvedAt",
-          s."verifiedAt",
-          s."tosReviewAt",
-          (SELECT MAX(e."updatedAt") FROM "Event" e
-            WHERE e."serviceId" = s.id AND e.visible AND e."deletedAt" IS NULL),
-          (SELECT MAX(v."updatedAt") FROM "VerificationStep" v WHERE v."serviceId" = s.id)
-        ) AS "reviewedAt"
-      FROM "Service" s
-      WHERE s."serviceVisibility" IN ('PUBLIC', 'ARCHIVED')
-      ORDER BY "reviewedAt" DESC NULLS LAST, s.slug
-    `
+    const listed = { serviceVisibility: { in: [ServiceVisibility.PUBLIC, ServiceVisibility.ARCHIVED] } }
+    // The latest event and test date per service is all latestReviewedAt needs, so they are grouped in SQL.
+    const [services, latestEvents, latestSteps] = await Promise.all([
+      prisma.service.findMany({
+        where: listed,
+        select: {
+          id: true,
+          slug: true,
+          listedAt: true,
+          createdAt: true,
+          approvedAt: true,
+          verifiedAt: true,
+          tosReviewAt: true,
+        },
+      }),
+      prisma.event.groupBy({
+        by: ['serviceId'],
+        where: { visible: true, deletedAt: null, service: listed },
+        _max: { updatedAt: true },
+      }),
+      prisma.verificationStep.groupBy({
+        by: ['serviceId'],
+        where: { service: listed },
+        _max: { updatedAt: true },
+      }),
+    ])
+    const latest = (groups: { serviceId: number | null; _max: { updatedAt: Date | null } }[], id: number) => {
+      const updatedAt = groups.find((group) => group.serviceId === id)?._max.updatedAt
+      return updatedAt ? [{ updatedAt }] : []
+    }
+    const rows = orderBy(
+      services.map((service) => ({
+        ...service,
+        reviewedAt: latestReviewedAt({
+          ...service,
+          events: latest(latestEvents, service.id),
+          verificationSteps: latest(latestSteps, service.id),
+        }),
+      })),
+      [(service) => service.reviewedAt?.getTime() ?? -Infinity, 'slug'],
+      ['desc', 'asc']
+    )
 
     const origin = site.origin
     const now = Date.now()
-    const urls = services
+    const urls = rows
       .map((service) => {
         const loc = he.encode(`${origin}/service/${service.slug}`)
         const modifiedAt = service.reviewedAt ?? service.listedAt ?? service.createdAt

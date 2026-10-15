@@ -12,6 +12,8 @@ type Props = Omit<HTMLAttributes<'a' | 'span'>, 'href' | 'rel' | 'target'> & {
   referral: string | null
   enableMinWidth?: boolean
   isScam?: boolean
+  // archived services link without the referral code, behind a warning that the domain may have changed hands.
+  archived?: boolean
 }
 
 const {
@@ -20,6 +22,7 @@ const {
   class: className,
   enableMinWidth = false,
   isScam = false,
+  archived = false,
   ...htmlProps
 } = Astro.props
 
@@ -127,46 +130,82 @@ function makeLink(url: string, referral: string | null) {
   }
 }
 
-const link = makeLink(baseUrl, referral)
+const link = makeLink(baseUrl, archived ? null : referral)
 
 if (!z.string().url().safeParse(link.url).success) {
   console.error(`Invalid service URL with referral: ${link.url}`)
 }
 
+const pillClass =
+  'inline-flex h-6 items-center gap-1 rounded-full bg-white text-xs whitespace-nowrap text-black focus-visible:ring-4 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-night-700 focus-visible:outline-none 2xs:h-8 2xs:gap-2 2xs:text-sm'
 const Tag = isScam ? 'span' : 'a'
 ---
 
-<Tag
-  href={isScam ? undefined : link.url}
-  target={isScam ? undefined : '_blank'}
-  rel={isScam ? undefined : referral ? 'sponsored nofollow noopener' : 'nofollow noopener'}
-  class={cn(
-    'inline-flex h-6 items-center gap-1 rounded-full bg-white text-xs whitespace-nowrap text-black focus-visible:ring-4 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-night-700 focus-visible:outline-none 2xs:h-8 2xs:gap-2 2xs:text-sm',
-    // The trailing arrow supplies the right-hand spacing; without it (scam) the
-    // pill needs its own padding or the text sits flush against the edge.
-    isScam && 'cursor-not-allowed bg-day-800 pr-3 text-red-300 2xs:pr-4',
-    className
-  )}
-  title={link.url}
-  {...htmlProps}
->
-  <Icon
-    name={isScam ? 'ri:alert-line' : link.icon}
-    class={cn('-mr-0.25 ml-1 size-4 2xs:-mr-0.5 2xs:ml-2 2xs:size-5', isScam && 'text-red-400')}
-  />
-  <span class={cn('font-title font-bold', { 'min-w-[29ch]': enableMinWidth })}>
-    {
-      link.textBits.map((textBit) => (
-        <span class={cn(textBit.style === 'irrelevant' && 'opacity-60')}>{textBit.text}</span>
-      ))
-    }
-  </span>
-  {
-    !isScam && (
+{
+  archived && !isScam ? (
+    <details class="group/archived relative inline-block">
+      <summary
+        class={cn(
+          pillClass,
+          'cursor-pointer list-none bg-day-700 pr-3 text-day-300 opacity-70 hover:opacity-100 2xs:pr-4 [&::-webkit-details-marker]:hidden',
+          className
+        )}
+        title={link.url}
+      >
+        <Icon name={link.icon} class="-mr-0.25 ml-1 size-4 2xs:-mr-0.5 2xs:ml-2 2xs:size-5" />
+        <span class="font-title font-bold">
+          {link.textBits.map((textBit) => (
+            <span class={cn(textBit.style === 'irrelevant' && 'opacity-60')}>{textBit.text}</span>
+          ))}
+        </span>
+        <Icon name="ri:archive-line" class="size-4" />
+      </summary>
+      <div class="absolute top-full left-0 z-20 mt-2 w-72 space-y-2 rounded-lg border border-yellow-500/30 bg-night-800 p-3 text-xs text-day-300 shadow-lg">
+        <p>
+          This service is archived. Its site may be gone or now belong to someone else. Check it before you
+          send money or data.
+        </p>
+        <a
+          href={link.url}
+          target="_blank"
+          rel="nofollow noopener noreferrer"
+          class="inline-flex items-center gap-1 font-medium text-yellow-200 underline hover:text-yellow-100"
+        >
+          Open anyway
+          <Icon name="ri:external-link-line" class="size-3.5" />
+        </a>
+      </div>
+    </details>
+  ) : (
+    <Tag
+      href={isScam ? undefined : link.url}
+      target={isScam ? undefined : '_blank'}
+      rel={isScam ? undefined : referral ? 'sponsored nofollow noopener' : 'nofollow noopener'}
+      class={cn(
+        pillClass,
+        // The trailing arrow supplies the right-hand spacing; without it (scam) the
+        // pill needs its own padding or the text sits flush against the edge.
+        isScam && 'cursor-not-allowed bg-day-800 pr-3 text-red-300 2xs:pr-4',
+        className
+      )}
+      title={link.url}
+      {...htmlProps}
+    >
       <Icon
-        name="ri:arrow-right-line"
-        class="mr-1 size-4 rounded-full bg-orange-500 p-0.5 text-white 2xs:size-6"
+        name={isScam ? 'ri:alert-line' : link.icon}
+        class={cn('-mr-0.25 ml-1 size-4 2xs:-mr-0.5 2xs:ml-2 2xs:size-5', isScam && 'text-red-400')}
       />
-    )
-  }
-</Tag>
+      <span class={cn('font-title font-bold', { 'min-w-[29ch]': enableMinWidth })}>
+        {link.textBits.map((textBit) => (
+          <span class={cn(textBit.style === 'irrelevant' && 'opacity-60')}>{textBit.text}</span>
+        ))}
+      </span>
+      {!isScam && (
+        <Icon
+          name="ri:arrow-right-line"
+          class="mr-1 size-4 rounded-full bg-orange-500 p-0.5 text-white 2xs:size-6"
+        />
+      )}
+    </Tag>
+  )
+}

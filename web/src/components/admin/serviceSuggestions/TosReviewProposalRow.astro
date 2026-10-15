@@ -6,22 +6,11 @@ import ProposalRow from '../../serviceSuggestions/ProposalRow.astro'
 
 import TosHighlightList from './TosHighlightList.astro'
 
-import type { MarkdownString } from '../../../lib/markdown'
-
-type TosReview = {
-  summary: MarkdownString
-  highlights: {
-    title: string
-    content: MarkdownString
-    rating: 'negative' | 'neutral' | 'positive'
-    evidence?: string
-    sourceUrl?: string
-  }[]
-}
+import type { TosReview } from '../../../lib/tosHighlights'
 
 type Props = {
-  currentTosReview: TosReview | null
-  proposedTosReview: TosReview
+  currentTosReview: Pick<TosReview, 'highlights' | 'summary'> | null
+  proposedTosReview: Pick<TosReview, 'highlights' | 'summary'>
   changed: boolean
   isActionable: boolean
 }

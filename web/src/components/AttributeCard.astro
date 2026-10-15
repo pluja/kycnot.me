@@ -18,7 +18,7 @@ type Props = {
     description: string
     privacyPoints: number
     trustPoints: number
-    /** Per-service detail. Sits under the shared description, never scored. */
+    // note is the per-service detail shown under the shared description. It is never scored.
     note?: string | null
     typeInfo: ReturnType<typeof getAttributeTypeInfo>
     links: {

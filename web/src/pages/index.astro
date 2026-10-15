@@ -67,6 +67,14 @@ const attributeOptions = [
   },
 ] as const satisfies AttributeOption[]
 
+// Retired filter. Old links still carry it, so send them to the canonical URL.
+const retiredParam = 'user-rating'
+if (Astro.url.searchParams.has(retiredParam)) {
+  const canonicalUrl = new URL(Astro.url)
+  canonicalUrl.searchParams.delete(retiredParam)
+  return Astro.redirect(canonicalUrl.pathname + canonicalUrl.search, 301)
+}
+
 const ignoredKeysForDefaultData = ['sort-seed']
 
 const {
@@ -85,7 +93,6 @@ const {
           .map((verification) => verification.slug)
       ),
     'min-score': z.coerce.number().default(0),
-    'user-rating': z.coerce.number().int().min(0).max(5).default(0),
     q: z.string().max(100).default(''),
     currencies: z.array(currenciesZodEnumBySlug.transform((slug) => currencySlugToId(slug))),
     'currency-mode': zodEnumFromConstant(modeOptions, 'value').default('or'),
@@ -116,7 +123,6 @@ const {
         'currency-mode': { if: 'another-is-unset', prop: 'currencies' },
         'attribute-mode': { if: 'another-is-unset', prop: 'attr' },
         'min-score': { if: 'default' },
-        'user-rating': { if: 'default' },
         'max-kyc': { if: 'default' },
         'sort-seed': { if: 'another-is-unset', prop: 'page' },
       },
@@ -170,15 +176,6 @@ const where = {
     lte: filters['max-kyc'],
   },
   AND: [
-    ...(filters['user-rating'] > 0
-      ? [
-          {
-            trustWeightedUserRating: {
-              gte: filters['user-rating'],
-            },
-          } satisfies Prisma.ServiceWhereInput,
-        ]
-      : []),
     ...(filters.networks.length
       ? [
           {
@@ -287,13 +284,7 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
         const rng = seedrandom(filters['sort-seed'])
         const selectedSort = sortOptions.find((sort) => sort.value === filters.sort) ?? defaultSortOption
 
-        // trustWeightedUserRating is nullable; lodash orders nulls first on desc,
-        // so coerce to -Infinity to keep unrated services last in both sort passes.
-        const sortIteratee =
-          selectedSort.orderBy.key === 'trustWeightedUserRating'
-            ? (service: { trustWeightedUserRating: number | null }) =>
-                service.trustWeightedUserRating ?? -Infinity
-            : selectedSort.orderBy.key
+        const sortIteratee = selectedSort.orderBy.key
 
         const sortedServices = orderBy(
           // NOTE: We do a first sort by id to make the seeded sort deterministic

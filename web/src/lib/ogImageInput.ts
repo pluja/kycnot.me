@@ -20,15 +20,11 @@ export const OG_IMAGE_LIMITS = {
     totalText: 200,
   },
   badge: {
-    name: 120,
+    site: 120,
   },
   score: {
     min: 0,
     max: 10,
-  },
-  rating: {
-    min: 0,
-    max: 5,
   },
   kycLevel: {
     min: 0,

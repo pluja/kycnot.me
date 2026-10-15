@@ -52,16 +52,9 @@ export function serviceDetailSelect(viewerId: number) {
       orderBy: { createdAt: 'desc' },
       take: 10,
     },
-    userSentiment: true,
-    userSentimentAt: true,
-    averageUserRating: true,
-    trustWeightedUserRating: true,
-    userRatingCount: true,
-    trustedUserRatingCount: true,
-    userRatingWeight: true,
     isRecentlyApproved: true,
     strictCommentingEnabled: true,
-    commentSectionMessage: true,
+    proofHint: true,
     contactMethods: {
       select: {
         value: true,
@@ -171,20 +164,6 @@ export function serviceDetailSelect(viewerId: number) {
         },
       },
       orderBy: { createdAt: 'desc' },
-    },
-    _count: {
-      select: {
-        comments: {
-          where: {
-            ratingActive: true,
-            status: {
-              in: ['APPROVED', 'VERIFIED'],
-            },
-            parentId: null,
-            ratingMuted: false,
-          },
-        },
-      },
     },
   } satisfies Prisma.ServiceSelect
 }

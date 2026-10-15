@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 
 import { getIncidentSeverityInfo } from '../../constants/incidentSeverities'
 import { cn } from '../../lib/cn'
+import { countOf } from '../../lib/pluralize'
 import { firstParagraph } from '../../lib/strings'
 
 import type { IncidentSeverity } from '@prisma/client'
@@ -44,10 +45,9 @@ const label = severityInfo
 
 const lead = firstParagraph(event.content)
 
-const count = (n: number, noun: string) => `${String(n)} ${noun}${n === 1 ? '' : 's'}`
 const more = [
-  moreIncidents > 0 && count(moreIncidents, 'incident'),
-  moreWarnings > 0 && count(moreWarnings, 'warning'),
+  moreIncidents > 0 && countOf(moreIncidents, 'incident', 'incidents'),
+  moreWarnings > 0 && countOf(moreWarnings, 'warning', 'warnings'),
 ]
   .filter(Boolean)
   .join(' and ')

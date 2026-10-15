@@ -130,22 +130,6 @@ function getBadgeEmbedCode(
               <input
                 type="checkbox"
                 checked
-                data-badge-toggle="rating"
-                aria-label="Show user rating"
-                class="mt-0.5 shrink-0"
-              />
-              <span class="flex min-w-0 items-center gap-2 text-sm text-day-100">
-                <Icon name="ri:star-line" class="size-3.5 text-yellow-300" />
-                <span>User rating</span>
-              </span>
-            </label>
-
-            <label
-              class="flex items-center gap-2.5 rounded-xl border border-day-500/10 bg-night-900/70 px-3 py-2 transition-colors hover:border-day-500/25"
-            >
-              <input
-                type="checkbox"
-                checked
                 data-badge-toggle="kyc"
                 aria-label="Show KYC level"
                 class="mt-0.5 shrink-0"
@@ -153,6 +137,27 @@ function getBadgeEmbedCode(
               <span class="flex min-w-0 items-center gap-2 text-sm text-day-100">
                 <Icon name="ri:shield-check-line" class="size-3.5 text-blue-300" />
                 <span>KYC level</span>
+              </span>
+            </label>
+
+            <label
+              class="flex items-start gap-2.5 rounded-xl border border-day-500/10 bg-night-900/70 px-3 py-2 transition-colors hover:border-day-500/25"
+            >
+              <input
+                type="checkbox"
+                data-badge-toggle="verdict"
+                aria-label="Show user reviews"
+                class="mt-1 shrink-0"
+              />
+              <span class="min-w-0 text-sm text-day-100">
+                <span class="flex items-center gap-2">
+                  <Icon name="ri:chat-3-line" class="size-3.5 text-yellow-300" />
+                  <span>User reviews</span>
+                </span>
+                <span class="mt-0.5 block text-2xs text-pretty text-day-500">
+                  What reviews on KYCnot.me say: Positive, Mixed or Negative. It updates on its own, also if
+                  it turns negative, and stays hidden until enough reviews back it.
+                </span>
               </span>
             </label>
           </div>
@@ -183,8 +188,8 @@ function getBadgeEmbedCode(
         <h2 class="mb-2 text-sm font-bold text-day-200">URL Parameters</h2>
         <ul class="space-y-1 text-2xs text-day-400">
           <li><code class="text-day-200">score=1</code> Show trust score</li>
-          <li><code class="text-day-200">rating=1</code> Show user rating</li>
           <li><code class="text-day-200">kyc=1</code> Show KYC level</li>
+          <li><code class="text-day-200">verdict=1</code> Show user reviews</li>
           <li><code class="text-day-200">theme=light</code> Light theme</li>
           <li><code class="text-day-200">size=lg|sm|xs</code> Badge size</li>
         </ul>
@@ -202,8 +207,8 @@ function getBadgeEmbedCode(
                   alt={`${size.label} badge preview`}
                   loading="lazy"
                   class={cn(
-                    'rounded-sm',
-                    size.id === 'lg' ? 'max-w-72' : size.id === 'sm' ? 'max-w-52' : 'max-w-40'
+                    'max-w-full',
+                    size.id === 'lg' ? 'w-[460px]' : size.id === 'sm' ? 'w-[300px]' : 'w-[200px]'
                   )}
                   data-badge-img={size.id}
                 />
@@ -285,8 +290,9 @@ function getBadgeEmbedCode(
     function getState() {
       return {
         score: controlsEl.querySelector<HTMLInputElement>('[data-badge-toggle="score"]')?.checked ?? true,
-        rating: controlsEl.querySelector<HTMLInputElement>('[data-badge-toggle="rating"]')?.checked ?? true,
         kyc: controlsEl.querySelector<HTMLInputElement>('[data-badge-toggle="kyc"]')?.checked ?? true,
+        verdict:
+          controlsEl.querySelector<HTMLInputElement>('[data-badge-toggle="verdict"]')?.checked ?? false,
         light: controlsEl.querySelector<HTMLInputElement>('[data-badge-toggle="light"]')?.checked ?? false,
       }
     }
@@ -300,8 +306,8 @@ function getBadgeEmbedCode(
 
       if (size !== 'xs') {
         if (state.score) params.set('score', '1')
-        if (state.rating) params.set('rating', '1')
         if (state.kyc) params.set('kyc', '1')
+        if (state.verdict) params.set('verdict', '1')
       }
 
       return `${currentSiteOrigin}/badge/${serviceSlug}.png?${params.toString()}`

@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { hasBeenReviewed, makeKycAnswer, makeSafetyAnswer, answerText, pickCaveats } from './serviceAnswers'
+import {
+  hasBeenReviewed,
+  makeKycAnswer,
+  makeSafetyAnswer,
+  makeUsersFact,
+  answerText,
+  pickCaveats,
+} from './serviceAnswers'
 
 void test('KYC levels map to distinct answers, and 0 is not the same as 1', () => {
   const guaranteed = makeKycAnswer(0)
@@ -319,4 +326,68 @@ void test('an open warning is a verdict of its own and rides under an incident',
     withIncident.incidents?.map((link) => link.kind),
     ['incident', 'warning']
   )
+})
+
+void test('the users fact counts recent experiences and states the verdict', () => {
+  const now = new Date()
+  const summary = {
+    total: 18,
+    checked: { total: 18, positive: 12, neutral: 3, negative: 1 },
+    all: { positive: 12, neutral: 3, negative: 1 },
+    weighted: { positive: 12, neutral: 3, negative: 1 },
+    latestAt: now,
+    recentLatestAt: now,
+  }
+  assert.deepEqual(makeUsersFact(summary, 90), {
+    verdict: { label: 'Mostly positive', tone: 'good' },
+    counts: summary.all,
+    detail: '18 user experiences in 90 days',
+  })
+  assert.equal(
+    makeUsersFact({ ...summary, total: 0, recentLatestAt: null }, 90)?.detail,
+    'No user experiences in 90 days'
+  )
+  assert.equal(makeUsersFact({ ...summary, latestAt: null }, 90), null)
+  const twoPosts = {
+    ...summary,
+    total: 2,
+    checked: { total: 0, positive: 0, neutral: 0, negative: 0 },
+    all: { positive: 2, neutral: 0, negative: 0 },
+    weighted: { positive: 2, neutral: 0, negative: 0 },
+  }
+  assert.deepEqual(makeUsersFact(twoPosts, 90), {
+    verdict: null,
+    counts: twoPosts.all,
+    detail: '2 user experiences in 90 days',
+  })
+})
+
+void test('an open low incident is never contradicted or left out', () => {
+  const low = { ...incident, title: 'Server list outdated', severity: 'LOW' as const }
+  const unreviewed = makeSafetyAnswer({ ...base, hasBeenReviewed: false, incidents: [low] })
+  assert.equal(unreviewed.answer, 'Nothing serious on record')
+  const withResolved = makeSafetyAnswer({
+    ...base,
+    incidents: [low, { ...incident, state: 'RESOLVED', resolvedAt: new Date('2026-01-01') }],
+  })
+  assert.deepEqual(
+    withResolved.incidents?.map((entry) => entry.title),
+    ['Server list outdated', 'Withdrawals frozen for 23 users']
+  )
+})
+
+void test('an open low incident is named next to a warning and a caveat', () => {
+  const low = { ...incident, title: 'Server list outdated', severity: 'LOW' as const }
+  const withWarning = makeSafetyAnswer({
+    ...base,
+    incidents: [low],
+    warnings: [{ id: 7, title: 'Slow withdrawals', startedAt: new Date('2026-09-01') }],
+  })
+  assert.equal(withWarning.answer, '1 incident and 1 warning ongoing')
+  assert.deepEqual(
+    withWarning.incidents?.map((entry) => entry.title),
+    ['Server list outdated', 'Slow withdrawals']
+  )
+  const withCaveat = makeSafetyAnswer({ ...base, incidents: [low], caveats: [{ title: 'No-refund policy' }] })
+  assert.doesNotMatch(withCaveat.detail, /Nothing on record/)
 })

@@ -1,3 +1,5 @@
+import type { ServiceVisibility } from '@prisma/client'
+
 // The destination URL is passed verbatim as a URL-encoded `?to=` param so
 // it stays human-readable in the address bar. Encoding adds nothing on top
 // of the hostname allowlist and only obscures where the user is being sent.
@@ -35,3 +37,9 @@ export const buildGoHref = ({ slug, deepLinkUrl, from, to }: BuildGoHrefArgs): s
   if (to && isValidCurrencyParam(to)) params.set('to_ccy', to)
   return `/go/${encodeURIComponent(slug)}?${params.toString()}`
 }
+
+// serviceOutboundUrl adds the service's referral code, except on an archived service, whose domain may have changed hands.
+export const serviceOutboundUrl = (
+  url: string,
+  service: { referral: string | null; serviceVisibility: ServiceVisibility }
+) => (service.serviceVisibility === 'ARCHIVED' ? url : url + (service.referral ?? ''))

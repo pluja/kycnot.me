@@ -80,23 +80,6 @@ void test('rejects an unknown verification status', () => {
   )
 })
 
-void test('rejects a rating that cannot be formatted', () => {
-  // Unparsed, `averageUserRating.toFixed(1)` threw a TypeError.
-  assert.equal(
-    rejected(badgeOgImagePropsSchemas['badge-sm'], {
-      theme: 'dark',
-      verificationStatus: 'APPROVED',
-      overallScore: 8,
-      averageUserRating: '5',
-      kycLevel: 1,
-      showScore: true,
-      showRating: true,
-      showKycLevel: true,
-    }),
-    'averageUserRating: invalid_type'
-  )
-})
-
 void test('accepts the maximum rendered category count', () => {
   const props = accepted(publicOgImagePropsSchemas.service, {
     ...serviceProps,

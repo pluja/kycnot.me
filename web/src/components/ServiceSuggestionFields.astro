@@ -25,7 +25,6 @@ type Props = {
   inputErrors: Partial<Record<string, string[]>>
   categories: Prisma.CategoryGetPayload<{ select: { id: true; name: true; icon: true } }>[]
   attributes: Prisma.AttributeGetPayload<{ select: { id: true; title: true; category: true; type: true } }>[]
-  /** The service's current values, when editing one. */
   values?: ServiceFieldValues
 }
 

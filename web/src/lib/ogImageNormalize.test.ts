@@ -4,7 +4,6 @@ import { test } from 'node:test'
 import { OG_IMAGE_LIMITS } from './ogImageInput'
 import {
   normalizeOgImageKycLevel,
-  normalizeOgImageRating,
   normalizeOgImageScore,
   normalizePublicOgImageProps,
 } from './ogImageNormalize'
@@ -77,16 +76,21 @@ void test('clamps badge numbers before schema validation', () => {
     theme: 'dark',
     verificationStatus: 'APPROVED',
     overallScore: normalizeOgImageScore(10),
-    averageUserRating: normalizeOgImageRating(5.0000000000000036),
     kycLevel: normalizeOgImageKycLevel(4),
     showScore: true,
-    showRating: true,
     showKycLevel: true,
+    verdict: 'good',
   }
 
-  assert.equal(props.averageUserRating, 5)
   assert.equal(badgeOgImagePropsSchemas['badge-sm'].safeParse(props).success, true)
-  assert.equal(normalizeOgImageRating(Infinity), null)
+  assert.equal(
+    badgeOgImagePropsSchemas['badge-sm'].safeParse({
+      ...props,
+      verdict: 'great',
+    }).success,
+    false
+  )
+  assert.equal(normalizeOgImageScore(11.6), 10)
   assert.equal(normalizeOgImageKycLevel(-1), 0)
 })
 

@@ -1,10 +1,14 @@
 import { orderBy } from 'lodash-es'
 
 import { getIncidentSeverityInfo } from '../constants/incidentSeverities'
+import { getVerificationStatusInfo } from '../constants/verificationStatus'
 
+import { summaryVerdict, verdictCounts } from './experienceVerdict'
+import { countOf } from './pluralize'
 import { stripMarkdown } from './strings'
 import { formatDaysAgo } from './timeAgo'
 
+import type { ExperienceSummaryData } from './experienceQueries'
 import type {
   AttributeCategory,
   AttributeType,
@@ -13,28 +17,26 @@ import type {
   VerificationStatus,
 } from '@prisma/client'
 
-/**
- * A negative attribute as the reader should see it. `note` is the per-service
- * detail, which says the specific thing the shared title cannot.
- */
+// Caveat is a negative attribute as the reader should see it. `note` is the per-service detail, which
+// says the specific thing the shared title cannot.
 export type Caveat = {
   title: string
   note?: string | null
-  /** Anchor of the full attribute card further down the page. */
+  // href anchors the full attribute card further down the page.
   href?: string
 }
 
 export type ServiceAnswer = {
   tone: 'bad' | 'caution' | 'good' | 'unknown'
-  /** Short enough to read at a glance, e.g. "No, guaranteed". */
+  // answer is short enough to read at a glance, e.g. "No, guaranteed".
   answer: string
-  /** One sentence of why, in the reader's terms rather than the model's. */
+  // detail is one sentence of why, in the reader's terms rather than the model's.
   detail: string
-  /** The same text with its bold kept, for the page; `detail` is the plain copy. */
+  // detailMd is the same text with its bold kept, for the page; `detail` is the plain copy.
   detailMd?: string
-  /** Named exceptions to the headline, costliest first. */
+  // caveats are named exceptions to the headline, costliest first.
   caveats?: Caveat[]
-  /** Incidents behind the headline, worst first, each linking to its card. */
+  // incidents are the ones behind the headline, worst first, each linking to its card.
   incidents?: IncidentLink[]
 }
 
@@ -47,15 +49,12 @@ export const checkAnchor = (stepId: number) => `check-${String(stepId)}`
 
 export const attributeAnchor = (slug: string) => `attribute-${slug}`
 
-/**
- * Answers "will it ask for your ID?".
- *
- * The headline follows the level, with one exception: a guaranteed no-KYC
- * service that carries a KYC-category caveat (a partner, a seller, a refund
- * path that can ask) reads "by them", since the guarantee stops at their own
- * door. KYC caveats are listed under the headline, unless a written policy
- * summary exists, which already says the specific thing.
- */
+// makeKycAnswer answers "will it ask for your ID?".
+//
+// The headline follows the level, with one exception: a guaranteed no-KYC service that carries a
+// KYC-category caveat (a partner, a seller, a refund path that can ask) reads "by them", since the
+// guarantee stops at their own door. KYC caveats are listed under the headline, unless a written policy
+// summary exists, which already says the specific thing.
 export function makeKycAnswer(
   kycLevel: number,
   kycCaveats: Caveat[] = [],
@@ -134,7 +133,7 @@ type OpenIncident = {
   resolvedAt: Date | null
 }
 
-/** A warning-class event with no end date: a live problem short of an incident. */
+// OpenWarning is a warning-class event with no end date: a live problem short of an incident.
 export type OpenWarning = {
   id: number
   title: string
@@ -143,31 +142,25 @@ export type OpenWarning = {
 
 type SafetyInput = {
   verificationStatus: VerificationStatus
-  /**
-   * Incidents still carrying a trust penalty. A resolved one stays here until
-   * its decay window ends (90 days to 18 months by severity), which is what
-   * "recent" means below. Faded ones do not count.
-   */
+  // incidents still carry a trust penalty. A resolved one stays here until its decay window ends (90 days
+  // to 18 months by severity), which is what "recent" means below. Faded ones do not count.
   incidents: OpenIncident[]
-  /** Open warnings. Listed under any incident verdict, and a verdict of their own without one. */
+  // warnings are the open ones, listed under any incident verdict and a verdict of their own without one.
   warnings?: OpenWarning[]
-  /** False when nobody has reviewed the listing, so a low score means "unknown". */
+  // hasBeenReviewed is false when nobody has reviewed the listing, so a low score means "unknown".
   hasBeenReviewed: boolean
-  /** The trust half of `pickCaveats`. */
+  // caveats is the trust half of `pickCaveats`.
   caveats: Caveat[]
-  /** Review checks that failed or raised a warning, each linking to its entry. */
+  // checks are the review checks that failed or raised a warning, each linking to its entry.
   checks: FlaggedCheck[]
-  /** Set while a listing counts as recently approved, so a clean record is also a short one. */
+  // recentlyApprovedAt is set while a listing counts as recently approved, so a clean record is also a short one.
   recentlyApprovedAt: Date | null
 }
 
 export type FlaggedCheck = { title: string; href: string; failed: boolean }
 
-/**
- * How far an ongoing incident overrides the rest of the answer. LOW is worth
- * the alert box above the panel but not a change of verdict; a patched server
- * list is not a reason to stay away.
- */
+// TONE_BY_SEVERITY sets how far an ongoing incident overrides the rest of the answer. LOW is worth the
+// alert box above the panel but not a change of verdict; a patched server list is not a reason to stay away.
 const TONE_BY_SEVERITY: Record<IncidentSeverity, Extract<ServiceAnswer['tone'], 'bad' | 'caution'> | null> = {
   LOW: null,
   MEDIUM: 'caution',
@@ -177,12 +170,9 @@ const TONE_BY_SEVERITY: Record<IncidentSeverity, Extract<ServiceAnswer['tone'], 
 
 const monthFormatter = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' })
 
-const count = (n: number, noun: string) => `${String(n)} ${noun}${n === 1 ? '' : 's'}`
-
-/** "Ongoing incident", "2 ongoing incidents", "Ongoing warning", "1 incident and 2 warnings ongoing". */
 function ongoingHeadline(incidents: number, warnings: number, tone: 'bad' | 'caution'): string {
   if (incidents > 0 && warnings > 0) {
-    return `${count(incidents, 'incident')} and ${count(warnings, 'warning')} ongoing`
+    return `${countOf(incidents, 'incident', 'incidents')} and ${countOf(warnings, 'warning', 'warnings')} ongoing`
   }
   if (incidents > 0) {
     if (tone === 'caution') return 'Open incident'
@@ -191,14 +181,11 @@ function ongoingHeadline(incidents: number, warnings: number, tone: 'bad' | 'cau
   return warnings === 1 ? 'Ongoing warning' : `${String(warnings)} ongoing warnings`
 }
 
-/**
- * Answers "is your money safe here?".
- *
- * An ongoing incident outranks the score. The score is a slow-moving average; a
- * service currently holding people's funds is a fact about today. A resolved
- * incident still inside its decay window reads as recent: named, in caution,
- * and left to the reader to weigh.
- */
+// makeSafetyAnswer answers "is your money safe here?".
+//
+// An ongoing incident outranks the score. The score is a slow-moving average; a service currently
+// holding people's funds is a fact about today. A resolved incident still inside its decay window reads
+// as recent: named, in caution, and left to the reader to weigh.
 export function makeSafetyAnswer({
   verificationStatus,
   incidents,
@@ -231,6 +218,14 @@ export function makeSafetyAnswer({
     (incident) => getIncidentSeverityInfo(incident.severity).order,
     'desc'
   )
+  const ongoingLinks = ongoing.map(
+    (incident): IncidentLink => ({
+      title: cleanTitle(incident.title),
+      href: `#${incidentAnchor(incident.id)}`,
+      note: `Unresolved since ${monthFormatter.format(incident.occurredAt)}`,
+      kind: 'incident',
+    })
+  )
   const worst = ongoing[0]
   const tone = worst && TONE_BY_SEVERITY[worst.severity]
   if (worst && tone) {
@@ -238,17 +233,7 @@ export function makeSafetyAnswer({
       tone,
       answer: ongoingHeadline(ongoing.length, warningLinks.length, tone),
       detail: '',
-      incidents: [
-        ...ongoing.map(
-          (incident): IncidentLink => ({
-            title: cleanTitle(incident.title),
-            href: `#${incidentAnchor(incident.id)}`,
-            note: `Unresolved since ${monthFormatter.format(incident.occurredAt)}`,
-            kind: 'incident',
-          })
-        ),
-        ...warningLinks,
-      ],
+      incidents: [...ongoingLinks, ...warningLinks],
       caveats: flaggedChecks,
     }
   }
@@ -263,12 +248,14 @@ export function makeSafetyAnswer({
       tone: 'caution',
       answer:
         warningLinks.length > 0
-          ? `${count(recent.length, 'recent incident')} and ${count(warningLinks.length, 'warning')} ongoing`
+          ? `${countOf(recent.length, 'recent incident', 'recent incidents')} and ${countOf(warningLinks.length, 'warning', 'warnings')} ongoing`
           : recent.length > 1
             ? 'Recent incidents'
             : 'Recent incident',
       detail: '',
       incidents: [
+        // Any ongoing incident here is LOW: listed first, since it is still open.
+        ...ongoingLinks,
         ...recent.map(
           (incident): IncidentLink => ({
             title: cleanTitle(incident.title),
@@ -287,9 +274,9 @@ export function makeSafetyAnswer({
   if (warningLinks.length > 0) {
     return {
       tone: 'caution',
-      answer: ongoingHeadline(0, warningLinks.length, 'caution'),
+      answer: ongoingHeadline(ongoing.length, warningLinks.length, 'caution'),
       detail: '',
-      incidents: warningLinks,
+      incidents: [...ongoingLinks, ...warningLinks],
       caveats: flaggedChecks,
     }
   }
@@ -297,8 +284,11 @@ export function makeSafetyAnswer({
   if (!hasBeenReviewed) {
     return {
       tone: 'unknown',
-      answer: 'Nothing on record',
-      detail: 'No incidents or warnings so far. Nobody from the team has looked yet.',
+      answer: ongoing.length > 0 ? 'Nothing serious on record' : 'Nothing on record',
+      detail:
+        ongoing.length > 0
+          ? 'Nothing beyond the notice above. Nobody from the team has looked yet.'
+          : 'No incidents or warnings so far. Nobody from the team has looked yet.',
       caveats: flaggedChecks,
     }
   }
@@ -306,13 +296,13 @@ export function makeSafetyAnswer({
   // it is our own finding, not a policy clause.
   if (checks.length > 0) {
     const failed = checks.filter((check) => check.failed)
-    const count = (n: number, one: string, many: string) => (n === 1 ? one : `${String(n)} ${many}`)
+    const checkPhrase = (n: number, one: string, many: string) => (n === 1 ? one : `${String(n)} ${many}`)
     return {
       tone: failed.length > 0 ? 'bad' : 'caution',
       answer:
         failed.length > 0
-          ? count(failed.length, 'A check failed', 'checks failed')
-          : count(checks.length, 'A check raised a warning', 'checks raised warnings'),
+          ? checkPhrase(failed.length, 'A check failed', 'checks failed')
+          : checkPhrase(checks.length, 'A check raised a warning', 'checks raised warnings'),
       detail: '',
       caveats: flaggedChecks,
     }
@@ -333,9 +323,11 @@ export function makeSafetyAnswer({
       answer: others === 0 ? first.title : `${first.title}, and ${String(others)} more`,
       detail: [
         shortRecord,
-        others === 0
-          ? 'Nothing on record against it. One thing to know:'
-          : 'Nothing on record against it, but worth knowing before you use it:',
+        ongoing.length > 0
+          ? 'Nothing serious beyond the notice above.'
+          : others === 0
+            ? 'Nothing on record against it. One thing to know:'
+            : 'Nothing on record against it, but worth knowing before you use it:',
       ]
         .filter(Boolean)
         .join(' '),
@@ -364,15 +356,12 @@ type CaveatSource = Omit<Caveat, 'href'> & {
   trustPoints: number
 }
 
-/**
- * Splits a service's attributes into the caveats each question shows.
- *
- * Category is the routing: KYC attributes qualify the ID answer, TRUST ones the
- * trust answer, and PRIVACY ones stay in the list below. A moderator marks
- * "listed but not a concern" the way they already do, with type INFO or zero
- * points, so no extra field is needed. The costliest come first because only
- * the first couple are shown.
- */
+// pickCaveats splits a service's attributes into the caveats each question shows.
+//
+// Category is the routing: KYC attributes qualify the ID answer, TRUST ones the trust answer, and PRIVACY
+// ones stay in the list below. A moderator marks "listed but not a concern" the way they already do, with
+// type INFO or zero points, so no extra field is needed. The costliest come first because only the first
+// couple are shown.
 export function pickCaveats(attributes: CaveatSource[]): { kyc: Caveat[]; trust: Caveat[] } {
   const concerns = orderBy(
     attributes.filter(
@@ -395,7 +384,7 @@ export function pickCaveats(attributes: CaveatSource[]): { kyc: Caveat[]; trust:
   }
 }
 
-/** The answer as one plain sentence, for structured data. */
+// answerText renders the answer as one plain sentence, for structured data.
 export function answerText({ answer, detail, caveats = [], incidents = [] }: ServiceAnswer): string {
   const caveatText = caveats.map((caveat) => (caveat.note?.trim() ? caveat.note : caveat.title)).join('; ')
   const incidentText = incidents
@@ -406,9 +395,17 @@ export function answerText({ answer, detail, caveats = [], incidents = [] }: Ser
     .join(' ')
 }
 
-/** Verification states that mean a person has actually looked at the listing. */
-const REVIEWED_STATUSES: VerificationStatus[] = ['VERIFICATION_SUCCESS', 'VERIFICATION_FAILED', 'APPROVED']
-
 export function hasBeenReviewed(verificationStatus: VerificationStatus): boolean {
-  return REVIEWED_STATUSES.includes(verificationStatus)
+  return getVerificationStatusInfo(verificationStatus).reviewed
+}
+
+// makeUsersFact is what the safety answer says about recent user experiences, or null when there are none.
+export function makeUsersFact(summary: ExperienceSummaryData, windowDays: number) {
+  if (!summary.latestAt) return null
+  const experiences = summary.total === 0 ? 'No' : summary.total.toLocaleString()
+  return {
+    verdict: summaryVerdict(summary),
+    counts: verdictCounts(summary).counts,
+    detail: `${experiences} user ${summary.total === 1 ? 'experience' : 'experiences'} in ${String(windowDays)} days`,
+  }
 }

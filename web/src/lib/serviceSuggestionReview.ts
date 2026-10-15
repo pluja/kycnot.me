@@ -1,41 +1,87 @@
+import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
-import { canReviewSuggestion } from './permissions'
+import { canReviewSuggestion, type UserForPermissions } from './permissions'
+import { openSuggestionStatuses } from './suggestionAssignment'
+import { emptyToUndefined } from './zodUtils'
 
 import type { ServiceSuggestionStatus } from '@prisma/client'
 
 type SuggestionWriter = {
   serviceSuggestion: {
     updateMany: (args: {
-      where: { id: number; status: { in: ServiceSuggestionStatus[] } }
-      data: { status: ServiceSuggestionStatus }
+      where: { id: number; status: { in: ServiceSuggestionStatus[] }; assignedToId?: number | null }
+      data: { status?: ServiceSuggestionStatus; assignedToId: number | null; assignedAt: Date | null }
     }) => Promise<{ count: number }>
   }
 }
 
-const openStatuses: ServiceSuggestionStatus[] = ['PENDING', 'UNDER_REVIEW']
+// seenAssigneeIdSchema reads who held the suggestion when the page was rendered, so nobody acts over a claim
+// they didn't see.
+export const seenAssigneeIdSchema = z.preprocess(
+  emptyToUndefined,
+  z.coerce.number().int().positive().optional()
+)
 
-/**
- * Moves a suggestion to a new status only if it is still in one of the expected
- * ones, inside the caller's transaction. A second reviewer acting at the same
- * time then fails here instead of writing over the first.
- */
+const conflict = () =>
+  new ActionError({
+    code: 'CONFLICT',
+    message: 'Someone else changed this suggestion first. Reload and try again.',
+  })
+
+// transitionSuggestion moves a suggestion to a new status only if it is still in one of the expected ones,
+// and still held by seenAssigneeId when given, inside the caller's transaction. A second reviewer acting at
+// the same time then fails here instead of writing over the first. Whoever moves it out of pending becomes
+// its assignee; back to pending, nobody is.
 export async function transitionSuggestion(
   tx: SuggestionWriter,
   suggestionId: number,
   status: ServiceSuggestionStatus,
-  from: ServiceSuggestionStatus[] = openStatuses
+  actorId: number,
+  {
+    from = openSuggestionStatuses,
+    seenAssigneeId,
+  }: { from?: ServiceSuggestionStatus[]; seenAssigneeId?: number | null } = {}
 ) {
+  const unassigned = status === 'PENDING'
   const updated = await tx.serviceSuggestion.updateMany({
-    where: { id: suggestionId, status: { in: from } },
-    data: { status },
+    where: {
+      id: suggestionId,
+      status: { in: from },
+      ...(seenAssigneeId !== undefined && { assignedToId: seenAssigneeId }),
+    },
+    data: {
+      status,
+      assignedToId: unassigned ? null : actorId,
+      assignedAt: unassigned ? null : new Date(),
+    },
   })
-  if (updated.count === 0) {
-    throw new ActionError({ code: 'CONFLICT', message: 'Someone else reviewed this suggestion first.' })
+  if (updated.count === 0) throw conflict()
+}
+
+// releaseSuggestion clears the assignee but keeps the status, so the author isn't told "back to pending"
+// each time a moderator hands a suggestion back.
+export async function releaseSuggestion(tx: SuggestionWriter, suggestionId: number, seenAssigneeId: number) {
+  const updated = await tx.serviceSuggestion.updateMany({
+    where: { id: suggestionId, status: { in: openSuggestionStatuses }, assignedToId: seenAssigneeId },
+    data: { assignedToId: null, assignedAt: null },
+  })
+  if (updated.count === 0) throw conflict()
+}
+
+export const suggestionStatusLabel = (status: ServiceSuggestionStatus) =>
+  status.replace('_', ' ').toLowerCase()
+
+export function assertOpenSuggestion(suggestion: { status: ServiceSuggestionStatus }) {
+  if (!openSuggestionStatuses.includes(suggestion.status)) {
+    throw new ActionError({
+      code: 'BAD_REQUEST',
+      message: `Suggestion is already ${suggestionStatusLabel(suggestion.status)}.`,
+    })
   }
 }
 
-type Reviewer = { id: number; admin: boolean; capabilities: string[] }
+type Reviewer = UserForPermissions & { id: number }
 
 export function assertCanReviewSuggestion(
   suggestion: { userId: number },

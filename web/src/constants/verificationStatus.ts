@@ -29,10 +29,13 @@ type VerificationStatusInfo<T extends string | null | undefined = string> = {
   }
   order: number
   verbPast: string
+  // listed is shown as a normal listing; reviewed means a person has looked at it.
+  listed: boolean
+  reviewed: boolean
 }
 
 export const READ_MORE_SENTENCE_LINK =
-  'Read more about the [listing statuses](/about#listing-statuses).' satisfies MarkdownString
+  'Read more about the [listing statuses](/docs/listings#listing-statuses).' satisfies MarkdownString
 
 export const {
   dataArray: verificationStatuses,
@@ -68,6 +71,8 @@ export const {
     },
     order: Infinity,
     verbPast: value ? transformCase(value, 'title') : String(value),
+    listed: false,
+    reviewed: false,
   }),
   [
     {
@@ -94,6 +99,8 @@ export const {
       },
       order: 1,
       verbPast: 'verified',
+      listed: true,
+      reviewed: true,
     },
     {
       value: 'APPROVED',
@@ -119,6 +126,8 @@ export const {
       },
       order: 2,
       verbPast: 'approved',
+      listed: true,
+      reviewed: true,
     },
     {
       value: 'COMMUNITY_CONTRIBUTED',
@@ -145,6 +154,8 @@ export const {
       },
       order: 3,
       verbPast: 'contributed by the community',
+      listed: false,
+      reviewed: false,
     },
     {
       value: 'VERIFICATION_FAILED',
@@ -170,6 +181,8 @@ export const {
       },
       order: 4,
       verbPast: 'marked as a SCAM',
+      listed: false,
+      reviewed: true,
     },
   ] as const satisfies VerificationStatusInfo<VerificationStatus>[]
 )

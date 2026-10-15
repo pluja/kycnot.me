@@ -1,3 +1,5 @@
+import { uniq } from 'lodash-es'
+
 import { getServiceEditFieldInfo, serviceEditFields } from '../constants/serviceEditFields'
 
 import type { ServiceEditListFieldId, ServiceEditTextFieldId } from '../constants/serviceEditFields'
@@ -23,11 +25,20 @@ export const serviceEditableSelect = {
 
 type EditableService = Prisma.ServiceGetPayload<{ select: typeof serviceEditableSelect }>
 
-// Both sides of a diff go through the same normalization, or a form submitted
-// untouched still differs from the record: browsers send textarea line breaks
-// as CRLF, and the input is trimmed.
-const normalizeText = (value: string) => value.replace(/\r\n/g, '\n').trim()
-const unique = <T>(values: T[]) => [...new Set(values)]
+export const proposalAttributeSelect = {
+  id: true,
+  title: true,
+  description: true,
+  category: true,
+  type: true,
+  privacyPoints: true,
+  trustPoints: true,
+} as const satisfies Prisma.AttributeSelect
+export type ProposalAttribute = Prisma.AttributeGetPayload<{ select: typeof proposalAttributeSelect }>
+
+// normalizeText runs on both sides of a diff, or a form submitted untouched still differs from the record:
+// browsers send textarea line breaks as CRLF, and the input is trimmed.
+export const normalizeText = (value: string) => value.replace(/\r\n/g, '\n').trim()
 
 export function serviceFieldValues(service: EditableService): ServiceFieldValues {
   return {
@@ -65,9 +76,9 @@ export function serviceFieldValuesFromForm(input: {
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     registrationCountryCode: input.registrationCountryCode || null,
     kycLevel: String(input.kycLevel),
-    categories: unique(input.categories.map(String)),
-    attributes: unique(input.attributes.map(String)),
-    acceptedCurrencies: unique(input.acceptedCurrencies),
+    categories: uniq(input.categories.map(String)),
+    attributes: uniq(input.attributes.map(String)),
+    acceptedCurrencies: uniq(input.acceptedCurrencies),
   }
 }
 
@@ -104,11 +115,8 @@ export function listFieldDelta(edit: ServiceListFieldEdit) {
   }
 }
 
-/**
- * Applies what the person added and removed to the list as it stands now, so
- * an entry someone else added since the suggestion is kept rather than
- * overwritten by the list the person saw.
- */
+// applyListFieldDelta applies what the person added and removed to the list as it stands now, so an entry
+// someone else added since the suggestion is kept rather than overwritten by the list the person saw.
 export function applyListFieldDelta(live: string[], edit: ServiceListFieldEdit) {
   const { added, removed } = listFieldDelta(edit)
   return [

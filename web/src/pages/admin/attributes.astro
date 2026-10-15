@@ -5,6 +5,7 @@ import { actions, isInputError } from 'astro:actions'
 import { z } from 'astro:content'
 import { orderBy as lodashOrderBy } from 'lodash-es'
 
+import DeleteConfirmButton from '../../components/admin/DeleteConfirmButton.astro'
 import Button from '../../components/Button.astro'
 import SortArrowIcon from '../../components/SortArrowIcon.astro'
 import Tooltip from '../../components/Tooltip.astro'
@@ -538,22 +539,13 @@ const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
                             onclick={`document.getElementById('edit-form-${index}').classList.toggle('hidden')`}
                           />
                         </Tooltip>
-                        <Tooltip text="Delete">
-                          <form method="POST" action={actions.admin.attribute.delete} class="inline-block">
-                            <input type="hidden" name="id" value={attribute.id} />
-                            <Button
-                              as="button"
-                              type="submit"
-                              color="danger"
-                              variant="faded"
-                              size="sm"
-                              iconOnly
-                              icon="ri:delete-bin-line"
-                              label="Delete"
-                              onclick="return confirm('Are you sure you want to delete this attribute?')"
-                            />
-                          </form>
-                        </Tooltip>
+                        <DeleteConfirmButton
+                          action={actions.admin.attribute.delete}
+                          id={`attribute-${attribute.id.toString()}`}
+                          label="Delete attribute"
+                        >
+                          <input type="hidden" name="id" value={attribute.id} />
+                        </DeleteConfirmButton>
                       </div>
                     </td>
                   </tr>

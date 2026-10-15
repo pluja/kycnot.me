@@ -6,10 +6,10 @@ import { pick } from 'lodash-es'
 import { getKycLevelInfo } from '../../constants/kycLevels'
 import { getVerificationStatusInfo } from '../../constants/verificationStatus'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
+import { serviceOutboundUrl } from '../../lib/goLink'
 import { prisma } from '../../lib/prisma'
 import { absoluteSiteUrl } from '../../lib/urls'
 import { zodUrlOptionalProtocol } from '../../lib/zodUtils'
-
 
 export const apiServiceActions = {
   get: defineProtectedAction({
@@ -148,8 +148,8 @@ export const apiServiceActions = {
         kycAttributes: service.attributes.map(({ attribute }) => attribute),
         categories: service.categories,
         listedAt: service.listedAt,
-        serviceUrls: [...service.serviceUrls, ...service.onionUrls, ...service.i2pUrls].map(
-          (url) => url + (service.referral ?? '')
+        serviceUrls: [...service.serviceUrls, ...service.onionUrls, ...service.i2pUrls].map((url) =>
+          serviceOutboundUrl(url, service)
         ),
         tosUrls: service.tosUrls,
         kycnotmeUrl: absoluteSiteUrl(`/service/${service.slug}`),

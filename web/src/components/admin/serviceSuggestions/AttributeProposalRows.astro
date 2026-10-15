@@ -8,19 +8,8 @@ import BadgeSmall from '../../BadgeSmall.astro'
 import QuotedClause from '../../QuotedClause.astro'
 import ProposalRow from '../../serviceSuggestions/ProposalRow.astro'
 
+import type { ProposalAttribute } from '../../../lib/serviceFieldEdits'
 import type { Prisma } from '@prisma/client'
-
-type Attribute = Prisma.AttributeGetPayload<{
-  select: {
-    id: true
-    title: true
-    description: true
-    category: true
-    type: true
-    privacyPoints: true
-    trustPoints: true
-  }
-}>
 
 type ProposedEdits = NonNullable<
   Prisma.ServiceSuggestionGetPayload<{ select: { proposedEdits: true } }>['proposedEdits']
@@ -30,7 +19,7 @@ type AttributeProposal = NonNullable<ProposedEdits['attributes']>['add'][number]
 type Props = {
   add: AttributeProposal[]
   remove: AttributeProposal[]
-  attributes: Attribute[]
+  attributes: ProposalAttribute[]
   isActionable: boolean
 }
 

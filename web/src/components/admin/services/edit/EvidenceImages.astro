@@ -2,13 +2,13 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 
-import Button from '../../../Button.astro'
 import FormSection from '../../../FormSection.astro'
 import FormSubSection from '../../../FormSubSection.astro'
 import InputImageFile from '../../../InputImageFile.astro'
 import InputSubmitButton from '../../../InputSubmitButton.astro'
-import MyPicture from '../../../MyPicture.astro'
+import LightboxImage from '../../../LightboxImage.astro'
 import TimeFormatted from '../../../TimeFormatted.astro'
+import DeleteConfirmButton from '../../DeleteConfirmButton.astro'
 
 import type { ImageFileInfo } from '../../../../lib/fileStorage'
 
@@ -35,39 +35,18 @@ const watermarkId = `${id}-watermark`
         </p>
       ) : (
         <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-          {evidenceImages.map((image) => (
+          {evidenceImages.map((image, index) => (
             <div class="group relative rounded-md border border-night-600 bg-night-800 p-2">
-              <button
-                type="button"
-                class="block w-full cursor-zoom-in"
-                data-lightbox-trigger
-                data-lightbox-src={image.url}
-              >
-                <MyPicture
-                  src={image.url}
-                  alt="Evidence image"
-                  class="aspect-square w-full rounded-sm object-cover"
-                  width={200}
-                  height={200}
-                />
-              </button>
-              <form
-                method="POST"
-                action={`${actions.admin.service.evidenceImage.delete}${sectionHash}`}
-                class="absolute top-1 right-1"
-              >
-                <input type="hidden" name="fileUrl" value={image.url} />
-                <Button
-                  type="submit"
-                  variant="faded"
-                  color="danger"
-                  size="sm"
-                  icon="ri:delete-bin-line"
-                  iconOnly
-                  label="Delete Image"
-                  class="opacity-0 transition-opacity group-hover:opacity-100"
-                />
-              </form>
+              <LightboxImage src={image.url} alt="Evidence image" />
+              <div class="absolute top-1 right-1 flex opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 has-checked:opacity-100">
+                <DeleteConfirmButton
+                  action={`${actions.admin.service.evidenceImage.delete}${sectionHash}`}
+                  id={`evidence-image-${index.toString()}`}
+                  label="Delete image"
+                >
+                  <input type="hidden" name="fileUrl" value={image.url} />
+                </DeleteConfirmButton>
+              </div>
 
               <div class="mt-2 space-y-1">
                 <p class="text-xs text-day-500">

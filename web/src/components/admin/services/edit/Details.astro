@@ -14,7 +14,6 @@ import { cn } from '../../../../lib/cn'
 import { DESCRIPTION_MAX_LENGTH, DESCRIPTION_RULE } from '../../../../lib/descriptionRules'
 import FormSection from '../../../FormSection.astro'
 import InputCardGroup from '../../../InputCardGroup.astro'
-import InputCheckbox from '../../../InputCheckbox.astro'
 import InputCheckboxGroup from '../../../InputCheckboxGroup.astro'
 import InputImageFile from '../../../InputImageFile.astro'
 import InputSelect from '../../../InputSelect.astro'
@@ -24,7 +23,9 @@ import InputTextArea from '../../../InputTextArea.astro'
 import Tooltip from '../../../Tooltip.astro'
 import EditableListItem from '../../EditableListItem.astro'
 import EditToggleButton from '../../EditToggleButton.astro'
+import ServiceProofFields from '../ServiceProofFields.astro'
 
+import type { proofIdPatternHealth } from '../../../../lib/commentProof'
 import type { Prisma } from '@prisma/client'
 
 type Props = {
@@ -42,10 +43,11 @@ type Props = {
   categories: { id: number; name: string; icon: string | null }[]
   attributes: Prisma.AttributeGetPayload<true>[]
   inputErrors: Record<string, string[] | undefined>
+  patternHealth: Awaited<ReturnType<typeof proofIdPatternHealth>> | null
   id?: string
 }
 
-const { service, categories, attributes, inputErrors, id = 'details' } = Astro.props
+const { service, categories, attributes, inputErrors, patternHealth, id = 'details' } = Astro.props
 const sectionHash = `#${id}`
 
 // Filled notes first: on a service with a dozen attributes the two that carry a
@@ -422,23 +424,7 @@ const notedCount = noteFields.filter(({ note }) => note).length
       cardSize="sm"
     />
 
-    <InputCheckbox
-      label="Strict Commenting"
-      name="strictCommentingEnabled"
-      checked={service.strictCommentingEnabled}
-      descriptionInline="Require proof of being a client for comments."
-    />
-
-    <InputTextArea
-      label="Comment Section Message"
-      name="commentSectionMessage"
-      value={service.commentSectionMessage ?? ''}
-      description="Markdown supported"
-      inputProps={{
-        rows: 4,
-      }}
-      error={inputErrors.commentSectionMessage}
-    />
+    <ServiceProofFields service={service} inputErrors={inputErrors} patternHealth={patternHealth} />
 
     <InputSubmitButton label="Update" icon="ri:save-line" hideCancel />
   </form>

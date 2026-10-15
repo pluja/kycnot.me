@@ -2,8 +2,8 @@ import type { Graph, Thing, WithContext } from 'schema-dts'
 
 export type JsonLdItem = Graph | WithContext<Thing>
 
-// HTML entities are not decoded inside <script>, so the only safe way to keep
-// "</script>" or "&" out of the markup is JSON's own unicode escapes.
+// UNSAFE_IN_SCRIPT maps characters to JSON's own unicode escapes: HTML entities are not decoded inside
+// <script>, so that is the only safe way to keep "</script>" or "&" out of the markup.
 const UNSAFE_IN_SCRIPT: Record<string, string> = {
   '<': '\\u003c',
   '>': '\\u003e',

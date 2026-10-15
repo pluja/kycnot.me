@@ -3,6 +3,7 @@ import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 import slugify from 'slugify'
 
+import { recordAuditLog } from '../../lib/auditLog'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
@@ -43,17 +44,7 @@ export const adminAttributeActions = {
   create: defineProtectedAction({
     accept: 'form',
     permissions: cap('attributes:manage'),
-    input: z.object({
-      title: z.string().trim().min(1, 'Title is required'),
-      description: z
-        .string()
-        .transform(normalizeMultilineInput)
-        .pipe(z.string().min(1, 'Description is required')),
-      category: z.nativeEnum(AttributeCategory),
-      type: z.nativeEnum(AttributeType),
-      privacyPoints: z.coerce.number().int().min(-100).max(100).default(0),
-      trustPoints: z.coerce.number().int().min(-100).max(100).default(0),
-    }),
+    input: attributeInputSchema.omit({ slug: true }),
     handler: async (input) => {
       const slug = slugify(input.title, { lower: true, strict: true })
 
@@ -121,10 +112,17 @@ export const adminAttributeActions = {
     input: z.object({
       id: z.coerce.number().int().positive('Attribute ID must be a positive integer.'),
     }),
-    handler: async ({ id }) => {
+    handler: async ({ id }, context) => {
       try {
-        await prisma.attribute.delete({
-          where: { id },
+        await prisma.$transaction(async (tx) => {
+          const attribute = await tx.attribute.delete({ where: { id }, select: { title: true } })
+          await recordAuditLog(tx, {
+            actorId: context.locals.user.id,
+            action: 'DELETED',
+            targetType: 'ATTRIBUTE',
+            targetId: id,
+            summary: `Deleted attribute "${attribute.title}"`,
+          })
         })
         return { success: true, message: 'Attribute deleted successfully.' }
       } catch (error) {

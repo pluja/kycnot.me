@@ -4,6 +4,7 @@ import { actions } from 'astro:actions'
 
 import { isListingCheckFieldId, listingCheckFieldLabels } from '../../../constants/listingCheckFields'
 import { cn } from '../../../lib/cn'
+import { openSuggestionStatuses } from '../../../lib/suggestionAssignment'
 import BadgeSmall from '../../BadgeSmall.astro'
 import Markdown from '../../Markdown.astro'
 import BeforeAfter from '../../serviceSuggestions/BeforeAfter.astro'
@@ -16,19 +17,8 @@ import AttributeProposalRows from './AttributeProposalRows.astro'
 import ListingCheckRows from './ListingCheckRows.astro'
 import TosReviewProposalRow from './TosReviewProposalRow.astro'
 
+import type { ProposalAttribute } from '../../../lib/serviceFieldEdits'
 import type { Prisma } from '@prisma/client'
-
-type Attribute = Prisma.AttributeGetPayload<{
-  select: {
-    id: true
-    title: true
-    description: true
-    category: true
-    type: true
-    privacyPoints: true
-    trustPoints: true
-  }
-}>
 
 type Suggestion = Prisma.ServiceSuggestionGetPayload<{
   select: { id: true; status: true; proposedEdits: true }
@@ -41,11 +31,12 @@ type Service = Prisma.ServiceGetPayload<{
 type Props = {
   suggestion: Suggestion
   service: Service
-  attributes: Attribute[]
+  attributes: ProposalAttribute[]
+  seenAssigneeId: number | null
   class?: string
 }
 
-const { suggestion, service, attributes, class: className } = Astro.props
+const { suggestion, service, attributes, seenAssigneeId, class: className } = Astro.props
 
 const proposedEdits = suggestion.proposedEdits
 
@@ -74,7 +65,7 @@ const descriptionChanged =
 const addCount = proposedAttributes.add.length
 const removeCount = proposedAttributes.remove.length
 const warningCount = proposedEdits?.warnings.length ?? 0
-const isActionable = suggestion.status === 'PENDING' || suggestion.status === 'UNDER_REVIEW'
+const isActionable = openSuggestionStatuses.includes(suggestion.status)
 const currentTosReview = service.tosReview
 const tosSummaryChanged =
   !!proposedTosReview && (currentTosReview?.summary ?? '') !== proposedTosReview.summary
@@ -172,6 +163,7 @@ const summaryItems = [
 
       <form method="POST" action={actions.admin.service.deepScan.apply} class="mt-4 space-y-4">
         <input type="hidden" name="suggestionId" value={suggestion.id} />
+        <input type="hidden" name="seenAssigneeId" value={seenAssigneeId ?? ''} />
 
         <ul class="divide-y divide-night-600 rounded-md border border-night-600 bg-night-800">
           {proposedTosReview && (

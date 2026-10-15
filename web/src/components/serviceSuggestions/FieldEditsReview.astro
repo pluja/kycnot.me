@@ -7,6 +7,7 @@ import { getCurrencyInfo } from '../../constants/currencies'
 import { getKycLevelInfo } from '../../constants/kycLevels'
 import { getServiceEditFieldInfo } from '../../constants/serviceEditFields'
 import { isListFieldEdit, isSameFieldValue, listFieldDelta } from '../../lib/serviceFieldEdits'
+import { openSuggestionStatuses } from '../../lib/suggestionAssignment'
 import BadgeSmall from '../BadgeSmall.astro'
 
 import BeforeAfter from './BeforeAfter.astro'
@@ -25,12 +26,13 @@ const SUMMARY_VALUE_LENGTH = 24
 type Props = {
   suggestion: Prisma.ServiceSuggestionGetPayload<{ select: { id: true; status: true } }>
   fieldEdits: NonNullable<Prisma.ServiceSuggestionGetPayload<{ select: { fieldEdits: true } }>['fieldEdits']>
-  /** The service as it is now, to flag fields that changed after the suggestion was made. */
+  // liveValues is the service as it is now, to flag fields that changed after the suggestion was made.
   liveValues: ServiceFieldValues
   categories: Prisma.CategoryGetPayload<{ select: { id: true; name: true } }>[]
   attributes: Prisma.AttributeGetPayload<{ select: { id: true; title: true } }>[]
-  /** Renders a checkbox per field and the apply button, for moderators. */
+  // reviewable renders a checkbox per field and the apply button, for moderators.
   reviewable?: boolean
+  seenAssigneeId?: number | null
   class?: string
 }
 
@@ -41,10 +43,11 @@ const {
   categories,
   attributes,
   reviewable = false,
+  seenAssigneeId = null,
   class: className,
 } = Astro.props
 
-const isOpen = suggestion.status === 'PENDING' || suggestion.status === 'UNDER_REVIEW'
+const isOpen = openSuggestionStatuses.includes(suggestion.status)
 const isActionable = reviewable && isOpen
 
 const categoryNames = new Map(categories.map((category) => [String(category.id), category.name]))
@@ -102,7 +105,14 @@ const Wrapper = isActionable ? 'form' : 'div'
     {...isActionable ? { method: 'POST', action: actions.admin.serviceSuggestions.applyFieldEdits } : {}}
     class="mt-4 space-y-4"
   >
-    {isActionable && <input type="hidden" name="suggestionId" value={suggestion.id} />}
+    {
+      isActionable && (
+        <>
+          <input type="hidden" name="suggestionId" value={suggestion.id} />
+          <input type="hidden" name="seenAssigneeId" value={seenAssigneeId ?? ''} />
+        </>
+      )
+    }
 
     <ul class="divide-y divide-night-600 rounded-md border border-night-600 bg-night-800">
       {
