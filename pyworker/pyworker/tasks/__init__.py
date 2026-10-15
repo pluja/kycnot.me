@@ -7,7 +7,7 @@ from .deep_scan import DeepScanTask
 from .force_triggers import ForceTriggersTask
 from .inactive_users import InactiveUsersTask
 from .service_score_recalc import ServiceScoreRecalculationTask
-from .user_sentiment import UserSentimentTask
+from .suggestion_cleanup import SuggestionCleanupTask
 
 __all__ = [
     "Task",
@@ -17,5 +17,5 @@ __all__ = [
     "ForceTriggersTask",
     "InactiveUsersTask",
     "ServiceScoreRecalculationTask",
-    "UserSentimentTask",
+    "SuggestionCleanupTask",
 ]

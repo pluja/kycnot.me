@@ -5,7 +5,7 @@ A Python worker for processing and analyzing data for the KYC Not project.
 ## Features
 
 - TOS (Terms of Service) text retrieval and analysis
-- User sentiment analysis from comments
+- Per-post experience classification
 - Comment moderation
 - Service score recalculation
 - Database trigger maintenance
@@ -32,14 +32,16 @@ cp .env.example .env
 Required environment variables:
 
 - `DATABASE_URL`: PostgreSQL connection string
-- `OPENAI_API_KEY`: OpenAI API key for AI tasks
+- `OPENAI_API_KEY`: API key for AI tasks
+- `OPENAI_MODEL`, `OPENAI_MODEL_FAST`: models for scans and moderation
+- `CLASSIFICATION_MODEL`: model for `classify-experiences`
 - `CRON_TOSREVIEW_TASK`: Cron expression for TOS review task
-- `CRON_SENTIMENT_TASK`: Cron expression for user sentiment analysis task
-- `CRON_MODERATION_TASK`: Cron expression for comment moderation task
+- `CRON_COMMENT_MODERATION_TASK`: Cron expression for comment moderation task
 - `CRON_FORCE_TRIGGERS_TASK`: Cron expression for force triggers task
 - `CRON_SERVICE_SCORE_RECALC_TASK`: Cron expression for service score recalculation task
 - `CRON_INACTIVE_USERS_TASK`: Cron expression for inactive users cleanup task
 - `CRON_CONTACT_CLEANUP_TASK`: Cron expression for deleting resolved contact threads past their 30-day retention
+- `CRON_SUGGESTION_CLEANUP_TASK`: Cron expression for withdrawing stale pending suggestions
 
 ## Usage
 
@@ -49,10 +51,14 @@ Run tasks directly:
 
 ```bash
 # Deep-scan services: terms, KYC level, attributes and listing checks
-uv run -m pyworker deep-scan [--service-id ID] [--all] [--force]
+# --description reviews only one service's description, from its front page
+uv run -m pyworker deep-scan [--service-id ID [--description]] [--all] [--force]
 
-# Run user sentiment analysis task
-uv run -m pyworker sentiment [--service-id ID]
+# Withdraw stale pending suggestions; --dry-run lists them and changes nothing
+uv run -m pyworker suggestion-cleanup [--dry-run]
+
+# Classify historical published posts without changing moderation
+uv run -m pyworker classify-experiences --limit 100 --after-id 0
 
 # Run comment moderation task
 uv run -m pyworker moderation [--service-id ID]
@@ -94,36 +100,34 @@ Tasks will run according to their configured cron schedules.
   first pass where every service still qualifies
 - Scheduled via `CRON_SCAN_SWEEP_TASK`
 
-### User Sentiment Task
+### Experience classification
 
-- Analyzes user comments to determine overall sentiment
-- Updates service records with sentiment analysis
-- Scheduled via `CRON_SENTIMENT_TASK`
+New experiences receive a sentiment suggestion during moderation only when the author has not chosen one. The explicit `classify-experiences` command classifies the posts still marked unclassified. Resume using the last processed ID. It does not re-moderate posts or generate service-wide summaries.
 
 ### Comment Moderation Task
 
 - Makes a basic first moderation of comments
 - Flags comments as needed
 - Adds content if needed
-- Scheduled via `CRON_MODERATION_TASK`
+- Scheduled via `CRON_COMMENT_MODERATION_TASK`
 
 ### Force Triggers Task
 
 - Maintains database triggers by forcing them to run under certain conditions
 - Currently handles updating the "isRecentlyApproved" flag for services after 15 days
-- Scheduled via `CRON_FORCE-TRIGGERS_TASK`
+- Scheduled via `CRON_FORCE_TRIGGERS_TASK`
 
 ### Service Score Recalculation Task
 
 - Recalculates service scores based on attribute changes
 - Processes jobs from the ServiceScoreRecalculationJob table
 - Calculates privacy, trust, and overall scores
-- Scheduled via `CRON_SERVICE-SCORE-RECALC_TASK`
+- Scheduled via `CRON_SERVICE_SCORE_RECALC_TASK`
 
 ### Inactive Users Task
 
 - Handles cleanup of inactive user accounts
-- Identifies users who have been inactive for 1 year (no comments, votes, suggestions, and 0 karma)
+- Identifies users who have been inactive for 1 year (no comments, suggestions, and 0 karma)
 - Sends deletion warning notifications at 30, 15, 5, and 1 day intervals
 - Deletes accounts that remain inactive after the warning period
 - Cancels deletion for users who become active again
@@ -134,6 +138,14 @@ Tasks will run according to their configured cron schedules.
 - Permanently deletes resolved contact threads 30 days after they were resolved
 - Messages cascade with the thread; this deletion (not encryption) is the privacy mechanism for the contact feature
 - Scheduled via `CRON_CONTACT_CLEANUP_TASK`
+
+### Suggestion Cleanup Task
+
+- Withdraws pending suggestions whose site stopped responding, where the team asked something and got no reply, or
+  for a service that is already listed
+- Posts a message from the support account, which must be staff, and writes an audit entry for each closure
+- Never touches suggestions under review
+- Scheduled via `CRON_SUGGESTION_CLEANUP_TASK`
 
 ## Development
 
@@ -152,10 +164,11 @@ pyworker/
 │   │   ├── __init__.py
 │   │   ├── base.py
 │   │   ├── comment_moderation.py
+│   │   ├── experience_classification.py
 │   │   ├── force_triggers.py
 │   │   ├── inactive_users.py
 │   │   ├── service_score_recalc.py
-│   │   └── user_sentiment.py
+│   │   └── suggestion_cleanup.py
 │   └── utils/
 │       ├── __init__.py
 │       ├── ai.py

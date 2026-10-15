@@ -7,7 +7,6 @@ import json
 import secrets
 import string
 from contextlib import contextmanager
-from datetime import datetime
 from typing import Any, Dict, Generator, List, Optional, TypedDict, Union
 from typing import Literal as TypeLiteral
 
@@ -22,25 +21,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 # --- Type Definitions ---
-
-
-# Moved from tasks/comment_moderation.py
-class CommentType(TypedDict):
-    id: int
-    upvotes: int
-    status: str
-    ratingMuted: bool
-    ratingMuteReason: Optional[str]
-    publicNote: Optional[str]
-    adminNote: Optional[str]
-    authorNote: Optional[str]
-    content: str
-    rating: Optional[float]
-    createdAt: datetime
-    updatedAt: datetime
-    authorId: int
-    serviceId: int
-    parentId: Optional[int]
 
 
 # Moved from utils/ai.py
@@ -98,22 +78,18 @@ class DeepScanResultType(TypedDict):
     warnings: List[DeepScanWarningType]
 
 
-class CommentSentimentSummaryType(TypedDict):
-    summary: str
-    sentiment: TypeLiteral["positive", "negative", "neutral"]
-    whatUsersLike: List[str]
-    whatUsersDislike: List[str]
-
-
 class CommentModerationType(TypedDict):
+    postKind: TypeLiteral["EXPERIENCE", "DISCUSSION", "UNCLASSIFIED"]
+    experienceSentiment: Optional[TypeLiteral["POSITIVE", "NEUTRAL", "NEGATIVE"]]
     recommendedAction: TypeLiteral["approve", "reject", "human_review"]
     reasoning: str
     commentQuality: int
     isSpam: bool
     isBrigade: bool
     brigadeConfidence: int
-    ratingShouldBeDisabled: bool
-    contextNote: str
+    rejectionRule: Optional[str]
+    rejectionConfident: bool
+    looksGenerated: bool
 
 
 QueryType = Union[str, bytes, SQL, Composed, Literal]
@@ -301,7 +277,7 @@ def fetch_all_services() -> List[Dict[str, Any]]:
                     SELECT id, name, slug, description, "kycLevel", "overallScore", 
                         "privacyScore", "trustScore", "verificationStatus", 
                         "serviceVisibility", "tosUrls", "serviceUrls", "onionUrls", "i2pUrls", 
-                        "tosReview", "tosReviewAt", "userSentiment", "userSentimentAt"
+                        "tosReview", "tosReviewAt"
                     FROM "Service"
                     WHERE "serviceVisibility" = 'PUBLIC'
                         AND ("verificationStatus" = 'VERIFICATION_SUCCESS' 
@@ -343,12 +319,15 @@ def fetch_services_with_pending_comments() -> List[Dict[str, Any]]:
                     SELECT DISTINCT s.id, s.name, s.slug, s.description, s."kycLevel", s."overallScore",
                         s."privacyScore", s."trustScore", s."verificationStatus",
                         s."serviceVisibility", s."tosUrls", s."serviceUrls", s."onionUrls", s."i2pUrls",
-                        s."tosReview", s."tosReviewAt", s."userSentiment", s."userSentimentAt"
+                        s."tosReview", s."tosReviewAt"
                     FROM "Service" s
                     JOIN "Comment" c ON s.id = c."serviceId"
-                    WHERE c.status = 'PENDING'
-                      AND c."aiDecidedAt" IS NULL
-                      AND c."humanAction" IS NULL
+                    WHERE (c.status = 'PENDING' AND c."aiDecidedAt" IS NULL AND c."humanAction" IS NULL)
+                       OR EXISTS (
+                           SELECT 1 FROM "CommentRevision" r
+                           WHERE r."commentId" = c.id AND r.status = 'PENDING'
+                             AND r."aiDecidedAt" IS NULL AND r."redactedAt" IS NULL
+                       )
                     ORDER BY s.id
                 """)
                 services = cursor.fetchall()
@@ -634,6 +613,8 @@ def save_deep_scan_proposed_edits(
                         UPDATE "ServiceSuggestion"
                         SET
                             status = 'WITHDRAWN',
+                            "assignedToId" = NULL,
+                            "assignedAt" = NULL,
                             notes = CASE
                                 WHEN notes IS NULL OR notes = '' THEN %s
                                 ELSE notes || E'\n\n' || %s
@@ -952,85 +933,6 @@ def create_legal_revision(
         return None
 
 
-def get_comments(service_id: int, status: str = "APPROVED") -> List[Dict[str, Any]]:
-    """
-    Get all comments for a specific service with the specified status.
-
-    Args:
-        service_id: The ID of the service.
-        status: The status of comments to fetch (e.g. 'APPROVED', 'PENDING'). Defaults to 'APPROVED'.
-
-    Returns:
-        A list of comment dictionaries.
-        NOTE: The structure returned by the SQL query might be different from CommentType.
-            Adjust CommentType or parsing if needed elsewhere.
-    """
-    comments = []
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor(row_factory=dict_row) as cursor:
-                cursor.execute(
-                    """
-                    WITH RECURSIVE comment_tree AS (
-                        -- Base case: get all root comments (no parent)
-                        SELECT 
-                            c.id, 
-                            c.content, 
-                            c.rating,
-                            c.upvotes,
-                            c."createdAt",
-                            c."updatedAt",
-                            c."parentId",
-                            c.status,
-                            u.id as "authorId",
-                            u.name as "authorName",
-                            u."displayName" as "authorDisplayName",
-                            u.picture as "authorPicture",
-                            u.verified as "authorVerified",
-                            0 as depth
-                        FROM "Comment" c
-                        JOIN "User" u ON c."authorId" = u.id
-                        WHERE c."serviceId" = %s
-                        AND c.status = %s
-                        AND c."parentId" IS NULL
-                        
-                        UNION ALL
-                        
-                        -- Recursive case: get all replies
-                        SELECT 
-                            c.id, 
-                            c.content, 
-                            c.rating,
-                            c.upvotes,
-                            c."createdAt",
-                            c."updatedAt",
-                            c."parentId",
-                            c.status,
-                            u.id as "authorId",
-                            u.name as "authorName",
-                            u."displayName" as "authorDisplayName",
-                            u.picture as "authorPicture",
-                            u.verified as "authorVerified",
-                            ct.depth + 1
-                        FROM "Comment" c
-                        JOIN "User" u ON c."authorId" = u.id
-                        JOIN comment_tree ct ON c."parentId" = ct.id
-                        WHERE c.status = %s
-                    )
-                    SELECT * FROM comment_tree
-                    ORDER BY "createdAt" DESC, depth ASC
-                """,
-                    (service_id, status, status),
-                )
-                comments = cursor.fetchall()
-    except Exception as e:
-        logger.error(
-            f"Error fetching comments for service {service_id} with status {status}: {e}"
-        )
-
-    return comments
-
-
 def get_pending_comments(service_id: int) -> List[Dict[str, Any]]:
     """
     Return the IDs of comments awaiting AI review for a service, oldest first.
@@ -1048,7 +950,7 @@ def get_pending_comments(service_id: int) -> List[Dict[str, Any]]:
             with conn.cursor(row_factory=dict_row) as cursor:
                 cursor.execute(
                     """
-                    SELECT c.id
+                    SELECT c.id, c.version
                     FROM "Comment" c
                     WHERE c."serviceId" = %s
                       AND c.status = 'PENDING'
@@ -1064,7 +966,95 @@ def get_pending_comments(service_id: int) -> List[Dict[str, Any]]:
     return comments
 
 
-def get_moderation_context(comment_id: int) -> Optional[Dict[str, Any]]:
+def get_pending_revisions(service_id: int) -> List[Dict[str, Any]]:
+    """Edits on a service's posts that the AI has not looked at yet, oldest first.
+
+    Each row carries what the edit gate needs: whether it changes the experience's
+    sentiment or outcome, and whether that experience has checked proof.
+    """
+    revisions: List[Dict[str, Any]] = []
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    SELECT r.id, r."commentId", r.content, r.kind, c.content AS "publishedContent",
+                      r."experienceData"->'issues' AS "editedIssues", c.issues::text[] AS "publishedIssues",
+                      r.kind <> c.kind AS "changesKind",
+                      c."humanAction" = 'HOLD' AS "heldByModerator",
+                      EXISTS (
+                        SELECT 1 FROM "ContactThread" t
+                        WHERE t."commentId" = c.id AND t.category = 'COMMENT_REPORT' AND t.status <> 'RESOLVED'
+                      ) AS "hasOpenReport",
+                      e.id IS NOT NULL AND (
+                        (r."experienceData"->>'sentiment') IS DISTINCT FROM e.sentiment::text
+                        OR COALESCE(r."experienceData"->>'outcome', 'UNSPECIFIED') <> e.outcome::text
+                        OR ARRAY(
+                          SELECT jsonb_array_elements_text(COALESCE(r."experienceData"->'issues', '[]'::jsonb)) ORDER BY 1
+                        ) IS DISTINCT FROM ARRAY(SELECT unnest(c.issues)::text ORDER BY 1)
+                      ) AS "changesVerdict",
+                      comment_has_accepted_proof(c.id) AS "experienceHasCheckedProof"
+                    FROM "CommentRevision" r
+                    JOIN "Comment" c ON c.id = r."commentId"
+                    LEFT JOIN "CommentExperience" e ON e."commentId" = c.id
+                    WHERE c."serviceId" = %s AND r.status = 'PENDING'
+                      AND r."aiDecidedAt" IS NULL AND r."redactedAt" IS NULL
+                    ORDER BY r."createdAt" ASC
+                    """,
+                    (service_id,),
+                )
+                revisions = cursor.fetchall()
+    except Exception as e:
+        logger.error(f"Error fetching pending edits for service {service_id}: {e}")
+    return revisions
+
+
+def apply_ai_edit_decision(
+    revision_id: int,
+    ai_action: TypeLiteral["APPROVE", "REJECT", "HOLD"],
+    ai_reasoning: str,
+    rejection_rule: Optional[str],
+) -> TypeLiteral["APPROVE", "REJECT", "HOLD"]:
+    """Record the AI's verdict on an edit and carry it out through apply_comment_revision.
+
+    Returns the action that stuck: an approval that finds the post changed since the
+    edit was written is recorded as HOLD, so the edit waits for a moderator.
+    """
+    with get_db_connection() as conn:
+        with conn.transaction():
+            with conn.cursor() as cursor:
+                outcome = ai_action
+                if ai_action != "HOLD":
+                    try:
+                        # A savepoint, so a malformed edit rolls back alone and is held instead
+                        # of failing the same way on every run.
+                        with conn.transaction():
+                            cursor.execute(
+                                'SELECT apply_comment_revision(%s, %s, NULL, NULL, %s::"CommentRule")',
+                                (revision_id, ai_action == "APPROVE", rejection_rule),
+                            )
+                            row = cursor.fetchone()
+                    except psycopg.Error as e:
+                        logger.error(
+                            f"Could not apply edit {revision_id}: {e}; holding it"
+                        )
+                        row = None
+                    if not row or not row[0]:
+                        outcome = "HOLD"
+                cursor.execute(
+                    """
+                    UPDATE "CommentRevision"
+                    SET "aiAction" = %s::"ModerationAction", "aiDecidedAt" = NOW(), "aiReasoning" = %s
+                    WHERE id = %s AND (status = 'PENDING' OR "decidedById" IS NULL)
+                    """,
+                    (outcome, ai_reasoning, revision_id),
+                )
+                return outcome
+
+
+def get_moderation_context(
+    comment_id: int, content: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     """Fetch the structured moderation context for a comment.
 
     Delegates to the SQL function get_comment_moderation_context, which returns a
@@ -1076,94 +1066,16 @@ def get_moderation_context(comment_id: int) -> Optional[Dict[str, Any]]:
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
-                    "SELECT get_comment_moderation_context(%s)::text",
-                    (comment_id,),
+                    "SELECT get_comment_moderation_context(%s, %s)::text",
+                    (comment_id, content),
                 )
                 row = cursor.fetchone()
                 if not row or row[0] is None:
                     return None
-                import json
-
                 return json.loads(row[0])
     except Exception as e:
         logger.error(f"Error fetching moderation context for comment {comment_id}: {e}")
         return None
-
-
-def get_max_comment_updated_at(
-    service_id: int, status: str = "APPROVED"
-) -> Optional[datetime]:
-    """
-    Get the maximum 'updatedAt' timestamp for comments of a specific service and status.
-
-    Args:
-        service_id: The ID of the service.
-        status: The status of comments to consider.
-
-    Returns:
-        The maximum 'updatedAt' timestamp as a datetime object, or None if no matching comments.
-    """
-    max_updated_at = None
-    try:
-        with get_db_connection() as conn:
-            with (
-                conn.cursor() as cursor
-            ):  # dict_row not strictly needed for single value
-                cursor.execute(
-                    """
-                    SELECT MAX("updatedAt") 
-                    FROM "Comment"
-                    WHERE "serviceId" = %s AND status = %s
-                    """,
-                    (service_id, status),
-                )
-                result = cursor.fetchone()
-                if result and result[0] is not None:
-                    max_updated_at = result[0]
-    except Exception as e:
-        logger.error(
-            f"Error fetching max comment updatedAt for service {service_id} with status {status}: {e}"
-        )
-    return max_updated_at
-
-
-def save_user_sentiment(
-    service_id: int,
-    sentiment: Optional[CommentSentimentSummaryType],
-    last_processed_comment_timestamp: Optional[datetime],
-):
-    """
-    Save user sentiment for a specific service and the timestamp of the last comment processed.
-
-    Args:
-        service_id: The ID of the service.
-        sentiment: A dictionary containing the sentiment data, or None to clear it.
-        last_processed_comment_timestamp: The 'updatedAt' timestamp of the most recent comment
-                                          considered in this sentiment analysis. Can be None.
-    """
-    try:
-        sentiment_json = json.dumps(sentiment) if sentiment is not None else None
-        with get_db_connection() as conn:
-            with conn.cursor() as cursor:  # row_factory not needed for UPDATE
-                cursor.execute(
-                    """
-                    UPDATE "Service" 
-                    SET "userSentiment" = %s, "userSentimentAt" = %s
-                    WHERE id = %s
-                    """,
-                    (sentiment_json, last_processed_comment_timestamp, service_id),
-                )
-                conn.commit()
-                if sentiment:
-                    logger.info(
-                        f"Successfully saved user sentiment for service {service_id} with last comment processed at {last_processed_comment_timestamp}"
-                    )
-                else:
-                    logger.info(
-                        f"Successfully cleared user sentiment for service {service_id}, last comment processed at set to {last_processed_comment_timestamp}"
-                    )
-    except Exception as e:
-        logger.error(f"Error saving user sentiment for service {service_id}: {e}")
 
 
 def apply_ai_moderation_decision(
@@ -1176,101 +1088,63 @@ def apply_ai_moderation_decision(
     ai_brigade_confidence: int,
     ai_signals: Optional[Dict[str, Any]],
     ai_reasoning: str,
-    rating_muted: bool,
-    rating_mute_reason: Optional[str],
-    public_note: Optional[str],
+    rejection_rule: Optional[str],
+    expected_version: int,
+    sentiment: Optional[str] = None,
+    kind: Optional[str] = None,
 ) -> bool:
-    """Persist the AI verdict to a comment row.
-
-    Writes the ai* audit columns (never overwritten by humans), the status
-    derived from ai_action, and the rating mute state when applicable.
-    adminNote is left to moderators. publicNote is only touched when the AI
-    returns a new value; we never clear an existing publicNote when the LLM
-    has nothing to add (a prior AI run or a moderator may have set it). Status is set
-    directly; the BEFORE-WRITE rating-trust trigger picks up ratingMuted /
-    ratingMuteReason changes automatically. Returns True on success.
-    """
-    import json as _json
-
-    base_assignments = [
-        '"status" = %(status)s::"CommentStatus"',
-        '"aiDecidedAt" = NOW()',
-        '"aiAction" = %(aiAction)s::"ModerationAction"',
-        '"aiQuality" = %(aiQuality)s',
-        '"aiIsSpam" = %(aiIsSpam)s',
-        '"aiIsBrigade" = %(aiIsBrigade)s',
-        '"aiBrigadeConfidence" = %(aiBrigadeConfidence)s',
-        '"aiSignals" = %(aiSignals)s::jsonb',
-        '"aiReasoning" = %(aiReasoning)s',
-        '"ratingMuted" = %(ratingMuted)s',
-        '"ratingMuteReason" = %(ratingMuteReason)s::"RatingMuteReason"',
-        '"updatedAt" = NOW()',
-    ]
-
-    params: Dict[str, Any] = {
-        "id": comment_id,
-        "status": status,
-        "aiAction": ai_action,
-        "aiQuality": ai_quality,
-        "aiIsSpam": ai_is_spam,
-        "aiIsBrigade": ai_is_brigade,
-        "aiBrigadeConfidence": ai_brigade_confidence,
-        "aiSignals": _json.dumps(ai_signals) if ai_signals else None,
-        "aiReasoning": ai_reasoning,
-        "ratingMuted": rating_muted,
-        "ratingMuteReason": rating_mute_reason,
-    }
-
-    if public_note is not None:
-        base_assignments.append('"publicNote" = %(publicNote)s')
-        params["publicNote"] = public_note
-
-    sql = f'UPDATE "Comment" SET {", ".join(base_assignments)} WHERE id = %(id)s'
-
-    # When the moderated comment is a root review (rating set, no parent),
-    # recompute which of the author's ratings on this service is active.
-    # Mirrors the web app's refreshActiveRatingForUserService.
-    refresh_active_sql = """
-        UPDATE "Comment"
-        SET "ratingActive" = COALESCE((id = (
-            SELECT id FROM "Comment"
-            WHERE "authorId" = %s
-              AND "serviceId" = %s
-              AND "parentId" IS NULL
-              AND rating IS NOT NULL
-              AND status IN ('APPROVED', 'VERIFIED')
-              AND "ratingMuted" = false
-            ORDER BY "createdAt" DESC, id DESC
-            LIMIT 1
-        )), false)
-        WHERE "authorId" = %s
-          AND "serviceId" = %s
-          AND "parentId" IS NULL
-          AND rating IS NOT NULL
-    """
-
+    if sentiment not in (None, "POSITIVE", "NEUTRAL", "NEGATIVE"):
+        return False
+    if kind not in (None, "EXPERIENCE", "DISCUSSION", "UNCLASSIFIED"):
+        return False
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute(sql, params)
                 cursor.execute(
-                    'SELECT "authorId", "serviceId", "parentId", rating '
-                    'FROM "Comment" WHERE id = %s',
-                    (comment_id,),
+                    """
+                    UPDATE "Comment" SET status=%s::"CommentStatus", "aiDecidedAt"=NOW(),
+                      "aiAction"=%s::"ModerationAction", "aiQuality"=%s, "aiIsSpam"=%s,
+                      "aiIsBrigade"=%s, "aiBrigadeConfidence"=%s, "aiSignals"=%s::jsonb,
+                      "aiReasoning"=%s, "aiDecisionReason"=%s::"CommentRule", "updatedAt"=NOW(),
+                      kind=CASE WHEN kind='UNCLASSIFIED' AND "parentId" IS NULL
+                        THEN COALESCE(%s::"CommentKind", kind) ELSE kind END
+                    WHERE id=%s AND version=%s AND status='PENDING'
+                      AND "humanAction" IS NULL AND "aiDecidedAt" IS NULL
+                    RETURNING kind, "parentId"
+                    """,
+                    (
+                        status,
+                        ai_action,
+                        ai_quality,
+                        ai_is_spam,
+                        ai_is_brigade,
+                        ai_brigade_confidence,
+                        json.dumps(ai_signals),
+                        ai_reasoning,
+                        rejection_rule,
+                        kind,
+                        comment_id,
+                        expected_version,
+                    ),
                 )
                 row = cursor.fetchone()
-                if row:
-                    author_id, service_id, parent_id, rating = row
-                    if parent_id is None and rating is not None:
-                        cursor.execute(
-                            refresh_active_sql,
-                            (author_id, service_id, author_id, service_id),
-                        )
+                if row is None:
+                    conn.rollback()
+                    return False
+                if row[0] == "EXPERIENCE" and row[1] is None:
+                    cursor.execute(
+                        """INSERT INTO "CommentExperience" ("commentId", sentiment, "sentimentSource", "classifiedAt")
+                        VALUES (%s, %s::"ExperienceSentiment", CASE WHEN %s::text IS NULL THEN NULL ELSE 'AI'::"SentimentSource" END, NOW())
+                        ON CONFLICT ("commentId") DO UPDATE SET sentiment=EXCLUDED.sentiment,
+                          "sentimentSource"=EXCLUDED."sentimentSource", "classifiedAt"=NOW()
+                        WHERE "CommentExperience".sentiment IS NULL AND "CommentExperience"."sentimentSource" IS NULL""",
+                        (comment_id, sentiment, sentiment),
+                    )
                 conn.commit()
                 return True
-    except Exception as e:
+    except Exception as error:
         logger.error(
-            f"Error applying AI moderation decision for comment {comment_id}: {e}"
+            f"Error applying moderation for comment {comment_id}: {type(error).__name__}"
         )
         return False
 
@@ -1317,6 +1191,13 @@ def run_db_query(query: Any, params: Optional[Any] = None) -> List[Dict[str, Any
     except Exception as e:
         logger.error(f"Error running query: {e}")
     return results
+
+
+def delete_user_account(user_id: int) -> None:
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT delete_user_account(%s::int)", (user_id,))
+        conn.commit()
 
 
 def execute_db_command(command: str, params: Optional[Any] = None) -> int:

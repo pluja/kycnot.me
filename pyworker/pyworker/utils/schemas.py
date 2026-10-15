@@ -128,6 +128,24 @@ def _validate_deep_scan(data: dict[str, Any]) -> None:
             )
 
 
+# COMMENT_RULES mirrors the CommentRule enum in web/prisma/schema.prisma.
+COMMENT_RULES = frozenset(
+    {
+        "SPAM",
+        "SCAM_CONTACT",
+        "HARASSMENT",
+        "SLUR",
+        "PRIVATE_INFO",
+        "NOT_GENUINE",
+        "DUPLICATE",
+        "NO_LONGER_APPLIES",
+        "OFF_TOPIC",
+        "NOT_ENOUGH_DETAIL",
+        "OTHER",
+    }
+)
+
+
 def _validate_comment_moderation(data: dict[str, Any]) -> None:
     required = {
         "recommendedAction",
@@ -136,27 +154,37 @@ def _validate_comment_moderation(data: dict[str, Any]) -> None:
         "isSpam",
         "isBrigade",
         "brigadeConfidence",
-        "ratingShouldBeDisabled",
-        "contextNote",
     }
     missing = required - data.keys()
     if missing:
         raise ValueError(f"Missing required fields: {missing}")
+
+    if data.get("experienceSentiment") not in (None, "POSITIVE", "NEUTRAL", "NEGATIVE"):
+        raise ValueError("Invalid experience sentiment")
+    if data.get("postKind") not in (None, "EXPERIENCE", "DISCUSSION", "UNCLASSIFIED"):
+        raise ValueError("Invalid post kind")
 
     if data["recommendedAction"] not in ("approve", "reject", "human_review"):
         raise ValueError(
             f"recommendedAction must be approve|reject|human_review, got {data['recommendedAction']!r}"
         )
 
-    for bool_field in ("isSpam", "isBrigade", "ratingShouldBeDisabled"):
+    if not isinstance(data.get("rejectionConfident", False), bool):
+        raise ValueError("rejectionConfident must be a bool")
+    if data.get("rejectionRule") not in (None, *COMMENT_RULES):
+        raise ValueError(f"Invalid rejectionRule {data['rejectionRule']!r}")
+
+    if not isinstance(data.get("looksGenerated", False), bool):
+        raise ValueError("looksGenerated must be a bool")
+
+    for bool_field in ("isSpam", "isBrigade"):
         if not isinstance(data[bool_field], bool):
             raise ValueError(
                 f"{bool_field} must be a bool, got {type(data[bool_field])}"
             )
 
-    for str_field in ("reasoning", "contextNote"):
-        if not isinstance(data[str_field], str):
-            raise ValueError(f"{str_field} must be a string")
+    if not isinstance(data["reasoning"], str):
+        raise ValueError("reasoning must be a string")
 
     quality = data["commentQuality"]
     if not isinstance(quality, int) or quality not in range(11):
@@ -170,25 +198,6 @@ def _validate_comment_moderation(data: dict[str, Any]) -> None:
         raise ValueError("isSpam cannot be true when recommendedAction is approve")
     if data["isBrigade"] and confidence == 0:
         raise ValueError("isBrigade cannot be true when brigadeConfidence is 0")
-
-
-def _validate_comment_sentiment(data: dict[str, Any]) -> None:
-    required = {"summary", "sentiment", "whatUsersLike", "whatUsersDislike"}
-    missing = required - data.keys()
-    if missing:
-        raise ValueError(f"Missing required fields: {missing}")
-
-    if not isinstance(data["summary"], str):
-        raise ValueError("summary must be a string")
-
-    if data["sentiment"] not in ("positive", "negative", "neutral"):
-        raise ValueError(
-            f"sentiment must be positive|negative|neutral, got {data['sentiment']!r}"
-        )
-
-    for list_field in ("whatUsersLike", "whatUsersDislike"):
-        if not isinstance(data[list_field], list):
-            raise ValueError(f"{list_field} must be a list")
 
 
 TOS_CHECK = PromptSchema(
@@ -301,8 +310,10 @@ DEEP_SCAN = PromptSchema(
 )
 
 COMMENT_MOD = PromptSchema(
-    ts_type="""interface CommentModeration {
-  /** Top-level decision. Server may downgrade approve -> human_review when hard gates apply (privateProof present, strictCommentingEnabled on a root review, kycIssueClaimed, fundsBlockedClaimed, high-confidence brigade). Reject and human_review are always honored. */
+    ts_type="""type CommentModeration = {
+  experienceSentiment: "POSITIVE" | "NEUTRAL" | "NEGATIVE" | null;
+  postKind: "EXPERIENCE" | "DISCUSSION" | "UNCLASSIFIED";
+  /** Top-level decision. Server may downgrade approve -> human_review when hard gates apply (strict mode, unproven claims of harm, reused or off-format order IDs, new-account waves, generated text, spam, high-confidence brigade). Reject and human_review are always honored. */
   recommendedAction: 'approve' | 'reject' | 'human_review';
   /** 1-3 sentences, internal-only. Cite the specific signals you used. */
   reasoning: string;
@@ -314,20 +325,12 @@ COMMENT_MOD = PromptSchema(
   isBrigade: boolean;
   /** 0=no signal, 5=certain. Must be > 0 when isBrigade=true. */
   brigadeConfidence: 0|1|2|3|4|5;
-  /** Only meaningful for root reviews with a rating. The comment may stay approved while the star rating is killed. */
-  ratingShouldBeDisabled: boolean;
-  /** User-visible. Empty string when no note is needed. */
-  contextNote: string;
+  /** True when the text reads as machine-generated or follows a template seen in other posts, positive or negative. */
+  looksGenerated: boolean;
+  /** True only when the post plainly breaks rejectionRule and no innocent reading fits. */
+  rejectionConfident: boolean;
+  /** The rule the post breaks when recommendedAction is reject, otherwise null. */
+  rejectionRule: 'SPAM' | 'SCAM_CONTACT' | 'HARASSMENT' | 'SLUR' | 'PRIVATE_INFO' | 'NOT_GENUINE' | 'DUPLICATE' | 'NO_LONGER_APPLIES' | 'OFF_TOPIC' | 'NOT_ENOUGH_DETAIL' | 'OTHER' | null;
 }""",
     validate=_validate_comment_moderation,
-)
-
-COMMENT_SEN = PromptSchema(
-    ts_type="""interface CommentSummary {
-  summary: string; // 1-2 sentences, 50 words max, no markdown
-  sentiment: 'positive'|'negative'|'neutral';
-  whatUsersLike: string[]; // 0-5 items, 1-3 words each, prefer 3 or fewer
-  whatUsersDislike: string[]; // 0-5 items, 1-3 words each, prefer 3 or fewer
-}""",
-    validate=_validate_comment_sentiment,
 )

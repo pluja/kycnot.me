@@ -23,11 +23,11 @@ from pyworker.scheduler import TaskScheduler
 from .tasks import (
     CommentModerationTask,
     ContactCleanupTask,
+    SuggestionCleanupTask,
     DeepScanTask,
     ForceTriggersTask,
     InactiveUsersTask,
     ServiceScoreRecalculationTask,
-    UserSentimentTask,
 )
 from pyworker.tasks.deep_scan import REVIEWABLE_STATUSES
 from pyworker.utils.app_logging import configure_logging
@@ -40,6 +40,7 @@ _TASKS_WITHOUT_SCHEDULER_INSTANCE = {
     "deep_scan",
     "scan_sweep",
     "service_score_recalc_all",
+    "suggestion_cleanup",
 }
 
 
@@ -92,13 +93,12 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     # Add subparsers for different tasks
     subparsers = parser.add_subparsers(dest="task", help="Task to run")
 
-    # User sentiment task
-    sentiment_parser = subparsers.add_parser(
-        "sentiment", help="Analyze user sentiment from comments"
+    classification_parser = subparsers.add_parser(
+        "classify-experiences",
+        help="Classify historical posts without changing moderation",
     )
-    sentiment_parser.add_argument(
-        "--service-id", type=int, help="Specific service ID to process (optional)"
-    )
+    classification_parser.add_argument("--limit", type=int, default=100)
+    classification_parser.add_argument("--after-id", type=int, default=0)
 
     # Comment moderation task
     moderation_parser = subparsers.add_parser(
@@ -149,6 +149,16 @@ def parse_args(args: List[str]) -> argparse.Namespace:
         help="Delete resolved contact threads past their 30-day retention window",
     )
 
+    cleanup_parser = subparsers.add_parser(
+        "suggestion-cleanup",
+        help="Withdraw stale pending suggestions: dead sites, no reply, already listed",
+    )
+    cleanup_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Check and list what would be closed without changing anything",
+    )
+
     sweep_parser = subparsers.add_parser(
         "scan-sweep",
         help="Scan services whose legal documents changed since their last scan",
@@ -186,52 +196,6 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     )
 
     return parser.parse_args(args)
-
-
-def run_sentiment_task(
-    service_id: Optional[int] = None, close_pool: bool = True
-) -> int:
-    """
-    Run the user sentiment analysis task.
-
-    Args:
-        service_id: Optional specific service ID to process.
-
-    Returns:
-        Exit code.
-    """
-    logger.info("Starting user sentiment analysis task")
-
-    try:
-        # Fetch services
-        services = fetch_all_services()
-        if not services:
-            logger.error("No services found")
-            return 1
-
-        # Filter by service ID if specified
-        if service_id:
-            services = [s for s in services if s["id"] == service_id]
-            if not services:
-                logger.error(f"Service with ID {service_id} not found")
-                return 1
-
-        # Initialize task and use as context manager
-        with UserSentimentTask() as task:  # type: ignore
-            # Process services using the same database connection
-            for service in services:
-                result = task.run(service)  # type: ignore
-                if result is not None:
-                    logger.info(
-                        f"Successfully analyzed sentiment for service {service['name']}"
-                    )
-
-        logger.info("User sentiment analysis task completed")
-        return 0
-    finally:
-        if close_pool:
-            # Ensure connection pool is closed even if an error occurs
-            close_db_pool()
 
 
 def run_moderation_task(
@@ -543,7 +507,7 @@ def run_deep_scan_task(
 
                 job_id = int(job["id"])
                 job_service_id = int(job["serviceId"])
-                job_kind = str(job.get("kind") or "DEEP_SCAN")
+                job_kind = str(job["kind"])
                 logger.info(
                     f"Claimed {job_kind} job {job_id} for service {job_service_id}"
                 )
@@ -622,6 +586,20 @@ def run_contact_cleanup_task(close_pool: bool = True) -> int:
             close_db_pool()
 
 
+def run_suggestion_cleanup_task(close_pool: bool = True, dry_run: bool = False) -> int:
+    logger.info("Starting suggestion cleanup task%s", " (dry run)" if dry_run else "")
+    try:
+        with SuggestionCleanupTask(dry_run=dry_run) as task:  # type: ignore
+            task.run()  # type: ignore
+        return 0
+    except Exception as e:
+        logger.exception(f"Error running suggestion cleanup task: {e}")
+        return 1
+    finally:
+        if close_pool:
+            close_db_pool()
+
+
 def run_worker_mode() -> int:
     """
     Run in worker mode, scheduling tasks to run periodically.
@@ -646,11 +624,11 @@ def run_worker_mode() -> int:
         logger.info("Disabled cron task schedules: %s", ", ".join(disabled_task_names))
 
     task_callables: dict[str, Any] = {
-        "user_sentiment": partial(run_sentiment_task, close_pool=False),
         "comment_moderation": partial(run_moderation_task, close_pool=False),
         "force_triggers": partial(run_force_triggers_task, close_pool=False),
         "inactive_users": partial(run_inactive_users_task, close_pool=False),
         "contact_cleanup": partial(run_contact_cleanup_task, close_pool=False),
+        "suggestion_cleanup": partial(run_suggestion_cleanup_task, close_pool=False),
         "service_score_recalc": partial(
             run_service_score_recalc_task, close_pool=False
         ),
@@ -716,8 +694,10 @@ def main() -> int:
             return run_worker_mode()
 
         # Otherwise, run the specified task once
-        elif args.task == "sentiment":
-            return run_sentiment_task(args.service_id)
+        elif args.task == "classify-experiences":
+            from pyworker.tasks.experience_classification import classify_experiences
+
+            return classify_experiences(args.limit, args.after_id)
         elif args.task == "moderation":
             return run_moderation_task(args.service_id)
         elif args.task == "force-triggers":
@@ -732,9 +712,14 @@ def main() -> int:
             return run_inactive_users_task()
         elif args.task == "contact-cleanup":
             return run_contact_cleanup_task()
+        elif args.task == "suggestion-cleanup":
+            return run_suggestion_cleanup_task(dry_run=args.dry_run)
         elif args.task == "scan-sweep":
             return run_scan_sweep_task(args.limit)
         elif args.task == "deep-scan":
+            if args.description and args.service_id is None:
+                logger.error("--description reviews one service: pass --service-id")
+                return 1
             return run_deep_scan_task(
                 args.service_id,
                 scan_all=args.all,

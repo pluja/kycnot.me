@@ -12,11 +12,10 @@ from openai.types.chat import ChatCompletionMessageParam
 
 from pyworker.database import (
     CommentModerationType,
-    CommentSentimentSummaryType,
     DeepScanResultType,
     DescriptionResultType,
 )
-from pyworker.utils import schemas
+from pyworker.utils import description_rules, schemas
 
 _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
@@ -55,9 +54,11 @@ _PROMPT_LEGAL_CHANGE_SUMMARY = _load_prompt(
 _PROMPT_DEEP_SCAN = _load_prompt(
     "deep_scan.md", schema=schemas.DEEP_SCAN.ts_type, fields=_LEGAL_REVIEW_FIELDS
 )
-_PROMPT_DESCRIPTION = _load_prompt("description.md", schema=schemas.DESCRIPTION.ts_type)
-PROMPT_COMMENT_SENTIMENT_SUMMARY = _load_prompt(
-    "comment_sentiment.md", schema=schemas.COMMENT_SEN.ts_type
+_PROMPT_DESCRIPTION = _load_prompt(
+    "description.md",
+    schema=schemas.DESCRIPTION.ts_type,
+    max_sentences=str(description_rules.MAX_SENTENCES),
+    max_length=str(description_rules.MAX_LENGTH),
 )
 _PROMPT_COMMENT_MODERATION = _load_prompt(
     "comment_moderation.md", schema=schemas.COMMENT_MOD.ts_type
@@ -72,8 +73,9 @@ client = OpenAI(
 
 def query_openai_json(
     messages: List[ChatCompletionMessageParam],
-    model: str = os.environ.get("OPENAI_MODEL", "deepseek-chat-cheaper"),
+    model: str | None = None,
 ) -> Dict[str, Any]:
+    model = model or os.environ["OPENAI_MODEL"]
     max_retries = int(os.environ.get("OPENAI_RETRY", 3))
     retry_delay = 30
     last_error = None
@@ -146,9 +148,7 @@ def prompt_check_tos_review(content: str) -> TosReviewCheck:
 
     result_dict = query_openai_json(
         messages,
-        model=os.environ.get(
-            "OPENAI_MODEL_FAST", "openai/gemini-2.5-flash-preview-05-20"
-        ),
+        model=os.environ.get("OPENAI_MODEL_FAST") or os.environ["OPENAI_MODEL"],
     )
 
     schemas.TOS_CHECK.validate(result_dict)
@@ -262,17 +262,6 @@ def prompt_description(
     result_dict = query_openai_json(messages)
     schemas.DESCRIPTION.validate(result_dict)
     return cast(DescriptionResultType, result_dict)
-
-
-def prompt_comment_sentiment_summary(content: str) -> CommentSentimentSummaryType:
-    messages: List[ChatCompletionMessageParam] = [
-        {"role": "system", "content": PROMPT_COMMENT_SENTIMENT_SUMMARY},
-        {"role": "user", "content": content},
-    ]
-
-    result_dict = query_openai_json(messages)
-    schemas.COMMENT_SEN.validate(result_dict)
-    return cast(CommentSentimentSummaryType, result_dict)
 
 
 def prompt_comment_moderation(content: str) -> CommentModerationType:

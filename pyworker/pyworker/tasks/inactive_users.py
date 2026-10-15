@@ -5,7 +5,7 @@ Task for handling inactive users - sending deletion warnings and cleaning up acc
 from datetime import datetime, timedelta, date
 from typing import Any, Dict
 
-from pyworker.database import execute_db_command, run_db_query
+from pyworker.database import delete_user_account, execute_db_command, run_db_query
 from pyworker.tasks.base import Task
 
 
@@ -64,9 +64,9 @@ class InactiveUsersTask(Task):
         A user is considered inactive if:
         - Account was created more than 1 year ago
         - Has 0 karma
-        - Has no comments, comment votes, or service suggestions
+        - Has no comments or service suggestions
         - Is not scheduled for deletion already
-        - Is not an admin or moderator
+        - Is not an admin and holds no capabilities
         """
         one_year_ago = datetime.now() - timedelta(days=365)
         deletion_date = date.today() + timedelta(days=30)  # 30 days from today
@@ -81,13 +81,10 @@ class InactiveUsersTask(Task):
             WHERE u."createdAt" < %s
                 AND u."scheduledDeletionAt" IS NULL
                 AND u."admin" = false
-                AND u."moderator" = false
+                AND cardinality(u.capabilities) = 0
                 AND u."totalKarma" = 0
                 AND NOT EXISTS (
                     SELECT 1 FROM "Comment" c WHERE c."authorId" = u."id"
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM "CommentVote" cv WHERE cv."userId" = u."id"
                 )
                 AND NOT EXISTS (
                     SELECT 1 FROM "ServiceSuggestion" ss WHERE ss."userId" = u."id"
@@ -126,7 +123,7 @@ class InactiveUsersTask(Task):
             FROM "User" u
             WHERE u."scheduledDeletionAt" = %s
                 AND u."admin" = false
-                AND u."moderator" = false
+                AND cardinality(u.capabilities) = 0
                 AND u."totalKarma" = 0
                 AND NOT EXISTS (
                     SELECT 1 FROM "Notification" n 
@@ -139,11 +136,6 @@ class InactiveUsersTask(Task):
                     SELECT 1 FROM "Comment" c 
                     WHERE c."authorId" = u."id" 
                         AND c."createdAt" > (u."scheduledDeletionAt" - INTERVAL '30 days')
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM "CommentVote" cv 
-                    WHERE cv."userId" = u."id" 
-                        AND cv."createdAt" > (u."scheduledDeletionAt" - INTERVAL '30 days')
                 )
                 AND NOT EXISTS (
                     SELECT 1 FROM "ServiceSuggestion" ss 
@@ -186,18 +178,13 @@ class InactiveUsersTask(Task):
         FROM "User" u
         WHERE u."scheduledDeletionAt" <= %s
             AND u."admin" = false
-            AND u."moderator" = false
+            AND cardinality(u.capabilities) = 0
             AND u."totalKarma" = 0
             -- Double-check they're still inactive
             AND NOT EXISTS (
                 SELECT 1 FROM "Comment" c 
                 WHERE c."authorId" = u."id" 
                     AND c."createdAt" > (u."scheduledDeletionAt" - INTERVAL '30 days')
-            )
-            AND NOT EXISTS (
-                SELECT 1 FROM "CommentVote" cv 
-                WHERE cv."userId" = u."id" 
-                    AND cv."createdAt" > (u."scheduledDeletionAt" - INTERVAL '30 days')
             )
             AND NOT EXISTS (
                 SELECT 1 FROM "ServiceSuggestion" ss 
@@ -211,9 +198,7 @@ class InactiveUsersTask(Task):
 
         for user in users_to_delete:
             try:
-                # Delete the user (this will cascade and delete related records)
-                delete_query = 'DELETE FROM "User" WHERE "id" = %s'
-                execute_db_command(delete_query, (user["id"],))
+                delete_user_account(user["id"])
                 deleted_count += 1
 
                 self.logger.info(
@@ -243,11 +228,6 @@ class InactiveUsersTask(Task):
                     SELECT 1 FROM "Comment" c 
                     WHERE c."authorId" = "User"."id" 
                         AND c."createdAt" > ("User"."scheduledDeletionAt" - INTERVAL '30 days')
-                )
-                OR EXISTS (
-                    SELECT 1 FROM "CommentVote" cv 
-                    WHERE cv."userId" = "User"."id" 
-                        AND cv."createdAt" > ("User"."scheduledDeletionAt" - INTERVAL '30 days')
                 )
                 OR EXISTS (
                     SELECT 1 FROM "ServiceSuggestion" ss 

@@ -1,42 +1,16 @@
-"""
-Automated moderation for pending comments.
-
-For each pending comment, fetch the structured moderation context via the
-get_comment_moderation_context SQL function, ask the LLM for a decision, then
-apply server-side hard gates before writing the verdict.
-
-Hard gates block auto-APPROVE but let REJECT pass through. Trash content
-shouldn't sit in a queue just because it can't be auto-approved.
-- the comment has a private proof (needs human verification)
-- the service has strictCommentingEnabled AND this is a root review
-  (replies don't need proof; strict-commenting only governs new reviews)
-- the user flagged KYC_REQUESTED or FUNDS_BLOCKED
-- the AI detected a brigade with confidence >= 4 (rating gets auto-muted)
-- the AI flags a rating as illegitimate on subjective grounds with no
-  concrete signal: the rating is NOT auto-muted, the comment is escalated
-  to a human who decides (mirrors how proof/funds-blocked claims escalate)
-
-Outcomes map to columns:
-- recommendedAction -> aiAction (APPROVE / REJECT / HOLD)
-- aiAction -> status (APPROVED / REJECTED / PENDING) unless overridden by hard gate
-- isBrigade && confidence >= 4 -> ratingMuted=true + ratingMuteReason=SUSPICIOUS_PATTERN
-- isSpam -> ratingMuted=true + ratingMuteReason=TEMPLATE_SPAM (drives the
-  "Potential SPAM" collapse + bottom-sort on the public side; brigade wins
-  over spam when both are set because brigade is the more specific signal)
-- ratingShouldBeDisabled auto-mutes ONLY with a concrete basis: an affiliated
-  self-rating (AUTHOR_AFFILIATED), negative karma (AUTHOR_LOW_TRUST), or a
-  brigade cluster (SUSPICIOUS_PATTERN). With no such signal the AI does not
-  get to mute a genuine user's rating; the comment goes to human review.
-"""
+"""Moderate pending public posts without sending private evidence to AI."""
 
 import json
+from difflib import SequenceMatcher
 from datetime import datetime
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping
 
 from pyworker.database import (  # type: ignore
+    apply_ai_edit_decision,
     apply_ai_moderation_decision,
     get_moderation_context,
     get_pending_comments,
+    get_pending_revisions,
 )
 from pyworker.tasks.base import Task  # type: ignore
 from pyworker.utils.ai import prompt_comment_moderation
@@ -63,38 +37,23 @@ class _DateTimeEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-def _pick_mute_reason(
-    ai_result: Mapping[str, Any],
-    context: Mapping[str, Any],
-    is_brigade_hard_gate: bool,
-) -> Optional[str]:
-    # A rating is auto-muted only when there is a concrete, checkable basis.
-    # Brigade is the most specific signal and wins, then spam (a content
-    # judgement independent of the author), then author-level facts
-    # (affiliated self-rating, negative karma). When the AI flags
-    # ratingShouldBeDisabled on subjective grounds alone, there is no concrete
-    # basis: return None so the caller escalates to a human instead of letting
-    # the AI silently mute a genuine user's rating.
-    if is_brigade_hard_gate:
-        return "SUSPICIOUS_PATTERN"
-    if ai_result.get("isSpam"):
-        return "TEMPLATE_SPAM"
-    if not ai_result.get("ratingShouldBeDisabled"):
-        return None
-    author = context["comment"]["author"]
-    if author.get("isServiceAffiliated"):
-        return "AUTHOR_AFFILIATED"
-    karma = author.get("totalKarma")
-    if karma is not None and karma < 0:
-        return "AUTHOR_LOW_TRUST"
-    if int(ai_result.get("brigadeConfidence", 0)) >= 2:
-        return "SUSPICIOUS_PATTERN"
-    return None
+# Claims of harm a post may only make with proof (requiresProof in web/src/constants/commentIssueTypes.ts).
+# They go live once a moderator accepts that proof; other posts never wait for a proof check.
+_HARM_CLAIMS = frozenset({"KYC_REQUESTED", "FUNDS_BLOCKED"})
+CLAIM_GATE_REASON = "claim awaiting a proof check"
+
+# Rejections for these rules count against the author's trust (web/prisma/triggers/18_user_trust.sql).
+_PENALIZING_RULES = frozenset(
+    {"SPAM", "SCAM_CONTACT", "HARASSMENT", "SLUR", "PRIVATE_INFO", "NOT_GENUINE"}
+)
+# The AI applies only these on its own, and only when sure; a person judges every other strike.
+_CLEAR_CUT_RULES = frozenset({"SPAM", "SCAM_CONTACT", "SLUR", "PRIVATE_INFO"})
 
 
 def _decide(ai_result: Mapping[str, Any], context: Mapping[str, Any]) -> Dict[str, Any]:
     """Combine the AI recommendation with server-side hard gates."""
     submission = context["comment"]["submission"]
+    author = context["comment"]["author"]
     service = context["service"]
 
     is_high_conf_brigade = (
@@ -102,36 +61,47 @@ def _decide(ai_result: Mapping[str, Any], context: Mapping[str, Any]) -> Dict[st
         and int(ai_result["brigadeConfidence"]) >= _BRIGADE_HARD_GATE_CONFIDENCE
     )
 
-    is_root_review = bool(submission.get("isRootReview"))
-
-    # Decide the rating outcome first. A concrete basis auto-mutes; a purely
-    # subjective ratingShouldBeDisabled (no affiliation / karma / brigade
-    # signal) does NOT auto-mute and instead escalates the comment to a human.
-    rating_mute_reason = _pick_mute_reason(ai_result, context, is_high_conf_brigade)
-    rating_muted = rating_mute_reason is not None
-    subjective_rating_flag = (
-        bool(ai_result.get("ratingShouldBeDisabled")) and rating_mute_reason is None
-    )
-
     hard_gate_reasons: List[str] = []
-    if submission.get("hasPrivateProof"):
-        hard_gate_reasons.append("private proof present")
-    if service.get("strictCommentingEnabled") and is_root_review:
+    if ai_result.get("isSpam"):
+        hard_gate_reasons.append("spam flag needs a consistent publication decision")
+    if service.get("strictCommentingEnabled"):
         hard_gate_reasons.append("strict commenting")
-    if submission.get("kycIssueClaimed"):
-        hard_gate_reasons.append("kyc issue claimed")
-    if submission.get("fundsBlockedClaimed"):
-        hard_gate_reasons.append("funds blocked claimed")
+    if _HARM_CLAIMS.intersection(submission.get("issues") or []) and not submission.get(
+        "hasAcceptedProof"
+    ):
+        hard_gate_reasons.append(CLAIM_GATE_REASON)
+    # A change of sentiment, outcome or problems is how pressure to soften a review shows up, so a person
+    # always confirms it. Text-only edits stay with the AI.
+    if submission.get("changesVerdict"):
+        hard_gate_reasons.append("update changes the experience verdict")
+    for flag, reason in (
+        ("proofIdReused", "order ID used on another post"),
+        ("proofIdOffFormat", "order ID does not match the service format"),
+        ("newAccountWave", "wave of new-account posts"),
+    ):
+        if submission.get(flag):
+            hard_gate_reasons.append(reason)
+    if ai_result.get("looksGenerated"):
+        hard_gate_reasons.append("text looks generated or templated")
     if is_high_conf_brigade:
         hard_gate_reasons.append(
             f"brigade confidence {ai_result['brigadeConfidence']}/5"
         )
-    if subjective_rating_flag:
-        hard_gate_reasons.append("rating integrity (needs human review)")
+    if (author.get("trust") or {}).get("postingDisabled"):
+        hard_gate_reasons.append("author's posting is disabled")
+    if (author.get("trust") or {}).get("isUntrusted"):
+        hard_gate_reasons.append("author has recent penalized rejections")
 
     hard_gate_reason = ", ".join(hard_gate_reasons)
     recommended_action = ai_result["recommendedAction"]
 
+    # Proof or a tagged claim is a first-hand specific, so the AI never rejects such a post on its own for lack of detail.
+    if (
+        recommended_action == "reject"
+        and ai_result.get("rejectionRule") == "NOT_ENOUGH_DETAIL"
+        and (submission.get("hasPrivateProof") or submission.get("issues"))
+    ):
+        recommended_action = "human_review"
     # Hard gates only block auto-APPROVE. REJECT and HOLD pass through so
     # obvious trash gets removed and explicit human-review requests don't
     # get masked behind a generic "hard gate" hold.
@@ -142,17 +112,34 @@ def _decide(ai_result: Mapping[str, Any], context: Mapping[str, Any]) -> Dict[st
         status = _ACTION_TO_STATUS[recommended_action]
         ai_action_enum = _ACTION_TO_ENUM[recommended_action]
 
-    public_note = ai_result.get("contextNote") or None
-    if public_note is not None and not public_note.strip():
-        public_note = None
+    # A rejection records which rule it broke, so it can count against the author's trust.
+    rejection_rule = None
+    if status == "REJECTED":
+        fallback_rule = "SPAM" if ai_result.get("isSpam") else "OTHER"
+        rejection_rule = ai_result.get("rejectionRule") or fallback_rule
+        clear_cut = (
+            rejection_rule in _CLEAR_CUT_RULES
+            and ai_result.get("rejectionConfident") is True
+        )
+        if rejection_rule in _PENALIZING_RULES and not clear_cut:
+            hard_gate_reason = ", ".join(
+                filter(
+                    None,
+                    [
+                        hard_gate_reason,
+                        f"possible {rejection_rule.lower().replace('_', ' ')}",
+                    ],
+                )
+            )
+            status, ai_action_enum, rejection_rule = "PENDING", "HOLD", None
 
     ai_signals = {
         "recommendedAction": ai_result["recommendedAction"],
         "isSpam": bool(ai_result["isSpam"]),
         "isBrigade": bool(ai_result["isBrigade"]),
         "brigadeConfidence": int(ai_result["brigadeConfidence"]),
+        "looksGenerated": bool(ai_result.get("looksGenerated")),
         "commentQuality": int(ai_result["commentQuality"]),
-        "ratingShouldBeDisabled": bool(ai_result["ratingShouldBeDisabled"]),
         "hardGateReason": hard_gate_reason or None,
     }
 
@@ -160,11 +147,98 @@ def _decide(ai_result: Mapping[str, Any], context: Mapping[str, Any]) -> Dict[st
         "status": status,
         "ai_action": ai_action_enum,
         "ai_signals": ai_signals,
-        "rating_muted": rating_muted,
-        "rating_mute_reason": rating_mute_reason,
-        "public_note": public_note,
+        "rejection_rule": rejection_rule,
         "hard_gate_reason": hard_gate_reason,
     }
+
+
+# An edit to a proof-checked experience waits for a moderator when more than this share of
+# the text is new: the badge vouches for the order, not for claims written after the check.
+_CHECKED_PROOF_REWRITE_SHARE = 0.5
+
+
+def _new_text_share(published: str, edited: str) -> float:
+    """Share of the longer text that the edit does not keep from the published one."""
+    longest = max(len(published), len(edited))
+    if longest == 0:
+        return 0.0
+    matcher = SequenceMatcher(None, published, edited, autojunk=False)
+    kept = sum(block.size for block in matcher.get_matching_blocks())
+    return 1 - kept / longest
+
+
+def _decide_edit(
+    ai_result: Mapping[str, Any], context: Mapping[str, Any]
+) -> Dict[str, Any]:
+    """Approve, reject or hold an edit to a published post, using the post's hard gates."""
+    decision = _decide(ai_result, context)
+    rule = decision["rejection_rule"]
+    submission = context["comment"]["submission"]
+    # A moderator is already involved, or the edit changes what kind of post this is.
+    needs_moderator = [
+        reason
+        for flag, reason in (
+            ("hasOpenReport", "the post has an open report"),
+            ("heldByModerator", "a moderator held the post"),
+            ("changesKind", "the edit changes the post type"),
+            (
+                "rewritesCheckedExperience",
+                "the edit rewrites most of a proof-checked experience",
+            ),
+        )
+        if submission.get(flag)
+    ]
+    if needs_moderator and decision["status"] == "APPROVED":
+        return {
+            "action": "HOLD",
+            "rejection_rule": None,
+            "hard_gate_reason": ", ".join(
+                filter(None, [decision["hard_gate_reason"], *needs_moderator])
+            ),
+        }
+    if decision["status"] == "APPROVED":
+        action = "APPROVE"
+    # A rejected edit leaves the published version live, so the AI rejects an edit only for a clear-cut rule.
+    elif decision["status"] == "REJECTED" and rule in _CLEAR_CUT_RULES:
+        action = "REJECT"
+    else:
+        action = "HOLD"
+    return {
+        "action": action,
+        "rejection_rule": rule if action == "REJECT" else None,
+        "hard_gate_reason": decision["hard_gate_reason"],
+    }
+
+
+def _edit_context(
+    context: Dict[str, Any], revision: Mapping[str, Any]
+) -> Dict[str, Any]:
+    """The post's moderation context with the edited text in place of the published one."""
+    comment = {**context["comment"], "content": revision["content"]}
+    comment["submission"] = {
+        **comment["submission"],
+        "kind": revision["kind"],
+        # Only claims the edit adds wait for proof; the published post already passed that gate.
+        "issues": [
+            issue
+            for issue in revision.get("editedIssues") or []
+            if issue not in (revision.get("publishedIssues") or [])
+        ],
+        "isEditOfPublishedPost": True,
+        # An edit changes neither the proof nor when the post arrived.
+        "proofIdReused": False,
+        "proofIdOffFormat": False,
+        "newAccountWave": False,
+        "changesVerdict": bool(revision["changesVerdict"]),
+        "experienceHasCheckedProof": bool(revision["experienceHasCheckedProof"]),
+        "changesKind": bool(revision["changesKind"]),
+        "heldByModerator": bool(revision["heldByModerator"]),
+        "hasOpenReport": bool(revision["hasOpenReport"]),
+        "rewritesCheckedExperience": bool(revision["experienceHasCheckedProof"])
+        and _new_text_share(revision["publishedContent"], revision["content"])
+        > _CHECKED_PROOF_REWRITE_SHARE,
+    }
+    return {**context, "comment": comment}
 
 
 class CommentModerationTask(Task):
@@ -179,16 +253,11 @@ class CommentModerationTask(Task):
 
         comments = get_pending_comments(service_id)
 
-        if not comments:
+        if comments:
             self.logger.info(
-                f"No pending comments for service {service_name} (ID: {service_id})."
+                f"Moderating {len(comments)} pending comment(s) for {service_name} "
+                f"(ID: {service_id})."
             )
-            return False
-
-        self.logger.info(
-            f"Moderating {len(comments)} pending comment(s) for {service_name} "
-            f"(ID: {service_id})."
-        )
 
         processed_at_least_one = False
         for comment_row in comments:
@@ -215,6 +284,9 @@ class CommentModerationTask(Task):
 
             ok = apply_ai_moderation_decision(
                 comment_id=comment_id,
+                expected_version=comment_row["version"],
+                sentiment=ai_result.get("experienceSentiment"),
+                kind=ai_result.get("postKind"),
                 status=decision["status"],
                 ai_action=decision["ai_action"],
                 ai_quality=int(ai_result["commentQuality"]),
@@ -223,9 +295,7 @@ class CommentModerationTask(Task):
                 ai_brigade_confidence=int(ai_result["brigadeConfidence"]),
                 ai_signals=decision["ai_signals"],
                 ai_reasoning=(ai_result.get("reasoning") or "").strip(),
-                rating_muted=decision["rating_muted"],
-                rating_mute_reason=decision["rating_mute_reason"],
-                public_note=decision["public_note"],
+                rejection_rule=decision["rejection_rule"],
             )
 
             if ok:
@@ -237,5 +307,38 @@ class CommentModerationTask(Task):
                     f"hardGate=({decision['hard_gate_reason'] or 'none'})"
                 )
                 processed_at_least_one = True
+
+        for revision in get_pending_revisions(service_id):
+            context = get_moderation_context(revision["commentId"], revision["content"])
+            if context is None:
+                continue
+            edit_context = _edit_context(context, revision)
+            try:
+                ai_result = prompt_comment_moderation(
+                    json.dumps(edit_context, cls=_DateTimeEncoder)
+                )
+            except Exception as e:
+                self.logger.error(
+                    f"AI call failed for edit {revision['id']}: {e}; leaving pending."
+                )
+                continue
+            decision = _decide_edit(ai_result, edit_context)
+            try:
+                outcome = apply_ai_edit_decision(
+                    revision_id=revision["id"],
+                    ai_action=decision["action"],
+                    ai_reasoning=(ai_result.get("reasoning") or "").strip(),
+                    rejection_rule=decision["rejection_rule"],
+                )
+            except Exception as e:
+                self.logger.error(
+                    f"Could not record the decision on edit {revision['id']}: {e}"
+                )
+                continue
+            self.logger.info(
+                f"Edit {revision['id']} on comment {revision['commentId']}: {outcome} "
+                f"hardGate=({decision['hard_gate_reason'] or 'none'})"
+            )
+            processed_at_least_one = True
 
         return processed_at_least_one

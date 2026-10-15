@@ -272,7 +272,14 @@ class DeepScanTask(Task):
 
         self.keep_supported_highlights(result, corpus)
 
-        description = self._propose_description(service, result["warnings"])
+        # The description is a separate call; losing it must not throw away the paid-for scan above.
+        try:
+            description = self._propose_description(service, result["warnings"])
+        except Exception:
+            self.logger.exception(
+                "Description proposal failed for service %s", service_id
+            )
+            description = None
 
         proposed_edits = self._build_proposed_edits(
             result=result,
@@ -528,6 +535,7 @@ class DeepScanTask(Task):
         )
         listing_checks = surviving("listing", listing_checks, "field")
 
+        open_description = description if description_proposal else None
         return {
             "contentHash": corpus_hash,
             "tosReview": {
@@ -563,14 +571,10 @@ class DeepScanTask(Task):
                     if description_proposal
                     else None
                 ),
-                "text": description["text"]
-                if description_proposal and description
-                else "",
-                "reasons": description["reasons"]
-                if description_proposal and description
-                else [],
-                "sourceHash": description["sourceHash"]
-                if description_proposal and description
+                "text": open_description["text"] if open_description else "",
+                "reasons": open_description["reasons"] if open_description else [],
+                "sourceHash": open_description["sourceHash"]
+                if open_description
                 else None,
             },
             "warnings": result["warnings"],

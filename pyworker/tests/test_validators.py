@@ -30,8 +30,7 @@ VALID_COMMENT_MOD = {
     "isSpam": False,
     "isBrigade": False,
     "brigadeConfidence": 0,
-    "ratingShouldBeDisabled": False,
-    "contextNote": "",
+    "rejectionRule": None,
 }
 
 
@@ -49,6 +48,11 @@ def test_comment_mod_missing_field():
 def test_comment_mod_quality_out_of_range():
     with pytest.raises(ValueError, match="commentQuality"):
         schemas.COMMENT_MOD.validate({**VALID_COMMENT_MOD, "commentQuality": 11})
+
+
+def test_comment_mod_unknown_rejection_rule():
+    with pytest.raises(ValueError):
+        schemas.COMMENT_MOD.validate({**VALID_COMMENT_MOD, "rejectionRule": "RUDE"})
 
 
 def test_comment_mod_quality_wrong_type():
@@ -93,34 +97,3 @@ def test_comment_mod_brigade_without_confidence_rejected():
                 "brigadeConfidence": 0,
             }
         )
-
-
-# --- COMMENT_SEN ---
-
-VALID_COMMENT_SEN = {
-    "summary": "Users mostly happy",
-    "sentiment": "positive",
-    "whatUsersLike": ["fast", "cheap"],
-    "whatUsersDislike": ["UI"],
-}
-
-
-def test_comment_sen_valid():
-    schemas.COMMENT_SEN.validate(VALID_COMMENT_SEN)
-
-
-def test_comment_sen_missing_field():
-    data = {**VALID_COMMENT_SEN}
-    del data["sentiment"]
-    with pytest.raises(ValueError, match="sentiment"):
-        schemas.COMMENT_SEN.validate(data)
-
-
-def test_comment_sen_invalid_sentiment():
-    with pytest.raises(ValueError, match="sentiment"):
-        schemas.COMMENT_SEN.validate({**VALID_COMMENT_SEN, "sentiment": "mixed"})
-
-
-def test_comment_sen_likes_wrong_type():
-    with pytest.raises(ValueError, match="whatUsersLike"):
-        schemas.COMMENT_SEN.validate({**VALID_COMMENT_SEN, "whatUsersLike": "fast"})
