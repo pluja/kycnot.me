@@ -7,10 +7,9 @@ import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { EVENT_KINDS, eventKindToFields, type EventKind } from '../../lib/eventKind'
 import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
-import { zodUrlOptionalProtocol } from '../../lib/zodUtils'
+import { emptyToUndefined, zodUrlOptionalProtocol } from '../../lib/zodUtils'
 
 const emptyToNull = (val: unknown) => (val === '' || val == null ? null : val)
-const emptyToUndefined = (val: unknown) => (val === '' || val == null ? undefined : val)
 
 const endedAtSchema = z.preprocess(emptyToNull, z.coerce.date().nullable().optional())
 
@@ -97,39 +96,41 @@ export const adminEventActions = {
       .superRefine(refineEvent),
     handler: async (input, context) => {
       const { class: eventClass, sentiment, type } = eventKindToFields(input.kind)
-      const event = await prisma.event.create({
-        data: {
-          serviceId: input.serviceId,
-          title: input.title,
-          content: input.content,
-          source: input.source,
-          type,
-          class: eventClass,
-          sentiment,
-          // Stated, not inherited from the column default: STAFF is the claim
-          // that a human wrote this, so it should never be set by omission.
-          origin: 'STAFF',
-          startedAt: input.startedAt,
-          endedAt: input.endedAt,
-          visible: true,
-          createdById: context.locals.user.id,
-        },
-        select: { id: true },
-      })
-
-      if (input.kind === 'INCIDENT' && input.severity) {
-        await prisma.incident.create({
-          data: { eventId: event.id, ...incidentDataFrom(input, input.severity) },
+      return prisma.$transaction(async (tx) => {
+        const event = await tx.event.create({
+          data: {
+            serviceId: input.serviceId,
+            title: input.title,
+            content: input.content,
+            source: input.source,
+            type,
+            class: eventClass,
+            sentiment,
+            // Stated, not inherited from the column default: STAFF is the claim
+            // that a human wrote this, so it should never be set by omission.
+            origin: 'STAFF',
+            startedAt: input.startedAt,
+            endedAt: input.endedAt,
+            visible: true,
+            createdById: context.locals.user.id,
+          },
+          select: { id: true },
         })
-      }
-      await recordAuditLog(prisma, {
-        actorId: context.locals.user.id,
-        action: 'CREATED',
-        targetType: 'EVENT',
-        targetId: event.id,
-        summary: `Created ${input.kind.toLowerCase()} "${input.title}"`,
+
+        if (input.kind === 'INCIDENT' && input.severity) {
+          await tx.incident.create({
+            data: { eventId: event.id, ...incidentDataFrom(input, input.severity) },
+          })
+        }
+        await recordAuditLog(tx, {
+          actorId: context.locals.user.id,
+          action: 'CREATED',
+          targetType: 'EVENT',
+          targetId: event.id,
+          summary: `Created ${input.kind.toLowerCase()} "${input.title}"`,
+        })
+        return { event }
       })
-      return { event }
     },
   }),
 
@@ -156,24 +157,26 @@ export const adminEventActions = {
         })
       }
 
-      const event = await prisma.event.update({
-        where: { id: input.eventId },
-        data: {
-          visible: !existingEvent.visible,
-          updatedById: context.locals.user.id,
-        },
-        select: {
-          id: true,
-        },
+      return prisma.$transaction(async (tx) => {
+        const event = await tx.event.update({
+          where: { id: input.eventId },
+          data: {
+            visible: !existingEvent.visible,
+            updatedById: context.locals.user.id,
+          },
+          select: {
+            id: true,
+          },
+        })
+        await recordAuditLog(tx, {
+          actorId: context.locals.user.id,
+          action: 'STATUS_CHANGED',
+          targetType: 'EVENT',
+          targetId: event.id,
+          summary: `${existingEvent.visible ? 'Hid' : 'Showed'} event "${existingEvent.title}"`,
+        })
+        return { event }
       })
-      await recordAuditLog(prisma, {
-        actorId: context.locals.user.id,
-        action: 'STATUS_CHANGED',
-        targetType: 'EVENT',
-        targetId: event.id,
-        summary: `${existingEvent.visible ? 'Hid' : 'Showed'} event "${existingEvent.title}"`,
-      })
-      return { event }
     },
   }),
 
@@ -195,41 +198,43 @@ export const adminEventActions = {
       // timeline and the feeds, so its taxonomy and incident state are left alone.
       const isListingEdit = existingEvent.class === 'CHANGE'
       const { class: eventClass, sentiment, type } = eventKindToFields(input.kind)
-      await prisma.event.update({
-        where: { id: input.eventId },
-        data: {
-          title: input.title,
-          content: input.content,
-          source: input.source,
-          ...(isListingEdit ? {} : { type, class: eventClass, sentiment }),
-          startedAt: input.startedAt,
-          endedAt: input.endedAt,
-          updatedById: context.locals.user.id,
-        },
-      })
-
-      if (isListingEdit) {
-        // Nothing else to reconcile: a listing edit never carries an incident.
-      } else if (input.kind === 'INCIDENT' && input.severity) {
-        const incidentData = incidentDataFrom(input, input.severity)
-        await prisma.incident.upsert({
-          where: { eventId: input.eventId },
-          create: { eventId: input.eventId, ...incidentData },
-          update: incidentData,
+      return prisma.$transaction(async (tx) => {
+        await tx.event.update({
+          where: { id: input.eventId },
+          data: {
+            title: input.title,
+            content: input.content,
+            source: input.source,
+            ...(isListingEdit ? {} : { type, class: eventClass, sentiment }),
+            startedAt: input.startedAt,
+            endedAt: input.endedAt,
+            updatedById: context.locals.user.id,
+          },
         })
-      } else {
-        // No longer an incident: drop any detail so it stops penalizing trust.
-        await prisma.incident.deleteMany({ where: { eventId: input.eventId } })
-      }
 
-      await recordAuditLog(prisma, {
-        actorId: context.locals.user.id,
-        action: 'UPDATED',
-        targetType: 'EVENT',
-        targetId: input.eventId,
-        summary: `Edited event "${input.title}"`,
+        if (isListingEdit) {
+          // Nothing else to reconcile: a listing edit never carries an incident.
+        } else if (input.kind === 'INCIDENT' && input.severity) {
+          const incidentData = incidentDataFrom(input, input.severity)
+          await tx.incident.upsert({
+            where: { eventId: input.eventId },
+            create: { eventId: input.eventId, ...incidentData },
+            update: incidentData,
+          })
+        } else {
+          // No longer an incident: drop any detail so it stops penalizing trust.
+          await tx.incident.deleteMany({ where: { eventId: input.eventId } })
+        }
+
+        await recordAuditLog(tx, {
+          actorId: context.locals.user.id,
+          action: 'UPDATED',
+          targetType: 'EVENT',
+          targetId: input.eventId,
+          summary: `Edited event "${input.title}"`,
+        })
+        return { event: { id: input.eventId } }
       })
-      return { event: { id: input.eventId } }
     },
   }),
 
@@ -250,22 +255,24 @@ export const adminEventActions = {
       }
 
       const resolvedAt = input.resolvedAt ?? new Date()
-      await prisma.incident.update({
-        where: { eventId: input.eventId },
-        data: { state: 'RESOLVED', resolvedAt, outcome: input.outcome },
+      return prisma.$transaction(async (tx) => {
+        await tx.incident.update({
+          where: { eventId: input.eventId },
+          data: { state: 'RESOLVED', resolvedAt, outcome: input.outcome },
+        })
+        await tx.event.update({
+          where: { id: input.eventId },
+          data: { endedAt: resolvedAt, updatedById: context.locals.user.id },
+        })
+        await recordAuditLog(tx, {
+          actorId: context.locals.user.id,
+          action: 'STATUS_CHANGED',
+          targetType: 'EVENT',
+          targetId: input.eventId,
+          summary: `Resolved incident, outcome ${input.outcome.toLowerCase().replace('_', ' ')}`,
+        })
+        return { event: { id: input.eventId } }
       })
-      await prisma.event.update({
-        where: { id: input.eventId },
-        data: { endedAt: resolvedAt, updatedById: context.locals.user.id },
-      })
-      await recordAuditLog(prisma, {
-        actorId: context.locals.user.id,
-        action: 'STATUS_CHANGED',
-        targetType: 'EVENT',
-        targetId: input.eventId,
-        summary: `Resolved incident, outcome ${input.outcome.toLowerCase().replace('_', ' ')}`,
-      })
-      return { event: { id: input.eventId } }
     },
   }),
 
@@ -278,19 +285,21 @@ export const adminEventActions = {
       eventId: z.coerce.number().int().positive(),
     }),
     handler: async (input, context) => {
-      const event = await prisma.event.update({
-        where: { id: input.eventId },
-        data: { deletedAt: new Date(), visible: false, updatedById: context.locals.user.id },
-        select: { id: true, title: true },
+      return prisma.$transaction(async (tx) => {
+        const event = await tx.event.update({
+          where: { id: input.eventId },
+          data: { deletedAt: new Date(), visible: false, updatedById: context.locals.user.id },
+          select: { id: true, title: true },
+        })
+        await recordAuditLog(tx, {
+          actorId: context.locals.user.id,
+          action: 'DELETED',
+          targetType: 'EVENT',
+          targetId: event.id,
+          summary: `Deleted event "${event.title}"`,
+        })
+        return { event }
       })
-      await recordAuditLog(prisma, {
-        actorId: context.locals.user.id,
-        action: 'DELETED',
-        targetType: 'EVENT',
-        targetId: event.id,
-        summary: `Deleted event "${event.title}"`,
-      })
-      return { event }
     },
   }),
 
@@ -301,19 +310,21 @@ export const adminEventActions = {
       eventId: z.coerce.number().int().positive(),
     }),
     handler: async (input, context) => {
-      const event = await prisma.event.update({
-        where: { id: input.eventId },
-        data: { deletedAt: null, visible: true, updatedById: context.locals.user.id },
-        select: { id: true, title: true },
+      return prisma.$transaction(async (tx) => {
+        const event = await tx.event.update({
+          where: { id: input.eventId },
+          data: { deletedAt: null, visible: true, updatedById: context.locals.user.id },
+          select: { id: true, title: true },
+        })
+        await recordAuditLog(tx, {
+          actorId: context.locals.user.id,
+          action: 'STATUS_CHANGED',
+          targetType: 'EVENT',
+          targetId: event.id,
+          summary: `Restored event "${event.title}"`,
+        })
+        return { event }
       })
-      await recordAuditLog(prisma, {
-        actorId: context.locals.user.id,
-        action: 'STATUS_CHANGED',
-        targetType: 'EVENT',
-        targetId: event.id,
-        summary: `Restored event "${event.title}"`,
-      })
-      return { event }
     },
   }),
 
@@ -325,18 +336,20 @@ export const adminEventActions = {
       eventId: z.coerce.number().int().positive(),
     }),
     handler: async (input, context) => {
-      const event = await prisma.event.delete({
-        where: { id: input.eventId },
-        select: { id: true, title: true },
+      return prisma.$transaction(async (tx) => {
+        const event = await tx.event.delete({
+          where: { id: input.eventId },
+          select: { id: true, title: true },
+        })
+        await recordAuditLog(tx, {
+          actorId: context.locals.user.id,
+          action: 'DELETED',
+          targetType: 'EVENT',
+          targetId: event.id,
+          summary: `Purged event "${event.title}" for good`,
+        })
+        return { event }
       })
-      await recordAuditLog(prisma, {
-        actorId: context.locals.user.id,
-        action: 'DELETED',
-        targetType: 'EVENT',
-        targetId: event.id,
-        summary: `Purged event "${event.title}" for good`,
-      })
-      return { event }
     },
   }),
 }

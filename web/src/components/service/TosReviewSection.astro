@@ -40,9 +40,6 @@ const highlights = sortBy(
       // One glyph carries both signals: the topic shapes it, the rating colours
       // it. Naming the topic as well only ever restated the title.
       icon: topicInfo?.icon ?? ratingInfo.icon,
-      // Model-authored, and the model reads text the service publishes, so the
-      // scheme is not ours to trust.
-      safeSourceUrl: safeHttpUrl(highlight.sourceUrl),
     }
   }),
   'ratingInfo.order'

@@ -1,7 +1,8 @@
 import { getEventKindInfo, resolvedEventClassNames } from '../constants/eventKinds'
+import { getIncidentSeverityInfo } from '../constants/incidentSeverities'
 
 import type { EventDisplayKind } from '../constants/eventKinds'
-import type { EventClass, EventSentiment, EventType, IncidentState } from '@prisma/client'
+import type { EventClass, EventSentiment, EventType, IncidentSeverity, IncidentState } from '@prisma/client'
 
 // A single moderator-facing choice that maps to the underlying class + sentiment
 // + legacy type, so the admin form has one "Kind" dropdown instead of three.
@@ -44,7 +45,7 @@ export type DisplayableEvent = {
   /// Only read to keep untriaged legacy rows at their original severity and
   /// solved state. Safe to omit once no row relies on the legacy bridges.
   type?: EventType
-  incident?: { state: IncidentState } | null
+  incident?: { state: IncidentState; severity?: IncidentSeverity | null } | null
 }
 
 // Legacy severities that predate the class + sentiment taxonomy. Rows still
@@ -124,7 +125,8 @@ export function eventStatusLabel(event: DisplayableEvent, now = new Date()): str
 }
 
 // pickPrimaryEvent picks the entry that represents a whole list in one badge:
-// the most severe unresolved one, falling back to the most severe overall.
+// the most severe unresolved one, falling back to the most severe overall. Between
+// incidents of the same kind, the higher incident severity wins.
 export function pickPrimaryEvent<T extends DisplayableEvent>(
   events: readonly T[],
   now = new Date()
@@ -132,7 +134,9 @@ export function pickPrimaryEvent<T extends DisplayableEvent>(
   let best: { event: T; rank: number } | null = null
   for (const event of events) {
     const display = getEventDisplay(event, now)
-    const rank = display.weight + (display.isResolved ? 0 : 100)
+    const severity = event.incident?.severity
+    const severityRank = severity ? getIncidentSeverityInfo(severity).order / 10 : 0
+    const rank = display.weight + severityRank + (display.isResolved ? 0 : 100)
     if (!best || rank > best.rank) best = { event, rank }
   }
   return best?.event ?? null

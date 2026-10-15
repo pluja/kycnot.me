@@ -52,17 +52,11 @@ export function computeIncidentTrustPenalty(
   const points = Math.round(rawPenalty(incident, now))
   const fullPoints = incident.trustOverride ?? FULL_PENALTY[incident.severity]
 
-  if (
-    incident.state !== 'RESOLVED' ||
-    incident.resolvedAt === null ||
-    incident.trustOverride !== null
-  ) {
+  if (incident.state !== 'RESOLVED' || incident.resolvedAt === null || incident.trustOverride !== null) {
     return { points, fullPoints, decayRemaining: 1, isDecaying: false, fadesOn: null }
   }
 
-  const fadesOn = new Date(
-    incident.resolvedAt.getTime() + DECAY_WINDOW_DAYS[incident.severity] * MS_PER_DAY
-  )
+  const fadesOn = new Date(incident.resolvedAt.getTime() + DECAY_WINDOW_DAYS[incident.severity] * MS_PER_DAY)
   const decayRemaining = fullPoints === 0 ? 0 : Math.max(0, Math.min(1, points / fullPoints))
   return { points, fullPoints, decayRemaining, isDecaying: points < 0, fadesOn }
 }

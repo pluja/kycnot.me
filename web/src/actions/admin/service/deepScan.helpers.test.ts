@@ -66,7 +66,7 @@ const collect = (accepted: {
     acceptedDescription: accepted.description ?? true,
   })
 
-test('an unticked description rewrite is declined for this corpus only', () => {
+void test('an unticked description rewrite is declined for this corpus only', () => {
   const rows = collect({
     add: [12, 13],
     remove: [7],
@@ -75,20 +75,24 @@ test('an unticked description rewrite is declined for this corpus only', () => {
   })
 
   assert.equal(rows.length, 1)
-  assert.equal(rows[0]?.kind, 'description')
-  assert.equal(rows[0]?.fingerprint, scanFingerprint(1, 'description', 'front-page-hash'))
+  const [row] = rows
+  assert.ok(row)
+  assert.equal(row.kind, 'description')
+  assert.equal(row.fingerprint, scanFingerprint(1, 'description', 'front-page-hash'))
 })
 
-test('unticked KYC notes are declined for this corpus only', () => {
+void test('unticked KYC notes are declined for this corpus only', () => {
   const rows = collect({ add: [12, 13], remove: [7], listing: ['registrationCountryCode'], kycNotes: false })
 
   assert.equal(rows.length, 1)
-  assert.equal(rows[0]!.kind, 'kycNotes')
-  assert.equal(rows[0]!.fingerprint, scanFingerprint(1, 'kycNotes', 'corpus-hash'))
-  assert.equal(rows[0]!.sourceUrlKey, null)
+  const [row] = rows
+  assert.ok(row)
+  assert.equal(row.kind, 'kycNotes')
+  assert.equal(row.fingerprint, scanFingerprint(1, 'kycNotes', 'corpus-hash'))
+  assert.equal(row.sourceUrlKey, null)
 })
 
-test('collectDeclines records everything left unticked', () => {
+void test('collectDeclines records everything left unticked', () => {
   const rows = collect({})
 
   assert.equal(rows.length, 4)
@@ -100,23 +104,25 @@ test('collectDeclines records everything left unticked', () => {
   ])
 })
 
-test('collectDeclines records nothing a reviewer accepted', () => {
+void test('collectDeclines records nothing a reviewer accepted', () => {
   const rows = collect({ add: [12, 13], remove: [7], listing: ['registrationCountryCode'] })
 
   assert.deepEqual(rows, [])
 })
 
-test('collectDeclines remembers a KYC level a reviewer left alone', () => {
+void test('collectDeclines remembers a KYC level a reviewer left alone', () => {
   const accepted = { add: [12, 13], remove: [7], listing: ['registrationCountryCode'] }
   const rows = collect({ ...accepted, kycLevel: false })
 
   assert.equal(rows.length, 1)
-  assert.equal(rows[0]!.kind, 'kycLevel')
+  const [row] = rows
+  assert.ok(row)
+  assert.equal(row.kind, 'kycLevel')
   // Keyed on the level, so a later move to 4 is still free to be proposed.
-  assert.equal(rows[0]!.fingerprint, scanFingerprint(1, 'kycLevel', 3))
+  assert.equal(row.fingerprint, scanFingerprint(1, 'kycLevel', 3))
 })
 
-test('collectDeclines does not record a level the reviewer was never offered', () => {
+void test('collectDeclines does not record a level the reviewer was never offered', () => {
   // The row renders disabled when the level is not open, and a disabled checkbox
   // submits nothing. Reading that as a decision would suppress a level for good
   // that nobody ever turned down.
@@ -130,7 +136,7 @@ test('collectDeclines does not record a level the reviewer was never offered', (
   assert.deepEqual(rows, [])
 })
 
-test('collectDeclines leaves the KYC level alone when no change was proposed', () => {
+void test('collectDeclines leaves the KYC level alone when no change was proposed', () => {
   const unchanged = {
     ...proposed,
     kycPolicy: { ...proposed.kycPolicy, levelFingerprint: null },
@@ -151,7 +157,7 @@ test('collectDeclines leaves the KYC level alone when no change was proposed', (
   assert.deepEqual(rows, [])
 })
 
-test('collectDeclines records only the unticked half of a partial accept', () => {
+void test('collectDeclines records only the unticked half of a partial accept', () => {
   const rows = collect({ add: [12] })
 
   assert.deepEqual(rows.map((row) => row.label).sort(), [
@@ -161,7 +167,7 @@ test('collectDeclines records only the unticked half of a partial accept', () =>
   ])
 })
 
-test('collectDeclines recomputes the fingerprint rather than trusting the payload', () => {
+void test('collectDeclines recomputes the fingerprint rather than trusting the payload', () => {
   // A hand-edited suggestion must not be able to bury an unrelated proposal.
   const listing = collect({}).find((row) => row.kind === 'listing')
 
@@ -170,7 +176,7 @@ test('collectDeclines recomputes the fingerprint rather than trusting the payloa
   assert.equal(listing.fingerprint, scanFingerprint(1, 'listing', 'registrationCountryCode'))
 })
 
-test('collectDeclines binds a decline to the document it came from', () => {
+void test('collectDeclines binds a decline to the document it came from', () => {
   const rows = collect({})
   const byLabel = new Map(rows.map((row) => [row.label, row]))
 
@@ -180,7 +186,7 @@ test('collectDeclines binds a decline to the document it came from', () => {
   assert.equal(byLabel.get('Add attribute 13')?.sourceContentHash, 'privacy-hash')
 })
 
-test('collectDeclines makes a decline final when the proposal named no source', () => {
+void test('collectDeclines makes a decline final when the proposal named no source', () => {
   // Nothing to watch for a change, so erring quiet is the right direction.
   const orphan = collect({}).find((row) => row.label === 'Remove attribute 7')
 
@@ -189,13 +195,13 @@ test('collectDeclines makes a decline final when the proposal named no source', 
   assert.equal(orphan.sourceContentHash, null)
 })
 
-test('collectDeclines records who declined', () => {
+void test('collectDeclines records who declined', () => {
   for (const row of collect({})) {
     assert.equal(row.declinedById, 99)
   }
 })
 
-test('collectDeclines survives a scan that predates listing checks', () => {
+void test('collectDeclines survives a scan that predates listing checks', () => {
   const older = { ...proposed, listingChecks: undefined } as PrismaJson.ProposedEdits
   const rows = collectDeclines({
     serviceId: 1,

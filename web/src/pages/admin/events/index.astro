@@ -6,7 +6,9 @@ import { actions, isInputError } from 'astro:actions'
 import AdminEventRow from '../../../components/admin/events/AdminEventRow.astro'
 import EventCreateForm from '../../../components/admin/events/EventCreateForm.astro'
 import Button from '../../../components/Button.astro'
+import Pagination from '../../../components/Pagination.astro'
 import ServicePicker from '../../../components/ServicePicker.astro'
+import { adminFilterFieldClass } from '../../../constants/adminFilterField'
 import { eventClassFilterFor, eventViews, eventViewsZodEnum } from '../../../constants/eventViews'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { cn } from '../../../lib/cn'
@@ -234,9 +236,6 @@ const shortcuts = [
   },
 ]
 
-const fieldClass =
-  'w-full rounded-md border border-night-500 bg-night-900 px-2.5 py-1.5 text-sm text-day-100 transition-colors [color-scheme:dark] focus:border-green-500/60 focus:outline-none'
-
 // Reopen the form when a submission bounced, so the errors are not hidden.
 const hasCreateErrors = Object.keys(createInputErrors).length > 0
 ---
@@ -316,13 +315,13 @@ const hasCreateErrors = Object.keys(createInputErrors).length > 0
         name="q"
         value={filters.q}
         placeholder="Search title or content..."
-        class={fieldClass}
+        class={adminFilterFieldClass}
       />
     </div>
 
     <div>
       <label for="view" class="sr-only">Show</label>
-      <select id="view" name="view" class={fieldClass}>
+      <select id="view" name="view" class={adminFilterFieldClass}>
         {
           eventViews.map((view) => (
             <option value={view.value} selected={filters.view === view.value}>
@@ -335,7 +334,7 @@ const hasCreateErrors = Object.keys(createInputErrors).length > 0
 
     <div>
       <label for="state" class="sr-only">State</label>
-      <select id="state" name="state" class={fieldClass}>
+      <select id="state" name="state" class={adminFilterFieldClass}>
         {
           eventStates.map((state) => (
             <option value={state.value} selected={filters.state === state.value}>
@@ -388,37 +387,5 @@ const hasCreateErrors = Object.keys(createInputErrors).length > 0
     )
   }
 
-  {
-    totalPages > 1 && (
-      <nav class="mt-5 flex items-center justify-between gap-3" aria-label="Pagination">
-        {filters.page > 1 ? (
-          <Button
-            as="a"
-            href={urlWithParams(Astro.url, { page: filters.page - 1 })}
-            label="Previous"
-            icon="ri:arrow-left-line"
-            size="sm"
-            variant="faded"
-          />
-        ) : (
-          <span />
-        )}
-        <span class="text-xs text-day-500">
-          Page {filters.page} of {totalPages}
-        </span>
-        {filters.page < totalPages ? (
-          <Button
-            as="a"
-            href={urlWithParams(Astro.url, { page: filters.page + 1 })}
-            label="Next"
-            icon="ri:arrow-right-line"
-            size="sm"
-            variant="faded"
-          />
-        ) : (
-          <span />
-        )}
-      </nav>
-    )
-  }
+  <Pagination currentPage={filters.page} totalPages={totalPages} class="mt-6" />
 </BaseLayout>

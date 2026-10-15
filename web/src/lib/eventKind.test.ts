@@ -196,3 +196,18 @@ void test('legacy solved entries are closed even without a later end date', () =
     assert.equal(isEventOpen(event({ sentiment: 'NEGATIVE', endedAt: start, type }), now), false, type)
   }
 })
+
+void test('pickPrimaryEvent prefers the more severe of two open incidents', () => {
+  const now = new Date('2026-10-18T12:00:00Z')
+  const incident = (severity: 'CRITICAL' | 'LOW', startedAt: string) => ({
+    class: 'INCIDENT' as const,
+    sentiment: 'NEGATIVE' as const,
+    startedAt: new Date(startedAt),
+    endedAt: null,
+    incident: { state: 'ONGOING' as const, severity },
+  })
+  const critical = incident('CRITICAL', '2026-01-10T00:00:00Z')
+  const low = incident('LOW', '2026-10-01T00:00:00Z')
+  assert.equal(pickPrimaryEvent([low, critical], now), critical)
+  assert.equal(pickPrimaryEvent([critical, low], now), critical)
+})

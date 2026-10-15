@@ -15,7 +15,12 @@ import { checkDescription } from '../../../lib/descriptionRules'
 import { cap } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
 import { proposalJobKind } from '../../../lib/scanJobs'
-import { transitionSuggestion } from '../../../lib/serviceSuggestionReview'
+import {
+  assertOpenSuggestion,
+  seenAssigneeIdSchema,
+  transitionSuggestion,
+} from '../../../lib/serviceSuggestionReview'
+import { openSuggestionStatuses } from '../../../lib/suggestionAssignment'
 
 import { buildAuditLines, collectDeclines, intersectAcceptedAttributeIds } from './deepScan.helpers'
 
@@ -57,7 +62,7 @@ export const deepScanActions = {
       const pending = await prisma.serviceSuggestion.findMany({
         where: {
           serviceId: input.serviceId,
-          status: { in: ['PENDING', 'UNDER_REVIEW'] },
+          status: { in: openSuggestionStatuses },
           proposedEdits: { not: Prisma.AnyNull },
         },
         select: { id: true, proposedEdits: true },
@@ -83,27 +88,29 @@ export const deepScanActions = {
         throw new ActionError({ code: 'CONFLICT', message: 'That job is running. Wait for it to finish.' })
       }
 
-      await prisma.serviceScanJob.upsert({
-        where: { serviceId_kind: { serviceId: input.serviceId, kind: input.kind } },
-        create: {
-          serviceId: input.serviceId,
-          kind: input.kind,
-          requestedByUserId: locals.user.id,
-        },
-        update: {
-          requestedByUserId: locals.user.id,
-          createdAt: new Date(),
-          claimedAt: null,
-          processedAt: null,
-          error: null,
-        },
-      })
-      await recordAuditLog(prisma, {
-        actorId: locals.user.id,
-        action: 'UPDATED',
-        targetType: 'SERVICE',
-        targetId: input.serviceId,
-        summary: input.kind === 'DESCRIPTION' ? 'Queued a description review' : 'Queued a deep scan',
+      await prisma.$transaction(async (tx) => {
+        await tx.serviceScanJob.upsert({
+          where: { serviceId_kind: { serviceId: input.serviceId, kind: input.kind } },
+          create: {
+            serviceId: input.serviceId,
+            kind: input.kind,
+            requestedByUserId: locals.user.id,
+          },
+          update: {
+            requestedByUserId: locals.user.id,
+            createdAt: new Date(),
+            claimedAt: null,
+            processedAt: null,
+            error: null,
+          },
+        })
+        await recordAuditLog(tx, {
+          actorId: locals.user.id,
+          action: 'UPDATED',
+          targetType: 'SERVICE',
+          targetId: input.serviceId,
+          summary: input.kind === 'DESCRIPTION' ? 'Queued a description review' : 'Queued a deep scan',
+        })
       })
     },
   }),
@@ -113,6 +120,7 @@ export const deepScanActions = {
     permissions: [cap('services:edit'), cap('suggestions:manage')],
     input: z.object({
       suggestionId: z.coerce.number().int().positive(),
+      seenAssigneeId: seenAssigneeIdSchema,
       acceptTosReview: checkboxBoolean,
       acceptKycLevel: checkboxBoolean,
       /** Echoed by the form when the level was actually offered as a decision. */
@@ -147,12 +155,7 @@ export const deepScanActions = {
           message: 'Suggestion has no proposed edits to apply.',
         })
       }
-      if (suggestion.status !== 'PENDING' && suggestion.status !== 'UNDER_REVIEW') {
-        throw new ActionError({
-          code: 'BAD_REQUEST',
-          message: `Suggestion is already ${suggestion.status.toLowerCase()}.`,
-        })
-      }
+      assertOpenSuggestion(suggestion)
 
       const proposed = suggestion.proposedEdits
       // A description review carries none of the scan blocks; every gate below
@@ -328,7 +331,9 @@ export const deepScanActions = {
           })
         }
 
-        await transitionSuggestion(tx, suggestion.id, 'APPROVED')
+        await transitionSuggestion(tx, suggestion.id, 'APPROVED', locals.user.id, {
+          seenAssigneeId: input.seenAssigneeId ?? null,
+        })
 
         await recordAuditLog(tx, {
           actorId: locals.user.id,
@@ -363,6 +368,7 @@ export const deepScanActions = {
     permissions: [cap('services:edit'), cap('suggestions:manage')],
     input: z.object({
       suggestionId: z.coerce.number().int().positive(),
+      seenAssigneeId: seenAssigneeIdSchema,
       reason: z.string().trim().max(500).optional(),
     }),
     handler: async (input, { locals }) => {
@@ -380,17 +386,14 @@ export const deepScanActions = {
           message: 'Suggestion has no proposed edits to dismiss.',
         })
       }
-      if (suggestion.status !== 'PENDING' && suggestion.status !== 'UNDER_REVIEW') {
-        throw new ActionError({
-          code: 'BAD_REQUEST',
-          message: `Suggestion is already ${suggestion.status.toLowerCase()}.`,
-        })
-      }
+      assertOpenSuggestion(suggestion)
 
       const dismissalLine = input.reason ? `Dismissed: ${input.reason}` : 'Dismissed'
 
       await prisma.$transaction(async (tx) => {
-        await transitionSuggestion(tx, suggestion.id, 'REJECTED')
+        await transitionSuggestion(tx, suggestion.id, 'REJECTED', locals.user.id, {
+          seenAssigneeId: input.seenAssigneeId ?? null,
+        })
         await recordAuditLog(tx, {
           actorId: locals.user.id,
           action: 'STATUS_CHANGED',

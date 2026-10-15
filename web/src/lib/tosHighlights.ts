@@ -4,13 +4,14 @@ import type { VerificationStatus } from '@prisma/client'
 
 export const TOS_REVIEW_ANCHOR = 'tos-review'
 
-/** A review is written only for listings the team vetted; a flagged scam gets none. */
+// isTosReviewable is true only for listings the team vetted; a flagged scam gets no review.
 export const isTosReviewable = (status: VerificationStatus) =>
   status === 'VERIFICATION_SUCCESS' || status === 'APPROVED'
 
-type Highlight = PrismaJson.TosReview['highlights'][number]
+export type TosReview = PrismaJson.TosReview
+type Highlight = TosReview['highlights'][number]
 
-/** Legacy reviews stored numeric ratings: 0 was neutral, 1 and 2 negative. */
+// normalizeTosHighlightRating maps legacy numeric ratings: 0 was neutral, 1 and 2 negative.
 export function normalizeTosHighlightRating(rating: Highlight['rating'] | number): Highlight['rating'] {
   if (typeof rating !== 'number') return rating
   return rating === 0 ? 'neutral' : 'negative'

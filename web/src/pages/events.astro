@@ -99,13 +99,13 @@ const [services, [dbEvents, totalEvents]] = await Astro.locals.banners.tryMany([
           },
           class: classFilter,
 
+          // An event shows when it overlaps the range: not ended before `from`, and started by `to`.
           ...(params.from || params.to
             ? {
-                OR: [
+                AND: [
                   ...(params.from
                     ? ([
-                        { endedAt: null },
-                        { endedAt: { gte: params.from } },
+                        { OR: [{ endedAt: null }, { endedAt: { gte: params.from } }] },
                       ] satisfies Prisma.EventWhereInput[])
                     : []),
                   ...(params.to

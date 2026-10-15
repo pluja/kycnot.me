@@ -87,7 +87,7 @@ const sourceUrl = safeHttpUrl(event.source)
 const sourceHost = sourceUrl ? new URL(sourceUrl).hostname.replace(/^www\./, '').toLowerCase() : null
 
 const severity = incident ? getIncidentSeverityInfo(incident.severity) : null
-const penalty = incident ? computeIncidentTrustPenalty(incident) : null
+const penalty = incident ? computeIncidentTrustPenalty(incident, now) : null
 const ongoing = incident ? incident.state === 'ONGOING' : closes && isEventOpen(event, now)
 const resolved = incident ? incident.state === 'RESOLVED' : closes && !ongoing
 

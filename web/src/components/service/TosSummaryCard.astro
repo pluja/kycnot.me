@@ -1,6 +1,7 @@
 ---
 import { Icon } from 'astro-icon/components'
 
+import { countOf } from '../../lib/pluralize'
 import { countTosHighlightRatings, isTosReviewable, TOS_REVIEW_ANCHOR } from '../../lib/tosHighlights'
 import Markdown from '../Markdown.astro'
 import Tooltip from '../Tooltip.astro'
@@ -34,7 +35,7 @@ const highlightCounts = countTosHighlightRatings(service.tosReview?.highlights ?
       <p class="mt-2 flex flex-wrap items-center gap-y-1 text-sm text-day-400 [&>*+*]:before:mx-2.5 [&>*+*]:before:text-day-600 [&>*+*]:before:content-['·']">
         {highlightCounts.map((rating) => (
           <Tooltip
-            text={`${String(rating.count)} ${rating.count === 1 ? rating.countLabel.one : rating.countLabel.many}`}
+            text={countOf(rating.count, rating.countLabel.one, rating.countLabel.many)}
             position="top"
             class="inline-flex items-center"
           >
