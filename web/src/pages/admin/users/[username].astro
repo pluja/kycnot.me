@@ -2,6 +2,7 @@
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 
+import DeleteConfirmButton from '../../../components/admin/DeleteConfirmButton.astro'
 import BadgeSmall from '../../../components/BadgeSmall.astro'
 import Button from '../../../components/Button.astro'
 import FormSection from '../../../components/FormSection.astro'
@@ -20,6 +21,7 @@ import { getServiceUserRoleInfo, serviceUserRoles } from '../../../constants/ser
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { staffBadgeLabel } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
+import { DISPLAY_NAME_MAX_LENGTH } from '../../../lib/zodUtils'
 
 const { username } = Astro.params
 
@@ -37,9 +39,6 @@ Astro.locals.banners.addIfSuccess(addAffiliationResult, 'Service affiliation add
 
 const removeAffiliationResult = Astro.getActionResult(actions.admin.user.serviceAffiliations.remove)
 Astro.locals.banners.addIfSuccess(removeAffiliationResult, 'Service affiliation removed successfully')
-
-const addKarmaTransactionResult = Astro.getActionResult(actions.admin.user.karmaTransactions.add)
-Astro.locals.banners.addIfSuccess(addKarmaTransactionResult, 'Karma transaction added successfully')
 
 const [user, allServices] = await Astro.locals.banners.tryMany([
   [
@@ -201,7 +200,7 @@ const staffLabel = staffBadgeLabel(user)
           label="Display Name"
           name="displayName"
           error={updateInputErrors.displayName}
-          inputProps={{ value: user.displayName ?? '', maxlength: 50 }}
+          inputProps={{ value: user.displayName ?? '', maxlength: DISPLAY_NAME_MAX_LENGTH }}
         />
 
         <InputText
@@ -361,17 +360,14 @@ const staffLabel = staffBadgeLabel(user)
                     <Icon name="ri:edit-line" class="size-5" />
                   </label>
 
-                  <form
-                    method="POST"
+                  <DeleteConfirmButton
                     action={actions.admin.user.internalNotes.delete}
-                    class="space-y-2"
-                    data-astro-reload
+                    id={`note-${note.id.toString()}`}
+                    label="Delete note"
+                    reload
                   >
                     <input type="hidden" name="noteId" value={note.id} />
-                    <button type="submit" class="p-1 text-day-300 transition-colors hover:text-red-400">
-                      <Icon name="ri:delete-bin-line" class="size-5" />
-                    </button>
-                  </form>
+                  </DeleteConfirmButton>
                 </div>
               </div>
 
@@ -444,17 +440,14 @@ const staffLabel = staffBadgeLabel(user)
                   class="ms-auto me-2 text-sm text-day-400"
                 />
 
-                <form
-                  method="POST"
+                <DeleteConfirmButton
                   action={actions.admin.user.serviceAffiliations.remove}
-                  data-astro-reload
-                  class="space-y-2"
+                  id={`affiliation-${affiliation.id.toString()}`}
+                  label="Remove affiliation"
+                  reload
                 >
                   <input type="hidden" name="id" value={affiliation.id} />
-                  <button type="submit" class="text-day-300 transition-colors hover:text-red-400">
-                    <Icon name="ri:delete-bin-line" class="size-5" />
-                  </button>
-                </form>
+                </DeleteConfirmButton>
               </div>
             )
           })}
@@ -496,28 +489,6 @@ const staffLabel = staffBadgeLabel(user)
       />
 
       <InputSubmitButton label="Add Affiliation" icon="ri:link" hideCancel />
-    </form>
-  </FormSection>
-
-  <FormSection title="Grant/Remove Karma">
-    <form method="POST" action={actions.admin.user.karmaTransactions.add} data-astro-reload class="space-y-2">
-      <input type="hidden" name="userId" value={user.id} />
-
-      <InputText
-        label="Points"
-        name="points"
-        error={addKarmaTransactionResult?.error?.message}
-        inputProps={{ type: 'number', required: true }}
-      />
-
-      <InputTextArea
-        label="Description"
-        name="description"
-        error={addKarmaTransactionResult?.error?.message}
-        inputProps={{ required: true }}
-      />
-
-      <InputSubmitButton label="Submit" icon="ri:add-line" hideCancel />
     </form>
   </FormSection>
 

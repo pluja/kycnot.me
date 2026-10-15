@@ -1,7 +1,6 @@
 ---
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
-import { sortBy } from 'lodash-es'
 
 import AdminOnly from '../../components/AdminOnly.astro'
 import BadgeSmall from '../../components/BadgeSmall.astro'
@@ -11,30 +10,37 @@ import Markdown from '../../components/Markdown.astro'
 import MyPicture from '../../components/MyPicture.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import Tooltip from '../../components/Tooltip.astro'
-import UserBadge from '../../components/UserBadge.astro'
-import { getKarmaTransactionActionInfo } from '../../constants/karmaTransactionActions'
-import { karmaUnlocks } from '../../constants/karmaUnlocks'
+import { getCommentStatusInfo } from '../../constants/commentStatus'
 import { getServiceSuggestionStatusInfo } from '../../constants/serviceSuggestionStatus'
 import { getServiceSuggestionTypeInfo } from '../../constants/serviceSuggestionType'
 import { getServiceUserRoleInfo } from '../../constants/serviceUserRoles'
 import { verificationStatusesByValue } from '../../constants/verificationStatus'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
-import { makeUserWithKarmaUnlocks } from '../../lib/karmaUnlocks'
+import { makeCommentUrl } from '../../lib/commentsWithReplies'
+import { safeHttpUrl } from '../../lib/exchange/safeUrl'
+import { publishedCommentStatuses } from '../../lib/experiences'
 import { isStaff, staffBadgeLabel } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
 import { formatDateShort } from '../../lib/timeAgo'
+import { commentsDisabledMessage, makeUserWithTrust, trustRecord } from '../../lib/trust'
 import { absoluteSiteUrl, urlDomain } from '../../lib/urls'
-import { isUserProfileIndexable } from '../../lib/userProfileSeo'
+import { isUserProfileIndexable, profileServiceWhere } from '../../lib/userProfileSeo'
 
+import type { CommentStatus } from '@prisma/client'
 import type { ProfilePage, WithContext } from 'schema-dts'
 
 const username = Astro.params.username
 if (!username) return Astro.rewrite('/404')
+const viewerIsOwner = Astro.locals.user?.name === username
+// The owner also sees their withdrawn posts, to restore them.
+const listedStatuses: CommentStatus[] = viewerIsOwner
+  ? [...publishedCommentStatuses, 'WITHDRAWN']
+  : publishedCommentStatuses
 
 const user = await Astro.locals.banners.try('user', async () => {
-  return makeUserWithKarmaUnlocks(
+  return makeUserWithTrust(
     await prisma.user.findUnique({
       where: { name: Astro.params.username },
       select: {
@@ -49,39 +55,12 @@ const user = await Astro.locals.banners.try('user', async () => {
         admin: true,
         capabilities: true,
         verifiedLink: true,
-        totalKarma: true,
         createdAt: true,
         lastLoginAt: true,
         _count: {
           select: {
-            comments: true,
-            commentVotes: true,
-            karmaTransactions: true,
+            comments: { where: { status: { in: listedStatuses }, service: profileServiceWhere } },
           },
-        },
-        karmaTransactions: {
-          select: {
-            id: true,
-            points: true,
-            action: true,
-            description: true,
-            createdAt: true,
-            grantedBy: {
-              select: {
-                name: true,
-                displayName: true,
-                picture: true,
-              },
-            },
-            comment: {
-              select: {
-                id: true,
-                content: true,
-              },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 5,
         },
         suggestions: {
           select: {
@@ -97,27 +76,19 @@ const user = await Astro.locals.banners.try('user', async () => {
               },
             },
           },
-          where: {
-            service: {
-              serviceVisibility: {
-                in: ['PUBLIC', 'ARCHIVED'],
-              },
-            },
-          },
+          where: { service: profileServiceWhere },
           orderBy: { createdAt: 'desc' },
           take: 5,
         },
         comments: {
           where: {
-            service: {
-              serviceVisibility: { in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'] },
-            },
+            status: { in: listedStatuses },
+            service: profileServiceWhere,
           },
           select: {
             id: true,
             content: true,
             createdAt: true,
-            upvotes: true,
             status: true,
             service: {
               select: {
@@ -130,41 +101,8 @@ const user = await Astro.locals.banners.try('user', async () => {
           orderBy: { createdAt: 'desc' },
           take: 5,
         },
-        commentVotes: {
-          where: {
-            comment: {
-              service: {
-                serviceVisibility: { in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'] },
-              },
-            },
-          },
-          select: {
-            id: true,
-            downvote: true,
-            createdAt: true,
-            comment: {
-              select: {
-                id: true,
-                content: true,
-                service: {
-                  select: {
-                    id: true,
-                    name: true,
-                    slug: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-        },
         serviceAffiliations: {
-          where: {
-            service: {
-              serviceVisibility: { in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'] },
-            },
-          },
+          where: { service: profileServiceWhere },
           select: {
             role: true,
             service: {
@@ -200,10 +138,14 @@ const user = await Astro.locals.banners.try('user', async () => {
 })
 
 if (!user) return Astro.rewrite('/404')
+const website = safeHttpUrl(user.link)
 
 const staffLabel = staffBadgeLabel(user)
 
 const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
+const viewerIsStaff = isStaff(Astro.locals.user)
+
+const publicTrustFacts = trustRecord(user.trust).filter((fact) => fact.count > 0)
 ---
 
 <BaseLayout
@@ -236,7 +178,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
         alternateName: user.displayName ? user.name : undefined,
         image: user.picture ?? undefined,
         url: absoluteSiteUrl(`/u/${user.name}`),
-        sameAs: user.link ? [user.link] : undefined,
+        sameAs: website ? [website] : undefined,
         description: `User profile page for ${user.displayName ?? user.name} on KYCnot.me`,
         identifier: [user.name, user.id.toString()],
         jobTitle: user.admin ? 'Administrator' : (staffLabel ?? undefined),
@@ -251,11 +193,6 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
             '@type': 'InteractionCounter',
             interactionType: { '@type': 'CommentAction' },
             userInteractionCount: user._count.comments,
-          },
-          {
-            '@type': 'InteractionCounter',
-            interactionType: { '@type': 'LikeAction' },
-            userInteractionCount: user._count.commentVotes,
           },
         ],
       },
@@ -311,6 +248,13 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
               staffLabel && (
                 <span class="rounded-full border border-green-500/50 bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
                   {staffLabel}
+                </span>
+              )
+            }
+            {
+              user.trust.unlocks.veteranBadge && (
+                <span class="rounded-full border border-amber-500/50 bg-amber-500/20 px-2 py-0.5 text-xs text-amber-400">
+                  veteran
                 </span>
               )
             }
@@ -387,7 +331,7 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
             </li>
 
             {
-              !!user.link && (
+              !!website && (
                 <li class="inline-flex items-start">
                   <span class="mt-0.5 mr-2 text-day-500">
                     <Icon name="ri:link" class="size-4" />
@@ -395,27 +339,31 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                   <div>
                     <p class="text-xs text-day-500">Website</p>
                     <a
-                      href={user.link}
+                      href={website}
                       target="_blank"
                       rel="nofollow noopener"
                       class="text-blue-400 hover:underline"
                     >
-                      {user.link}
+                      {website}
                     </a>
                   </div>
                 </li>
               )
             }
 
-            <li class="flex items-start">
-              <span class="mt-0.5 mr-2 text-day-500"><Icon name="ri:award-line" class="size-4" /></span>
-              <div>
-                <p class="text-xs text-day-500">Karma</p>
-                <p class="text-day-300">
-                  {!user.admin && !isStaff(user) ? user.totalKarma.toLocaleString() : '∞'}
-                </p>
-              </div>
-            </li>
+            {
+              publicTrustFacts.map((fact) => (
+                <li class="flex items-start">
+                  <span class="mt-0.5 mr-2 text-day-500">
+                    <Icon name={fact.icon} class="size-4" />
+                  </span>
+                  <div>
+                    <p class="text-xs text-day-500">{fact.label}</p>
+                    <p class="text-day-300">{fact.count.toLocaleString()}</p>
+                  </div>
+                </li>
+              ))
+            }
           </ul>
         </div>
 
@@ -480,6 +428,25 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                 }
               </div>
             </li>
+
+            {
+              viewerIsStaff && (user.trust.untrusted || user.trust.commentsDisabled) && (
+                <li class="flex items-start">
+                  <span class="mt-0.5 mr-2 text-day-500">
+                    <Icon name="ri:shield-user-line" class="size-4" />
+                  </span>
+                  <div>
+                    <p class="text-xs text-day-500">Trust (staff only)</p>
+                    {user.trust.untrusted && (
+                      <p class="text-sm text-yellow-400">Posts are reviewed before publishing</p>
+                    )}
+                    {user.trust.commentsDisabled && (
+                      <p class="text-sm text-red-400">{commentsDisabledMessage}</p>
+                    )}
+                  </div>
+                </li>
+              )
+            }
 
             <li class="flex items-start">
               <span class="mt-0.5 mr-2 text-day-500"><Icon name="ri:calendar-line" class="size-4" /></span>
@@ -662,158 +629,6 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
     )
   }
 
-  {
-    !user.admin && !isStaff(user) && (
-      <section
-        class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs"
-        id="karma-unlocks"
-      >
-        <header>
-          <h2 class="mb-4 font-title text-xl font-bold text-day-200">
-            <Icon name="ri:lock-unlock-line" class="mr-2 inline-block size-5" />
-            Karma Unlocks
-          </h2>
-
-          <p class="mb-4 text-day-300">
-            Earn karma to unlock features and privileges.{' '}
-            <a href="/docs/karma" class="text-day-200 hover:underline">
-              Learn about karma
-            </a>
-          </p>
-        </header>
-
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div class="space-y-3">
-            <input type="checkbox" id="positive-unlocks-toggle" class="peer sr-only md:hidden" checked />
-            <label
-              for="positive-unlocks-toggle"
-              class="flex cursor-pointer items-center justify-between border-b border-green-500/20 pb-2 peer-checked:**:data-expand-arrow:rotate-180 md:cursor-default"
-            >
-              <h3 class="font-title text-sm text-day-200">Positive unlocks</h3>
-              <Icon name="ri:arrow-down-s-line" class="size-5 text-day-400 md:hidden" data-expand-arrow />
-            </label>
-
-            <div class="mt-3 hidden space-y-3 peer-checked:block md:block">
-              {sortBy(
-                karmaUnlocks.filter((unlock) => unlock.karma >= 0 || unlock.unlockDirection === 'gte'),
-                'karma'
-              ).map((unlock) => (
-                <div
-                  class={cn(
-                    'flex items-center justify-between rounded-md border p-3',
-                    user.karmaUnlocks[unlock.id]
-                      ? 'border-green-500/30 bg-green-500/10'
-                      : 'border-night-500 bg-night-800'
-                  )}
-                >
-                  <div class="flex items-center">
-                    <span class={cn('mr-3', user.karmaUnlocks[unlock.id] ? 'text-day-400' : 'text-day-500')}>
-                      <Icon name={unlock.icon} class="size-5" />
-                    </span>
-                    <div>
-                      <p
-                        class={cn(
-                          'font-medium',
-                          user.karmaUnlocks[unlock.id] ? 'text-day-300' : 'text-day-400'
-                        )}
-                      >
-                        {unlock.name}
-                      </p>
-                      <p class="text-sm text-day-500">
-                        {unlock.karmaLabel ?? `${unlock.karma.toLocaleString()} karma`}
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    {user.karmaUnlocks[unlock.id] ? (
-                      <span class="inline-flex items-center rounded-full bg-day-500/20 px-2 py-1 text-xs text-day-300">
-                        <Icon name="ri:check-line" class="mr-1 size-3" /> Unlocked
-                      </span>
-                    ) : (
-                      <span class="inline-flex items-center rounded-full bg-night-800 px-2 py-1 text-xs text-day-400">
-                        <Icon name="ri:lock-line" class="mr-1 size-3" /> Locked
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <p class="mt-4 rounded-md border border-night-500/30 bg-night-800/70 p-3 text-xs text-day-400">
-              <span class="font-bold text-day-300">*</span>
-              Reviews with approved usage proof get 90% weight. Verified reviews get 100%.
-            </p>
-          </div>
-
-          <div class="space-y-3">
-            <input type="checkbox" id="negative-unlocks-toggle" class="peer sr-only md:hidden" />
-
-            <label
-              for="negative-unlocks-toggle"
-              class="flex cursor-pointer items-center justify-between border-b border-red-500/20 pb-2 peer-checked:**:data-expand-arrow:rotate-180 md:cursor-default"
-            >
-              <h3 class="font-title text-sm text-red-400">Negative unlocks</h3>
-              <Icon name="ri:arrow-down-s-line" class="size-5 text-day-400 md:hidden" data-expand-arrow />
-            </label>
-
-            <div class="mt-3 hidden space-y-3 peer-checked:block md:block">
-              {sortBy(
-                karmaUnlocks.filter((unlock) => unlock.karma < 0 && unlock.unlockDirection !== 'gte'),
-                'karma'
-              )
-                .reverse()
-                .map((unlock) => (
-                  <div
-                    class={cn(
-                      'flex items-center justify-between rounded-md border p-3',
-                      user.karmaUnlocks[unlock.id]
-                        ? 'border-red-500/30 bg-red-500/10'
-                        : 'border-night-500 bg-night-800'
-                    )}
-                  >
-                    <div class="flex items-center">
-                      <span
-                        class={cn('mr-3', user.karmaUnlocks[unlock.id] ? 'text-red-400' : 'text-day-500')}
-                      >
-                        <Icon name={unlock.icon} class="size-5" />
-                      </span>
-                      <div>
-                        <p
-                          class={cn(
-                            'font-medium',
-                            user.karmaUnlocks[unlock.id] ? 'text-red-400' : 'text-day-400'
-                          )}
-                        >
-                          {unlock.name}
-                        </p>
-                        <p class="text-sm text-day-500">{unlock.karma.toLocaleString()} karma</p>
-                      </div>
-                    </div>
-                    <div>
-                      {user.karmaUnlocks[unlock.id] ? (
-                        <span class="inline-flex items-center rounded-full bg-red-500/20 px-2 py-1 text-xs text-red-400">
-                          <Icon name="ri:alert-line" class="mr-1 size-3" /> Active
-                        </span>
-                      ) : (
-                        <span class="inline-flex items-center rounded-full bg-night-800 px-2 py-1 text-xs text-day-400">
-                          <Icon name="ri:shield-check-line" class="mr-1 size-3" /> Avoided
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-              <p class="mt-4 rounded-md border border-night-500/30 bg-night-800/70 p-3 text-xs text-day-400">
-                <Icon name="ri:information-line" class="inline-block size-4" />
-                Negative karma leads to restrictions. Keep interactions positive to avoid penalties.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-    )
-  }
-
   <div class="space-y-6">
     <section class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
       <header class="flex items-center justify-between">
@@ -835,7 +650,6 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                   <th class="px-4 py-3 text-left text-xs text-day-400">Service</th>
                   <th class="px-4 py-3 text-left text-xs text-day-400">Comment</th>
                   <th class="px-4 py-3 text-center text-xs text-day-400">Status</th>
-                  <th class="px-4 py-3 text-center text-xs text-day-400">Upvotes</th>
                   <th class="px-4 py-3 text-right text-xs text-day-400">Date</th>
                 </tr>
               </thead>
@@ -848,16 +662,20 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                       </a>
                     </td>
                     <td class="px-4 py-3 text-day-300">
-                      <p class="line-clamp-1">{comment.content}</p>
+                      <a
+                        href={makeCommentUrl({
+                          serviceSlug: comment.service.slug,
+                          commentId: comment.id,
+                          ...(comment.status === 'WITHDRAWN' ? { tool: 'edit', section: 'withdraw' } : {}),
+                        })}
+                        class="line-clamp-1 hover:underline"
+                      >
+                        {comment.content}
+                      </a>
                     </td>
                     <td class="px-4 py-3 text-center">
                       <span class="inline-flex rounded-full border border-day-700/20 bg-night-800/30 px-2 py-0.5 text-xs text-day-300">
-                        {comment.status}
-                      </span>
-                    </td>
-                    <td class="px-4 py-3 text-center text-xs text-day-300">
-                      <span class="inline-flex items-center">
-                        <Icon name="ri:thumb-up-line" class="mr-1 size-4" /> {comment.upvotes}
+                        {getCommentStatusInfo(comment.status).publicLabel}
                       </span>
                     </td>
                     <td class="px-4 py-3 text-right text-xs whitespace-nowrap text-day-400">
@@ -876,84 +694,6 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
         )
       }
     </section>
-
-    {
-      user.karmaUnlocks.voteComments || user._count.commentVotes ? (
-        <section class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
-          <header class="flex items-center justify-between">
-            <h2 class="mb-4 font-title text-xl font-bold text-day-200">
-              <Icon name="ri:thumb-up-line" class="mr-2 inline-block size-5" />
-              Recent Votes
-            </h2>
-            <span class="text-day-500">{user._count.commentVotes.toLocaleString()} votes</span>
-          </header>
-
-          {user.commentVotes.length === 0 ? (
-            <p class="text-day-400">No votes yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full min-w-full divide-y divide-night-400/20">
-                <thead>
-                  <tr>
-                    <th class="px-4 py-3 text-left text-xs text-day-400">Service</th>
-                    <th class="px-4 py-3 text-left text-xs text-day-400">Comment</th>
-                    <th class="px-4 py-3 text-center text-xs text-day-400">Vote</th>
-                    <th class="px-4 py-3 text-right text-xs text-day-400">Date</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-night-400/10">
-                  {user.commentVotes.map((vote) => (
-                    <tr class="hover:bg-night-500/5">
-                      <td class="px-4 py-3 text-xs whitespace-nowrap text-day-300">
-                        <a
-                          href={`/service/${vote.comment.service.slug}`}
-                          class="text-blue-400 hover:underline"
-                        >
-                          {vote.comment.service.name}
-                        </a>
-                      </td>
-                      <td class="px-4 py-3 text-day-300">
-                        <p class="line-clamp-1">{vote.comment.content}</p>
-                      </td>
-                      <td class="px-4 py-3 text-center">
-                        {vote.downvote ? (
-                          <span class="inline-flex items-center text-red-400">
-                            <Icon name="ri:thumb-down-fill" class="size-4" />
-                          </span>
-                        ) : (
-                          <span class="inline-flex items-center text-green-400">
-                            <Icon name="ri:thumb-up-fill" class="size-4" />
-                          </span>
-                        )}
-                      </td>
-                      <td class="px-4 py-3 text-right text-xs whitespace-nowrap text-day-400">
-                        <TimeFormatted
-                          date={vote.createdAt}
-                          prefix={false}
-                          hourPrecision
-                          caseType="sentence"
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      ) : (
-        <section class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
-          <h2 class="grow-9999 font-title text-xl font-bold text-day-200">
-            <Icon name="ri:thumb-up-line" class="mr-2 inline-block size-5" />
-            Recent Votes
-          </h2>
-          <span class="inline-flex grow items-center justify-center gap-1 text-day-500">
-            <Icon name="ri:lock-line" class="inline-block size-5" />
-            Locked
-          </span>
-        </section>
-      )
-    }
 
     {
       !user.admin && !isStaff(user) && (
@@ -1008,76 +748,6 @@ const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
                         <td class="px-4 py-3 text-right text-xs whitespace-nowrap text-day-400">
                           <TimeFormatted
                             date={suggestion.createdAt}
-                            prefix={false}
-                            hourPrecision
-                            caseType="sentence"
-                          />
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      )
-    }
-
-    {
-      !user.admin && !isStaff(user) && (
-        <section class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
-          <header class="flex items-center justify-between">
-            <h2 class="mb-4 font-title text-xl font-bold text-day-200">
-              <Icon name="ri:exchange-line" class="mr-2 inline-block size-5" />
-              Recent Karma Transactions
-            </h2>
-            <span class="text-day-500">{user.totalKarma.toLocaleString()} karma</span>
-          </header>
-
-          {user.karmaTransactions.length === 0 ? (
-            <p class="text-day-400">No karma transactions yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full min-w-full divide-y divide-night-400/20">
-                <thead>
-                  <tr>
-                    <th class="px-4 py-3 text-left text-xs text-day-400">Action</th>
-                    <th class="px-4 py-3 text-left text-xs text-day-400">Description</th>
-                    <th class="px-4 py-3 text-right text-xs text-day-400">Points</th>
-                    <th class="px-4 py-3 text-right text-xs text-day-400">Date</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-night-400/10">
-                  {user.karmaTransactions.map((transaction) => {
-                    const actionInfo = getKarmaTransactionActionInfo(transaction.action)
-                    return (
-                      <tr class="hover:bg-night-500/5">
-                        <td class="px-4 py-3 text-xs whitespace-nowrap text-day-300">
-                          <span class="inline-flex items-center gap-1">
-                            <Icon name={actionInfo.icon} class="size-4" />
-                            {actionInfo.label}
-                            {transaction.action === 'MANUAL_ADJUSTMENT' && transaction.grantedBy && (
-                              <>
-                                <span class="text-day-500">from</span>
-                                <UserBadge user={transaction.grantedBy} size="sm" class="text-day-500" />
-                              </>
-                            )}
-                          </span>
-                        </td>
-                        <td class="px-4 py-3 text-day-300">{transaction.description}</td>
-                        <td
-                          class={cn(
-                            'px-4 py-3 text-right text-xs whitespace-nowrap',
-                            transaction.points >= 0 ? 'text-green-400' : 'text-red-400'
-                          )}
-                        >
-                          {transaction.points >= 0 && '+'}
-                          {transaction.points}
-                        </td>
-                        <td class="px-4 py-3 text-right text-xs whitespace-nowrap text-day-400">
-                          <TimeFormatted
-                            date={transaction.createdAt}
                             prefix={false}
                             hourPrecision
                             caseType="sentence"

@@ -5,12 +5,16 @@ import { actions } from 'astro:actions'
 import Button from '../../components/Button.astro'
 import CopyButton from '../../components/CopyButton.astro'
 import MiniLayout from '../../layouts/MiniLayout.astro'
+import { makeSafeRedirectUrl } from '../../lib/redirectUrls'
+import { siteOrigin } from '../../lib/urls'
 import { prettifyUserSecretToken } from '../../lib/userSecretToken'
 
 const result = Astro.getActionResult(actions.account.generate)
 if (result?.error) return Astro.redirect('/account/generate')
 
 const prettyToken = result ? prettifyUserSecretToken(result.data.token) : null
+// A GET form replaces its action's query string, so the return path's parameters ride as hidden fields.
+const continueUrl = new URL(makeSafeRedirectUrl(result?.data.redirect, siteOrigin), siteOrigin)
 ---
 
 <MiniLayout
@@ -57,7 +61,10 @@ const prettyToken = result ? prettifyUserSecretToken(result.data.token) : null
           or <span class="font-medium text-day-200">secure location</span>
         </p>
 
-        <form method="GET" action="/" class="mt-8 space-y-4">
+        <form method="GET" action={continueUrl.pathname} class="mt-8 space-y-4">
+          {[...continueUrl.searchParams].map(([name, value]) => (
+            <input type="hidden" name={name} value={value} />
+          ))}
           <div class="flex items-center gap-4">
             <input type="checkbox" id="confirm-saved" required />
             <label for="confirm-saved" class="text-sm text-pretty text-day-400">

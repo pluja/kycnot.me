@@ -1,18 +1,16 @@
-import type { Prisma } from '@prisma/client'
+import { ServiceVisibility, type Prisma } from '@prisma/client'
 
-/**
- * Affiliations to a service the public can actually reach. A profile whose
- * only link is to a hidden service is not a public presence.
- */
-const PUBLICLY_VISIBLE_SERVICE = {
-  serviceVisibility: { in: ['PUBLIC', 'ARCHIVED', 'UNLISTED'] },
+// profileServiceWhere is the services a profile shows activity on: listed ones. A profile whose only link is
+// to an unlisted or hidden service is not a public presence.
+export const profileServiceWhere = {
+  serviceVisibility: { in: [ServiceVisibility.PUBLIC, ServiceVisibility.ARCHIVED] },
 } satisfies Prisma.ServiceWhereInput
 
 /**
  * A profile earns indexing once it stands for a real, identifiable person on
  * the site: someone verified, or someone attached to a service.
  *
- * The `User` model has no bio, so a profile below this bar renders karma
+ * The `User` model has no bio, so a profile below this bar renders trust
  * widgets and empty-state placeholders around a machine-generated username.
  * Those pages were reaching Google through comment bylines and collecting
  * impressions with no clicks.
@@ -23,7 +21,7 @@ const PUBLICLY_VISIBLE_SERVICE = {
  */
 export const indexableUserProfileWhere = {
   scheduledDeletionAt: null,
-  OR: [{ verified: true }, { serviceAffiliations: { some: { service: PUBLICLY_VISIBLE_SERVICE } } }],
+  OR: [{ verified: true }, { serviceAffiliations: { some: { service: profileServiceWhere } } }],
 } satisfies Prisma.UserWhereInput
 
 /**

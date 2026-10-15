@@ -34,8 +34,15 @@ export const {
       value: 'comments:moderate',
       slug: 'comments-moderate',
       label: 'Moderate comments',
-      description: 'Approve, reject and moderate comments and ratings.',
+      description: 'Approve, reject and moderate experiences, discussion posts and replies.',
       icon: 'ri:chat-check-line',
+    },
+    {
+      value: 'comments:redact',
+      slug: 'comments-redact',
+      label: 'Remove sensitive text',
+      description: "Edit sensitive details out of an author's post and its history.",
+      icon: 'ri:eraser-line',
     },
     {
       value: 'contact:manage',
@@ -133,8 +140,9 @@ export const {
 
 export type Capability = (typeof capabilities)[number]['value']
 
-// Capabilities that only make sense alongside others. userCan ignores a grant
+// capabilityRequirements lists capabilities that only make sense alongside others. userCan ignores a grant
 // whose requirements are not all held, so an orphan grant never does anything.
 export const capabilityRequirements: Partial<Record<Capability, readonly Capability[]>> = {
   'suggestions:self-apply': ['suggestions:manage'],
+  'comments:redact': ['comments:moderate'],
 }

@@ -26,6 +26,11 @@ if (Astro.locals.user) {
 }
 
 const message = Astro.url.searchParams.get('message')
+const returnPath = makeSafeRedirectUrl(Astro.url.searchParams.get('redirect'), siteOrigin)
+const createAccountUrl =
+  returnPath === '/'
+    ? '/account/generate'
+    : `/account/generate?${new URLSearchParams({ redirect: returnPath }).toString()}`
 ---
 
 <MiniLayout
@@ -80,7 +85,7 @@ const message = Astro.url.searchParams.get('message')
 
   <Button
     as="a"
-    href="/account/generate"
+    href={createAccountUrl}
     dataAstroReload
     label="Create account"
     icon="ri:user-add-line"

@@ -1,0 +1,51 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { trustUnlocks } from '../constants/trustUnlocks'
+import { cn } from '../lib/cn'
+import { describeTrustRequirement } from '../lib/trust'
+
+import type { TrustUnlocks } from '../lib/trust'
+
+type Props = {
+  unlocks?: TrustUnlocks
+}
+
+const { unlocks } = Astro.props
+---
+
+<ul class="space-y-3">
+  {
+    trustUnlocks.map((unlock) => {
+      const isUnlocked = unlocks?.[unlock.id] ?? false
+      return (
+        <li
+          class={cn(
+            'flex items-center justify-between gap-3 rounded-md border p-3',
+            isUnlocked ? 'border-green-500/30 bg-green-500/10' : 'border-night-500 bg-night-800'
+          )}
+        >
+          <div class="flex items-center">
+            <span class={cn('mr-3', isUnlocked ? 'text-day-400' : 'text-day-500')}>
+              <Icon name={unlock.icon} class="size-5" />
+            </span>
+            <div>
+              <p class={cn('font-medium', isUnlocked ? 'text-day-300' : 'text-day-400')}>{unlock.name}</p>
+              <p class="text-sm text-day-500">{describeTrustRequirement(unlock)}</p>
+            </div>
+          </div>
+          {unlocks &&
+            (isUnlocked ? (
+              <span class="inline-flex shrink-0 items-center rounded-full bg-day-500/20 px-2 py-1 text-xs text-day-300">
+                <Icon name="ri:check-line" class="mr-1 size-3" /> Unlocked
+              </span>
+            ) : (
+              <span class="inline-flex shrink-0 items-center rounded-full bg-night-800 px-2 py-1 text-xs text-day-400">
+                <Icon name="ri:lock-line" class="mr-1 size-3" /> Locked
+              </span>
+            ))}
+        </li>
+      )
+    })
+  }
+</ul>

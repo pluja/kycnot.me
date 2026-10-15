@@ -8,6 +8,7 @@ import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { saveFileLocally } from '../../lib/fileStorage'
 import { cap, withoutOrphanCapabilities } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
+import { displayNameSchema, httpUrlSchema } from '../../lib/zodUtils'
 
 const selectUserReturnFields = {
   id: true,
@@ -20,7 +21,6 @@ const selectUserReturnFields = {
   capabilities: true,
   canCreateApiKeys: true,
   verifiedLink: true,
-  totalKarma: true,
   createdAt: true,
   updatedAt: true,
   spammer: true,
@@ -60,6 +60,14 @@ function userUpdateAuditSummary(before: AuditedUserFields, after: AuditedUserFie
     .join('; ')
 }
 
+// preventOwnAffiliationChange lets only admins change their own affiliations, which decide who may moderate a
+// service.
+function preventOwnAffiliationChange(actor: { id: number; admin: boolean }, targetUserId: number) {
+  if (actor.id === targetUserId && !actor.admin) {
+    throw new ActionError({ code: 'FORBIDDEN', message: 'Ask an admin to change your own affiliations.' })
+  }
+}
+
 export const adminUserActions = {
   search: defineProtectedAction({
     accept: 'form',
@@ -83,9 +91,7 @@ export const adminUserActions = {
     input: z.object({
       id: z.number().int().positive(),
       name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
-      link: z
-        .string()
-        .url('Invalid URL')
+      link: httpUrlSchema
         .nullable()
         .default(null) // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         .transform((val) => val || null),
@@ -93,15 +99,11 @@ export const adminUserActions = {
       type: z.array(z.enum(['admin', 'spammer'])).default([]),
       capabilities: z.array(capabilitiesZodEnum).default([]),
       canCreateApiKeys: z.coerce.boolean().default(false),
-      verifiedLink: z
-        .string()
-        .url('Invalid URL')
+      verifiedLink: httpUrlSchema
         .nullable()
         .default(null) // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         .transform((val) => val || null),
-      displayName: z
-        .string()
-        .max(50, 'Display Name must be less than 50 characters')
+      displayName: displayNameSchema
         .nullable()
         .default(null) // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         .transform((val) => val || null),
@@ -214,11 +216,19 @@ export const adminUserActions = {
       input: z.object({
         noteId: z.coerce.number().int().positive(),
       }),
-      handler: async (input) => {
-        await prisma.internalUserNote.delete({
-          where: {
-            id: input.noteId,
-          },
+      handler: async (input, context) => {
+        await prisma.$transaction(async (tx) => {
+          const note = await tx.internalUserNote.delete({
+            where: { id: input.noteId },
+            select: { userId: true },
+          })
+          await recordAuditLog(tx, {
+            actorId: context.locals.user.id,
+            action: 'DELETED',
+            targetType: 'USER',
+            targetId: note.userId,
+            summary: 'Deleted an internal note',
+          })
         })
       },
     }),
@@ -259,6 +269,7 @@ export const adminUserActions = {
         role: z.enum(['OWNER', 'ADMIN', 'MODERATOR', 'SUPPORT', 'TEAM_MEMBER']),
       }),
       handler: async (input, context) => {
+        preventOwnAffiliationChange(context.locals.user, input.userId)
         // Check if the user exists
         const user = await prisma.user.findUnique({
           where: { id: input.userId },
@@ -362,18 +373,18 @@ export const adminUserActions = {
         id: z.coerce.number().int().positive(),
       }),
       handler: async (input, context) => {
-        const serviceAffiliation = await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx) => {
+          const existing = await tx.serviceUser.findUnique({
+            where: { id: input.id },
+            select: { userId: true },
+          })
+          if (!existing) throw new ActionError({ code: 'NOT_FOUND', message: 'Affiliation not found' })
+          preventOwnAffiliationChange(context.locals.user, existing.userId)
           const deleted = await tx.serviceUser.delete({
             where: {
               id: input.id,
             },
-            include: {
-              service: {
-                select: {
-                  name: true,
-                },
-              },
-            },
+            select: { userId: true, service: { select: { name: true } } },
           })
           await recordAuditLog(tx, {
             actorId: context.locals.user.id,
@@ -382,45 +393,6 @@ export const adminUserActions = {
             targetId: deleted.userId,
             summary: `Removed affiliation with ${deleted.service.name}`,
           })
-          return deleted
-        })
-
-        return { serviceAffiliation }
-      },
-    }),
-  },
-
-  karmaTransactions: {
-    add: defineProtectedAction({
-      accept: 'form',
-      permissions: cap('users:manage'),
-      input: z.object({
-        userId: z.coerce.number().int().positive(),
-        points: z.coerce.number().int(),
-        description: z.string().min(1, 'Description is required'),
-      }),
-      handler: async (input, context) => {
-        // Check if the user exists
-        const user = await prisma.user.findUnique({
-          where: { id: input.userId },
-          select: { id: true },
-        })
-
-        if (!user) {
-          throw new ActionError({
-            code: 'BAD_REQUEST',
-            message: 'User not found',
-          })
-        }
-
-        await prisma.karmaTransaction.create({
-          data: {
-            userId: input.userId,
-            points: input.points,
-            action: 'MANUAL_ADJUSTMENT',
-            description: input.description,
-            grantedByUserId: context.locals.user.id,
-          },
         })
       },
     }),

@@ -2,18 +2,20 @@ import { ActionError } from 'astro:actions'
 import { z } from 'astro:content'
 import { pick } from 'lodash-es'
 
-import { karmaUnlocksById } from '../constants/karmaUnlocks'
+import { trustUnlocksById } from '../constants/trustUnlocks'
 import { createAccount } from '../lib/accountCreate'
 import { generateApiKey, getApiKeyPrefix, hashApiKey } from '../lib/apiKey'
 import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../lib/captchaValidation'
+import { cleanupCommentEvidenceFiles } from '../lib/commentEvidenceCleanup'
+import { deleteUserAccount } from '../lib/dbFunctions'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
 import { saveFileLocally } from '../lib/fileStorage'
 import { startImpersonating, stopImpersonating } from '../lib/impersonation'
-import { makeKarmaUnlockMessage, makeUserWithKarmaUnlocks } from '../lib/karmaUnlocks'
 import { prisma } from '../lib/prisma'
 import { makeSafeRedirectUrl } from '../lib/redirectUrls'
 import { getRedisPreGeneratedSecretTokens } from '../lib/redis/redisPreGeneratedSecretTokens'
 import { handleHoneypotTrap } from '../lib/spamDetection'
+import { makeTrustUnlockMessage, makeUserWithTrust } from '../lib/trust'
 import { login, logout, setUserSessionIdCookie } from '../lib/userCookies'
 import {
   generateUserSecretToken,
@@ -21,7 +23,7 @@ import {
   parseUserSecretToken,
   USER_SECRET_TOKEN_REGEX,
 } from '../lib/userSecretToken'
-import { imageFileSchema } from '../lib/zodUtils'
+import { displayNameSchema, httpUrlSchema, imageFileSchema } from '../lib/zodUtils'
 
 // toPublicUser strips credential-equivalent fields before a User is returned
 // from an action: the result is devalue-serialized into the PRG action session,
@@ -57,7 +59,7 @@ export const accountActions = {
         })
       }
 
-      await login(context, makeUserWithKarmaUnlocks(matchedUser))
+      await login(context, await makeUserWithTrust(matchedUser))
 
       const origin = new URL(context.request.url).origin
       return {
@@ -86,6 +88,7 @@ export const accountActions = {
     input: z
       .object({
         token: z.string().regex(USER_SECRET_TOKEN_REGEX).transform(parseUserSecretToken).optional(),
+        redirect: z.string().max(2000).optional(),
         /** @deprecated Honey pot field, do not use */
         message: z.unknown().optional(),
         ...captchaFormSchemaProperties,
@@ -106,7 +109,9 @@ export const accountActions = {
       } else {
         // The form always submits one, so a miss means the password manager
         // saved a token this account will not use.
-        console.error('[account.generate] no pre-generated token submitted, creating account from a fresh one')
+        console.error(
+          '[account.generate] no pre-generated token submitted, creating account from a fresh one'
+        )
       }
       if (!isValidToken) {
         throw new ActionError({
@@ -117,11 +122,12 @@ export const accountActions = {
 
       const { token, user: newUser } = await createAccount(input.token)
       await setUserSessionIdCookie(context.cookies, context.url, newUser.secretTokenHash)
-      context.locals.user = makeUserWithKarmaUnlocks(newUser)
+      context.locals.user = await makeUserWithTrust(newUser)
 
       return {
         token,
         user: toPublicUser(newUser),
+        redirect: makeSafeRedirectUrl(input.redirect, new URL(context.request.url).origin),
       } as const
     },
   }),
@@ -154,7 +160,7 @@ export const accountActions = {
         })
       }
 
-      await startImpersonating(context, adminUser, makeUserWithKarmaUnlocks(targetUser))
+      await startImpersonating(context, adminUser, await makeUserWithTrust(targetUser))
 
       const origin = new URL(context.request.url).origin
       return {
@@ -170,8 +176,8 @@ export const accountActions = {
     permissions: 'user',
     input: z.object({
       id: z.coerce.number().int().positive(),
-      displayName: z.string().max(100, 'Display name must be 100 characters or less').nullable(),
-      link: z.string().url('Must be a valid URL').max(255, 'URL must be 255 characters or less').nullable(),
+      displayName: displayNameSchema.nullable(),
+      link: httpUrlSchema.nullable(),
       pictureFile: imageFileSchema,
       removePicture: z.coerce.boolean(),
     }),
@@ -186,36 +192,36 @@ export const accountActions = {
       if (
         input.displayName !== null &&
         input.displayName !== context.locals.user.displayName &&
-        !context.locals.user.karmaUnlocks.displayName
+        !context.locals.user.trust.unlocks.displayName
       ) {
         throw new ActionError({
           code: 'FORBIDDEN',
-          message: makeKarmaUnlockMessage(karmaUnlocksById.displayName),
+          message: makeTrustUnlockMessage(trustUnlocksById.displayName),
         })
       }
 
       if (
         input.link !== null &&
         input.link !== context.locals.user.link &&
-        !context.locals.user.karmaUnlocks.websiteLink
+        !context.locals.user.trust.unlocks.websiteLink
       ) {
         throw new ActionError({
           code: 'FORBIDDEN',
-          message: makeKarmaUnlockMessage(karmaUnlocksById.websiteLink),
+          message: makeTrustUnlockMessage(trustUnlocksById.websiteLink),
         })
       }
 
-      if (input.pictureFile !== undefined && !context.locals.user.karmaUnlocks.profilePicture) {
+      if (input.pictureFile !== undefined && !context.locals.user.trust.unlocks.profilePicture) {
         throw new ActionError({
           code: 'FORBIDDEN',
-          message: makeKarmaUnlockMessage(karmaUnlocksById.profilePicture),
+          message: makeTrustUnlockMessage(trustUnlocksById.profilePicture),
         })
       }
 
-      if (input.removePicture && !context.locals.user.karmaUnlocks.profilePicture) {
+      if (input.removePicture && !context.locals.user.trust.unlocks.profilePicture) {
         throw new ActionError({
           code: 'FORBIDDEN',
-          message: makeKarmaUnlockMessage(karmaUnlocksById.profilePicture),
+          message: makeTrustUnlockMessage(trustUnlocksById.profilePicture),
         })
       }
 
@@ -231,9 +237,11 @@ export const accountActions = {
       const user = await prisma.user.update({
         where: { id: context.locals.user.id },
         data: {
-          displayName: context.locals.user.karmaUnlocks.displayName ? (input.displayName ?? null) : undefined,
-          link: context.locals.user.karmaUnlocks.websiteLink ? (input.link ?? null) : undefined,
-          picture: context.locals.user.karmaUnlocks.profilePicture
+          displayName: context.locals.user.trust.unlocks.displayName
+            ? (input.displayName ?? null)
+            : undefined,
+          link: context.locals.user.trust.unlocks.websiteLink ? (input.link ?? null) : undefined,
+          picture: context.locals.user.trust.unlocks.profilePicture
             ? input.removePicture
               ? null
               : (pictureUrl ?? undefined)
@@ -261,9 +269,9 @@ export const accountActions = {
         })
       }
 
-      await prisma.user.delete({
-        where: { id: context.locals.user.id },
-      })
+      await deleteUserAccount(prisma, context.locals.user.id)
+
+      await cleanupCommentEvidenceFiles()
 
       const deletedUser = pick(context.locals.user, ['id', 'name', 'displayName', 'picture'])
 

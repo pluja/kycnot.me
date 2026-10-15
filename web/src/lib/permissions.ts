@@ -13,7 +13,7 @@ import type { Capability } from '../constants/capabilities'
 // `admin` is a superuser (passes every capability); everything else is
 // capability-gated. `verified`/`spammer` remain separate user-state flags.
 
-type UserForPermissions = {
+export type UserForPermissions = {
   admin: boolean
   capabilities: string[]
 }
@@ -21,7 +21,7 @@ type UserForPermissions = {
 // capabilityRequirementsMet is true when everything the capability requires is
 // itself held, recursively. A requirement cycle would recurse forever; the
 // capabilities test rejects one before it can ship.
-export function capabilityRequirementsMet(granted: readonly string[], capability: Capability): boolean {
+function capabilityRequirementsMet(granted: readonly string[], capability: Capability): boolean {
   return (capabilityRequirements[capability] ?? []).every(
     (required) => granted.includes(required) && capabilityRequirementsMet(granted, required)
   )
@@ -99,28 +99,21 @@ export function userCanAccessAdmin(user: UserForPermissions | null | undefined):
   )
 }
 
-// isStaff marks support-level staff (comment + service powers) for the public
-// "Staff" badge. Admins are reported separately via their own badge.
+// isStaff is a moderator who can also edit services.
 export function isStaff(user: UserForPermissions | null | undefined): boolean {
   return userCan(user, 'comments:moderate') && userCan(user, 'services:edit')
 }
 
-// Capabilities whose holders act on public content, so they are named publicly.
-// Internal grants (stats, audit, notifications...) stay private.
-const moderatorCapabilities = [
-  'cases:manage',
-  'comments:moderate',
-  'events:manage',
-  'suggestions:manage',
-] as const satisfies Capability[]
-
-// staffBadgeLabel names a team member publicly: "Staff" for the isStaff set, and
-// "Moderator" for anyone else holding a moderation capability.
-export function staffBadgeLabel(user: UserForPermissions | null | undefined): 'Moderator' | 'Staff' | null {
-  if (isStaff(user)) return 'Staff'
-  if (moderatorCapabilities.some((capability) => userCan(user, capability))) return 'Moderator'
-  return null
+// staffBadgeLabel names only people who can moderate posts. Narrower grants like cases:manage stay private,
+// and admins get their own badge.
+export function staffBadgeLabel(user: UserForPermissions | null | undefined): 'Moderator' | null {
+  return !user?.admin && userCan(user, 'comments:moderate') ? 'Moderator' : null
 }
+
+// postStaffRole is the staff role an author's posts show, and staffNameClasses the colour of their name.
+export const postStaffRole = (user: UserForPermissions | null | undefined) =>
+  user?.admin ? ('Admin' as const) : staffBadgeLabel(user)
+export const staffNameClasses = { Admin: 'text-green-300', Moderator: 'text-teal-300' } as const
 
 // hasAnyCapability is true for any holder of at least one capability. The admin
 // user list keys both its "Staff" filter and the per-row badge on this, so a

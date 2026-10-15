@@ -10,6 +10,7 @@ export const capabilityPresets = [
     capabilities: [
       'services:edit',
       'comments:moderate',
+      'comments:redact',
       'contact:manage',
       'attributes:manage',
       'suggestions:manage',
@@ -24,13 +25,13 @@ export const capabilityPresets = [
     id: 'moderator',
     label: 'Moderator',
     icon: 'ri:shield-user-line',
-    capabilities: ['events:manage', 'suggestions:manage', 'comments:moderate'],
+    capabilities: ['events:manage', 'suggestions:manage', 'comments:moderate', 'comments:redact'],
   },
   {
     id: 'comments-moderator',
     label: 'Comments moderator',
     icon: 'ri:chat-check-line',
-    capabilities: ['comments:moderate'],
+    capabilities: ['comments:moderate', 'comments:redact'],
   },
   {
     id: 'cases-manager',

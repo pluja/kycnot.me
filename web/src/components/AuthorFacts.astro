@@ -1,0 +1,41 @@
+---
+import { format } from 'date-fns'
+
+import { countOf } from '../lib/pluralize'
+import { computeTrustUnlocks, type TrustFacts } from '../lib/trust'
+
+import BadgeSmall from './BadgeSmall.astro'
+import Tooltip from './Tooltip.astro'
+
+type Props = { facts?: TrustFacts | null; memberSince?: Date }
+const { facts, memberSince } = Astro.props
+const summary =
+  facts && memberSince
+    ? [
+        [
+          facts.publishedPosts > 0 && countOf(facts.publishedPosts, 'post', 'posts'),
+          facts.checkedProofPosts > 0 && `${facts.checkedProofPosts.toLocaleString()} with checked proof`,
+          `member since ${format(memberSince, 'yyyy')}`,
+        ]
+          .filter((item) => !!item)
+          .join(' · '),
+        facts.approvedSuggestions > 0 &&
+          countOf(facts.approvedSuggestions, 'approved suggestion', 'approved suggestions'),
+      ]
+        .filter((line) => !!line)
+        .join('\n')
+    : null
+const isVeteran = !!facts && !!memberSince && computeTrustUnlocks(facts, memberSince).veteranBadge
+---
+
+{
+  summary ? (
+    <Tooltip size="sm" text={summary}>
+      <slot />
+      <span class="sr-only">{summary}</span>
+    </Tooltip>
+  ) : (
+    <slot />
+  )
+}
+{isVeteran && <BadgeSmall text="Veteran" icon="ri:medal-line" color="amber" variant="faded" />}

@@ -7,6 +7,8 @@ import Captcha from '../../components/Captcha.astro'
 import InputHoneypotTrap from '../../components/InputHoneypotTrap.astro'
 import MiniLayout from '../../layouts/MiniLayout.astro'
 import { callActionWithObject } from '../../lib/callActionWithUrlParams'
+import { makeSafeRedirectUrl } from '../../lib/redirectUrls'
+import { siteOrigin } from '../../lib/urls'
 import { prettifyUserSecretToken } from '../../lib/userSecretToken'
 
 const generateResult = Astro.getActionResult(actions.account.generate)
@@ -18,6 +20,7 @@ const data = await callActionWithObject(Astro, actions.account.preGenerateToken,
 
 const preGeneratedToken = data?.token
 const prettyToken = preGeneratedToken ? prettifyUserSecretToken(preGeneratedToken) : undefined
+const returnPath = makeSafeRedirectUrl(Astro.url.searchParams.get('redirect'), siteOrigin)
 ---
 
 {/* eslint-disable astro/jsx-a11y/no-autofocus */}
@@ -57,6 +60,7 @@ const prettyToken = preGeneratedToken ? prettifyUserSecretToken(preGeneratedToke
   }
 
   <form method="POST" action={`/account/welcome${actions.account.generate}`}>
+    {returnPath !== '/' && <input type="hidden" name="redirect" value={returnPath} />}
     {/* Hack to make password managers suggest saving the secret token */}
     <div class="-z-50 m-0 mb-2 grid h-4 grid-cols-2">
       <input
@@ -83,8 +87,10 @@ const prettyToken = preGeneratedToken ? prettifyUserSecretToken(preGeneratedToke
       />
     </div>
 
-    {/* Name must match the account.generate schema key, or the account is built
-        from a fresh token and the one saved above belongs to nobody. */}
+    {
+      /* Name must match the account.generate schema key, or the account is built
+        from a fresh token and the one saved above belongs to nobody. */
+    }
     <input type="hidden" name="token" value={preGeneratedToken} autocomplete="off" />
 
     <Captcha action={actions.account.generate} autofocus />

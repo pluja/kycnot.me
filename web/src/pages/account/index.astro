@@ -2,28 +2,32 @@
 import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 import { differenceInCalendarDays } from 'date-fns'
-import { sortBy } from 'lodash-es'
 
 import BadgeSmall from '../../components/BadgeSmall.astro'
 import Button from '../../components/Button.astro'
 import MyPicture from '../../components/MyPicture.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import Tooltip from '../../components/Tooltip.astro'
-import UserBadge from '../../components/UserBadge.astro'
-import { getKarmaTransactionActionInfo } from '../../constants/karmaTransactionActions'
-import { karmaUnlocks, karmaUnlocksById } from '../../constants/karmaUnlocks'
+import TrustUnlocksList from '../../components/TrustUnlocksList.astro'
 import { getServiceSuggestionStatusInfo } from '../../constants/serviceSuggestionStatus'
 import { getServiceSuggestionTypeInfo } from '../../constants/serviceSuggestionType'
 import { getServiceUserRoleInfo } from '../../constants/serviceUserRoles'
+import { trustUnlocksById } from '../../constants/trustUnlocks'
 import { verificationStatusesByValue } from '../../constants/verificationStatus'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
-import { makeUserWithKarmaUnlocks } from '../../lib/karmaUnlocks'
+import { safeHttpUrl } from '../../lib/exchange/safeUrl'
 import { staffBadgeLabel } from '../../lib/permissions'
 import { pluralize } from '../../lib/pluralize'
 import { prisma } from '../../lib/prisma'
 import { makeLoginUrl } from '../../lib/redirectUrls'
 import { formatDateShort } from '../../lib/timeAgo'
+import {
+  commentsDisabledMessage,
+  makeTrustUnlockMessage,
+  makeUserWithTrust,
+  trustRecord,
+} from '../../lib/trust'
 import { urlDomain } from '../../lib/urls'
 
 const userId = Astro.locals.user?.id
@@ -35,7 +39,7 @@ const updateResult = Astro.getActionResult(actions.account.update)
 Astro.locals.banners.addIfSuccess(updateResult, 'Profile updated successfully')
 
 const user = await Astro.locals.banners.try('user', async () => {
-  return makeUserWithKarmaUnlocks(
+  return makeUserWithTrust(
     await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -49,39 +53,12 @@ const user = await Astro.locals.banners.try('user', async () => {
         admin: true,
         capabilities: true,
         verifiedLink: true,
-        totalKarma: true,
         createdAt: true,
         scheduledDeletionAt: true,
         _count: {
           select: {
             comments: true,
-            commentVotes: true,
-            karmaTransactions: true,
           },
-        },
-        karmaTransactions: {
-          select: {
-            id: true,
-            points: true,
-            action: true,
-            description: true,
-            createdAt: true,
-            grantedBy: {
-              select: {
-                name: true,
-                displayName: true,
-                picture: true,
-              },
-            },
-            comment: {
-              select: {
-                id: true,
-                content: true,
-              },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 5,
         },
         suggestions: {
           select: {
@@ -105,35 +82,12 @@ const user = await Astro.locals.banners.try('user', async () => {
             id: true,
             content: true,
             createdAt: true,
-            upvotes: true,
             status: true,
             service: {
               select: {
                 id: true,
                 name: true,
                 slug: true,
-              },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-        },
-        commentVotes: {
-          select: {
-            id: true,
-            downvote: true,
-            createdAt: true,
-            comment: {
-              select: {
-                id: true,
-                content: true,
-                service: {
-                  select: {
-                    id: true,
-                    name: true,
-                    slug: true,
-                  },
-                },
               },
             },
           },
@@ -161,12 +115,22 @@ const user = await Astro.locals.banners.try('user', async () => {
 })
 
 if (!user) return Astro.rewrite('/404')
+const website = safeHttpUrl(user.link)
 
 const staffLabel = staffBadgeLabel(user)
 
 const daysUntilDeletion = user.scheduledDeletionAt
   ? differenceInCalendarDays(user.scheduledDeletionAt, new Date())
   : null
+
+const trustFacts = [
+  ...trustRecord(user.trust).map(({ count, ...fact }) => ({ ...fact, value: count.toLocaleString() })),
+  {
+    label: 'Member since',
+    icon: 'ri:calendar-line',
+    value: formatDateShort(user.createdAt, { prefix: false, caseType: 'sentence' }),
+  },
+]
 ---
 
 <BaseLayout
@@ -289,14 +253,18 @@ const daysUntilDeletion = user.scheduledDeletionAt
               </div>
             </li>
 
-            <Tooltip as="li" text="Unlock with more karma" class="inline-flex items-start">
+            <Tooltip
+              as="li"
+              text={makeTrustUnlockMessage(trustUnlocksById.displayName)}
+              class="inline-flex items-start"
+            >
               <span class="mt-0.5 mr-2 text-day-500">
                 <Icon name="ri:user-smile-line" class="size-4" />
               </span>
               <div>
                 <p class="text-xs text-day-500">
                   Display Name {
-                    !user.karmaUnlocks.displayName && (
+                    !user.trust.unlocks.displayName && (
                       <Icon name="ri:lock-line" class="inline-block size-3 align-[-0.15em]" />
                     )
                   }
@@ -308,14 +276,18 @@ const daysUntilDeletion = user.scheduledDeletionAt
               </div>
             </Tooltip>
 
-            <Tooltip as="li" text="Unlock with more karma" class="inline-flex items-start">
+            <Tooltip
+              as="li"
+              text={makeTrustUnlockMessage(trustUnlocksById.websiteLink)}
+              class="inline-flex items-start"
+            >
               <span class="mt-0.5 mr-2 text-day-500">
                 <Icon name="ri:link" class="size-4" />
               </span>
               <div>
                 <p class="text-xs text-day-500">
                   Website {
-                    !user.karmaUnlocks.websiteLink && (
+                    !user.trust.unlocks.websiteLink && (
                       <Icon name="ri:lock-line" class="inline-block size-3 align-[-0.15em]" />
                     )
                   }
@@ -323,14 +295,9 @@ const daysUntilDeletion = user.scheduledDeletionAt
 
                 <p class="text-day-300">
                   {
-                    user.link ? (
-                      <a
-                        href={user.link}
-                        target="_blank"
-                        rel="noopener"
-                        class="text-blue-400 hover:underline"
-                      >
-                        {user.link}
+                    website ? (
+                      <a href={website} target="_blank" rel="noopener" class="text-blue-400 hover:underline">
+                        {website}
                       </a>
                     ) : (
                       <span class="text-sm italic">Not set</span>
@@ -339,14 +306,6 @@ const daysUntilDeletion = user.scheduledDeletionAt
                 </p>
               </div>
             </Tooltip>
-
-            <li class="flex items-start">
-              <span class="mt-0.5 mr-2 text-day-500"><Icon name="ri:award-line" class="size-4" /></span>
-              <div>
-                <p class="text-xs text-day-500">Karma</p>
-                <p class="text-day-300">{user.totalKarma.toLocaleString()}</p>
-              </div>
-            </li>
           </ul>
         </div>
 
@@ -431,8 +390,7 @@ const daysUntilDeletion = user.scheduledDeletionAt
                       )}
                     </span>
                     <p class="mt-2 text-xs text-day-400">
-                      To prevent deletion, take any action such as voting, commenting, or suggesting a
-                      service.
+                      To prevent deletion, take any action such as posting, replying or suggesting a service.
                     </p>
                   </div>
                 </li>
@@ -558,147 +516,55 @@ const daysUntilDeletion = user.scheduledDeletionAt
 
   <section
     class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs"
-    id="karma-unlocks"
+    id="trust"
   >
     <header>
       <h2 class="mb-4 font-title text-xl font-bold text-day-200">
-        <Icon name="ri:lock-unlock-line" class="mr-2 inline-block size-5" />
-        Karma Unlocks
+        <Icon name="ri:shield-user-line" class="mr-2 inline-block size-5" />
+        Trust
       </h2>
 
       <p class="mb-4 text-day-300">
-        Earn karma to unlock features and privileges. <a href="/docs/karma" class="text-day-200 hover:underline">Learn about karma</a>
+        Published posts, checked proof and approved suggestions unlock features over time.
+        <a href="/docs/trust" class="text-day-200 hover:underline">Learn more about trust</a>
       </p>
     </header>
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <div class="space-y-3">
-        <input type="checkbox" id="positive-unlocks-toggle" class="peer sr-only md:hidden" checked />
-        <label
-          for="positive-unlocks-toggle"
-          class="flex cursor-pointer items-center justify-between border-b border-green-500/20 pb-2 peer-checked:**:data-expand-arrow:rotate-180 md:cursor-default"
-        >
-          <h3 class="font-title text-sm text-day-200">Positive unlocks</h3>
-          <Icon name="ri:arrow-down-s-line" class="size-5 text-day-400 md:hidden" data-expand-arrow />
-        </label>
+    <ul class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      {
+        trustFacts.map((fact) => (
+          <li class="flex items-start">
+            <span class="mt-0.5 mr-2 text-day-500">
+              <Icon name={fact.icon} class="size-4" />
+            </span>
+            <div>
+              <p class="text-xs text-day-500">{fact.label}</p>
+              <p class="text-day-300">{fact.value}</p>
+            </div>
+          </li>
+        ))
+      }
+    </ul>
 
-        <div class="mt-3 hidden space-y-3 peer-checked:block md:block">
-          {
-            sortBy(
-              karmaUnlocks.filter((unlock) => unlock.karma >= 0 || unlock.unlockDirection === 'gte'),
-              'karma'
-            ).map((unlock) => (
-              <div
-                class={cn(
-                  'flex items-center justify-between rounded-md border p-3',
-                  user.karmaUnlocks[unlock.id]
-                    ? 'border-green-500/30 bg-green-500/10'
-                    : 'border-night-500 bg-night-800'
-                )}
-              >
-                <div class="flex items-center">
-                  <span class={cn('mr-3', user.karmaUnlocks[unlock.id] ? 'text-day-400' : 'text-day-500')}>
-                    <Icon name={unlock.icon} class="size-5" />
-                  </span>
-                  <div>
-                    <p
-                      class={cn(
-                        'font-medium',
-                        user.karmaUnlocks[unlock.id] ? 'text-day-300' : 'text-day-400'
-                      )}
-                    >
-                      {unlock.name}
-                    </p>
-                    <p class="text-sm text-day-500">{unlock.karmaLabel ?? `${unlock.karma.toLocaleString()} karma`}</p>
-                  </div>
-                </div>
-                <div>
-                  {user.karmaUnlocks[unlock.id] ? (
-                    <span class="inline-flex items-center rounded-full bg-day-500/20 px-2 py-1 text-xs text-day-300">
-                      <Icon name="ri:check-line" class="mr-1 size-3" /> Unlocked
-                    </span>
-                  ) : (
-                    <span class="inline-flex items-center rounded-full bg-night-800 px-2 py-1 text-xs text-day-400">
-                      <Icon name="ri:lock-line" class="mr-1 size-3" /> Locked
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))
-          }
-        </div>
-
-        <p class="mt-4 rounded-md border border-night-500/30 bg-night-800/70 p-3 text-xs text-day-400">
-          <span class="font-bold text-day-300">*</span>
-          Reviews with approved usage proof get 90% weight. Verified reviews get 100%.
+    {
+      user.trust.untrusted && (
+        <p class="mb-4 rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-200">
+          <Icon name="ri:time-line" class="mr-1 inline-block size-4 align-[-0.15em]" />
+          Because of recent rejections, a moderator reviews your posts before they are published.
         </p>
-      </div>
+      )
+    }
 
-      <div class="space-y-3">
-        <input type="checkbox" id="negative-unlocks-toggle" class="peer sr-only md:hidden" />
+    {
+      user.trust.commentsDisabled && (
+        <p class="mb-4 rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+          <Icon name="ri:forbid-line" class="mr-1 inline-block size-4 align-[-0.15em]" />
+          {commentsDisabledMessage}
+        </p>
+      )
+    }
 
-        <label
-          for="negative-unlocks-toggle"
-          class="flex cursor-pointer items-center justify-between border-b border-red-500/20 pb-2 peer-checked:**:data-expand-arrow:rotate-180 md:cursor-default"
-        >
-          <h3 class="font-title text-sm text-red-400">Negative unlocks</h3>
-          <Icon name="ri:arrow-down-s-line" class="size-5 text-day-400 md:hidden" data-expand-arrow />
-        </label>
-
-        <div class="mt-3 hidden space-y-3 peer-checked:block md:block">
-          {
-            sortBy(
-              karmaUnlocks.filter((unlock) => unlock.karma < 0 && unlock.unlockDirection !== 'gte'),
-              'karma'
-            )
-              .reverse()
-              .map((unlock) => (
-                <div
-                  class={cn(
-                    'flex items-center justify-between rounded-md border p-3',
-                    user.karmaUnlocks[unlock.id]
-                      ? 'border-red-500/30 bg-red-500/10'
-                      : 'border-night-500 bg-night-800'
-                  )}
-                >
-                  <div class="flex items-center">
-                    <span class={cn('mr-3', user.karmaUnlocks[unlock.id] ? 'text-red-400' : 'text-day-500')}>
-                      <Icon name={unlock.icon} class="size-5" />
-                    </span>
-                    <div>
-                      <p
-                        class={cn(
-                          'font-medium',
-                          user.karmaUnlocks[unlock.id] ? 'text-red-400' : 'text-day-400'
-                        )}
-                      >
-                        {unlock.name}
-                      </p>
-                      <p class="text-sm text-day-500">{unlock.karma.toLocaleString()} karma</p>
-                    </div>
-                  </div>
-                  <div>
-                    {user.karmaUnlocks[unlock.id] ? (
-                      <span class="inline-flex items-center rounded-full bg-red-500/20 px-2 py-1 text-xs text-red-400">
-                        <Icon name="ri:alert-line" class="mr-1 size-3" /> Active
-                      </span>
-                    ) : (
-                      <span class="inline-flex items-center rounded-full bg-night-800 px-2 py-1 text-xs text-day-400">
-                        <Icon name="ri:shield-check-line" class="mr-1 size-3" /> Avoided
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))
-          }
-
-          <p class="mt-4 rounded-md border border-night-500/30 bg-night-800/70 p-3 text-xs text-day-400">
-            <Icon name="ri:information-line" class="inline-block size-4" />
-            Negative karma leads to restrictions. Keep interactions positive to avoid penalties.
-          </p>
-        </div>
-      </div>
-    </div>
+    <TrustUnlocksList unlocks={user.trust.unlocks} />
   </section>
 
   <div class="space-y-6">
@@ -722,7 +588,6 @@ const daysUntilDeletion = user.scheduledDeletionAt
                   <th class="px-4 py-3 text-left text-xs text-day-400">Service</th>
                   <th class="px-4 py-3 text-left text-xs text-day-400">Comment</th>
                   <th class="px-4 py-3 text-center text-xs text-day-400">Status</th>
-                  <th class="px-4 py-3 text-center text-xs text-day-400">Upvotes</th>
                   <th class="px-4 py-3 text-right text-xs text-day-400">Date</th>
                 </tr>
               </thead>
@@ -742,11 +607,6 @@ const daysUntilDeletion = user.scheduledDeletionAt
                         {comment.status}
                       </span>
                     </td>
-                    <td class="px-4 py-3 text-center text-xs text-day-300">
-                      <span class="inline-flex items-center">
-                        <Icon name="ri:thumb-up-line" class="mr-1 size-4" /> {comment.upvotes}
-                      </span>
-                    </td>
                     <td class="px-4 py-3 text-right text-xs whitespace-nowrap text-day-400">
                       <TimeFormatted
                         date={comment.createdAt}
@@ -763,87 +623,6 @@ const daysUntilDeletion = user.scheduledDeletionAt
         )
       }
     </section>
-
-    {
-      user.karmaUnlocks.voteComments || user._count.commentVotes ? (
-        <section class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
-          <header class="flex items-center justify-between">
-            <h2 class="mb-4 font-title text-xl font-bold text-day-200">
-              <Icon name="ri:thumb-up-line" class="mr-2 inline-block size-5" />
-              Recent Votes
-            </h2>
-            <span class="text-day-500">{user._count.commentVotes.toLocaleString()} votes</span>
-          </header>
-
-          {user.commentVotes.length === 0 ? (
-            <p class="text-day-400">No votes yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full min-w-full divide-y divide-night-400/20">
-                <thead>
-                  <tr>
-                    <th class="px-4 py-3 text-left text-xs text-day-400">Service</th>
-                    <th class="px-4 py-3 text-left text-xs text-day-400">Comment</th>
-                    <th class="px-4 py-3 text-center text-xs text-day-400">Vote</th>
-                    <th class="px-4 py-3 text-right text-xs text-day-400">Date</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-night-400/10">
-                  {user.commentVotes.map((vote) => (
-                    <tr class="hover:bg-night-500/5">
-                      <td class="px-4 py-3 text-xs whitespace-nowrap text-day-300">
-                        <a
-                          href={`/service/${vote.comment.service.slug}`}
-                          class="text-blue-400 hover:underline"
-                        >
-                          {vote.comment.service.name}
-                        </a>
-                      </td>
-                      <td class="px-4 py-3 text-day-300">
-                        <p class="line-clamp-1">{vote.comment.content}</p>
-                      </td>
-                      <td class="px-4 py-3 text-center">
-                        {vote.downvote ? (
-                          <span class="inline-flex items-center text-red-400">
-                            <Icon name="ri:thumb-down-fill" class="size-4" />
-                          </span>
-                        ) : (
-                          <span class="inline-flex items-center text-green-400">
-                            <Icon name="ri:thumb-up-fill" class="size-4" />
-                          </span>
-                        )}
-                      </td>
-                      <td class="px-4 py-3 text-right text-xs whitespace-nowrap text-day-400">
-                        <TimeFormatted
-                          date={vote.createdAt}
-                          prefix={false}
-                          hourPrecision
-                          caseType="sentence"
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      ) : (
-        <section class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
-          <h2 class="grow-9999 font-title text-xl font-bold text-day-200">
-            <Icon name="ri:thumb-up-line" class="mr-2 inline-block size-5" />
-            Recent Votes
-          </h2>
-          <Tooltip
-            text={`Get ${(karmaUnlocksById.voteComments.karma - user.totalKarma).toLocaleString()} more karma to unlock`}
-            class="inline-flex grow items-center justify-center gap-1 text-day-500"
-          >
-            <Icon name="ri:lock-line" class="inline-block size-5" />
-            Locked
-          </Tooltip>
-        </section>
-      )
-    }
 
     <section class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs">
       <header class="flex items-center justify-between">
@@ -903,77 +682,6 @@ const daysUntilDeletion = user.scheduledDeletionAt
                       <td class="px-4 py-3 text-right text-xs whitespace-nowrap text-day-400">
                         <TimeFormatted
                           date={suggestion.createdAt}
-                          prefix={false}
-                          hourPrecision
-                          caseType="sentence"
-                        />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )
-      }
-    </section>
-
-    <section
-      class="rounded-lg border border-night-400 bg-night-400/5 p-6 shadow-sm backdrop-blur-xs"
-      id="karma-transactions"
-    >
-      <header class="flex items-center justify-between">
-        <h2 class="mb-4 font-title text-xl font-bold text-day-200">
-          <Icon name="ri:exchange-line" class="mr-2 inline-block size-5" />
-          Recent Karma Transactions
-        </h2>
-        <span class="text-day-500">{user.totalKarma.toLocaleString()} karma</span>
-      </header>
-
-      {
-        user.karmaTransactions.length === 0 ? (
-          <p class="text-day-400">No karma transactions yet.</p>
-        ) : (
-          <div class="overflow-x-auto">
-            <table class="w-full min-w-full divide-y divide-night-400/20">
-              <thead>
-                <tr>
-                  <th class="px-4 py-3 text-left text-xs text-day-400">Action</th>
-                  <th class="px-4 py-3 text-left text-xs text-day-400">Description</th>
-                  <th class="px-4 py-3 text-right text-xs text-day-400">Points</th>
-                  <th class="px-4 py-3 text-right text-xs text-day-400">Date</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-night-400/10">
-                {user.karmaTransactions.map((transaction) => {
-                  const actionInfo = getKarmaTransactionActionInfo(transaction.action)
-                  return (
-                    <tr class="hover:bg-night-500/5">
-                      <td class="px-4 py-3 text-xs whitespace-nowrap text-day-300">
-                        <span class="inline-flex items-center gap-1">
-                          <Icon name={actionInfo.icon} class="size-4" />
-                          {actionInfo.label}
-                          {transaction.action === 'MANUAL_ADJUSTMENT' && transaction.grantedBy && (
-                            <>
-                              <span class="text-day-500">from</span>
-                              <UserBadge user={transaction.grantedBy} size="sm" class="text-day-500" />
-                            </>
-                          )}
-                        </span>
-                      </td>
-                      <td class="px-4 py-3 text-day-300">{transaction.description}</td>
-                      <td
-                        class={cn(
-                          'px-4 py-3 text-right text-xs whitespace-nowrap',
-                          transaction.points >= 0 ? 'text-green-400' : 'text-red-400'
-                        )}
-                      >
-                        {transaction.points >= 0 && '+'}
-                        {transaction.points}
-                      </td>
-                      <td class="px-4 py-3 text-right text-xs whitespace-nowrap text-day-400">
-                        <TimeFormatted
-                          date={transaction.createdAt}
                           prefix={false}
                           hourPrecision
                           caseType="sentence"

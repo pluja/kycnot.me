@@ -4,6 +4,7 @@ import { z } from 'astro:content'
 import { orderBy as lodashOrderBy } from 'lodash-es'
 
 import Button from '../../../components/Button.astro'
+import Pagination from '../../../components/Pagination.astro'
 import SortArrowIcon from '../../../components/SortArrowIcon.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
 import Tooltip from '../../../components/Tooltip.astro'
@@ -20,7 +21,7 @@ import type { Prisma } from '@prisma/client'
 
 const { data: filters } = zodParseQueryParamsStoringErrors(
   {
-    'sort-by': z.enum(['name', 'role', 'lastLoginAt', 'karma', 'createdAt']).default('createdAt'),
+    'sort-by': z.enum(['name', 'role', 'lastLoginAt', 'createdAt']).default('createdAt'),
     'sort-order': z.enum(['asc', 'desc']).default('desc'),
     search: z.string().optional(),
     role: z.enum(['user', 'admin', 'staff', 'verified', 'spammer', 'has-api-key']).optional(),
@@ -32,13 +33,9 @@ const { data: filters } = zodParseQueryParamsStoringErrors(
 
 // Set up Prisma orderBy with correct typing
 const prismaOrderBy =
-  filters['sort-by'] === 'name' ||
-  filters['sort-by'] === 'createdAt' ||
-  filters['sort-by'] === 'lastLoginAt' ||
-  filters['sort-by'] === 'karma'
+  filters['sort-by'] === 'name' || filters['sort-by'] === 'createdAt' || filters['sort-by'] === 'lastLoginAt'
     ? {
-        [filters['sort-by'] === 'karma' ? 'totalKarma' : filters['sort-by']]:
-          filters['sort-order'] === 'asc' ? 'asc' : 'desc',
+        [filters['sort-by']]: filters['sort-order'] === 'asc' ? 'asc' : 'desc',
       }
     : { createdAt: 'desc' as const }
 
@@ -93,7 +90,6 @@ const dbUsers = await prisma.user.findMany({
     admin: true,
     capabilities: true,
     spammer: true,
-    totalKarma: true,
     createdAt: true,
     updatedAt: true,
     lastLoginAt: true,
@@ -133,12 +129,6 @@ const makeSortUrl = (sortBy: NonNullable<(typeof filters)['sort-by']>) => {
   return urlWithParams(Astro.url, {
     'sort-by': sortBy,
     'sort-order': filters['sort-by'] === sortBy && filters['sort-order'] === 'asc' ? 'desc' : 'asc',
-  })
-}
-
-const makePageUrl = (page: number) => {
-  return urlWithParams(Astro.url, {
-    page: page.toString(),
   })
 }
 
@@ -262,16 +252,6 @@ const makePageSizeUrl = (size: string) => {
                 </a>
               </th>
               <th
-                class="w-[10%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
-              >
-                <a href={makeSortUrl('karma')} class="flex items-center justify-center hover:text-zinc-200">
-                  Karma <SortArrowIcon
-                    active={filters['sort-by'] === 'karma'}
-                    sortOrder={filters['sort-order']}
-                  />
-                </a>
-              </th>
-              <th
                 class="w-[15%] px-4 py-3 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase"
               >
                 <div class="flex flex-wrap items-center justify-center gap-1">
@@ -365,13 +345,6 @@ const makePageSizeUrl = (size: string) => {
                       class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${user.admin ? 'bg-purple-900/30 text-purple-300' : 'bg-zinc-700 text-zinc-300'}`}
                     >
                       {user.admin ? 'Admin' : 'User'}
-                    </span>
-                  </td>
-                  <td class="px-4 py-3 text-center text-sm">
-                    <span
-                      class={`font-medium ${user.totalKarma >= 100 ? 'text-green-400' : user.totalKarma >= 0 ? 'text-zinc-300' : 'text-red-400'}`}
-                    >
-                      {user.totalKarma.toLocaleString()}
                     </span>
                   </td>
                   <td class="px-4 py-3 text-center text-sm">
@@ -473,50 +446,7 @@ const makePageSizeUrl = (size: string) => {
             <div class="text-xs text-zinc-400">
               Showing {startIndex + 1} to {Math.min(endIndex, totalUsers)} of {totalUsers} users
             </div>
-            <div class="flex gap-1">
-              {validPage > 1 && (
-                <a
-                  href={makePageUrl(validPage - 1)}
-                  class="rounded-md bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-600"
-                >
-                  <Icon name="ri:arrow-left-s-line" class="inline-block size-4 align-[-0.125em]" />
-                  Previous
-                </a>
-              )}
-              <div class="flex gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(
-                    (page) =>
-                      page === 1 || page === totalPages || (page >= validPage - 1 && page <= validPage + 1)
-                  )
-                  .map((page, index, array) => (
-                    <>
-                      {index > 0 && array[index - 1] !== page - 1 && (
-                        <span class="flex items-center px-2 text-zinc-500">...</span>
-                      )}
-                      <a
-                        href={makePageUrl(page)}
-                        class={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                          page === validPage
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
-                        }`}
-                      >
-                        {page}
-                      </a>
-                    </>
-                  ))}
-              </div>
-              {validPage < totalPages && (
-                <a
-                  href={makePageUrl(validPage + 1)}
-                  class="rounded-md bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-600"
-                >
-                  Next
-                  <Icon name="ri:arrow-right-s-line" class="inline-block size-4 align-[-0.125em]" />
-                </a>
-              )}
-            </div>
+            <Pagination currentPage={validPage} totalPages={totalPages} />
           </div>
         </div>
       )

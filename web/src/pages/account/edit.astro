@@ -4,10 +4,11 @@ import { actions, isInputError } from 'astro:actions'
 import Button from '../../components/Button.astro'
 import InputImageFile from '../../components/InputImageFile.astro'
 import InputText from '../../components/InputText.astro'
-import { karmaUnlocksById } from '../../constants/karmaUnlocks'
+import { trustUnlocksById } from '../../constants/trustUnlocks'
 import MiniLayout from '../../layouts/MiniLayout.astro'
-import { makeKarmaUnlockMessage } from '../../lib/karmaUnlocks'
 import { makeLoginUrl } from '../../lib/redirectUrls'
+import { makeTrustUnlockMessage } from '../../lib/trust'
+import { DISPLAY_NAME_MAX_LENGTH } from '../../lib/zodUtils'
 
 const user = Astro.locals.user
 if (!user) {
@@ -50,11 +51,11 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
       error={inputErrors.displayName}
       inputProps={{
         value: user.displayName,
-        maxlength: 100,
-        disabled: !user.karmaUnlocks.displayName,
+        maxlength: DISPLAY_NAME_MAX_LENGTH,
+        disabled: !user.trust.unlocks.displayName,
       }}
-      description={!user.karmaUnlocks.displayName
-        ? `${makeKarmaUnlockMessage(karmaUnlocksById.displayName)} [Learn more](/docs/karma)`
+      description={!user.trust.unlocks.displayName
+        ? `${makeTrustUnlockMessage(trustUnlocksById.displayName)} [Learn more](/docs/trust)`
         : undefined}
     />
 
@@ -66,10 +67,10 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
         value: user.link,
         type: 'url',
         placeholder: 'https://example.com',
-        disabled: !user.karmaUnlocks.websiteLink,
+        disabled: !user.trust.unlocks.websiteLink,
       }}
-      description={!user.karmaUnlocks.websiteLink
-        ? `${makeKarmaUnlockMessage(karmaUnlocksById.websiteLink)} [Learn more](/docs/karma)`
+      description={!user.trust.unlocks.websiteLink
+        ? `${makeTrustUnlockMessage(trustUnlocksById.websiteLink)} [Learn more](/docs/trust)`
         : undefined}
     />
 
@@ -79,9 +80,9 @@ const inputErrors = isInputError(result?.error) ? result.error.fields : {}
       value={user.picture}
       error={inputErrors.pictureFile}
       square
-      disabled={!user.karmaUnlocks.profilePicture}
-      description={!user.karmaUnlocks.profilePicture
-        ? `${makeKarmaUnlockMessage(karmaUnlocksById.profilePicture)} [Learn more](/docs/karma)`
+      disabled={!user.trust.unlocks.profilePicture}
+      description={!user.trust.unlocks.profilePicture
+        ? `${makeTrustUnlockMessage(trustUnlocksById.profilePicture)} [Learn more](/docs/trust)`
         : undefined}
       removeCheckbox={user.picture
         ? {

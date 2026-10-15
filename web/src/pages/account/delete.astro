@@ -31,8 +31,6 @@ const user = await Astro.locals.banners.try('Failed to load user profile', () =>
       picture: true,
       _count: {
         select: {
-          comments: true,
-          commentVotes: true,
           suggestions: true,
           suggestionMessages: true,
           verificationRequests: true,
@@ -76,7 +74,12 @@ if (!user) return Astro.rewrite('/404')
     href="/account"
     class="group relative mb-2 flex flex-col items-center rounded-xl border border-red-500/10 bg-red-500/10 p-4"
   >
-    <UserBadge user={user} size="lg" noLink classNames={{ text: 'group-hover:underline' }} />
+    <UserBadge
+      user={{ name: user.name, displayName: user.displayName, picture: user.picture }}
+      size="lg"
+      noLink
+      classNames={{ text: 'group-hover:underline' }}
+    />
     <Icon
       name="ri:forbid-line"
       class="absolute top-1/2 left-3 hidden size-8 -translate-y-1/2 text-red-300/10 2xs:block"
@@ -91,20 +94,6 @@ if (!user) return Astro.rewrite('/404')
     <li>
       <span class="me-1 align-[-0.1em] text-2xl font-bold text-day-200">1</span>
       <span class="text-sm text-day-400">User</span>
-    </li>
-
-    <li>
-      <span class="me-1 align-[-0.1em] text-2xl font-bold text-day-200"
-        >{user._count.comments.toLocaleString()}</span
-      >
-      <span class="text-sm text-day-400">Comments <span class="text-xs">(+ their replies)</span></span>
-    </li>
-
-    <li>
-      <span class="me-1 align-[-0.1em] text-2xl font-bold text-day-200"
-        >{user._count.commentVotes.toLocaleString()}</span
-      >
-      <span class="text-sm text-day-400">Comment Votes</span>
     </li>
 
     <li>
@@ -128,6 +117,14 @@ if (!user) return Astro.rewrite('/404')
       <span class="text-sm text-day-400">Verification Requests</span>
     </li>
   </ul>
+
+  <p class="mb-8 text-sm text-pretty text-day-400">
+    Deleting your account doesn't remove what you published. Your posts and replies that were ever public
+    stay, with their proof, shown as from a deleted account and no longer linked to you. Posts that were never
+    published or were rejected are deleted, along with your account and service suggestions. If you want
+    something specific removed, <a href="/contact" class="underline">ask us</a> before deleting your account. Messages
+    you sent us through the contact page stay as moderation records.
+  </p>
 
   {
     user.admin || user.capabilities.length > 0 ? (
