@@ -1,0 +1,64 @@
+---
+import { authorDisplayName } from '../lib/authorName'
+import { cn } from '../lib/cn'
+import { makeCommentUrl } from '../lib/commentsWithReplies'
+
+import CommentStatusChip from './CommentStatusChip.astro'
+import TimeFormatted from './TimeFormatted.astro'
+import UserBadge from './UserBadge.astro'
+
+import type { CommentStatus } from '@prisma/client'
+import type { ComponentProps } from 'astro/types'
+
+type Props = {
+  post: {
+    id: number
+    content: string
+    status: CommentStatus
+    createdAt: Date
+    author: ComponentProps<typeof UserBadge>['user']
+    service: { name: string; slug: string }
+  }
+  // parent is the post this one replies to, shown so a reply can be judged in its thread.
+  parent?: { content: string; author: { name: string; displayName: string | null } | null } | null
+  // textHidden hides the text and author from viewers who may no longer read the post.
+  textHidden?: boolean
+  label?: string | null
+  class?: string
+}
+const { post, parent, textHidden = false, label, class: className } = Astro.props
+const threadUrl = makeCommentUrl({ serviceSlug: post.service.slug, commentId: post.id })
+---
+
+<div class={cn('rounded-md border border-night-600 bg-night-900 p-2.5', className)}>
+  <p class="mb-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-day-400">
+    <a href={threadUrl} class="font-medium text-day-200 hover:underline">{post.service.name}</a>
+    <span aria-hidden="true">·</span>
+    {
+      !textHidden && (
+        <>
+          <UserBadge user={post.author} size="sm" />
+          <span aria-hidden="true">·</span>
+        </>
+      )
+    }
+    <TimeFormatted date={post.createdAt} />
+    <CommentStatusChip id={`comment-status-${post.id.toString()}`} status={post.status} />
+    {!textHidden && label && <span class="text-day-500">{label}</span>}
+  </p>
+  {
+    !textHidden && parent && (
+      <p class="mb-1.5 line-clamp-2 border-l-2 border-night-500 pl-2 text-xs text-day-400">
+        <span class="text-day-500">{`Replying to ${authorDisplayName(parent.author)}:`}</span>{' '}
+        {parent.content}
+      </p>
+    )
+  }
+  {
+    textHidden ? (
+      <p class="text-xs text-day-500">This post is no longer public.</p>
+    ) : (
+      <p class="line-clamp-6 text-sm wrap-break-word whitespace-pre-wrap text-day-200">{post.content}</p>
+    )
+  }
+</div>

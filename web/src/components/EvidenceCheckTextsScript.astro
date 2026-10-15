@@ -1,0 +1,29 @@
+<script>
+  ////////////////////////////////////////////////////////////
+  // Optional script for the proof check form.              //
+  // Picking a result fills the explanation with its        //
+  // standard wording, unless the moderator typed in it.    //
+  // Listens on the document because the moderation panel  //
+  // is often swapped in by htmx. Without it, the server    //
+  // swaps a stale result's wording for the chosen one.     //
+  ////////////////////////////////////////////////////////////
+  import { defaultCheckTexts } from '../constants/evidenceCheckTexts'
+
+  document.addEventListener('input', (event) => {
+    const field = event.target
+    if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement)) return
+    if (!field.closest('[data-evidence-check-form]') || field.name === 'finding') return
+    field.dataset.edited = ''
+  })
+
+  document.addEventListener('change', (event) => {
+    const radio = event.target
+    if (!(radio instanceof HTMLInputElement) || radio.name !== 'finding') return
+    const form = radio.closest<HTMLFormElement>('[data-evidence-check-form]')
+    if (!form || !(radio.value in defaultCheckTexts)) return
+    const field = form.elements.namedItem('explanation')
+    if (field instanceof HTMLTextAreaElement && !('edited' in field.dataset)) {
+      field.value = defaultCheckTexts[radio.value as keyof typeof defaultCheckTexts].explanation
+    }
+  })
+</script>

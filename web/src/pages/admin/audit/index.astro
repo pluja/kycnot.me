@@ -4,8 +4,10 @@ import { z } from 'astro/zod'
 import { Icon } from 'astro-icon/components'
 
 import Button from '../../../components/Button.astro'
+import Pagination from '../../../components/Pagination.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
 import UserBadge from '../../../components/UserBadge.astro'
+import { adminFilterFieldClass } from '../../../constants/adminFilterField'
 import { auditActions, getAuditActionInfo } from '../../../constants/auditActions'
 import {
   auditTargetTypes,
@@ -166,9 +168,6 @@ const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 if (filters.page > totalPages) return Astro.redirect(urlWithParams(Astro.url, { page: totalPages }))
 const rangeStart = total === 0 ? 0 : (filters.page - 1) * PAGE_SIZE + 1
 const rangeEnd = Math.min(filters.page * PAGE_SIZE, total)
-
-const fieldClass =
-  'w-full rounded-md border border-night-500 bg-night-900 px-2.5 py-1.5 text-sm text-day-100 transition-colors [color-scheme:dark] focus:border-green-500/60 focus:outline-none'
 ---
 
 <BaseLayout pageTitle="Audit log" widthClassName="max-w-5xl" noindex>
@@ -189,7 +188,7 @@ const fieldClass =
         name="q"
         value={filters.q}
         placeholder="Search summaries..."
-        class={fieldClass}
+        class={adminFilterFieldClass}
       />
     </div>
     <div>
@@ -200,12 +199,12 @@ const fieldClass =
         name="actor"
         value={filters.actor}
         placeholder="Actor"
-        class={fieldClass}
+        class={adminFilterFieldClass}
       />
     </div>
     <div>
       <label for="target" class="sr-only">Target</label>
-      <select id="target" name="target" class={fieldClass}>
+      <select id="target" name="target" class={adminFilterFieldClass}>
         <option value="">All targets</option>
         {
           auditTargetTypes.map((type) => (
@@ -218,7 +217,7 @@ const fieldClass =
     </div>
     <div>
       <label for="action" class="sr-only">Action</label>
-      <select id="action" name="action" class={fieldClass}>
+      <select id="action" name="action" class={adminFilterFieldClass}>
         <option value="">All actions</option>
         {
           auditActions.map((action) => (
@@ -299,37 +298,5 @@ const fieldClass =
     ))
   }
 
-  {
-    totalPages > 1 && (
-      <nav class="mt-5 flex items-center justify-between gap-3" aria-label="Pagination">
-        {filters.page > 1 ? (
-          <Button
-            as="a"
-            href={urlWithParams(Astro.url, { page: filters.page - 1 })}
-            label="Newer"
-            icon="ri:arrow-left-line"
-            size="sm"
-            variant="faded"
-          />
-        ) : (
-          <span />
-        )}
-        <span class="text-xs text-day-500">
-          Page {filters.page} of {totalPages}
-        </span>
-        {filters.page < totalPages ? (
-          <Button
-            as="a"
-            href={urlWithParams(Astro.url, { page: filters.page + 1 })}
-            label="Older"
-            icon="ri:arrow-right-line"
-            size="sm"
-            variant="faded"
-          />
-        ) : (
-          <span />
-        )}
-      </nav>
-    )
-  }
+  <Pagination currentPage={filters.page} totalPages={totalPages} class="mt-6" />
 </BaseLayout>

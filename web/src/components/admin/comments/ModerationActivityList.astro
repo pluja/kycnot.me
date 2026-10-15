@@ -1,0 +1,28 @@
+---
+import TimeFormatted from '../../TimeFormatted.astro'
+
+type Props = {
+  entries: {
+    createdAt: Date
+    summary: string
+    actor: { name: string; displayName: string | null } | null
+  }[]
+}
+const { entries } = Astro.props
+---
+
+<ol class="space-y-0.5">
+  {
+    entries.map((entry) => (
+      <li class="grid grid-cols-[6.5rem_1fr] gap-2">
+        <TimeFormatted date={entry.createdAt} class="text-day-500" />
+        <span class="text-day-200">
+          {entry.summary}
+          <span class="text-day-500">
+            {` · ${entry.actor ? (entry.actor.displayName ?? entry.actor.name) : 'Platform'}`}
+          </span>
+        </span>
+      </li>
+    ))
+  }
+</ol>

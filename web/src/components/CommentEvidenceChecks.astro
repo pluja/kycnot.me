@@ -1,0 +1,358 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import {
+  evidenceFindings,
+  evidenceFindingsByValue,
+  evidenceKindsByValue,
+  findingLabel,
+} from '../constants/experiences'
+import { cn } from '../lib/cn'
+import { getFormReplay } from '../lib/formReplay'
+import { checkTimeline, lookupUrlFor, proofStatus } from '../lib/proofEvidence'
+
+import DeleteConfirmButton from './admin/DeleteConfirmButton.astro'
+import Button from './Button.astro'
+import CommentPrivateEvidence from './CommentPrivateEvidence.astro'
+import EvidenceCheckTextsScript from './EvidenceCheckTextsScript.astro'
+import FormReplay from './FormReplay.astro'
+import InputCheckbox from './InputCheckbox.astro'
+import InputTextArea from './InputTextArea.astro'
+import TimeFormatted from './TimeFormatted.astro'
+import Tooltip from './Tooltip.astro'
+
+import type { CommentPageEvidence, CommentPagePrivateEvidence } from '../lib/commentPage'
+import type { CommentIssueType } from '@prisma/client'
+
+export type ReusedProof = { normalizedId: string | null; commentId: number | null }
+type Props = {
+  commentId: number
+  postAuthorId: number | null
+  issues: CommentIssueType[]
+  evidence: CommentPageEvidence[]
+  privateEvidence: CommentPagePrivateEvidence[]
+  reusedProof: ReusedProof[]
+  panelPath: string
+  lookupUrlTemplate: string | null
+  // hasProofRequest hides the one-click note clear: a note may answer the request and needs a recorded result.
+  hasProofRequest: boolean
+}
+const {
+  commentId,
+  postAuthorId,
+  issues,
+  evidence,
+  privateEvidence,
+  reusedProof,
+  panelPath,
+  lookupUrlTemplate,
+  hasProofRequest,
+} = Astro.props
+const result = Astro.getActionResult(actions.admin.experience.checkEvidence)
+const replay = getFormReplay(result?.error ? Astro.locals.actionFormValues : null)
+const focusedEvidenceId = Number(Astro.url.searchParams.get('evidenceId') ?? replay.text('evidenceId', ''))
+const privateEvidenceById = new Map(privateEvidence.map((item) => [item.id, item]))
+const activeEvidence = evidence.filter((item) => !item.removedAt)
+const findingOptions = evidenceFindings.filter((option) => option.value !== 'LEGACY')
+const checkGroup = `evidence-check-${commentId.toString()}`
+const closeCheckId = `${checkGroup}-none`
+// openEvidenceId keeps a failed check form open and closes it once the result is published.
+const openEvidenceId = result?.error
+  ? focusedEvidenceId
+  : result
+    ? undefined
+    : Number(Astro.url.searchParams.get('evidenceId')) || undefined
+---
+
+<div class="space-y-3">
+  {activeEvidence.length === 0 && <p class="text-xs text-day-400">No proof sent yet.</p>}
+  <input type="radio" name={checkGroup} id={closeCheckId} checked={!openEvidenceId} class="sr-only" />
+  <ol class="space-y-2">
+    {
+      activeEvidence.map((item) => {
+        const rawEvidence = privateEvidenceById.get(item.id)
+        const [latestCheck] = item.checks
+        const isFocused = focusedEvidenceId === item.id
+        // An imported check's texts describe the import, not a result, so a new check starts blank.
+        const startingValues = latestCheck?.finding === 'LEGACY' ? undefined : latestCheck
+        const selectedFinding = (isFocused ? replay.text('finding') : undefined) ?? startingValues?.finding
+        const ownProof = !Astro.locals.user?.admin && Astro.locals.user?.id === postAuthorId
+        const lookupUrl = lookupUrlFor(lookupUrlTemplate, rawEvidence?.normalizedId ?? null)
+        const reusedOn = rawEvidence?.normalizedId
+          ? reusedProof.flatMap((reuse) =>
+              reuse.commentId && reuse.normalizedId === rawEvidence.normalizedId ? [reuse.commentId] : []
+            )
+          : []
+        const proof = rawEvidence
+          ? proofStatus({ ...rawEvidence, legacyStatus: item.legacyStatus, checks: item.checks })
+          : null
+        const kind = rawEvidence ? evidenceKindsByValue[rawEvidence.kind] : null
+        const finding = latestCheck ? evidenceFindingsByValue[latestCheck.finding] : null
+        const status = !finding
+          ? { label: 'To check', icon: 'ri:time-line', className: 'bg-yellow-500/10 text-yellow-200' }
+          : {
+              label: `${findingLabel(finding.value, issues)} · ${proof?.counts ? 'counts as proof' : "doesn't count"}`,
+              icon: finding.icon,
+              className: finding.classNames.strip,
+            }
+        const statusDetails = latestCheck
+          ? [latestCheck.explanation, ...checkTimeline(item.checks)].filter(Boolean).join(' · ')
+          : undefined
+        const hasInfo =
+          !!rawEvidence &&
+          ((rawEvidence.formatValid !== null && rawEvidence.kind !== 'TRANSACTION_ID') ||
+            reusedOn.length > 0 ||
+            !!lookupUrl)
+        return (
+          <li
+            id={`moderation-evidence-${item.id.toString()}`}
+            class="group/evidence overflow-hidden rounded-lg border border-night-600 bg-night-900"
+          >
+            {!ownProof && (
+              <input
+                type="radio"
+                name={checkGroup}
+                id={`check-evidence-${item.id.toString()}`}
+                checked={openEvidenceId === item.id}
+                data-check-toggle
+                class="sr-only"
+              />
+            )}
+            <header
+              class={cn(
+                'flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-1.5 text-xs',
+                status.className
+              )}
+            >
+              <span title={statusDetails} class="flex min-w-0 items-center gap-1.5">
+                <Icon name={status.icon} class="size-3.5 shrink-0" />
+                <span class="font-medium">{status.label}</span>
+              </span>
+              <span class="ml-auto flex items-center gap-1 text-day-400">
+                {kind && <Icon name={kind.icon} class="size-3.5" />}
+                {kind?.label}
+                <span>·</span>
+                <TimeFormatted date={item.createdAt} />
+              </span>
+            </header>
+            <div class="space-y-2 p-3">
+              {rawEvidence ? (
+                <div class="overflow-hidden rounded-md border border-night-700 bg-night-950">
+                  <div class="px-2.5 py-2">
+                    <CommentPrivateEvidence evidence={rawEvidence} />
+                  </div>
+                  {hasInfo && (
+                    <div class="flex flex-wrap items-center gap-1.5 border-t border-night-700 px-2.5 py-1.5 text-xs">
+                      {rawEvidence.formatValid === true && (
+                        <span class="rounded-md bg-green-500/15 px-1.5 py-0.5 text-green-200">Format OK</span>
+                      )}
+                      {rawEvidence.formatValid === false && rawEvidence.kind !== 'TRANSACTION_ID' && (
+                        <span class="rounded-md bg-yellow-500/15 px-1.5 py-0.5 text-yellow-200">
+                          Unexpected format
+                        </span>
+                      )}
+                      {reusedOn.length > 0 && (
+                        <span class="inline-flex flex-wrap items-center gap-1 rounded-md bg-red-500/15 px-1.5 py-0.5 text-red-200">
+                          <Icon name="ri:file-copy-line" class="size-3.5" />
+                          Same ID on
+                          {reusedOn.map((reusedCommentId) => (
+                            <a
+                              href={`/admin/comments/moderate/${reusedCommentId.toString()}`}
+                              hx-boost="false"
+                              target="_blank"
+                              class="underline"
+                            >
+                              #{reusedCommentId}
+                            </a>
+                          ))}
+                        </span>
+                      )}
+                      {lookupUrl && (
+                        <Tooltip text="Opens the service's site. Use Tor or a VPN so the service can't link the lookup to you.">
+                          <a
+                            href={lookupUrl}
+                            hx-boost="false"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            referrerpolicy="no-referrer"
+                            class="inline-flex items-center gap-1 rounded-md bg-blue-500/15 px-1.5 py-0.5 text-blue-200 hover:bg-blue-500/25"
+                          >
+                            <Icon name="ri:external-link-line" class="size-3.5" />
+                            Open lookup
+                          </a>
+                        </Tooltip>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p class="text-xs text-day-500">Nothing to show.</p>
+              )}
+              {ownProof ? (
+                <p class="flex items-center gap-1.5 text-xs text-yellow-200">
+                  <Icon name="ri:lock-line" class="size-3.5" />
+                  Another moderator must check proof on your own post or proof you added.
+                </p>
+              ) : (
+                rawEvidence && (
+                  <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                    <label
+                      for={`check-evidence-${item.id.toString()}`}
+                      class="inline-flex cursor-pointer items-center gap-1 rounded-md bg-blue-500/20 px-2 py-1 font-medium text-blue-100 group-has-[[data-check-toggle]:checked]/evidence:hidden hover:bg-blue-500/30"
+                    >
+                      <Icon name="ri:arrow-down-s-line" class="size-3.5" />
+                      {latestCheck ? 'Change result' : 'Check'}
+                    </label>
+                    <label
+                      for={closeCheckId}
+                      class="hidden cursor-pointer items-center gap-1 rounded-md bg-night-500 px-2 py-1 font-medium text-day-100 group-has-[[data-check-toggle]:checked]/evidence:inline-flex hover:bg-night-400"
+                    >
+                      <Icon name="ri:arrow-up-s-line" class="size-3.5" />
+                      Close
+                    </label>
+                    {rawEvidence.kind === 'NOTE' &&
+                      item.needsCheck &&
+                      !item.checks.length &&
+                      !hasProofRequest && (
+                        <form method="POST" action={`${panelPath}${actions.admin.experience.dismissNote}`}>
+                          <input type="hidden" name="evidenceId" value={item.id} />
+                          <button
+                            type="submit"
+                            title="Nothing to check here. Clears it from the queue; readers see no result."
+                            class="inline-flex items-center gap-1 rounded-md bg-night-700 px-1.5 py-0.5 text-day-200 hover:bg-night-600"
+                          >
+                            <Icon name="ri:close-circle-line" class="size-3.5" />
+                            Not proof
+                          </button>
+                        </form>
+                      )}
+                    {rawEvidence.imagePath && rawEvidence.body && (
+                      <DeleteConfirmButton
+                        action={`${panelPath}${actions.admin.experience.removeEvidenceImage}`}
+                        id={`evidence-image-${item.id.toString()}`}
+                        label="Remove screenshot"
+                        showLabel
+                        reasonLabel="Why, e.g. unrelated image"
+                        description="Erases the screenshot for good and keeps the rest of the proof."
+                      >
+                        <input type="hidden" name="evidenceId" value={item.id} />
+                      </DeleteConfirmButton>
+                    )}
+                    <DeleteConfirmButton
+                      action={`${panelPath}${actions.admin.experience.deleteEvidence}`}
+                      id={`evidence-${item.id.toString()}`}
+                      label="Delete"
+                      showLabel
+                      reasonLabel="Why, e.g. unrelated image or contact thread #123"
+                      description="For unrelated or harmful content, or when the author asks. Erases it for good; any check stays in the history."
+                    >
+                      <input type="hidden" name="evidenceId" value={item.id} />
+                    </DeleteConfirmButton>
+                  </div>
+                )
+              )}
+              {!ownProof && (
+                <div class="hidden border-t border-night-600 pt-3 group-has-[[data-check-toggle]:checked]/evidence:block">
+                  <form
+                    method="POST"
+                    action={`${panelPath}${actions.admin.experience.checkEvidence}`}
+                    class="group/form space-y-2.5"
+                    data-evidence-check-form
+                  >
+                    <FormReplay />
+                    <input type="hidden" name="evidenceId" value={item.id} />
+                    {startingValues && (
+                      <p class="text-xs text-day-400">
+                        Starts from the current result. The current one stays in the public history.
+                      </p>
+                    )}
+                    <fieldset class="grid gap-1 sm:grid-cols-2">
+                      <legend class="mb-1 text-xs font-medium text-day-300">Result</legend>
+                      {findingOptions.map((option) => (
+                        <label
+                          title={option.guidance}
+                          class={cn(
+                            'flex cursor-pointer items-start gap-1.5 rounded-md border border-night-500 px-2 py-1.5 hover:border-night-400 has-focus-visible:ring-2 has-focus-visible:ring-blue-500',
+                            option.classNames.checked
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="finding"
+                            value={option.value}
+                            checked={selectedFinding === option.value}
+                            data-needs-lookup-confirmation={
+                              option.value === 'ORDER_FOUND' || option.value === 'ORDER_NOT_FOUND'
+                                ? ''
+                                : undefined
+                            }
+                            required
+                            class="sr-only"
+                          />
+                          <Icon
+                            name={option.icon}
+                            class={cn('mt-0.5 size-3.5 shrink-0', option.classNames.text)}
+                          />
+                          <span class="min-w-0">
+                            <span class="block text-xs font-medium text-day-100">{option.shortLabel}</span>
+                            <span class="line-clamp-1 text-[11px] text-day-500">{option.guidance}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </fieldset>
+                    <p class="text-xs text-day-500">
+                      Picking a result fills in its public wording. Leave out order IDs, addresses and other
+                      private details.
+                    </p>
+                    <InputTextArea
+                      name="explanation"
+                      label="What it shows (public)"
+                      value={
+                        isFocused
+                          ? replay.text('explanation', startingValues?.explanation ?? '')
+                          : startingValues?.explanation
+                      }
+                      inputProps={{
+                        minlength: 10,
+                        maxlength: 500,
+                        rows: 2,
+                        placeholder: 'What this does and does not establish',
+                      }}
+                    />
+                    <div class="hidden group-has-[[data-needs-lookup-confirmation]:checked]/form:block">
+                      <InputCheckbox
+                        name="orderLookupConfirmed"
+                        label="I checked that the lookup tells a real order from an invalid reference (required for Order ID exists and Order not found)."
+                      />
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <Button
+                        type="submit"
+                        label="Publish result"
+                        icon="ri:send-plane-2-line"
+                        color="success"
+                        size="sm"
+                      />
+                      <label
+                        for={closeCheckId}
+                        class="cursor-pointer px-1.5 text-xs text-day-400 hover:text-day-200"
+                      >
+                        Cancel
+                      </label>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+          </li>
+        )
+      })
+    }
+  </ol>
+  <div class="flex flex-wrap items-start gap-2">
+    <slot />
+  </div>
+</div>
+
+<EvidenceCheckTextsScript />

@@ -1,0 +1,374 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import { commentKinds } from '../constants/commentKinds'
+import { getCommentStatusInfo } from '../constants/commentStatus'
+import { experienceSentiments } from '../constants/experiences'
+import { getModerationActionInfo } from '../constants/moderationActions'
+import { lastActionFeedback } from '../lib/actionFeedback'
+import { MODERATOR_REASON_LENGTH } from '../lib/commentLimits'
+import { inlinePanelClose, swapRejectedActions } from '../lib/inlinePanel'
+import { userCan } from '../lib/permissions'
+
+import ActionFeedback from './ActionFeedback.astro'
+import CommentReviewContext from './admin/comments/CommentReviewContext.astro'
+import ModerationActivityList from './admin/comments/ModerationActivityList.astro'
+import BadgeSmall from './BadgeSmall.astro'
+import Button from './Button.astro'
+import CommentEditReview from './CommentEditReview.astro'
+import CommentEvidenceChecks from './CommentEvidenceChecks.astro'
+import CommentModeration from './CommentModeration.astro'
+import CommentModeratorNotes from './CommentModeratorNotes.astro'
+import CommentNotes from './CommentNotes.astro'
+import CommentSensitiveText from './CommentSensitiveText.astro'
+import CommentStatusChip from './CommentStatusChip.astro'
+import InlineLoadErrors from './InlineLoadErrors.astro'
+import InputSelect from './InputSelect.astro'
+import InputText from './InputText.astro'
+import ModeratorProofRequest from './ModeratorProofRequest.astro'
+import RadioTabs from './RadioTabs.astro'
+import TimeFormatted from './TimeFormatted.astro'
+
+import type { ReusedProof } from './CommentEvidenceChecks.astro'
+import type { AdminCommentReview } from '../lib/adminCommentReview'
+import type {
+  CommentPageEvidence,
+  CommentPagePost,
+  CommentPagePrivateEvidence,
+  CommentPageRevision,
+} from '../lib/commentPage'
+
+type Props = {
+  comment: CommentPagePost
+  context: AdminCommentReview | null
+  evidence: CommentPageEvidence[]
+  privateEvidence: CommentPagePrivateEvidence[]
+  reusedProof: ReusedProof[]
+  revisions: CommentPageRevision[]
+  activity: {
+    id: number
+    createdAt: Date
+    summary: string
+    actor: { name: string; displayName: string | null } | null
+  }[]
+  canModerate: boolean
+  inline: boolean
+}
+const { comment, context, evidence, privateEvidence, reusedProof, revisions, activity, canModerate, inline } =
+  Astro.props
+const panelPath = `/admin/comments/moderate/${comment.id.toString()}`
+const canRequestProof =
+  !comment.parentId &&
+  comment.kind === 'EXPERIENCE' &&
+  (comment.status === 'APPROVED' || comment.status === 'PENDING')
+const panelId = `moderation-panel-${comment.id.toString()}`
+const user = Astro.locals.user
+const canRedact = canModerate && userCan(user, 'comments:redact')
+const canClassify = canModerate && !comment.parentId && comment.experience?.sentimentSource !== 'AUTHOR'
+const pendingEdits = revisions.filter((revision) => revision.status === 'PENDING').length
+const editDecisions = revisions.filter((revision) => revision.reason)
+const activeEvidence = evidence.filter((item) => !item.removedAt)
+const evidenceAwaitingCheck =
+  comment.status === 'WITHDRAWN' ? 0 : activeEvidence.filter((item) => item.needsCheck).length
+
+const actionResults = {
+  publish: Astro.getActionResult(actions.admin.experience.publish),
+  saveNote: Astro.getActionResult(actions.admin.experience.saveNote),
+  savePublicNote: Astro.getActionResult(actions.admin.experience.savePublicNote),
+  reviewRevision: Astro.getActionResult(actions.admin.experience.reviewRevision),
+  checkEvidence: Astro.getActionResult(actions.admin.experience.checkEvidence),
+  redactRevision: Astro.getActionResult(actions.admin.experience.redactRevision),
+  classify: Astro.getActionResult(actions.admin.experience.classify),
+  linkCase: Astro.getActionResult(actions.admin.experience.linkCase),
+  removeEvidenceImage: Astro.getActionResult(actions.admin.experience.removeEvidenceImage),
+  deleteEvidence: Astro.getActionResult(actions.admin.experience.deleteEvidence),
+  dismissNote: Astro.getActionResult(actions.admin.experience.dismissNote),
+  requestProof: Astro.getActionResult(actions.admin.experience.requestProof),
+  cancelProofRequest: Astro.getActionResult(actions.admin.experience.cancelProofRequest),
+}
+const feedbackMessages = {
+  publish: 'Decision saved.',
+  saveNote: 'Internal note saved.',
+  savePublicNote: 'Public note saved.',
+  reviewRevision: 'Edit review saved.',
+  checkEvidence: actionResults.checkEvidence?.data?.publishedPost
+    ? 'Check result published. The proof was the only hold, so the post is now published.'
+    : 'Check result published.',
+  redactRevision: 'Edited text saved. Matching copies were updated.',
+  classify: 'Post type saved.',
+  linkCase: 'Case linked.',
+  removeEvidenceImage: 'Screenshot removed.',
+  deleteEvidence: 'Proof deleted.',
+  dismissNote: 'Note cleared. It no longer waits for a check.',
+  requestProof: 'Request sent. The author has a week to answer.',
+  cancelProofRequest: 'Request cancelled.',
+} as const satisfies Record<keyof typeof actionResults, string>
+const { action: lastAction, feedback } = lastActionFeedback(actionResults, feedbackMessages)
+const linkedCase = actionResults.linkCase?.data?.case
+
+const SHOWN_ACTIVITY = 5
+const tabs = [
+  {
+    id: 'evidence',
+    label: 'Proof',
+    icon: 'ri:file-search-line',
+    show: activeEvidence.length > 0 || comment.kind === 'EXPERIENCE',
+    attention: evidenceAwaitingCheck > 0,
+  },
+  {
+    id: 'edits',
+    label: pendingEdits ? `Edits (${pendingEdits.toString()})` : 'Edits',
+    icon: 'ri:git-pull-request-line',
+    show: revisions.length > 0,
+    attention: pendingEdits > 0,
+  },
+  { id: 'history', label: 'History', icon: 'ri:history-line', show: !!context || activity.length > 0 },
+  { id: 'notes', label: 'Notes', icon: 'ri:sticky-note-line', show: !!context },
+  { id: 'redact', label: 'Redact', icon: 'ri:eraser-line', show: canRedact },
+  { id: 'label', label: 'Label', icon: 'ri:price-tag-3-line', show: canClassify },
+].filter((tab) => tab.show)
+const tabForAction = {
+  publish: undefined,
+  saveNote: 'notes',
+  savePublicNote: 'notes',
+  reviewRevision: 'edits',
+  checkEvidence: 'evidence',
+  redactRevision: 'redact',
+  classify: 'label',
+  linkCase: undefined,
+  removeEvidenceImage: 'evidence',
+  deleteEvidence: 'evidence',
+  dismissNote: 'evidence',
+  requestProof: 'evidence',
+  cancelProofRequest: 'evidence',
+} as const
+const requestedTab = Astro.url.searchParams.get('tab') ?? (lastAction ? tabForAction[lastAction] : undefined)
+const activeTab =
+  tabs.find((tab) => tab.id === requestedTab)?.id ??
+  (pendingEdits ? 'edits' : evidenceAwaitingCheck ? 'evidence' : context ? 'history' : tabs[0]?.id)
+const tabGroup = `moderation-tab-${comment.id.toString()}`
+---
+
+<section
+  id={panelId}
+  data-moderation-panel
+  aria-label={`Moderation for comment #${comment.id.toString()}`}
+  class="mt-2 overflow-hidden rounded-lg border border-teal-800/70 bg-night-900 text-sm shadow-lg shadow-black/20"
+  hx-boost="true"
+  hx-target={`#${panelId}`}
+  hx-swap="outerHTML"
+  hx-push-url="false"
+  {...{ 'hx-on:htmx:before-swap': swapRejectedActions }}
+>
+  {
+    inline && (
+      <CommentStatusChip id={`comment-status-${comment.id.toString()}`} status={comment.status} outOfBand />
+    )
+  }
+  {
+    inline && context && (
+      <CommentNotes
+        commentId={comment.id}
+        publicNote={context.publicNote}
+        internalNote={context.adminNote}
+        outOfBand
+      />
+    )
+  }
+  <header class="flex flex-wrap items-center gap-2 border-b border-night-600 bg-teal-950/30 px-3 py-2">
+    <Icon name="ri:shield-line" class="size-4 text-teal-300" />
+    <h3 class="font-medium text-day-100">Moderation</h3>
+    <span class="text-xs text-day-500">#{comment.id}</span>
+    <CommentStatusChip id={`${panelId}-status`} status={comment.status} />
+    {comment.parentId && <BadgeSmall text="Reply" color="zinc" variant="faded" />}
+    {
+      context?.aiAction && (
+        <BadgeSmall
+          text={`AI: ${getModerationActionInfo(context.aiAction).verb}`}
+          icon="ri:robot-2-line"
+          color="violet"
+          variant="faded"
+        />
+      )
+    }
+    <span class="ml-auto flex items-center gap-1">
+      {!inline && <span class="text-xs text-day-500">Moderation tools</span>}
+      {
+        inline && (
+          <button
+            type="button"
+            {...inlinePanelClose}
+            class="inline-flex size-7 items-center justify-center rounded-md text-day-400 hover:bg-night-700 hover:text-day-100"
+            aria-label="Close moderation"
+            title="Close"
+          >
+            <Icon name="ri:close-line" class="size-4" />
+          </button>
+        )
+      }
+    </span>
+  </header>
+  {
+    context?.adminNote && (
+      <p class="flex gap-1.5 border-b border-night-600 bg-teal-500/5 px-3 py-2 text-xs">
+        <Icon name="ri:lock-line" class="mt-px size-3.5 shrink-0 text-teal-300" />
+        <span class="shrink-0 font-medium text-teal-300">Internal note</span>
+        <span class="min-w-0 whitespace-pre-wrap text-day-200">{context.adminNote}</span>
+      </p>
+    )
+  }
+  <div class="space-y-3 p-3">
+    <ActionFeedback feedback={feedback} />
+    {inline && <InlineLoadErrors />}
+    {
+      linkedCase && (
+        <a
+          href={`/admin/cases/${linkedCase.id.toString()}`}
+          hx-boost="false"
+          class="text-xs text-green-300 underline"
+        >
+          Open case #{linkedCase.id}
+        </a>
+      )
+    }
+    {
+      canModerate ? (
+        <CommentModeration comment={comment} actionPath={panelPath} />
+      ) : (
+        <p class="flex items-center gap-2 text-yellow-200">
+          <Icon name="ri:lock-line" class="size-4" />
+          Another moderator must review your own post or a service you are affiliated with.
+        </p>
+      )
+    }
+  </div>
+  {
+    canModerate && tabs.length > 0 && (
+      <div class="group/tabs border-t border-night-600">
+        <RadioTabs
+          name={tabGroup}
+          label="Moderation tools"
+          tabs={tabs}
+          activeTab={activeTab}
+          accent="teal"
+          class="px-2 pt-2"
+        />
+        <div class="bg-night-800 p-3">
+          <div class="hidden space-y-4 group-has-[[data-tab=edits]:checked]/tabs:block">
+            <CommentEditReview comment={comment} revisions={revisions} panelPath={panelPath} />
+            {!pendingEdits && <p class="text-xs text-day-400">No edits waiting for review.</p>}
+            {editDecisions.length > 0 && (
+              <div class="space-y-2 border-t border-night-600 pt-3">
+                <h4 class="text-xs font-medium text-day-300">Previous decisions</h4>
+                <ol class="space-y-2">
+                  {editDecisions.map((revision) => (
+                    <li class="text-xs">
+                      <span class="text-day-500">
+                        <TimeFormatted date={revision.decidedAt ?? revision.createdAt} /> ·{' '}
+                        {getCommentStatusInfo(revision.status).publicLabel}
+                      </span>
+                      <p class="text-day-200">{revision.reason}</p>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+          </div>
+          <div class="hidden group-has-[[data-tab=evidence]:checked]/tabs:block">
+            <CommentEvidenceChecks
+              commentId={comment.id}
+              postAuthorId={comment.authorId}
+              issues={comment.issues}
+              evidence={evidence}
+              privateEvidence={privateEvidence}
+              reusedProof={reusedProof}
+              panelPath={panelPath}
+              lookupUrlTemplate={comment.service.proofLookupUrl}
+              hasProofRequest={comment.proofRequests.length > 0}
+            >
+              {canRequestProof && (
+                <ModeratorProofRequest comment={comment} evidence={evidence} panelPath={panelPath} />
+              )}
+            </CommentEvidenceChecks>
+          </div>
+          <div class="hidden space-y-4 group-has-[[data-tab=history]:checked]/tabs:block">
+            {context && (
+              <div hx-boost="false">
+                <CommentReviewContext comment={context} />
+              </div>
+            )}
+            {activity.length > 0 && (
+              <section class="space-y-1 border-t border-night-600 pt-3 text-xs">
+                <h4 class="flex items-center gap-2 text-day-400">
+                  <Icon name="ri:time-line" class="size-4" />
+                  Activity
+                </h4>
+                <ModerationActivityList entries={activity.slice(0, SHOWN_ACTIVITY)} />
+                {activity.length > SHOWN_ACTIVITY && (
+                  <details class="group/activity">
+                    <summary class="cursor-pointer list-none text-day-500 group-open/activity:hidden hover:text-day-300 [&::-webkit-details-marker]:hidden">
+                      {`Show ${String(activity.length - SHOWN_ACTIVITY)} older`}
+                    </summary>
+                    <ModerationActivityList entries={activity.slice(SHOWN_ACTIVITY)} />
+                  </details>
+                )}
+              </section>
+            )}
+          </div>
+          {context && (
+            <div class="hidden group-has-[[data-tab=notes]:checked]/tabs:block">
+              <CommentModeratorNotes comment={context} panelPath={panelPath} />
+            </div>
+          )}
+          {canRedact && (
+            <div class="hidden group-has-[[data-tab=redact]:checked]/tabs:block">
+              <CommentSensitiveText comment={comment} revisions={revisions} panelPath={panelPath} />
+            </div>
+          )}
+          <div class="hidden group-has-[[data-tab=label]:checked]/tabs:block">
+            {canClassify && (
+              <form
+                method="POST"
+                action={`${panelPath}${actions.admin.experience.classify}`}
+                class="space-y-3"
+              >
+                <p class="text-xs text-day-400">Both are public. The author sees the reason.</p>
+                <input type="hidden" name="commentId" value={comment.id} />
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <InputSelect
+                    name="kind"
+                    label="Post type"
+                    selectedValue={comment.kind}
+                    options={commentKinds
+                      .filter((kind) => kind.classifiable)
+                      .map((kind) => ({ value: kind.value, label: kind.label }))}
+                  />
+                  <InputSelect
+                    name="sentiment"
+                    label="Experience"
+                    selectedValue={comment.experience?.sentiment ?? ''}
+                    options={[
+                      { value: '', label: 'Unclear' },
+                      ...experienceSentiments.map((item) => ({ value: item.value, label: item.label })),
+                    ]}
+                  />
+                </div>
+                <InputText
+                  name="reason"
+                  label="Reason"
+                  inputProps={{
+                    required: true,
+                    minlength: MODERATOR_REASON_LENGTH.min,
+                    maxlength: MODERATOR_REASON_LENGTH.max,
+                  }}
+                />
+                <Button type="submit" label="Save label" color="success" size="sm" />
+              </form>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+</section>

@@ -1,0 +1,60 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import { ADMIN_NOTE_MAX_LENGTH, PUBLIC_NOTE_MAX_LENGTH } from '../lib/commentLimits'
+import { getFormReplay } from '../lib/formReplay'
+
+import Button from './Button.astro'
+import FormReplay from './FormReplay.astro'
+import InputTextArea from './InputTextArea.astro'
+
+type Props = {
+  comment: { id: number; adminNote: string | null; publicNote: string | null }
+  panelPath: string
+}
+const { comment, panelPath } = Astro.props
+const replayAfterError = (result: { error?: unknown } | undefined) =>
+  getFormReplay(result?.error ? Astro.locals.actionFormValues : null)
+const adminNoteReplay = replayAfterError(Astro.getActionResult(actions.admin.experience.saveNote))
+const publicNoteReplay = replayAfterError(Astro.getActionResult(actions.admin.experience.savePublicNote))
+---
+
+<div class="space-y-4">
+  <form method="POST" action={`${panelPath}${actions.admin.experience.saveNote}`} class="space-y-2">
+    <FormReplay />
+    <input type="hidden" name="commentId" value={comment.id} />
+    <h4 class="flex items-center gap-1.5 text-sm font-medium">
+      <Icon name="ri:lock-line" class="size-3.5 text-teal-300" />
+      Internal note
+    </h4>
+    <InputTextArea
+      name="adminNote"
+      label="Internal note"
+      hideLabel
+      value={adminNoteReplay.text('adminNote', comment.adminNote ?? '')}
+      inputProps={{ maxlength: ADMIN_NOTE_MAX_LENGTH, rows: 2, placeholder: 'Only moderators see this' }}
+    />
+    <Button type="submit" label="Save" color="success" size="sm" class="ml-auto flex" />
+  </form>
+  <form method="POST" action={`${panelPath}${actions.admin.experience.savePublicNote}`} class="space-y-2">
+    <FormReplay />
+    <input type="hidden" name="commentId" value={comment.id} />
+    <h4 class="flex items-center gap-1.5 text-sm font-medium">
+      <Icon name="ri:global-line" class="size-3.5 text-day-400" />
+      Public note
+    </h4>
+    <InputTextArea
+      name="publicNote"
+      label="Note below the post"
+      hideLabel
+      value={publicNoteReplay.text('publicNote', comment.publicNote ?? '')}
+      inputProps={{
+        maxlength: PUBLIC_NOTE_MAX_LENGTH,
+        rows: 2,
+        placeholder: 'Shown under the post. No private details.',
+      }}
+    />
+    <Button type="submit" label="Save" color="success" size="sm" class="ml-auto flex" />
+  </form>
+</div>

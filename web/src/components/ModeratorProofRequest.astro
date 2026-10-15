@@ -1,0 +1,84 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+import { format } from 'date-fns'
+
+import { PROOF_REQUEST_MESSAGE_LENGTH } from '../lib/commentLimits'
+import { PROOF_REQUEST_DAYS, proofRequestState } from '../lib/proofRequests'
+
+import Button from './Button.astro'
+import InputTextArea from './InputTextArea.astro'
+
+import type { CommentPageEvidence, CommentPagePost } from '../lib/commentPage'
+
+type Props = {
+  comment: Pick<CommentPagePost, 'id' | 'proofRequests'>
+  evidence: CommentPageEvidence[]
+  panelPath: string
+}
+const { comment, evidence, panelPath } = Astro.props
+const [request] = comment.proofRequests
+const state = request ? proofRequestState(request, evidence) : null
+const asker = request?.source === 'SERVICE' ? 'The service disputed this post' : 'Proof was requested'
+const statusText = request && {
+  open: `${asker}. Answer due ${format(request.dueAt, 'MMM d')}.`,
+  answered: `${asker}, and the author sent proof.`,
+  unanswered: `${asker}. No answer since ${format(request.dueAt, 'MMM d')}.`,
+}
+const waitsForCheck = evidence.some((item) => item.needsCheck && !item.removedAt)
+---
+
+{
+  request && state && statusText ? (
+    <div class="flex basis-full flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-night-800 px-2.5 py-1.5 text-xs">
+      <Icon name="ri:question-answer-line" class="size-3.5 text-day-400" />
+      <span class="text-day-200">{statusText[state]}</span>
+      {request.message && <span class="text-day-400">{`Asked: ${request.message}`}</span>}
+      <form
+        method="POST"
+        action={`${panelPath}${actions.admin.experience.cancelProofRequest}`}
+        class="ml-auto"
+      >
+        <input type="hidden" name="requestId" value={request.id} />
+        <button type="submit" class="text-day-400 underline hover:text-day-200">
+          Cancel request
+        </button>
+      </form>
+    </div>
+  ) : waitsForCheck ? (
+    <span
+      title="Check the proof the author sent first. If it's not enough, ask for more."
+      class="inline-flex cursor-not-allowed items-center gap-1 rounded-md bg-night-800 px-2 py-1 text-xs text-day-500"
+    >
+      <Icon name="ri:question-line" class="size-3.5" />
+      Ask the author for proof
+    </span>
+  ) : (
+    <details class="group/ask open:basis-full open:rounded-lg open:border open:border-night-600 open:bg-night-900">
+      <summary class="inline-flex cursor-pointer list-none items-center gap-1 rounded-md bg-night-700 px-2 py-1 text-xs font-medium text-day-200 group-open/ask:m-3 hover:bg-night-600 [&::-webkit-details-marker]:hidden">
+        <Icon name="ri:question-line" class="size-3.5" />
+        Ask the author for proof
+      </summary>
+      <form
+        method="POST"
+        action={`${panelPath}${actions.admin.experience.requestProof}`}
+        class="space-y-2 px-3 pb-3"
+      >
+        <input type="hidden" name="commentId" value={comment.id} />
+        <InputTextArea
+          name="message"
+          label="What should the author send?"
+          description={`They're notified and have ${String(PROOF_REQUEST_DAYS)} days. Without an answer, a published post reads as Unproven and stops counting.`}
+          inputProps={{
+            required: true,
+            minlength: PROOF_REQUEST_MESSAGE_LENGTH.min,
+            maxlength: PROOF_REQUEST_MESSAGE_LENGTH.max,
+            rows: 2,
+            placeholder: 'e.g. Add the order ID from the exchange page.',
+          }}
+        />
+        <Button type="submit" label="Send request" size="sm" color="success" />
+      </form>
+    </details>
+  )
+}

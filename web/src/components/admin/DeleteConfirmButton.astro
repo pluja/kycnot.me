@@ -1,4 +1,7 @@
 ---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../lib/cn'
 import Button from '../Button.astro'
 import Tooltip from '../Tooltip.astro'
 
@@ -8,49 +11,87 @@ type Props = {
   action: unknown
   id: string
   label?: string
+  // showLabel shows a small labelled chip instead of an icon button, for rows of chips.
+  showLabel?: boolean
+  // reasonLabel requires a reason in the confirm row, sent as "reason".
+  reasonLabel?: string
+  // description explains the consequence in the confirm row.
+  description?: string
+  // reload submits with a full page load instead of a client-side navigation.
+  reload?: boolean
   children?: AstroChildren
 }
 
-const { action, id, label = 'Delete' } = Astro.props
+const {
+  action,
+  id,
+  label = 'Delete',
+  showLabel = false,
+  reasonLabel,
+  description,
+  reload = false,
+} = Astro.props
 const checkboxId = `confirm-delete-${id}`
+const isWide = !!reasonLabel || !!description
 ---
 
-<form method="POST" action={action as never} class="contents">
+<form method="POST" action={action as never} class="contents" data-astro-reload={reload ? true : undefined}>
   <slot />
   <input type="checkbox" id={checkboxId} class="peer/del sr-only" />
 
-  <div class="contents peer-checked/del:hidden">
-    <Tooltip text={label}>
-      <Button
-        as="label"
+  {
+    showLabel ? (
+      <label
         for={checkboxId}
-        size="sm"
-        variant="faded"
-        icon="ri:delete-bin-line"
-        iconOnly
-        label={label}
-      />
-    </Tooltip>
-  </div>
+        class="inline-flex cursor-pointer items-center gap-1 rounded-md bg-night-700 px-1.5 py-0.5 text-xs text-day-300 peer-checked/del:hidden peer-focus-visible/del:ring-2 peer-focus-visible/del:ring-red-400 hover:bg-red-500/15 hover:text-red-200"
+      >
+        <Icon name="ri:delete-bin-line" class="size-3.5" />
+        {label}
+      </label>
+    ) : (
+      <div class="contents peer-checked/del:hidden peer-focus-visible/del:[&_label]:ring-2 peer-focus-visible/del:[&_label]:ring-red-400">
+        <Tooltip text={label}>
+          <Button
+            as="label"
+            for={checkboxId}
+            size="sm"
+            variant="faded"
+            icon="ri:delete-bin-line"
+            iconOnly
+            label={label}
+          />
+        </Tooltip>
+      </div>
+    )
+  }
 
-  <div class="hidden items-center gap-1 rounded-md border border-red-500/40 bg-red-950/40 px-1.5 py-0.5 peer-checked/del:flex">
-    <span class="px-1 text-xs whitespace-nowrap text-red-200">Sure?</span>
-    <Button
+  <div
+    class={cn(
+      'hidden items-center gap-1.5 rounded-md border border-red-500/30 bg-night-800 p-1 text-xs peer-checked/del:flex',
+      isWide && 'basis-full flex-wrap p-1.5'
+    )}
+  >
+    {
+      reasonLabel && (
+        <input
+          type="text"
+          name="reason"
+          required
+          minlength={3}
+          maxlength={200}
+          placeholder={reasonLabel}
+          aria-label={reasonLabel}
+          class="h-7 min-w-0 flex-1 basis-48 rounded-md border border-night-500 bg-night-900 px-2 text-xs text-day-100"
+        />
+      )
+    }
+    <button
       type="submit"
-      size="sm"
-      color="danger"
-      icon="ri:check-line"
-      iconOnly
-      label={`Confirm ${label}`}
-    />
-    <Button
-      as="label"
-      for={checkboxId}
-      size="sm"
-      variant="faded"
-      icon="ri:close-line"
-      iconOnly
-      label="Cancel"
-    />
+      class="h-7 rounded-md bg-red-600 px-2.5 font-medium whitespace-nowrap text-white hover:bg-red-500"
+    >
+      {label}
+    </button>
+    <label for={checkboxId} class="cursor-pointer px-1.5 text-day-400 hover:text-day-200">Cancel</label>
+    {description && <p class="basis-full px-0.5 text-day-500">{description}</p>}
   </div>
 </form>

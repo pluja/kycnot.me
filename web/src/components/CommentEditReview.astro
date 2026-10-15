@@ -1,0 +1,112 @@
+---
+import { actions } from 'astro:actions'
+
+import { getCommentKindInfo } from '../constants/commentKinds'
+import { MODERATOR_REASON_LENGTH } from '../lib/commentLimits'
+import { experienceInput, isPublishedComment } from '../lib/experiences'
+import { getFormReplay } from '../lib/formReplay'
+
+import Button from './Button.astro'
+import CommentEditDiff from './CommentEditDiff.astro'
+import FormReplay from './FormReplay.astro'
+import InputTextArea from './InputTextArea.astro'
+import TimeFormatted from './TimeFormatted.astro'
+
+import type { CommentPagePost, CommentPageRevision } from '../lib/commentPage'
+
+type Props = { comment: CommentPagePost; revisions: CommentPageRevision[]; panelPath: string }
+const { comment, revisions, panelPath } = Astro.props
+const pendingRevisions = revisions.filter((revision) => revision.status === 'PENDING')
+if (!pendingRevisions.length) return null
+const reviewFailed = !!Astro.getActionResult(actions.admin.experience.reviewRevision)?.error
+---
+
+<div class="space-y-6">
+  {
+    pendingRevisions.map((revision) => {
+      const proposed = experienceInput.safeParse(revision.experienceData ?? {})
+      const canPublish =
+        isPublishedComment(comment.status) &&
+        comment.version === revision.baseVersion &&
+        (revision.kind !== 'EXPERIENCE' || proposed.success)
+      const replay = getFormReplay(
+        reviewFailed && Astro.locals.actionFormValues?.revisionId === revision.id.toString()
+          ? Astro.locals.actionFormValues
+          : null
+      )
+      return (
+        <article class="space-y-4">
+          <p class="text-xs text-day-400">
+            Submitted <TimeFormatted date={revision.createdAt} />
+          </p>
+          {revision.aiAction === 'HOLD' && revision.aiReasoning && (
+            <p class="rounded-md bg-violet-500/10 px-2 py-1.5 text-xs text-violet-200">
+              AI held this edit: {revision.aiReasoning}
+            </p>
+          )}
+          {revision.kind !== comment.kind && (
+            <p class="text-xs text-day-300">
+              Type: {getCommentKindInfo(comment.kind).label} → {getCommentKindInfo(revision.kind).label}
+            </p>
+          )}
+          <CommentEditDiff
+            before={{
+              content: comment.content,
+              experienceData: { ...comment.experience, issues: comment.issues },
+            }}
+            after={{ content: revision.content, experienceData: revision.experienceData }}
+          />
+          {!canPublish && (
+            <p class="text-xs text-yellow-200">
+              This edit cannot be published because the post or its details changed. Reject it and ask the
+              author to submit a new correction.
+            </p>
+          )}
+          <form
+            method="POST"
+            action={`${panelPath}${actions.admin.experience.reviewRevision}`}
+            class="space-y-3"
+          >
+            <FormReplay />
+            <input type="hidden" name="revisionId" value={revision.id} />
+            {/* A textarea, so Enter adds a line instead of submitting with the first button, Publish. */}
+            <InputTextArea
+              name="reason"
+              label="Feedback to the author (private)"
+              value={replay.text('reason', '')}
+              inputProps={{
+                required: true,
+                minlength: MODERATOR_REASON_LENGTH.min,
+                maxlength: MODERATOR_REASON_LENGTH.max,
+                rows: 2,
+              }}
+            />
+            <div class="flex flex-wrap gap-2">
+              <Button
+                type="submit"
+                name="approve"
+                value="true"
+                label="Publish this edit"
+                disabled={!canPublish}
+                color="success"
+                size="sm"
+              />
+              <Button
+                type="submit"
+                name="approve"
+                value=""
+                label="Reject this edit"
+                color="danger"
+                variant="faded"
+                size="sm"
+              />
+            </div>
+            <p class="text-xs text-day-400">
+              Publishing replaces the current post. Rejecting leaves it unchanged.
+            </p>
+          </form>
+        </article>
+      )
+    })
+  }
+</div>

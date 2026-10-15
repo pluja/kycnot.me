@@ -2,6 +2,7 @@ import { type Prisma } from '@prisma/client'
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
+import { recordAuditLog } from '../../lib/auditLog'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { cap } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
@@ -120,7 +121,7 @@ export const adminAnnouncementActions = {
     input: z.object({
       id: z.coerce.number().int().positive(),
     }),
-    handler: async (input) => {
+    handler: async (input, context) => {
       const announcement = await prisma.announcement.findUnique({
         where: {
           id: input.id,
@@ -137,8 +138,18 @@ export const adminAnnouncementActions = {
         })
       }
 
-      await prisma.announcement.delete({
-        where: { id: announcement.id },
+      await prisma.$transaction(async (tx) => {
+        const deleted = await tx.announcement.delete({
+          where: { id: announcement.id },
+          select: { content: true },
+        })
+        await recordAuditLog(tx, {
+          actorId: context.locals.user.id,
+          action: 'DELETED',
+          targetType: 'ANNOUNCEMENT',
+          targetId: announcement.id,
+          summary: `Deleted announcement "${deleted.content.slice(0, 80)}"`,
+        })
       })
 
       return { success: true }

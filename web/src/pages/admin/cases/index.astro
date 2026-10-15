@@ -4,6 +4,8 @@ import { Icon } from 'astro-icon/components'
 
 import AdminCaseRow from '../../../components/admin/cases/AdminCaseRow.astro'
 import Button from '../../../components/Button.astro'
+import Pagination from '../../../components/Pagination.astro'
+import { adminFilterFieldClass } from '../../../constants/adminFilterField'
 import { caseIssueTypes, caseIssueTypesZodEnum } from '../../../constants/caseIssueTypes'
 import { caseStatuses, caseStatusesZodEnum, getCaseStatusInfo } from '../../../constants/caseStatus'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
@@ -89,9 +91,6 @@ const countByStatus = new Map(statusCounts.map((row) => [row.status, row._count.
 const totalCount = statusCounts.reduce((sum, row) => sum + row._count._all, 0)
 const totalPages = Math.max(1, Math.ceil(totalCases / PAGE_SIZE))
 
-const fieldClass =
-  'w-full rounded-md border border-night-500 bg-night-900 px-2.5 py-1.5 text-sm text-day-100 transition-colors [color-scheme:dark] focus:border-green-500/60 focus:outline-none'
-
 const statusTabs = [
   { value: undefined, label: 'All', icon: 'ri:stack-line', count: totalCount },
   ...caseStatuses.map((status) => ({
@@ -145,13 +144,13 @@ const statusTabs = [
         name="q"
         value={filters.q}
         placeholder="Search title or summary..."
-        class={fieldClass}
+        class={adminFilterFieldClass}
       />
     </div>
 
     <div>
       <label for="issueType" class="sr-only">Issue type</label>
-      <select id="issueType" name="issueType" class={fieldClass}>
+      <select id="issueType" name="issueType" class={adminFilterFieldClass}>
         <option value="">Any issue type</option>
         {
           caseIssueTypes.map((issue) => (
@@ -165,7 +164,7 @@ const statusTabs = [
 
     <div>
       <label for="service" class="sr-only">Service</label>
-      <select id="service" name="service" class={fieldClass}>
+      <select id="service" name="service" class={adminFilterFieldClass}>
         <option value="">All services</option>
         {
           services.map((service) => (
@@ -179,7 +178,7 @@ const statusTabs = [
 
     <div>
       <label for="linked" class="sr-only">Incident link</label>
-      <select id="linked" name="linked" class={fieldClass}>
+      <select id="linked" name="linked" class={adminFilterFieldClass}>
         <option value="any" selected={filters.linked === 'any'}>Linked or not</option>
         <option value="yes" selected={filters.linked === 'yes'}>Linked to an incident</option>
         <option value="no" selected={filters.linked === 'no'}>Not linked</option>
@@ -213,37 +212,5 @@ const statusTabs = [
     )
   }
 
-  {
-    totalPages > 1 && (
-      <nav class="mt-5 flex items-center justify-between gap-3" aria-label="Pagination">
-        {filters.page > 1 ? (
-          <Button
-            as="a"
-            href={urlWithParams(Astro.url, { page: filters.page - 1 })}
-            label="Previous"
-            icon="ri:arrow-left-line"
-            size="sm"
-            variant="faded"
-          />
-        ) : (
-          <span />
-        )}
-        <span class="text-xs text-day-500">
-          Page {filters.page} of {totalPages}
-        </span>
-        {filters.page < totalPages ? (
-          <Button
-            as="a"
-            href={urlWithParams(Astro.url, { page: filters.page + 1 })}
-            label="Next"
-            icon="ri:arrow-right-line"
-            size="sm"
-            variant="faded"
-          />
-        ) : (
-          <span />
-        )}
-      </nav>
-    )
-  }
+  <Pagination currentPage={filters.page} totalPages={totalPages} class="mt-6" />
 </BaseLayout>

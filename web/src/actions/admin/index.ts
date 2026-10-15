@@ -3,6 +3,7 @@ import { adminAttributeActions } from './attribute'
 import { adminCaseActions } from './case'
 import { adminContactActions } from './contact'
 import { adminEventActions } from './event'
+import { adminExperienceActions } from './experience'
 import { adminNotificationActions } from './notification'
 import { adminServiceActions } from './service'
 import { adminServiceSuggestionActions } from './serviceSuggestion'
@@ -15,6 +16,7 @@ export const adminActions = {
   case: adminCaseActions,
   contact: adminContactActions,
   event: adminEventActions,
+  experience: adminExperienceActions,
   notification: adminNotificationActions,
   service: adminServiceActions,
   serviceSuggestions: adminServiceSuggestionActions,

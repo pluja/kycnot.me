@@ -1,667 +1,342 @@
 ---
+import { CommentStatus, type Prisma } from '@prisma/client'
 import { z } from 'astro/zod'
 import { Icon } from 'astro-icon/components'
+import { mapValues } from 'lodash-es'
 
-import AdminCommentRow from '../../components/admin/comments/AdminCommentRow.astro'
+import ModerationQueueItem from '../../components/admin/comments/ModerationQueueItem.astro'
+import Lightbox from '../../components/Lightbox.astro'
 import Pagination from '../../components/Pagination.astro'
-import SortArrowIcon from '../../components/SortArrowIcon.astro'
-import {
-  adminCommentSortOptions,
-  adminCommentSortOptionsZodEnum,
-  getAdminCommentSortOptionInfo,
-} from '../../constants/adminCommentSortOptions'
-import {
-  commentStatusFilters,
-  commentStatusFiltersById,
-  commentStatusFiltersZodEnum,
-  getCommentStatusFilterInfo,
-} from '../../constants/commentStatusFilters'
+import { commentStatus } from '../../constants/commentStatus'
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import {
+  adminCommentReviewSelect,
+  compareTodo,
+  moderatorTodoReasons,
+  oldProofWhere,
+  proofsToCheck,
+  todoRank,
+  todoRankSelect,
+} from '../../lib/adminCommentReview'
 import { cn } from '../../lib/cn'
+import { conflictedCommentWhere } from '../../lib/experiences'
+import { authorHistory } from '../../lib/moderationSignals'
 import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
 import { prisma } from '../../lib/prisma'
-import { urlWithParams } from '../../lib/urls'
 
-import type { CommentStatusFilter } from '../../constants/commentStatusFilters'
-import type { CommentStatus, Prisma, VerificationStatus } from '@prisma/client'
+import type { AdminCommentReview, TodoReason } from '../../lib/adminCommentReview'
 
-if (!Astro.locals.userCan('comments:moderate')) {
-  return Astro.rewrite('/404')
-}
+if (!Astro.locals.userCan('comments:moderate')) return Astro.rewrite('/404')
+Astro.response.headers.set('Cache-Control', 'private, no-store')
 
-const DEFAULT_SORT_ORDER = 'desc'
+const todoReasons = moderatorTodoReasons()
+const notWithdrawn = { status: { not: CommentStatus.WITHDRAWN } }
+const queueWheres = {
+  todo: { ...notWithdrawn, OR: Object.values(todoReasons) },
+  ...mapValues(todoReasons, (reason) => ({ ...notWithdrawn, ...reason })),
+  oldProof: oldProofWhere,
+  ai: { moderationState: 'AWAITING_AI' },
+  all: {},
+} satisfies Record<string, Prisma.CommentWhereInput>
+type QueueId = keyof typeof queueWheres
 
 const { data: params } = zodParseQueryParamsStoringErrors(
   {
-    // Default to the Mod Work queue: union of fresh AI-handoffs and any
-    // comments a mod has deferred (Hold). The full mod inbox in one view.
-    status: commentStatusFiltersZodEnum.default('mod-work'),
+    queue: z
+      .enum(Object.keys(queueWheres) as [QueueId, ...QueueId[]])
+      .catch('todo')
+      .default('todo'),
+    serviceId: z.coerce.number().int().positive().optional(),
+    status: z.nativeEnum(CommentStatus).optional().catch(undefined),
+    search: z.string().trim().max(200).optional().catch(undefined),
     page: z.coerce.number().int().positive().default(1),
-    'priority-page': z.coerce.number().int().positive().default(1),
-    'sort-by': adminCommentSortOptionsZodEnum.default('createdAt'),
-    'sort-order': z.enum(['asc', 'desc']).default(DEFAULT_SORT_ORDER),
   },
   Astro
 )
-const PAGE_SIZE = 30
-const PRIORITY_PAGE_SIZE = 30
-
-const statusFilter = getCommentStatusFilterInfo(params.status)
-const sortBy = getAdminCommentSortOptionInfo(params['sort-by'])
-
-// Legend for the left-border ribbon on each row. Mirrors AdminCommentRow's
-// ribbonClass (Spam is the override that wins over the lifecycle status).
-const ribbonLegend = [
-  { label: 'Pending', swatch: 'bg-yellow-600' },
-  { label: 'Approved', swatch: 'bg-green-700' },
-  { label: 'Verified', swatch: 'bg-cyan-700' },
-  { label: 'Rejected', swatch: 'bg-red-700' },
-  { label: 'Spam', swatch: 'bg-orange-700' },
-] as const
-
-// The filter list is long; only the everyday filters stay as visible pills.
-// The rest live in a grouped "More filters" dropdown so the header stays short.
-const primaryFilterValues: CommentStatusFilter[] = ['all', 'mod-work', 'pending', 'rejected']
-const filterGroups: { label: string; values: CommentStatusFilter[] }[] = [
-  { label: 'Status', values: ['approved', 'verified'] },
-  { label: 'Queue', values: ['needs-human', 'on-hold', 'unmoderated-by-ai'] },
-  { label: 'AI', values: ['ai-reject', 'ai-auto-decided', 'brigade'] },
-  {
-    label: 'Flags',
-    values: ['suspicious', 'rating-muted', 'has-proof', 'proof-pending', 'issue-kyc', 'issue-funds', 'affiliated'],
-  },
-]
-
-const primaryFilters = primaryFilterValues.map((value) => commentStatusFiltersById[value])
-// Safety net: any filter not listed above still appears under "Other" so a
-// newly added filter can never become unreachable.
-const placedValues = new Set<string>([...primaryFilterValues, ...filterGroups.flatMap((g) => g.values)])
-const ungrouped = commentStatusFilters.filter((f) => !placedValues.has(f.value))
-const moreFilterGroups = ungrouped.length
-  ? [...filterGroups, { label: 'Other', values: ungrouped.map((f) => f.value) }]
-  : filterGroups
-const activeFilterInMore = !primaryFilterValues.includes(params.status)
-
-const listedServiceStatuses = ['APPROVED', 'VERIFICATION_SUCCESS'] satisfies VerificationStatus[]
-const pendingCommentStatuses = ['PENDING'] satisfies CommentStatus[]
-
-// AND the conditions so a filter that pins status (e.g., Approved) and
-// the priority "must be PENDING" constraint don't silently overwrite each
-// other via object-spread. Incompatible combos return 0 rows naturally.
-const priorityWhere = {
-  AND: [
-    statusFilter.whereClause,
-    { status: { in: pendingCommentStatuses } },
-    { service: { verificationStatus: { in: [...listedServiceStatuses] } } },
-  ],
-} satisfies Prisma.CommentWhereInput
-
-const regularWhere = {
-  AND: [
-    statusFilter.whereClause,
-    {
-      NOT: {
-        AND: [
-          { status: { in: pendingCommentStatuses } },
-          { service: { verificationStatus: { in: [...listedServiceStatuses] } } },
-        ],
-      },
-    },
-  ],
-} satisfies Prisma.CommentWhereInput
-
-const commentSelect = {
-  id: true,
-  content: true,
-  status: true,
-  moderationState: true,
-  parentId: true,
-  rating: true,
-  ratingActive: true,
-  ratingMuted: true,
-  ratingMuteReason: true,
-  ratingWeight: true,
-  ratingTrustLabel: true,
-  ratingTrustReason: true,
-  createdAt: true,
-  approvedAt: true,
-  privateProof: true,
-  privateProofStatus: true,
-  issues: true,
-  publicNote: true,
-  adminNote: true,
-  authorNote: true,
-  aiAction: true,
-  aiQuality: true,
-  aiIsSpam: true,
-  aiIsBrigade: true,
-  aiBrigadeConfidence: true,
-  aiReasoning: true,
-  aiSignals: true,
-  aiDecidedAt: true,
-  humanAction: true,
-  humanDecidedAt: true,
-  humanReasoning: true,
-  humanDecidedBy: {
-    select: { id: true, name: true, displayName: true, picture: true },
-  },
-  author: {
-    select: {
-      name: true,
-      displayName: true,
-      picture: true,
-      createdAt: true,
-      lastLoginAt: true,
-      totalKarma: true,
-      verified: true,
-      spammer: true,
-      _count: { select: { comments: true } },
-    },
-  },
-  service: {
-    select: {
-      name: true,
-      slug: true,
-      imageUrl: true,
-      verificationStatus: true,
-    },
-  },
-  parent: {
-    select: {
-      content: true,
-      author: {
-        select: { name: true, displayName: true, picture: true },
-      },
-    },
-  },
-} as const
-
-const commentOrderBy = [
-  {
-    [sortBy.value]: sortBy.hasNulls ? { sort: params['sort-order'], nulls: 'last' } : params['sort-order'],
-  },
-  { id: 'asc' as const },
-]
-
-const [priorityComments = [], totalPriorityComments = 0] = await Astro.locals.banners.try(
-  'Error fetching priority comments',
-  async () =>
-    prisma.comment.findManyAndCount({
-      where: priorityWhere,
-      select: commentSelect,
-      orderBy: commentOrderBy,
-      skip: (params['priority-page'] - 1) * PRIORITY_PAGE_SIZE,
-      take: PRIORITY_PAGE_SIZE,
-    }),
-  []
-)
-
-const [comments = [], totalComments = 0] = await Astro.locals.banners.try(
-  'Error fetching comments',
-  async () =>
-    prisma.comment.findManyAndCount({
-      where: regularWhere,
-      select: commentSelect,
-      orderBy: commentOrderBy,
-      skip: (params.page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-    }),
-  []
-)
-
-// A comment awaiting AI for longer than this means the worker is likely
-// stuck: the pyworker moderates hourly, so a multi-hour backlog is abnormal.
-const STALE_AWAITING_AI_HOURS = 3
-
-// Header stats. Counts the global table since the user clicks them to jump
-// to that filter, which then applies its own where clause.
-const [headerStats] = await Astro.locals.banners.try(
-  'Error fetching dashboard stats',
-  async () => {
-    const staleAwaitingAiBefore = new Date(Date.now() - STALE_AWAITING_AI_HOURS * 60 * 60 * 1000)
-    const totalPending = await prisma.comment.count({ where: { status: 'PENDING' } })
-    const modWork = await prisma.comment.count({
-      where: { moderationState: 'AWAITING_HUMAN' },
-    })
-    const staleAwaitingAi = await prisma.comment.count({
-      where: { moderationState: 'AWAITING_AI', createdAt: { lt: staleAwaitingAiBefore } },
-    })
-    const brigade = await prisma.comment.count({
-      where: { aiIsBrigade: true, status: 'PENDING' },
-    })
-    const proofPending = await prisma.comment.count({
-      where: { privateProof: { not: null }, privateProofStatus: 'PENDING', status: 'PENDING' },
-    })
-    return [{ totalPending, modWork, staleAwaitingAi, brigade, proofPending }]
-  },
-  [{ totalPending: 0, modWork: 0, staleAwaitingAi: 0, brigade: 0, proofPending: 0 }]
-)
-
-const totalPages = Math.ceil(totalComments / PAGE_SIZE)
-const priorityTotalPages = Math.ceil(totalPriorityComments / PRIORITY_PAGE_SIZE)
-
-// If a user lands on an out-of-range page (e.g. they had ?page=6 and then
-// switched to a filter that only has 2 pages), bounce them to page 1 of the
-// same filter rather than showing an empty list. Keep all other params.
-const pageOutOfRange = params.page > 1 && (totalComments === 0 || params.page > totalPages)
-const priorityPageOutOfRange =
-  params['priority-page'] > 1 && (totalPriorityComments === 0 || params['priority-page'] > priorityTotalPages)
-if (pageOutOfRange || priorityPageOutOfRange) {
-  const fixed = new URL(Astro.url)
-  if (pageOutOfRange) fixed.searchParams.delete('page')
-  if (priorityPageOutOfRange) fixed.searchParams.delete('priority-page')
-  return Astro.redirect(fixed.pathname + fixed.search)
+const pageSize = 25
+const userId = Astro.locals.user?.id ?? -1
+const serviceWhere: Prisma.CommentWhereInput = {
+  ...(params.serviceId ? { serviceId: params.serviceId } : {}),
+  NOT: conflictedCommentWhere({ id: userId, admin: !!Astro.locals.user?.admin }),
 }
+const allFilters: Prisma.CommentWhereInput[] =
+  params.queue === 'all'
+    ? [
+        ...(params.status ? [{ status: params.status }] : []),
+        ...(params.search
+          ? [
+              {
+                OR: [
+                  { content: { contains: params.search, mode: 'insensitive' as const } },
+                  { author: { name: { equals: params.search } } },
+                ],
+              },
+            ]
+          : []),
+      ]
+    : []
+const where: Prisma.CommentWhereInput = { AND: [serviceWhere, queueWheres[params.queue], ...allFilters] }
+// rankedReasons are the reasons that order a queue; the AI queue and All keep a plain date order.
+const rankedReasons: Partial<Record<QueueId, TodoReason[]>> = {
+  todo: ['reports', 'posts', 'edits', 'proof'],
+  reports: ['reports'],
+  posts: ['posts'],
+  edits: ['edits'],
+  proof: ['proof'],
+  oldProof: ['oldProof'],
+}
+const reasonWheres: Record<TodoReason, Prisma.CommentWhereInput> = { ...todoReasons, oldProof: oldProofWhere }
 
-const makePriorityPageUrl = (page: number) => {
-  const searchParams = new URLSearchParams(Astro.url.search)
-  searchParams.set('priority-page', page.toString())
-  return `${Astro.url.pathname}?${searchParams.toString()}`
+const [result, counts, service] = await Astro.locals.banners.tryMany([
+  [
+    'Failed to load the moderation queue',
+    async () => {
+      const offset = (params.page - 1) * pageSize
+      const reasons = rankedReasons[params.queue]
+      if (!reasons) {
+        const [total, posts] = await Promise.all([
+          prisma.comment.count({ where }),
+          prisma.comment.findMany({
+            where,
+            select: adminCommentReviewSelect,
+            orderBy:
+              params.queue === 'all'
+                ? [{ createdAt: 'desc' }, { id: 'desc' }]
+                : [{ createdAt: 'asc' }, { id: 'asc' }],
+            skip: offset,
+            take: pageSize,
+          }),
+        ])
+        return { posts, total, waitingSince: new Map<number, Date>() }
+      }
+      const candidates = await prisma.comment.findMany({ where, select: todoRankSelect })
+      const candidateIds = candidates.map((post) => post.id)
+      // A post can wait for several reasons; the most urgent one places it.
+      const reasonsByPost = new Map<number, Set<TodoReason>>()
+      for (const reason of reasons) {
+        const matching =
+          reasons.length === 1
+            ? candidateIds
+            : (
+                await prisma.comment.findMany({
+                  where: { AND: [{ id: { in: candidateIds } }, reasonWheres[reason]] },
+                  select: { id: true },
+                })
+              ).map((post) => post.id)
+        for (const id of matching) reasonsByPost.set(id, (reasonsByPost.get(id) ?? new Set()).add(reason))
+      }
+      const ranked = candidates
+        .map((post) => ({ id: post.id, ...todoRank(post, reasonsByPost.get(post.id) ?? new Set()) }))
+        .sort(compareTodo)
+      const pageIds = ranked.slice(offset, offset + pageSize).map((post) => post.id)
+      const pagePosts = await prisma.comment.findMany({
+        where: { id: { in: pageIds } },
+        select: adminCommentReviewSelect,
+      })
+      return {
+        posts: pageIds.flatMap((id) => pagePosts.filter((post) => post.id === id)),
+        total: ranked.length,
+        waitingSince: new Map(ranked.map((post) => [post.id, post.since])),
+      }
+    },
+    { posts: [] as AdminCommentReview[], total: 0, waitingSince: new Map<number, Date>() },
+  ],
+  [
+    'Failed to count the queues',
+    async () => {
+      const ids = Object.keys(queueWheres) as QueueId[]
+      const totals = await Promise.all(
+        ids.map((id) =>
+          id === 'all'
+            ? Promise.resolve(null)
+            : prisma.comment.count({ where: { AND: [serviceWhere, queueWheres[id]] } })
+        )
+      )
+      return Object.fromEntries(ids.map((id, index) => [id, totals[index]])) as Record<QueueId, number | null>
+    },
+    null,
+  ],
+  [
+    'Failed to load the service',
+    () =>
+      params.serviceId
+        ? prisma.service.findUnique({ where: { id: params.serviceId }, select: { name: true } })
+        : Promise.resolve(null),
+    null,
+  ],
+])
+const posts = result.posts
+const historyFor = await Astro.locals.banners.try(
+  'Failed to load author history',
+  () => authorHistory(posts),
+  () => ({ rejectedPosts: 0, postsOnService: 0 })
+)
+const queues = [
+  { id: 'todo', label: 'To do', icon: 'ri:inbox-line' },
+  { id: 'posts', label: 'Posts', icon: 'ri:pause-circle-line' },
+  { id: 'proof', label: 'Proof', icon: 'ri:file-search-line' },
+  { id: 'reports', label: 'Reports', icon: 'ri:flag-line' },
+  { id: 'edits', label: 'Edits', icon: 'ri:git-pull-request-line' },
+  { id: 'oldProof', label: 'Old proof', icon: 'ri:archive-line' },
+  { id: 'ai', label: 'Waiting for AI', icon: 'ri:robot-2-line' },
+  { id: 'all', label: 'All', icon: 'ri:search-line' },
+] as const satisfies { id: QueueId; label: string; icon: string }[]
+const queueUrl = (queue: QueueId, serviceId = params.serviceId) => {
+  const search = new URLSearchParams({ queue })
+  if (serviceId) search.set('serviceId', serviceId.toString())
+  return `/admin/comments?${search.toString()}`
+}
+// panelTabFor opens the tab a row most likely needs; a decision or a report needs no particular tab.
+const panelTabFor = (comment: AdminCommentReview) =>
+  params.queue === 'proof' || params.queue === 'oldProof'
+    ? 'evidence'
+    : params.queue === 'edits'
+      ? 'edits'
+      : comment.moderationState === 'AWAITING_HUMAN' || comment.contactThreads.length > 0
+        ? undefined
+        : proofsToCheck(comment) > 0
+          ? 'evidence'
+          : comment.revisions.length > 0
+            ? 'edits'
+            : undefined
+const emptyMessages: Record<QueueId, string> = {
+  todo: 'Nothing to do.',
+  posts: 'No posts waiting for a decision.',
+  proof: 'No proof to check.',
+  reports: 'No open reports.',
+  edits: 'No edits to review.',
+  oldProof: 'The old proof backlog is done.',
+  ai: 'Nothing is waiting for the AI.',
+  all: 'No posts match.',
 }
 ---
 
-<BaseLayout pageTitle="Comment Moderation" widthClassName="max-w-screen-2xl">
-  <div class="mb-4 flex items-baseline justify-between gap-3">
-    <h1 class="font-title text-2xl text-green-500">&gt; comments.moderate</h1>
-    <details id="hotkey-help" data-dismissible class="group relative">
-      <summary
-        class="inline-flex cursor-pointer list-none items-center gap-1 rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
-      >
-        <Icon name="ri:keyboard-line" class="size-3.5" />
-        Shortcuts
-        <kbd class="ml-1 rounded-sm bg-night-700 px-1 font-mono">?</kbd>
-      </summary>
-      <div
-        class="absolute right-0 z-20 mt-1 w-72 rounded-md border border-zinc-700 bg-night-800 p-3 text-xs shadow-lg"
-      >
-        <div class="mb-2 font-medium text-zinc-200">Keyboard shortcuts</div>
-        <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-zinc-300">
-          <dt class="flex gap-1">
-            <kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">j</kbd><kbd
-              class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">k</kbd>
-          </dt>
-          <dd class="text-zinc-400">Navigate rows</dd>
-          <dt><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">e</kbd></dt>
-          <dd class="text-zinc-400">Expand / collapse</dd>
-          <dt><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">a</kbd></dt>
-          <dd class="text-zinc-400">Approve focused</dd>
-          <dt><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">r</kbd></dt>
-          <dd class="text-zinc-400">Reject focused</dd>
-          <dt><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">h</kbd></dt>
-          <dd class="text-zinc-400">Hold focused</dd>
-          <dt><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">v</kbd></dt>
-          <dd class="text-zinc-400">Verify (toggle)</dd>
-          <dt><kbd class="rounded-sm bg-night-700 px-1.5 py-0.5 font-mono">?</kbd></dt>
-          <dd class="text-zinc-400">Toggle this panel</dd>
-        </dl>
-      </div>
-    </details>
-  </div>
-
-  {
-    headerStats.staleAwaitingAi > 0 && (
-      <a
-        href={urlWithParams(Astro.url, { status: 'unmoderated-by-ai', page: null, 'priority-page': null })}
-        class="mb-4 flex items-center gap-2 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300 transition-colors hover:border-red-500/70"
-      >
-        <Icon name="ri:error-warning-line" class="size-4 shrink-0" />
-        <span>
-          <strong>{headerStats.staleAwaitingAi}</strong> comment{headerStats.staleAwaitingAi === 1 ? '' : 's'} have
-          been awaiting AI review for over {STALE_AWAITING_AI_HOURS}h. The moderation worker may be stuck.
-        </span>
-      </a>
-    )
-  }
-
-  <!-- Header stats -->
-  <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-    <a
-      href={urlWithParams(Astro.url, { status: 'pending', page: null, 'priority-page': null })}
-      class="rounded-md border border-zinc-800 bg-night-800 px-3 py-2 transition-colors hover:border-blue-500/50"
-    >
-      <div class="text-xs text-zinc-400">Pending</div>
-      <div class="font-title text-2xl text-blue-300">{headerStats.totalPending}</div>
-    </a>
-    <a
-      href={urlWithParams(Astro.url, { status: 'mod-work', page: null, 'priority-page': null })}
-      class="rounded-md border border-zinc-800 bg-night-800 px-3 py-2 transition-colors hover:border-yellow-500/50"
-    >
-      <div class="text-xs text-zinc-400">Mod work</div>
-      <div class="font-title text-2xl text-yellow-300">{headerStats.modWork}</div>
-    </a>
-    <a
-      href={urlWithParams(Astro.url, { status: 'brigade', page: null, 'priority-page': null })}
-      class="rounded-md border border-zinc-800 bg-night-800 px-3 py-2 transition-colors hover:border-orange-500/50"
-    >
-      <div class="text-xs text-zinc-400">Brigade</div>
-      <div class="font-title text-2xl text-orange-300">{headerStats.brigade}</div>
-    </a>
-    <a
-      href={urlWithParams(Astro.url, { status: 'proof-pending', page: null, 'priority-page': null })}
-      class="rounded-md border border-zinc-800 bg-night-800 px-3 py-2 transition-colors hover:border-purple-500/50"
-    >
-      <div class="text-xs text-zinc-400">Proof pending</div>
-      <div class="font-title text-2xl text-purple-300">{headerStats.proofPending}</div>
-    </a>
-  </div>
-
-  <!-- Filters: a few everyday pills + a grouped dropdown for the rest. -->
-  <div class="mb-3 flex flex-wrap items-center gap-1.5">
-    {
-      primaryFilters.map((filter) => (
-        <a
-          href={urlWithParams(Astro.url, { status: filter.value, page: null, 'priority-page': null })}
-          class={cn(
-            'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs',
-            params.status === filter.value
-              ? filter.classNames.filter
-              : 'border-zinc-700 transition-colors hover:border-green-500/50'
-          )}
-        >
-          <Icon name={filter.icon} class="size-3.5 shrink-0" />
-          {filter.label}
-        </a>
-      ))
-    }
-
-    <details data-dismissible class="group/filters relative">
-      <summary
-        class={cn(
-          'flex cursor-pointer list-none items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs select-none',
-          activeFilterInMore
-            ? statusFilter.classNames.filter
-            : 'border-zinc-700 transition-colors hover:border-green-500/50'
-        )}
-      >
-        <Icon name={activeFilterInMore ? statusFilter.icon : 'ri:filter-3-line'} class="size-3.5 shrink-0" />
-        {activeFilterInMore ? statusFilter.label : 'More filters'}
-        <Icon name="ri:arrow-down-s-line" class="size-3.5 transition-transform group-open/filters:rotate-180" />
-      </summary>
-      <div
-        class="absolute left-0 z-20 mt-1 w-[min(92vw,32rem)] space-y-2.5 rounded-md border border-zinc-700 bg-night-800 p-3 shadow-lg"
-      >
+<BaseLayout
+  pageTitle="Comment moderation"
+  description="Decide on posts, check proof, and handle reports and edits."
+  noindex
+  widthClassName="max-w-5xl"
+  htmx
+>
+  <header class="mt-8 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="font-title text-2xl font-bold">Comment moderation</h1>
+      <p class="mt-1 text-sm text-day-400">
         {
-          moreFilterGroups.map((group) => (
-            <div class="space-y-1">
-              <div class="text-[10px] font-semibold tracking-wide text-day-600 uppercase">{group.label}</div>
-              <div class="flex flex-wrap gap-1">
-                {group.values.map((value) => {
-                  const filter = commentStatusFiltersById[value]
-                  return (
-                    <a
-                      href={urlWithParams(Astro.url, { status: value, page: null, 'priority-page': null })}
-                      class={cn(
-                        'flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs',
-                        params.status === value
-                          ? filter.classNames.filter
-                          : 'border-zinc-700 transition-colors hover:border-green-500/50'
-                      )}
-                    >
-                      <Icon name={filter.icon} class="size-3.5 shrink-0" />
-                      {filter.label}
-                    </a>
-                  )
-                })}
-              </div>
-            </div>
-          ))
+          params.queue === 'all'
+            ? 'Every post, newest first.'
+            : params.queue === 'oldProof'
+              ? 'Proof the old system never reviewed, on published posts. Nothing waits on it; work through it as time allows.'
+              : 'Each post once. Most urgent first: serious reports, other reports, held posts, held edits, then proof. Longest wait first within each.'
         }
-      </div>
-    </details>
-  </div>
-
-  <!-- Sort -->
-  <div class="mb-4 flex flex-wrap items-center gap-2 text-xs">
-    <span class="text-zinc-400">Sort:</span>
+      </p>
+    </div>
     {
-      adminCommentSortOptions.map((o) => (
+      service && (
         <a
-          href={urlWithParams(Astro.url, {
-            'sort-by': o.value,
-            'sort-order':
-              sortBy.value === o.value
-                ? params['sort-order'] === 'asc'
-                  ? 'desc'
-                  : 'asc'
-                : DEFAULT_SORT_ORDER,
-            page: null,
-            'priority-page': null,
-          })}
-          class={cn(
-            'flex items-center gap-1 rounded-md border px-2 py-1 transition-colors',
-            sortBy.value === o.value
-              ? 'border-blue-500 bg-blue-500/10 text-blue-400'
-              : 'border-zinc-700 hover:border-blue-500/50'
-          )}
+          href={queueUrl(params.queue, undefined)}
+          class="inline-flex items-center gap-1.5 rounded-md border border-night-500 px-2.5 py-1 text-sm text-day-200 hover:border-night-400"
+          aria-label={`Remove the filter for ${service.name}`}
         >
-          {o.label}
-          <SortArrowIcon active={sortBy.value === o.value} sortOrder={params['sort-order']} />
+          {service.name}
+          <Icon name="ri:close-line" class="size-4 text-day-400" />
         </a>
-      ))
-    }
-    <span class="text-zinc-500">{params['sort-order'] === 'desc' ? 'newest' : 'oldest'} first</span>
-
-    {/* Ribbon color legend, kept on the sort line to save vertical space. */}
-    <span class="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-day-500">
-      <span class="text-[10px] font-semibold tracking-wide text-day-600 uppercase">Row color</span>
-      {
-        ribbonLegend.map((item) => (
-          <span class="flex items-center gap-1.5">
-            <span class={cn('inline-block h-3 w-1 rounded-full', item.swatch)} />
-            {item.label}
-          </span>
-        ))
-      }
-    </span>
-  </div>
-
-  <!-- Priority section: pending on listed services -->
-  {
-    totalPriorityComments > 0 && (
-      <section class="mb-6 rounded-lg border border-amber-600/40 bg-amber-950/10">
-        <header class="flex items-center gap-2 border-b border-amber-700/30 px-3 py-2">
-          <Icon name="ri:star-fill" class="size-4 text-amber-400" />
-          <h2 class="text-sm font-medium text-amber-300">Priority: pending on listed services</h2>
-          <span class="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-amber-950">
-            {totalPriorityComments}
-          </span>
-        </header>
-        <div class="space-y-1 p-2">
-          {priorityComments.map((comment) => (
-            <AdminCommentRow comment={comment} isPriority />
-          ))}
-        </div>
-        {priorityTotalPages > 1 && (
-          <footer class="flex items-center justify-between border-t border-amber-700/30 px-3 py-2 text-xs text-amber-200/70">
-            <span>
-              Page {Math.min(Math.max(1, params['priority-page']), priorityTotalPages)} of{' '}
-              {priorityTotalPages}
-            </span>
-            <div class="flex gap-1">
-              {params['priority-page'] > 1 && (
-                <a
-                  href={makePriorityPageUrl(params['priority-page'] - 1)}
-                  class="rounded-md bg-amber-800 px-2 py-0.5 text-amber-200 hover:bg-amber-700"
-                >
-                  Prev
-                </a>
-              )}
-              {params['priority-page'] < priorityTotalPages && (
-                <a
-                  href={makePriorityPageUrl(params['priority-page'] + 1)}
-                  class="rounded-md bg-amber-800 px-2 py-0.5 text-amber-200 hover:bg-amber-700"
-                >
-                  Next
-                </a>
-              )}
-            </div>
-          </footer>
-        )}
-      </section>
-    )
-  }
-
-  {
-    totalPriorityComments === 0 && (
-      <div class="mb-4 rounded-md border border-zinc-800 bg-night-800/50 px-3 py-2 text-xs text-zinc-500">
-        No pending comments on listed services.
-      </div>
-    )
-  }
-
-  <!-- Main list -->
-  <div class="space-y-2">
-    {
-      comments.length === 0 && (
-        <div class="rounded-md border border-zinc-800 bg-night-800/50 px-3 py-6 text-center text-sm text-zinc-500">
-          No comments match the current filter.
-        </div>
       )
     }
-    {comments.map((comment) => <AdminCommentRow comment={comment} />)}
-  </div>
+  </header>
 
-  {totalPages > 1 && <Pagination currentPage={params.page} totalPages={totalPages} class="mt-6" />}
+  <nav class="mt-5 flex flex-wrap gap-1" aria-label="Moderation queues">
+    {
+      queues.map((queue) => {
+        const count = counts?.[queue.id] ?? null
+        const active = params.queue === queue.id
+        if (queue.id === 'oldProof' && count === 0 && !active) return null
+        return (
+          <a
+            href={queueUrl(queue.id)}
+            aria-current={active ? 'page' : undefined}
+            class={cn(
+              'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm',
+              active
+                ? 'border-teal-500/60 bg-teal-500/10 text-day-100'
+                : 'border-night-600 text-day-400 hover:border-night-500 hover:text-day-200'
+            )}
+          >
+            <Icon name={queue.icon} class="size-4" />
+            {queue.label}
+            {count !== null && (
+              <span
+                class={cn(
+                  'rounded-sm px-1 text-xs tabular-nums',
+                  count > 0 ? 'bg-night-600 text-day-100' : 'text-day-600'
+                )}
+              >
+                {count.toLocaleString()}
+              </span>
+            )}
+          </a>
+        )
+      })
+    }
+  </nav>
+
+  {
+    params.queue === 'all' && (
+      <form method="GET" action="/admin/comments" class="mt-3 flex flex-wrap items-center gap-2">
+        <input type="hidden" name="queue" value="all" />
+        {params.serviceId && <input type="hidden" name="serviceId" value={params.serviceId} />}
+        <input
+          type="search"
+          name="search"
+          value={params.search ?? ''}
+          placeholder="Search text or exact username"
+          class="min-w-0 flex-1 rounded-md border border-night-500 bg-night-800 px-2.5 py-1.5 text-sm text-day-100"
+        />
+        <select
+          name="status"
+          class="rounded-md border border-night-500 bg-night-800 px-2 py-1.5 text-sm text-day-100"
+        >
+          <option value="">Any status</option>
+          {commentStatus.map((status) => (
+            <option value={status.id} selected={params.status === status.id}>
+              {status.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          class="rounded-md border border-night-500 px-3 py-1.5 text-sm text-day-200 hover:border-night-400"
+        >
+          Search
+        </button>
+      </form>
+    )
+  }
+
+  <section class="mt-4" aria-label="Queue">
+    {
+      posts.map((comment) => (
+        <ModerationQueueItem
+          comment={comment}
+          history={historyFor(comment)}
+          panelTab={panelTabFor(comment)}
+          waitingSince={result.waitingSince.get(comment.id)}
+        />
+      ))
+    }
+    {
+      posts.length === 0 && (
+        <p class="flex items-center gap-2 py-10 text-sm text-day-400">
+          <Icon name="ri:checkbox-circle-line" class="size-5 text-green-400" />
+          {emptyMessages[params.queue]}
+        </p>
+      )
+    }
+  </section>
+  {
+    result.total > pageSize && (
+      <Pagination currentPage={params.page} totalPages={Math.ceil(result.total / pageSize)} />
+    )
+  }
+  <Lightbox />
 </BaseLayout>
-
-<script>
-  ////////////////////////////////////////////////////////////
-  // Keyboard navigation for the moderation dashboard.      //
-  // j/k move focus between comment rows, e toggles expand, //
-  // a/r/h dispatch human-action approve/reject/hold on the //
-  // focused row, v toggles verify when applicable. Ignored //
-  // while typing in inputs.                                //
-  ////////////////////////////////////////////////////////////
-  document.addEventListener('astro:page-load', () => {
-    const rows = Array.from(document.querySelectorAll<HTMLDetailsElement>('details[data-comment-row]'))
-    if (rows.length === 0) return
-
-    // Clicks inside an element marked [data-row-no-toggle] should not flip the
-    // parent details open/closed. But for actual links we MUST NOT call
-    // preventDefault (that would cancel their navigation). Buttons fire their
-    // own listener before this handler runs, so preventDefault on a button is
-    // safe (its action has already dispatched) and keeps the row from toggling.
-    rows.forEach((row) => {
-      const summary = row.querySelector<HTMLElement>(':scope > summary')
-      summary?.addEventListener('click', (e) => {
-        const t = e.target as HTMLElement | null
-        if (!t || !t.closest('[data-row-no-toggle]')) return
-        e.stopPropagation()
-        // Skip preventDefault for anchors so target="_blank" navigation works.
-        if (!t.closest('a')) {
-          e.preventDefault()
-        }
-      })
-
-      // Stop Enter/Space on action-rail buttons from also toggling the parent
-      // <details>. The button still receives the key event natively because
-      // focus is on the button, not the summary.
-      summary?.addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter' && e.key !== ' ') return
-        const t = e.target as HTMLElement | null
-        if (!t || !t.closest('[data-row-no-toggle]')) return
-        e.stopPropagation()
-        if (!t.closest('a')) e.preventDefault()
-      })
-    })
-
-    let focusedIdx = -1
-
-    function focusRow(idx: number) {
-      if (idx < 0 || idx >= rows.length) return
-      focusedIdx = idx
-      const summary = rows[idx]?.querySelector<HTMLElement>(':scope > summary')
-      summary?.focus()
-      summary?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-    }
-
-    // Track which row the user's focus enters so j/k pick up where they are.
-    rows.forEach((row, idx) => {
-      row.addEventListener('focusin', () => {
-        focusedIdx = idx
-      })
-    })
-
-    document.addEventListener('keydown', (e) => {
-      const target = e.target as HTMLElement | null
-      if (!target) return
-      if (target.matches('input, textarea, select, [contenteditable="true"]')) return
-      if (e.ctrlKey || e.metaKey || e.altKey) return
-
-      const focused = rows[focusedIdx]
-
-      switch (e.key) {
-        case 'j': {
-          e.preventDefault()
-          focusRow(focusedIdx < 0 ? 0 : Math.min(rows.length - 1, focusedIdx + 1))
-          break
-        }
-        case 'k': {
-          e.preventDefault()
-          focusRow(focusedIdx < 0 ? 0 : Math.max(0, focusedIdx - 1))
-          break
-        }
-        case 'e': {
-          if (!focused) return
-          e.preventDefault()
-          focused.open = !focused.open
-          break
-        }
-        case 'a':
-        case 'r':
-        case 'h': {
-          if (!focused) return
-          e.preventDefault()
-          const value = e.key === 'a' ? 'APPROVE' : e.key === 'r' ? 'REJECT' : 'HOLD'
-          const btn = focused.querySelector<HTMLButtonElement>(
-            `:scope > summary button[data-action="human-action"][data-value="${value}"]`
-          )
-          btn?.click()
-          break
-        }
-        case 'v': {
-          if (!focused) return
-          e.preventDefault()
-          const btn = focused.querySelector<HTMLButtonElement>(
-            ':scope > summary button[data-action="status"]'
-          )
-          btn?.click()
-          break
-        }
-        case '?': {
-          e.preventDefault()
-          const help = document.getElementById('hotkey-help') as HTMLDetailsElement | null
-          if (help) help.open = !help.open
-          break
-        }
-      }
-    })
-  })
-</script>
-
-<script>
-  ////////////////////////////////////////////////////////////
-  // Dismiss open dropdowns (filters menu, shortcuts panel)  //
-  // on an outside click or Escape. The panels are plain     //
-  // <details>, so they still work without this; it only     //
-  // adds the close-on-outside-click niceties. Closing is    //
-  // idempotent, so re-running on navigation is harmless.    //
-  ////////////////////////////////////////////////////////////
-  document.addEventListener('astro:page-load', () => {
-    const closeAll = (except: Element | null) => {
-      document.querySelectorAll<HTMLDetailsElement>('details[data-dismissible][open]').forEach((details) => {
-        if (details !== except) details.open = false
-      })
-    }
-
-    document.addEventListener('click', (event) => {
-      const target = event.target as Node | null
-      const insideDetails = target instanceof Element ? target.closest('details[data-dismissible]') : null
-      closeAll(insideDetails)
-    })
-
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') closeAll(null)
-    })
-  })
-</script>

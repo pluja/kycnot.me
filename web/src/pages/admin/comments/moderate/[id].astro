@@ -1,0 +1,152 @@
+---
+import CommentModerationPanel from '../../../../components/CommentModerationPanel.astro'
+import Lightbox from '../../../../components/Lightbox.astro'
+import PostQuote from '../../../../components/PostQuote.astro'
+import BaseLayout from '../../../../layouts/BaseLayout.astro'
+import { adminCommentReviewSelect } from '../../../../lib/adminCommentReview'
+import {
+  commentPageEvidenceSelect,
+  commentPagePrivateEvidenceSelect,
+  commentPageRevisionSelect,
+  commentPageSelect,
+} from '../../../../lib/commentPage'
+import { makeCommentUrl } from '../../../../lib/commentsWithReplies'
+import { hasModerationConflict } from '../../../../lib/experiences'
+import { prisma } from '../../../../lib/prisma'
+
+const id = Number(Astro.params.id)
+if (!Number.isSafeInteger(id) || id <= 0) return Astro.rewrite('/404')
+Astro.response.headers.set('Cache-Control', 'private, no-store')
+
+const comment = await Astro.locals.banners.try(
+  'Failed to load comment',
+  () => prisma.comment.findUnique({ where: { id }, select: commentPageSelect }),
+  null
+)
+if (!comment) return Astro.rewrite('/404')
+
+const user = Astro.locals.user
+const canModerate =
+  !!user &&
+  !hasModerationConflict(user, {
+    authorId: comment.authorId,
+    affiliatedUserIds: comment.service.affiliatedUsers.map((item) => item.userId),
+  })
+
+const [context, evidence, privateEvidence, revisions, activity] = canModerate
+  ? await Astro.locals.banners.tryMany([
+      [
+        'Failed to load moderator context',
+        () => prisma.comment.findUnique({ where: { id }, select: adminCommentReviewSelect }),
+        null,
+      ],
+      [
+        'Failed to load proof',
+        () =>
+          prisma.commentEvidence.findMany({
+            where: { commentId: id },
+            select: commentPageEvidenceSelect,
+            orderBy: { createdAt: 'asc' },
+          }),
+        [],
+      ],
+      [
+        'Failed to load private proof',
+        () =>
+          prisma.commentEvidence.findMany({
+            where: { commentId: id, removedAt: null },
+            select: commentPagePrivateEvidenceSelect,
+            orderBy: { createdAt: 'asc' },
+          }),
+        [],
+      ],
+      [
+        'Failed to load edits',
+        () =>
+          prisma.commentRevision.findMany({
+            where: { commentId: id },
+            select: {
+              ...commentPageRevisionSelect,
+              reason: true,
+              decisionRule: true,
+              aiAction: true,
+              aiReasoning: true,
+              baseVersion: true,
+              kind: true,
+              experienceData: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          }),
+        [],
+      ],
+      [
+        'Failed to load activity',
+        () =>
+          prisma.auditLog.findMany({
+            where: { targetType: 'COMMENT', targetId: id },
+            select: {
+              id: true,
+              createdAt: true,
+              summary: true,
+              actor: { select: { name: true, displayName: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 30,
+          }),
+        [],
+      ],
+    ])
+  : [null, [], [], [], []]
+
+const proofIds = [
+  ...new Set(privateEvidence.flatMap((item) => (item.normalizedId ? [item.normalizedId] : []))),
+]
+const reusedProof = proofIds.length
+  ? await Astro.locals.banners.try(
+      'Failed to check for reused order IDs',
+      () =>
+        prisma.commentEvidence.findMany({
+          where: {
+            normalizedId: { in: proofIds },
+            removedAt: null,
+            commentId: { not: id },
+            comment: { serviceId: comment.service.id },
+          },
+          select: { normalizedId: true, commentId: true },
+          take: 20,
+        }),
+      []
+    )
+  : []
+
+const inline = Astro.request.headers.get('HX-Request') === 'true'
+const panelProps = {
+  comment,
+  context,
+  evidence,
+  privateEvidence,
+  reusedProof,
+  revisions,
+  activity,
+  canModerate,
+  inline,
+}
+---
+
+{
+  inline ? (
+    <CommentModerationPanel {...panelProps} />
+  ) : (
+    <BaseLayout pageTitle={`Moderate comment #${id.toString()}`} noindex widthClassName="max-w-3xl" htmx>
+      <a
+        href={makeCommentUrl({ serviceSlug: comment.service.slug, commentId: id })}
+        class="mt-8 mb-3 inline-block text-sm text-green-400 hover:underline"
+      >
+        Open in thread on {comment.service.name}
+      </a>
+      {context && <PostQuote post={context} parent={context.parent} class="mb-3" />}
+      <CommentModerationPanel {...panelProps} />
+      <Lightbox />
+    </BaseLayout>
+  )
+}

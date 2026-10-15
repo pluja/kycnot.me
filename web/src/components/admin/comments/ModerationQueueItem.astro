@@ -1,0 +1,210 @@
+---
+import { Icon } from 'astro-icon/components'
+import { formatDistanceStrict } from 'date-fns'
+
+import { getCommentKindInfo } from '../../../constants/commentKinds'
+import { getCommentRuleInfo } from '../../../constants/commentRules'
+import { getExperienceSentimentInfo } from '../../../constants/experiences'
+import { getVerificationStatusInfo } from '../../../constants/verificationStatus'
+import { proofsToCheck } from '../../../lib/adminCommentReview'
+import { DELETED_ACCOUNT_LABEL } from '../../../lib/authorName'
+import { cn } from '../../../lib/cn'
+import { commentReviewSignals } from '../../../lib/commentReviewSignals'
+import { makeCommentUrl } from '../../../lib/commentsWithReplies'
+import { inlinePanelToggle } from '../../../lib/inlinePanel'
+import { moderationSignals } from '../../../lib/moderationSignals'
+import { getAiHardGateReason } from '../../../lib/proofEvidence'
+import BadgeSmall from '../../BadgeSmall.astro'
+import Button from '../../Button.astro'
+import CommentNotes from '../../CommentNotes.astro'
+import CommentStatusChip from '../../CommentStatusChip.astro'
+
+import ModerationSignalBadges from './ModerationSignalBadges.astro'
+
+import type { AdminCommentReview } from '../../../lib/adminCommentReview'
+import type { AuthorHistory } from '../../../lib/moderationSignals'
+
+type Props = {
+  comment: AdminCommentReview
+  history: AuthorHistory
+  panelTab?: string
+  // waitingSince is when the reason that placed the post in its queue started waiting.
+  waitingSince?: Date
+}
+const { comment, history, panelTab, waitingSince } = Astro.props
+const idText = comment.id.toString()
+const textSignals = commentReviewSignals(comment.content)
+const isLong = comment.content.length > 400 || comment.content.split('\n').length > 4
+const TextBox = isLong ? 'details' : 'div'
+const TextSummary = isLong ? 'summary' : 'div'
+const signals = moderationSignals(comment, history)
+const heldReason = getAiHardGateReason(comment)
+const sentiment = comment.experience?.sentiment
+  ? getExperienceSentimentInfo(comment.experience.sentiment)
+  : null
+const verification = getVerificationStatusInfo(comment.service.verificationStatus)
+const reports = comment.contactThreads
+const reportReasonLabels = [
+  ...new Set(reports.flatMap((report) => (report.reportReason ? [report.reportReason] : []))),
+]
+  .map((reason) => getCommentRuleInfo(reason).label)
+  .join(', ')
+const reasons = [
+  proofsToCheck(comment) > 0 && {
+    label:
+      proofsToCheck(comment) > 1 ? `${proofsToCheck(comment).toString()} proofs to check` : 'Proof to check',
+    icon: 'ri:file-search-line',
+    color: 'blue',
+  },
+  reports.length > 0 && {
+    label: `${reports.length > 1 ? `Reported ${reports.length.toString()} times` : 'Reported'}: ${reportReasonLabels}`,
+    icon: 'ri:flag-line',
+    color: 'red',
+    href: `/admin/contact/${reports[0]?.id.toString() ?? ''}`,
+  },
+  reports.some((report) => report.fromService) && {
+    label: 'Reported by the service',
+    icon: 'ri:store-2-line',
+    color: 'blue',
+  },
+  comment.revisions.length > 0 && {
+    label: 'Edit to review',
+    icon: 'ri:git-pull-request-line',
+    color: 'violet',
+  },
+  comment.status === 'PENDING' &&
+    comment.moderationState === 'AWAITING_AI' && {
+      label: 'Waiting for AI',
+      icon: 'ri:robot-2-line',
+      color: 'gray',
+    },
+  comment.status === 'PENDING' &&
+    comment.moderationState === 'AWAITING_HUMAN' && {
+      label: heldReason ? `AI held: ${heldReason}` : 'Needs a decision',
+      icon: 'ri:pause-circle-line',
+      color: 'yellow',
+    },
+].filter((reason) => !!reason)
+---
+
+<article
+  id={`review-${idText}`}
+  class="group/item scroll-mt-20 border-b border-night-600 py-4 last:border-b-0"
+  aria-labelledby={`review-${idText}-title`}
+>
+  <header class="flex flex-wrap items-center gap-x-2 gap-y-1">
+    <CommentStatusChip id={`comment-status-${idText}`} status={comment.status} />
+    <h3 id={`review-${idText}-title`} class="font-medium text-day-100">
+      <a
+        href={makeCommentUrl({ serviceSlug: comment.service.slug, commentId: comment.id })}
+        class="hover:underline"
+      >
+        {comment.service.name}
+      </a>
+    </h3>
+    <span
+      class={cn('inline-flex items-center gap-1 text-xs', verification.classNames.icon)}
+      title={verification.label}
+    >
+      <Icon name={verification.icon} class="size-3.5" />
+      <span class="sr-only">{verification.label}</span>
+    </span>
+    <span class="text-xs text-day-400">
+      {comment.parent ? 'Reply' : getCommentKindInfo(comment.kind).label}
+    </span>
+    {
+      sentiment && (
+        <span class={cn('inline-flex items-center gap-1 text-xs', sentiment.classNames.text)}>
+          <Icon name={sentiment.icon} class="size-3.5" />
+          {sentiment.shortLabel}
+        </span>
+      )
+    }
+    <span class="ml-auto text-xs text-day-500" title={comment.createdAt.toISOString()}>
+      {comment.status === 'PENDING' ? 'waiting' : 'posted'}
+      {formatDistanceStrict(comment.createdAt, new Date())}
+      {comment.status !== 'PENDING' && ' ago'}
+    </span>
+  </header>
+
+  {
+    reasons.length > 0 && (
+      <ul class="mt-2 flex flex-wrap gap-1.5" aria-label="Why it is in the queue">
+        {reasons.map((reason) => (
+          <li>
+            {'href' in reason ? (
+              <BadgeSmall
+                as="a"
+                href={reason.href}
+                class="hover:underline"
+                text={reason.label}
+                icon={reason.icon}
+                color={reason.color}
+                variant="faded"
+              />
+            ) : (
+              <BadgeSmall text={reason.label} icon={reason.icon} color={reason.color} variant="faded" />
+            )}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+    {
+      comment.author ? (
+        <a href={`/u/${comment.author.name}`} class="font-medium text-day-200 hover:underline">
+          {comment.author.name}
+        </a>
+      ) : (
+        <span class="font-medium text-day-400">{DELETED_ACCOUNT_LABEL}</span>
+      )
+    }
+    <ModerationSignalBadges signals={signals} />
+  </div>
+
+  <TextBox class="group/text mt-2">
+    <TextSummary class={cn('list-none [&::-webkit-details-marker]:hidden', isLong && 'cursor-pointer')}>
+      <!-- prettier-ignore -->
+      <p class={cn('max-w-[75ch] text-sm wrap-break-word whitespace-pre-wrap text-day-200', isLong && 'line-clamp-4 group-open/text:line-clamp-none')}>{textSignals.parts.map((part) => part.reason ? <mark title={part.reason} class="rounded-xs bg-yellow-300 px-0.5 text-night-900">{part.text}</mark> : part.text)}</p>
+      {isLong && <span class="mt-1 inline-block text-xs text-day-500 group-open/text:hidden">Show all</span>}
+    </TextSummary>
+  </TextBox>
+  {
+    textSignals.reasons.length > 0 && (
+      <p class="mt-1 text-xs text-yellow-200">Highlighted: {textSignals.reasons.join(', ')}</p>
+    )
+  }
+
+  <CommentNotes commentId={comment.id} publicNote={comment.publicNote} internalNote={comment.adminNote} />
+
+  <footer class="mt-3 flex flex-wrap items-center gap-3 text-xs">
+    <Button
+      as="a"
+      {...inlinePanelToggle({
+        url: `/admin/comments/moderate/${idText}${panelTab ? `?tab=${panelTab}` : ''}`,
+        slotId: `moderation-${idText}`,
+      })}
+      label="Moderate"
+      icon="ri:shield-line"
+      size="sm"
+      color="success"
+      variant="faded"
+      class="group-has-[[data-moderation-panel]]/item:ring-1 group-has-[[data-moderation-panel]]/item:ring-green-500/60"
+    />
+    <a
+      href={makeCommentUrl({ serviceSlug: comment.service.slug, commentId: comment.id })}
+      class="text-day-400 hover:text-day-200 hover:underline"
+    >
+      Open in thread
+    </a>
+    {
+      waitingSince && (
+        <span class="text-day-400">{`Waiting ${formatDistanceStrict(waitingSince, new Date())}`}</span>
+      )
+    }
+    <span class="text-day-600">#{idText}</span>
+  </footer>
+  <div id={`moderation-${idText}`} data-inline-panel></div>
+</article>

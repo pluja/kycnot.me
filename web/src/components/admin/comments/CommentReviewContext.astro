@@ -1,0 +1,253 @@
+---
+import { z } from 'astro/zod'
+import { Icon } from 'astro-icon/components'
+import { differenceInCalendarDays, format, formatDistanceStrict, subDays } from 'date-fns'
+
+import { getCommentRuleInfo } from '../../../constants/commentRules'
+import { getModerationActionInfo } from '../../../constants/moderationActions'
+import { DELETED_ACCOUNT_LABEL } from '../../../lib/authorName'
+import { cn } from '../../../lib/cn'
+import { holdReasonLabels, makeCommentUrl } from '../../../lib/commentsWithReplies'
+import { authorHistory } from '../../../lib/moderationSignals'
+import { countOf } from '../../../lib/pluralize'
+import { prisma } from '../../../lib/prisma'
+import { getAiHardGateReason } from '../../../lib/proofEvidence'
+import { getTrustFacts } from '../../../lib/trust'
+import TimeFormatted from '../../TimeFormatted.astro'
+
+import type { AdminCommentReview } from '../../../lib/adminCommentReview'
+
+type Props = { comment: AdminCommentReview }
+const { comment } = Astro.props
+const { author } = comment
+if (!Astro.locals.userCan('comments:moderate')) return null
+
+const history = await Astro.locals.banners.try(
+  'Failed to load author history',
+  async () => (await authorHistory([comment]))(comment),
+  { rejectedPosts: 0, postsOnService: 0 }
+)
+const trust = await Astro.locals.banners.try(
+  'Failed to load author trust',
+  async () => (author ? ((await getTrustFacts([author.id])).get(author.id) ?? null) : null),
+  null
+)
+// Withdrawing while waiting for a moderator dodges a rejection; withdrawn negative experiences on one
+// service can mean pressure on their authors.
+const withdrawals = await Astro.locals.banners.try(
+  'Failed to count withdrawals',
+  async () => {
+    const [whileWaiting, negativeOnService] = await Promise.all([
+      author ? prisma.comment.count({ where: { authorId: author.id, withdrawnWhileWaiting: true } }) : 0,
+      prisma.comment.count({
+        where: {
+          serviceId: comment.service.id,
+          status: 'WITHDRAWN',
+          parentId: null,
+          withdrawnAt: { gte: subDays(new Date(), 90) },
+          experience: { sentiment: 'NEGATIVE' },
+        },
+      }),
+    ])
+    return { whileWaiting, negativeOnService }
+  },
+  { whileWaiting: 0, negativeOnService: 0 }
+)
+const heldReason = getAiHardGateReason(comment)
+const answered = comment.replyTo ?? comment.parent
+const recommended = z
+  .object({ recommendedAction: z.enum(['approve', 'reject', 'human_review']) })
+  .safeParse(comment.aiSignals)
+const aiVerdict = recommended.success
+  ? getModerationActionInfo(
+      ({ approve: 'APPROVE', reject: 'REJECT', human_review: 'HOLD' } as const)[
+        recommended.data.recommendedAction
+      ]
+    )
+  : comment.aiAction
+    ? getModerationActionInfo(comment.aiAction)
+    : null
+const aiNotes = [
+  heldReason && `held for ${holdReasonLabels(heldReason).join(', ')}`,
+  comment.aiIsSpam && 'possible spam',
+  comment.aiIsBrigade &&
+    `coordinated posting${comment.aiBrigadeConfidence !== null ? ` ${String(comment.aiBrigadeConfidence)}/5` : ''}`,
+].filter((note) => !!note)
+const warn = 'text-yellow-300'
+const bad = 'text-red-300'
+const isNewAccount = !!author && differenceInCalendarDays(comment.createdAt, author.createdAt) < 14
+const worksForService = !!author && comment.service.affiliatedUsers.some((item) => item.userId === author.id)
+const otherServices = (author?.serviceAffiliations ?? []).filter(
+  (affiliation) => affiliation.service.id !== comment.service.id
+)
+const authorFacts = author
+  ? [
+      author.spammer && { text: 'posting restricted', className: bad },
+      worksForService && { text: 'works for this service', className: bad },
+      otherServices.length > 0 && {
+        text: `works for ${otherServices.map((affiliation) => affiliation.service.name).join(', ')}`,
+        className: warn,
+      },
+      {
+        text: `${formatDistanceStrict(author.createdAt, comment.createdAt)} old when posting`,
+        className: isNewAccount ? warn : undefined,
+      },
+      trust && { text: `${trust.publishedPosts.toLocaleString()} published` },
+      trust && { text: `${trust.checkedProofPosts.toLocaleString()} with checked proof` },
+      trust &&
+        trust.penalizingRejections > 0 && {
+          text: `${trust.penalizingRejections.toLocaleString()} penalized in 90 days`,
+          className: bad,
+        },
+      trust?.commentsDisabled
+        ? { text: 'posting disabled', className: bad }
+        : trust?.untrusted && { text: 'untrusted', className: warn },
+      {
+        text:
+          author._count.comments <= 1
+            ? 'first post'
+            : `${countOf(author._count.comments - 1, 'other post', 'other posts')}, ${history.postsOnService.toLocaleString()} here`,
+        className: author._count.comments <= 1 ? warn : undefined,
+      },
+      history.rejectedPosts > 0 && {
+        text: `${history.rejectedPosts.toLocaleString()} rejected`,
+        className: bad,
+      },
+      withdrawals.whileWaiting > 0 && {
+        text: `${withdrawals.whileWaiting.toLocaleString()} withdrawn while waiting`,
+        className: warn,
+      },
+      author.verified && { text: 'verified', className: 'text-green-300' },
+      { text: `last seen ${format(author.lastLoginAt, 'MMM d')}` },
+    ].filter((fact) => !!fact)
+  : []
+---
+
+<div class="space-y-3 text-xs text-day-300">
+  <section class="flex gap-2">
+    <Icon name="ri:robot-2-line" class="mt-px size-4 shrink-0 text-day-400" />
+    <div class="min-w-0 flex-1">
+      <p>
+        {
+          aiVerdict ? (
+            <span class={cn('font-medium', aiVerdict.className)}>AI suggests {aiVerdict.verb}</span>
+          ) : (
+            <span class="text-day-500">AI review not run yet</span>
+          )
+        }
+        {aiNotes.map((note) => <span class="text-day-400">{` · ${note}`}</span>)}
+        {
+          comment.aiQuality !== null && (
+            <span class="text-day-500">{` · quality ${String(comment.aiQuality)}/10`}</span>
+          )
+        }
+      </p>
+      {
+        comment.aiReasoning && (
+          <details class="group/ai">
+            <summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+              <span class="line-clamp-2 text-day-400 group-open/ai:line-clamp-none">
+                {comment.aiReasoning}
+              </span>
+            </summary>
+            {comment.aiSignals && (
+              <pre class="mt-1 max-h-60 overflow-auto rounded-sm bg-night-900 p-2 wrap-break-word whitespace-pre-wrap text-day-500">
+                {JSON.stringify(comment.aiSignals, null, 2)}
+              </pre>
+            )}
+          </details>
+        )
+      }
+    </div>
+  </section>
+
+  <section class="flex gap-2">
+    <Icon name="ri:user-line" class="mt-px size-4 shrink-0 text-day-400" />
+    <div class="min-w-0 flex-1 text-day-400">
+      <p class="flex flex-wrap items-baseline gap-x-2">
+        {
+          author ? (
+            <a href={`/u/${author.name}`} class="font-medium text-day-100 hover:underline">
+              {author.name}
+            </a>
+          ) : (
+            <span class="font-medium">{DELETED_ACCOUNT_LABEL}</span>
+          )
+        }
+        {
+          author && Astro.locals.user?.admin && (
+            <a href={`/admin/users/${author.name}`} class="text-day-500 underline hover:text-day-300">
+              Manage
+            </a>
+          )
+        }
+      </p>
+      {
+        authorFacts.length > 0 && (
+          <p>
+            {authorFacts.map((fact, index) => (
+              <span class={fact.className}>{`${index > 0 ? ' · ' : ''}${fact.text}`}</span>
+            ))}
+          </p>
+        )
+      }
+    </div>
+  </section>
+  {
+    withdrawals.negativeOnService > 0 && (
+      <p class="flex gap-2 text-yellow-300">
+        <Icon name="ri:arrow-go-back-line" class="mt-px size-4 shrink-0" />
+        {`${countOf(withdrawals.negativeOnService, 'negative experience', 'negative experiences')} on this service withdrawn in 90 days`}
+      </p>
+    )
+  }
+  {
+    (answered || comment.humanDecisionReason || comment.humanReasoning || comment.authorNote) && (
+      <dl class="space-y-2 border-t border-night-600 pt-3">
+        {answered && (
+          <div>
+            <dt class="text-day-500">
+              In reply to{' '}
+              <a
+                href={makeCommentUrl({ serviceSlug: comment.service.slug, commentId: answered.id })}
+                class="text-day-300 hover:underline"
+              >
+                {answered.author?.name ?? DELETED_ACCOUNT_LABEL}
+              </a>
+            </dt>
+            <dd class="mt-0.5 line-clamp-3 border-l-2 border-night-500 pl-2 text-day-300">
+              {answered.content}
+            </dd>
+          </div>
+        )}
+        {(comment.humanDecisionReason || comment.humanReasoning) && (
+          <div>
+            <dt class="text-day-500">
+              Last moderator decision
+              {comment.humanDecidedAt && (
+                <>
+                  {' · '}
+                  <TimeFormatted date={comment.humanDecidedAt} />
+                </>
+              )}
+            </dt>
+            <dd class="mt-0.5 text-day-200">
+              {[
+                comment.humanDecisionReason && getCommentRuleInfo(comment.humanDecisionReason).label,
+                comment.humanReasoning,
+              ]
+                .filter(Boolean)
+                .join(': ')}
+            </dd>
+          </div>
+        )}
+        {comment.authorNote && (
+          <div>
+            <dt class="text-day-500">Private note from the author</dt>
+            <dd class="mt-0.5 whitespace-pre-wrap text-day-200">{comment.authorNote}</dd>
+          </div>
+        )}
+      </dl>
+    )
+  }
+</div>

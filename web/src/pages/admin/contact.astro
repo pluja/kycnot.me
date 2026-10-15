@@ -4,10 +4,12 @@ import { z } from 'astro/zod'
 import BadgeSmall from '../../components/BadgeSmall.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import UserBadge from '../../components/UserBadge.astro'
+import { getCommentRuleInfo } from '../../constants/commentRules'
 import { contactCategoryBadges, contactCategoryLabels } from '../../constants/contactCategories'
 import { getServiceUserRoleInfo } from '../../constants/serviceUserRoles'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { cn } from '../../lib/cn'
+import { conflictedCommentWhere } from '../../lib/experiences'
 import { zodParseQueryParamsStoringErrors } from '../../lib/parseUrlFilters'
 import { contactCategoriesForUser } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
@@ -15,17 +17,21 @@ import { urlWithParams } from '../../lib/urls'
 
 import type { ContactStatus, Prisma } from '@prisma/client'
 
-const allowedCategories = contactCategoriesForUser(Astro.locals.user)
-if (allowedCategories !== 'all' && allowedCategories.length === 0) {
+const staff = Astro.locals.user
+const allowedCategories = contactCategoriesForUser(staff)
+if (!staff || (allowedCategories !== 'all' && allowedCategories.length === 0)) {
   return Astro.rewrite('/404')
 }
 
 // Scope every query to the categories this user may manage: urgent-only staff
 // (contact:manage-urgent) see just urgent reports, full managers see everything.
-const categoryScope: Prisma.ContactThreadWhereInput =
-  allowedCategories === 'all' ? {} : { category: { in: allowedCategories } }
+// Threads about posts they must leave to someone else are hidden as well.
+const categoryScope: Prisma.ContactThreadWhereInput = {
+  ...(allowedCategories === 'all' ? {} : { category: { in: allowedCategories } }),
+  NOT: { comment: conflictedCommentWhere(staff) },
+}
 
-const filterValues = ['unread', 'open', 'replied', 'resolved', 'all'] as const
+const filterValues = ['unread', 'open', 'replied', 'service', 'resolved', 'all'] as const
 
 const { data: params } = zodParseQueryParamsStoringErrors(
   { filter: z.enum(filterValues).default('unread') },
@@ -36,6 +42,7 @@ const whereByFilter: Record<(typeof filterValues)[number], Prisma.ContactThreadW
   unread: { readAt: null },
   open: { status: 'AWAITING_STAFF' },
   replied: { status: 'AWAITING_USER' },
+  service: { fromService: true, status: { not: 'RESOLVED' } },
   resolved: { status: 'RESOLVED' },
   all: {},
 }
@@ -44,15 +51,17 @@ const filterLabels: Record<(typeof filterValues)[number], string> = {
   unread: 'Unread',
   open: 'Awaiting reply',
   replied: 'Answered',
+  service: 'From services',
   resolved: 'Resolved',
   all: 'All',
 }
 
-const statusStyles: Record<ContactStatus, { label: string; color: 'rose' | 'green' | 'gray'; icon: string }> = {
-  AWAITING_STAFF: { label: 'Awaiting reply', color: 'rose', icon: 'ri:time-line' },
-  AWAITING_USER: { label: 'Answered', color: 'green', icon: 'ri:chat-1-line' },
-  RESOLVED: { label: 'Resolved', color: 'gray', icon: 'ri:check-line' },
-}
+const statusStyles: Record<ContactStatus, { label: string; color: 'gray' | 'green' | 'rose'; icon: string }> =
+  {
+    AWAITING_STAFF: { label: 'Awaiting reply', color: 'rose', icon: 'ri:time-line' },
+    AWAITING_USER: { label: 'Answered', color: 'green', icon: 'ri:chat-1-line' },
+    RESOLVED: { label: 'Resolved', color: 'gray', icon: 'ri:check-line' },
+  }
 
 const [threads, counts] = await Astro.locals.banners.tryMany([
   [
@@ -66,6 +75,8 @@ const [threads, counts] = await Astro.locals.banners.tryMany([
           id: true,
           category: true,
           requestedRole: true,
+          reportReason: true,
+          fromService: true,
           status: true,
           readAt: true,
           lastMessageAt: true,
@@ -83,22 +94,23 @@ const [threads, counts] = await Astro.locals.banners.tryMany([
   [
     'Failed to count contact threads',
     async () => {
-      const [unread, open, replied, resolved, all] = await Promise.all([
-        prisma.contactThread.count({ where: { ...whereByFilter.unread, ...categoryScope } }),
-        prisma.contactThread.count({ where: { ...whereByFilter.open, ...categoryScope } }),
-        prisma.contactThread.count({ where: { ...whereByFilter.replied, ...categoryScope } }),
-        prisma.contactThread.count({ where: { ...whereByFilter.resolved, ...categoryScope } }),
-        prisma.contactThread.count({ where: { ...whereByFilter.all, ...categoryScope } }),
-      ])
-      return { unread, open, replied, resolved, all }
+      const totals = await Promise.all(
+        filterValues.map((value) =>
+          prisma.contactThread.count({ where: { ...whereByFilter[value], ...categoryScope } })
+        )
+      )
+      return Object.fromEntries(filterValues.map((value, index) => [value, totals[index] ?? 0])) as Record<
+        (typeof filterValues)[number],
+        number
+      >
     },
-    { unread: 0, open: 0, replied: 0, resolved: 0, all: 0 },
+    { unread: 0, open: 0, replied: 0, service: 0, resolved: 0, all: 0 },
   ],
 ])
 ---
 
 <BaseLayout pageTitle="Contact queue" widthClassName="max-w-screen-2xl">
-  <h1 class="font-title mb-4 text-2xl text-rose-300">&gt; contact.queue</h1>
+  <h1 class="mb-4 font-title text-2xl text-rose-300">&gt; contact.queue</h1>
 
   <div class="mb-4 flex flex-wrap gap-1.5">
     {
@@ -148,9 +160,24 @@ const [threads, counts] = await Astro.locals.banners.tryMany([
                 <div class="mb-1.5 flex flex-wrap items-center gap-2 text-xs">
                   {!t.readAt && <span class="size-2 shrink-0 rounded-full bg-rose-400" title="Unread" />}
                   <BadgeSmall color={status.color} text={status.label} icon={status.icon} />
-                  <BadgeSmall color={category.color} variant="faded" text={contactCategoryLabels[t.category]} icon={category.icon} />
+                  <BadgeSmall
+                    color={category.color}
+                    variant="faded"
+                    text={contactCategoryLabels[t.category]}
+                    icon={category.icon}
+                  />
                   {role && (
                     <BadgeSmall color={role.color} variant="faded" text={role.label} icon={role.icon} />
+                  )}
+                  {t.reportReason && (
+                    <BadgeSmall
+                      color="amber"
+                      variant="faded"
+                      text={getCommentRuleInfo(t.reportReason).label}
+                    />
+                  )}
+                  {t.fromService && (
+                    <BadgeSmall color="blue" variant="faded" text="From the service" icon="ri:store-2-line" />
                   )}
                   {t.author ? (
                     <UserBadge user={t.author} size="sm" noLink />

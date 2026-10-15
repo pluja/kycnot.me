@@ -10,7 +10,7 @@ type AuditTargetTypeInfo<T extends string | null | undefined = string> = {
   slug: string
   label: string
   icon: string
-  /** Admin page for one target by id, or null when the page needs more than the id. */
+  // href is the admin page for one target by id, or null when the page needs more than the id.
   href: ((id: number) => string) | null
 }
 
@@ -48,6 +48,14 @@ export const {
       href: (id) => `/admin/cases/${String(id)}`,
     },
     { id: 'EVENT', slug: 'event', label: 'Event', icon: 'ri:calendar-event-line', href: null },
+    { id: 'ATTRIBUTE', slug: 'attribute', label: 'Attribute', icon: 'ri:price-tag-3-line', href: null },
+    {
+      id: 'ANNOUNCEMENT',
+      slug: 'announcement',
+      label: 'Announcement',
+      icon: 'ri:megaphone-line',
+      href: null,
+    },
   ] as const satisfies AuditTargetTypeInfo<AuditTargetType>[]
 )
 

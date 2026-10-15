@@ -1,0 +1,23 @@
+---
+import { signalToneColor } from '../../../lib/moderationSignals'
+import BadgeSmall from '../../BadgeSmall.astro'
+
+import type { ModerationSignal } from '../../../lib/moderationSignals'
+
+type Props = { signals: ModerationSignal[] }
+const { signals } = Astro.props
+---
+
+<ul class="flex flex-wrap items-center gap-1.5" aria-label="Signals">
+  {
+    signals.map((signal) => (
+      <BadgeSmall
+        as="li"
+        text={signal.label}
+        icon={signal.icon}
+        color={signalToneColor[signal.tone]}
+        variant="faded"
+      />
+    ))
+  }
+</ul>

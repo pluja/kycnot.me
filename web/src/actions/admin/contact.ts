@@ -2,7 +2,12 @@ import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
 import { CONTACT_MESSAGE_MAX_LENGTH } from '../../actions/contact'
+import {
+  commentReportOutcomesZodEnumByValue,
+  getCommentReportOutcomeInfo,
+} from '../../constants/commentReports'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
+import { conflictedCommentWhere } from '../../lib/experiences'
 import { cap, contactCategoriesForUser } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { sendContactChatMessageEvents } from '../../lib/sendChatEvents'
@@ -15,14 +20,17 @@ const threadId = z.coerce.number().int().positive()
 // (contact:manage-urgent) may only act on the categories they manage.
 const contactPermissions = [cap('contact:manage'), cap('contact:manage-urgent')]
 
-// ensureCategoryInScope rejects (as not-found, to avoid leaking existence) when
-// the acting user is not allowed to manage the thread's category.
-function ensureCategoryInScope(
-  user: Parameters<typeof contactCategoriesForUser>[0],
-  category: ContactCategory
+// ensureThreadInScope rejects (as not-found, to avoid leaking existence) when the acting user may
+// not manage the thread's category, or the thread is about a post they must leave to someone else.
+async function ensureThreadInScope(
+  user: NonNullable<Parameters<typeof contactCategoriesForUser>[0]> & { id: number; admin: boolean },
+  thread: { category: ContactCategory; commentId: number | null }
 ) {
   const allowed = contactCategoriesForUser(user)
-  if (allowed !== 'all' && !allowed.includes(category)) {
+  const conflicted =
+    thread.commentId !== null &&
+    (await prisma.comment.count({ where: { id: thread.commentId, ...conflictedCommentWhere(user) } })) > 0
+  if ((allowed !== 'all' && !allowed.includes(thread.category)) || conflicted) {
     throw new ActionError({ code: 'NOT_FOUND', message: 'Conversation not found' })
   }
 }
@@ -32,7 +40,7 @@ function ensureCategoryInScope(
 async function notifyContactThreadAuthor(
   id: number,
   userId: number,
-  type: 'CONTACT_SEEN' | 'CONTACT_RESOLVED'
+  type: 'CONTACT_RESOLVED' | 'CONTACT_SEEN'
 ) {
   const exists = await prisma.notification.findFirst({
     where: { userId, type, aboutContactThreadId: id },
@@ -43,6 +51,77 @@ async function notifyContactThreadAuthor(
 }
 
 export const adminContactActions = {
+  closeReport: defineProtectedAction({
+    accept: 'form',
+    permissions: contactPermissions,
+    input: z
+      .object({
+        threadId,
+        outcome: commentReportOutcomesZodEnumByValue.refine(
+          (outcome) => getCommentReportOutcomeInfo(outcome).moderatorChoice
+        ),
+        note: z.string().trim().max(300).nullish(),
+      })
+      .refine((input) => input.outcome !== 'NO_ACTION' || (input.note?.length ?? 0) >= 5, {
+        path: ['note'],
+        message: 'Tell the reporter briefly why no action was taken.',
+      }),
+    handler: async (input, context) => {
+      const thread = await prisma.contactThread.findUnique({
+        where: { id: input.threadId },
+        select: { id: true, category: true, commentId: true, authorId: true, reportOutcome: true },
+      })
+      if (thread?.category !== 'COMMENT_REPORT') {
+        throw new ActionError({ code: 'NOT_FOUND', message: 'Report not found' })
+      }
+      await ensureThreadInScope(context.locals.user, thread)
+      if (thread.reportOutcome) throw new ActionError({ code: 'CONFLICT', message: 'This report is closed.' })
+
+      const note = input.outcome === 'NO_ACTION' ? (input.note ?? null) : null
+      const now = new Date()
+      await prisma.$transaction([
+        // A report closed without action ends the service dispute it opened.
+        ...(input.outcome === 'NO_ACTION' && thread.commentId
+          ? [
+              prisma.proofRequest.updateMany({
+                where: {
+                  commentId: thread.commentId,
+                  source: 'SERVICE',
+                  requestedById: thread.authorId,
+                  cancelledAt: null,
+                },
+                data: { cancelledAt: now },
+              }),
+            ]
+          : []),
+        prisma.contactThread.update({
+          where: { id: thread.id },
+          data: {
+            reportOutcome: input.outcome,
+            reportOutcomeNote: note,
+            status: 'RESOLVED',
+            resolvedAt: now,
+            readAt: now,
+            lastMessageAt: now,
+          },
+        }),
+        prisma.contactMessage.create({
+          data: {
+            threadId: thread.id,
+            fromStaff: true,
+            authorId: context.locals.user.id,
+            content:
+              input.outcome === 'ACTION_TAKEN'
+                ? 'Thanks for the report. We took action on this post.'
+                : `We reviewed this post and took no action: ${note ?? ''}`,
+          },
+        }),
+      ])
+      sendContactChatMessageEvents(thread.id, context.locals.user.id).catch(console.error)
+      if (thread.authorId) await notifyContactThreadAuthor(thread.id, thread.authorId, 'CONTACT_RESOLVED')
+    },
+  }),
+
   // Staff reply, posted through the shared Chat component (same as the user side).
   message: defineProtectedAction({
     accept: 'form',
@@ -54,10 +133,10 @@ export const adminContactActions = {
     handler: async (input, context) => {
       const thread = await prisma.contactThread.findUnique({
         where: { id: input.threadId },
-        select: { id: true, category: true },
+        select: { id: true, category: true, commentId: true },
       })
       if (!thread) throw new ActionError({ code: 'NOT_FOUND', message: 'Conversation not found' })
-      ensureCategoryInScope(context.locals.user, thread.category)
+      await ensureThreadInScope(context.locals.user, thread)
 
       const now = new Date()
       await prisma.$transaction([
@@ -92,10 +171,10 @@ export const adminContactActions = {
     handler: async (input, context) => {
       const thread = await prisma.contactThread.findUnique({
         where: { id: input.threadId },
-        select: { id: true, category: true, authorId: true, status: true, readAt: true },
+        select: { id: true, category: true, commentId: true, authorId: true, status: true, readAt: true },
       })
       if (!thread) throw new ActionError({ code: 'NOT_FOUND', message: 'Conversation not found' })
-      ensureCategoryInScope(context.locals.user, thread.category)
+      await ensureThreadInScope(context.locals.user, thread)
 
       switch (input.action) {
         case 'mark-read':
@@ -110,6 +189,9 @@ export const adminContactActions = {
           await prisma.contactThread.update({ where: { id: thread.id }, data: { readAt: null } })
           return
         case 'resolve':
+          if (thread.category === 'COMMENT_REPORT') {
+            throw new ActionError({ code: 'BAD_REQUEST', message: 'Close reports with an outcome.' })
+          }
           // Resolving implies the thread was read, so mark it read too.
           await prisma.contactThread.update({
             where: { id: thread.id },
