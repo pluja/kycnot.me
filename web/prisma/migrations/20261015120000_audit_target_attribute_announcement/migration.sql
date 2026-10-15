@@ -1,0 +1,3 @@
+-- AlterEnum
+ALTER TYPE "AuditTargetType" ADD VALUE 'ATTRIBUTE';
+ALTER TYPE "AuditTargetType" ADD VALUE 'ANNOUNCEMENT';

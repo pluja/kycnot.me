@@ -1,13 +1,13 @@
 CREATE OR REPLACE FUNCTION manage_comment_approved_at()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Set approvedAt when comment is approved or verified for the first time
-  IF (NEW.status = 'APPROVED' OR NEW.status = 'VERIFIED') THEN
-    IF OLD."approvedAt" IS NULL THEN
+  -- Stamp approvedAt when a comment becomes published, not when a published comment is saved again
+  IF NEW.status = 'APPROVED' THEN
+    IF OLD.status <> 'APPROVED' AND NEW."approvedAt" IS NULL THEN
       NEW."approvedAt" := NOW();
     END IF;
-  ELSE
-    -- Clear approvedAt if status is changed away from approved/verified
+  ELSIF NEW.status::text <> 'WITHDRAWN' THEN
+    -- Clear approvedAt if status is changed away from approved; a withdrawn post keeps it for its restore.
     NEW."approvedAt" := NULL;
   END IF;
 

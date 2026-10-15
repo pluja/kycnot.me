@@ -1,16 +1,17 @@
 -- Function & Trigger for Root Comment Insertions (Approved/Verified)
 CREATE OR REPLACE FUNCTION notify_root_comment_inserted()
 RETURNS TRIGGER AS $$
-DECLARE
-  watcher_count INT;
 BEGIN
-  RAISE NOTICE '[notify_root_comment_inserted] Trigger fired for comment ID: %', NEW.id;
   WITH watchers AS (
-    SELECT np."userId", np."enableNotifyPendingRepliesOnWatch"
+    SELECT np."userId"
     FROM "_onRootCommentCreatedForServices" rc
     JOIN "NotificationPreferences" np ON rc."A" = np."id"
     WHERE rc."B" = NEW."serviceId"
-      AND np."userId" <> NEW."authorId"
+      AND np."userId" IS DISTINCT FROM NEW."authorId"
+      AND EXISTS (
+        SELECT 1 FROM "Service" s
+        WHERE s.id = NEW."serviceId" AND s."serviceVisibility"::text IN ('PUBLIC', 'ARCHIVED', 'UNLISTED')
+      )
   )
   INSERT INTO "Notification" ("userId", "type", "aboutCommentId")
   SELECT w."userId",
@@ -18,12 +19,8 @@ BEGIN
         NEW."id"
   FROM watchers w
   WHERE (
-    NEW.status IN ('APPROVED', 'VERIFIED')
-    OR (NEW.status = 'PENDING' AND w."enableNotifyPendingRepliesOnWatch")
-  )
-  ON CONFLICT DO NOTHING;
-
-  RAISE NOTICE '[notify_root_comment_inserted] Inserted % notifications for comment ID: %', FOUND, NEW.id;
+    NEW.status = 'APPROVED'
+  );
   
   RETURN NEW;
 END;
@@ -41,22 +38,24 @@ CREATE OR REPLACE FUNCTION notify_reply_comment_inserted()
 RETURNS TRIGGER AS $$
 BEGIN
   WITH watchers AS (
-    SELECT np."userId", np."enableNotifyPendingRepliesOnWatch"
+    SELECT np."userId"
     FROM "_watchedComments" w
     JOIN "NotificationPreferences" np ON w."B" = np."id"
-    WHERE w."A" = NEW."parentId"
-      AND np."userId" <> NEW."authorId"
+    WHERE w."A" IN (NEW."parentId", NEW."replyToId")
+      AND np."userId" IS DISTINCT FROM NEW."authorId"
+      AND EXISTS (
+        SELECT 1 FROM "Service" s
+        WHERE s.id = NEW."serviceId" AND s."serviceVisibility"::text IN ('PUBLIC', 'ARCHIVED', 'UNLISTED')
+      )
   )
   INSERT INTO "Notification" ("userId", "type", "aboutCommentId")
-  SELECT w."userId",
-        'REPLY_COMMENT_CREATED',
+  SELECT DISTINCT w."userId",
+        'REPLY_COMMENT_CREATED'::"NotificationType",
         NEW."id"
   FROM watchers w
   WHERE (
-    NEW.status IN ('APPROVED', 'VERIFIED')
-    OR (NEW.status = 'PENDING' AND w."enableNotifyPendingRepliesOnWatch")
-  )
-  ON CONFLICT DO NOTHING;
+    NEW.status = 'APPROVED'
+  );
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -76,15 +75,23 @@ BEGIN
     SELECT np."userId"
     FROM "_watchedComments" w
     JOIN "NotificationPreferences" np ON w."B" = np."id"
-    WHERE w."A" = NEW."parentId"
-      AND np."userId" <> NEW."authorId"
+    WHERE w."A" IN (NEW."parentId", NEW."replyToId")
+      AND np."userId" IS DISTINCT FROM NEW."authorId"
+      AND EXISTS (
+        SELECT 1 FROM "Service" s
+        WHERE s.id = NEW."serviceId" AND s."serviceVisibility"::text IN ('PUBLIC', 'ARCHIVED', 'UNLISTED')
+      )
   )
   INSERT INTO "Notification" ("userId", "type", "aboutCommentId")
-  SELECT w."userId",
-        'REPLY_COMMENT_CREATED',
+  SELECT DISTINCT w."userId",
+        'REPLY_COMMENT_CREATED'::"NotificationType",
         NEW."id"
   FROM watchers w
-  ON CONFLICT DO NOTHING;
+  -- A post published again after a hold must not notify the same watchers twice.
+  WHERE NOT EXISTS (
+    SELECT 1 FROM "Notification" n
+    WHERE n."userId" = w."userId" AND n.type = 'REPLY_COMMENT_CREATED' AND n."aboutCommentId" = NEW."id"
+  );
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -93,7 +100,7 @@ DROP TRIGGER IF EXISTS trg_notify_reply_approved ON "Comment";
 CREATE TRIGGER trg_notify_reply_approved
   AFTER UPDATE OF status ON "Comment"
   FOR EACH ROW
-  WHEN (NEW."parentId" IS NOT NULL AND NEW.status IN ('APPROVED', 'VERIFIED') AND OLD.status NOT IN ('APPROVED', 'VERIFIED'))
+  WHEN (NEW."parentId" IS NOT NULL AND NEW.status = 'APPROVED' AND OLD.status::text NOT IN ('APPROVED', 'WITHDRAWN'))
   EXECUTE FUNCTION notify_reply_approved();
 
 DROP TRIGGER IF EXISTS trg_notify_root_approved ON "Comment";
@@ -106,15 +113,21 @@ BEGIN
     FROM "_onRootCommentCreatedForServices" rc
     JOIN "NotificationPreferences" np ON rc."A" = np."id"
     WHERE rc."B" = NEW."serviceId"
-      AND np."userId" <> NEW."authorId"
-      AND NOT np."enableNotifyPendingRepliesOnWatch"
+      AND np."userId" IS DISTINCT FROM NEW."authorId"
+      AND EXISTS (
+        SELECT 1 FROM "Service" s
+        WHERE s.id = NEW."serviceId" AND s."serviceVisibility"::text IN ('PUBLIC', 'ARCHIVED', 'UNLISTED')
+      )
   )
   INSERT INTO "Notification" ("userId", "type", "aboutCommentId")
   SELECT w."userId",
         'ROOT_COMMENT_CREATED',
         NEW."id"
   FROM watchers w
-  ON CONFLICT DO NOTHING;
+  WHERE NOT EXISTS (
+    SELECT 1 FROM "Notification" n
+    WHERE n."userId" = w."userId" AND n.type = 'ROOT_COMMENT_CREATED' AND n."aboutCommentId" = NEW."id"
+  );
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -122,7 +135,7 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_notify_root_approved
   AFTER UPDATE OF status ON "Comment"
   FOR EACH ROW
-  WHEN (NEW."parentId" IS NULL AND NEW.status IN ('APPROVED', 'VERIFIED') AND OLD.status NOT IN ('APPROVED', 'VERIFIED'))
+  WHEN (NEW."parentId" IS NULL AND NEW.status = 'APPROVED' AND OLD.status::text NOT IN ('APPROVED', 'WITHDRAWN'))
   EXECUTE FUNCTION notify_root_approved();
 
 -- Function & Trigger for Comment Status Changes (status, rating mute, humanAction)
@@ -130,25 +143,16 @@ CREATE OR REPLACE FUNCTION notify_comment_status_changed()
 RETURNS TRIGGER AS $$
 DECLARE
   v_status_change "CommentStatusChange" := NULL;
-  v_was_penalty BOOLEAN;
-  v_is_penalty  BOOLEAN;
 BEGIN
-  -- Penalty-bearing mute states (SUSPICIOUS_PATTERN / TEMPLATE_SPAM) carry
-  -- "marked as spam" semantics; other mute reasons (affiliation, conflict,
-  -- moderator discretion) do not trigger user-facing spam notifications.
-  v_was_penalty := COALESCE(OLD."ratingMuted", false)
-                   AND OLD."ratingMuteReason"::text IN ('SUSPICIOUS_PATTERN', 'TEMPLATE_SPAM');
-  v_is_penalty  := COALESCE(NEW."ratingMuted", false)
-                   AND NEW."ratingMuteReason"::text IN ('SUSPICIOUS_PATTERN', 'TEMPLATE_SPAM');
 
-  IF NEW.status <> OLD.status THEN
+  -- Withdrawing and restoring are the author's own moves, so nobody is told about them.
+  IF NEW.status::text = 'WITHDRAWN' OR OLD.status::text = 'WITHDRAWN' THEN
+    NULL;
+  ELSIF NEW.status <> OLD.status THEN
     IF NEW.status = 'APPROVED' THEN v_status_change := 'STATUS_CHANGED_TO_APPROVED';
-    ELSIF NEW.status = 'VERIFIED' THEN v_status_change := 'STATUS_CHANGED_TO_VERIFIED';
     ELSIF NEW.status = 'REJECTED' THEN v_status_change := 'STATUS_CHANGED_TO_REJECTED';
     ELSIF NEW.status = 'PENDING' AND OLD.status <> 'PENDING' THEN v_status_change := 'STATUS_CHANGED_TO_PENDING';
     END IF;
-  ELSIF v_was_penalty <> v_is_penalty THEN
-    v_status_change := CASE WHEN v_is_penalty THEN 'MARKED_AS_SPAM' ELSE 'UNMARKED_AS_SPAM' END;
   ELSIF NEW."humanAction" IS DISTINCT FROM OLD."humanAction" THEN
     IF NEW."humanAction" = 'HOLD' AND OLD."humanAction" IS DISTINCT FROM 'HOLD' THEN
       v_status_change := 'MARKED_FOR_ADMIN_REVIEW';
@@ -163,8 +167,9 @@ BEGIN
       FROM "_watchedComments" w
       JOIN "NotificationPreferences" np ON w."B" = np."id"
       WHERE w."A" = NEW."id"
-        AND np."userId" <> NEW."authorId"
+        AND np."userId" IS DISTINCT FROM NEW."authorId"
         AND np."enableOnMyCommentStatusChange"
+        AND NEW.status = 'APPROVED'
 
       UNION ALL
 
@@ -172,14 +177,15 @@ BEGIN
       FROM "NotificationPreferences" np
       WHERE np."userId" = NEW."authorId"
         AND np."enableOnMyCommentStatusChange"
+        -- An admin publishing or deciding their own post needs no notice of it
+        AND NEW."humanDecidedById" IS DISTINCT FROM NEW."authorId"
     )
     INSERT INTO "Notification" ("userId", "type", "aboutCommentId", "aboutCommentStatusChange")
     SELECT w."userId",
           'COMMENT_STATUS_CHANGE',
           NEW."id",
           v_status_change
-    FROM watchers w
-    ON CONFLICT DO NOTHING;
+    FROM watchers w;
   END IF;
 
   RETURN NEW;
@@ -188,12 +194,10 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_notify_comment_status_changed ON "Comment";
 CREATE TRIGGER trg_notify_comment_status_changed
-  AFTER UPDATE OF status, "ratingMuted", "ratingMuteReason", "humanAction" ON "Comment"
+  AFTER UPDATE OF status, "humanAction" ON "Comment"
   FOR EACH ROW
   WHEN (
     NEW.status <> OLD.status
-    OR NEW."ratingMuted" IS DISTINCT FROM OLD."ratingMuted"
-    OR NEW."ratingMuteReason" IS DISTINCT FROM OLD."ratingMuteReason"
     OR NEW."humanAction" IS DISTINCT FROM OLD."humanAction"
   )
   EXECUTE FUNCTION notify_comment_status_changed();
@@ -202,25 +206,27 @@ CREATE TRIGGER trg_notify_comment_status_changed
 CREATE OR REPLACE FUNCTION notify_community_note_added()
 RETURNS TRIGGER AS $$
 BEGIN
+  -- Only a published post with an author has anyone to tell.
+  IF NEW.status::text <> 'APPROVED' OR NEW."authorId" IS NULL THEN
+    RETURN NEW;
+  END IF;
   -- Notify watchers of this specific comment (excluding author)
   WITH watchers AS (
     SELECT np."userId"
     FROM "_watchedComments" w
     JOIN "NotificationPreferences" np ON w."B" = np."id"
     WHERE w."A" = NEW."id"
-      AND np."userId" <> NEW."authorId"
+      AND np."userId" IS DISTINCT FROM NEW."authorId"
   )
   INSERT INTO "Notification" ("userId", "type", "aboutCommentId")
   SELECT w."userId",
         'COMMUNITY_NOTE_ADDED',
         NEW."id"
-  FROM watchers w
-  ON CONFLICT DO NOTHING;
+  FROM watchers w;
 
   -- Always notify the author
   INSERT INTO "Notification" ("userId", "type", "aboutCommentId")
-  VALUES (NEW."authorId", 'COMMUNITY_NOTE_ADDED', NEW."id")
-  ON CONFLICT DO NOTHING;
+  VALUES (NEW."authorId", 'COMMUNITY_NOTE_ADDED', NEW."id");
 
   RETURN NEW;
 END;

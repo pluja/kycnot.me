@@ -1,0 +1,3 @@
+-- AlterEnum
+ALTER TYPE "EvidenceFinding" ADD VALUE 'CLAIM_SUPPORTED';
+ALTER TYPE "EvidenceFinding" ADD VALUE 'ORDER_NOT_FOUND';

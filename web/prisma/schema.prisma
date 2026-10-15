@@ -22,8 +22,8 @@ generator json {
 enum CommentStatus {
   PENDING
   APPROVED
-  VERIFIED
   REJECTED
+  WITHDRAWN
 }
 
 /// Derived moderation/queue state. Computed via trigger from status +
@@ -55,30 +55,84 @@ enum ModerationActor {
   HUMAN
 }
 
-enum RatingMuteReason {
-  AUTHOR_AFFILIATED
-  AUTHOR_LOW_TRUST
-  SUSPICIOUS_PATTERN
-  TEMPLATE_SPAM
-  CONFLICT_OF_INTEREST
-  MODERATOR_DISCRETION
-}
-
 enum CommentIssueType {
   KYC_REQUESTED
   FUNDS_BLOCKED
+  OTHER
+}
+
+enum CommentKind {
+  EXPERIENCE
+  DISCUSSION
+  UNCLASSIFIED
+}
+
+enum ExperienceSentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}
+
+enum SentimentSource {
+  AUTHOR
+  LEGACY_RATING
+  AI
+  MODERATOR
+}
+
+enum ExperienceOutcome {
+  NO_ISSUE
+  ONGOING
+  RESOLVED
+  UNSPECIFIED
+}
+
+enum EvidenceFinding {
+  ORDER_FOUND
+  SCREENSHOT_REVIEWED
+  TRANSACTION_SUPPORTED
+  REFUND_SUPPORTED
+  CLAIM_SUPPORTED
+  UNABLE_TO_CHECK
+  ORDER_NOT_FOUND
+  INCONSISTENT
+  LEGACY
+}
+
+/// One list of rules for moderator decisions, AI rejections and reports. Which ones penalize the author
+/// lives in src/constants/commentRules.ts.
+enum CommentRule {
+  SPAM
+  SCAM_CONTACT
+  HARASSMENT
+  SLUR
+  PRIVATE_INFO
+  NOT_GENUINE
+  DUPLICATE
+  NO_LONGER_APPLIES
+  OFF_TOPIC
+  NOT_ENOUGH_DETAIL
+  OTHER
 }
 
 model Comment {
   id              Int                    @id @default(autoincrement())
   /// Computed via trigger. Do not update through prisma.
-  upvotes         Int                    @default(0)
   status          CommentStatus          @default(PENDING)
   /// Computed via trigger. Do not update through prisma.
   moderationState CommentModerationState @default(AWAITING_AI)
 
-  content String
-  rating  Int?   @db.SmallInt
+  content          String
+  rating           Int?               @db.SmallInt
+  kind             CommentKind        @default(UNCLASSIFIED)
+  version          Int                @default(1)
+  experience       CommentExperience?
+  experienceUpdate ExperienceUpdate?
+  revisions        CommentRevision[]
+  evidence         CommentEvidence[]
+  proofRequests    ProofRequest[]
+  sourceCases      Case[]
+  contactThreads   ContactThread[]
 
   // --- Notes (named after audience, not source) ---
   /// Visible to everyone.
@@ -88,78 +142,205 @@ model Comment {
   /// Submitted by the author; visible only to the author and admins.
   authorNote String?
 
-  // --- Private proof of usage ---
-  privateProof       String?             @db.VarChar(100)
-  privateProofStatus PrivateProofStatus? @default(PENDING)
-
   // --- Issue tags ---
   issues CommentIssueType[] @default([])
-
-  // --- Rating ---
-  ratingActive      Boolean           @default(false)
-  ratingMuted       Boolean           @default(false)
-  ratingMuteReason  RatingMuteReason?
-  /// Computed via trigger. Do not update through prisma.
-  ratingWeight      Float             @default(0)
-  /// Computed via trigger. Do not update through prisma.
-  ratingTrustLabel  String?
-  /// Computed via trigger. Do not update through prisma.
-  ratingTrustReason String?
 
   // --- AI verdict (overwritten on re-run) ---
   aiDecidedAt         DateTime?
   aiAction            ModerationAction?
   aiQuality           Int?
   /// Informational only: the AI's spam call, kept for moderator context
-  /// and dataset analysis. Behavior is driven by ratingMuted +
-  /// ratingMuteReason (pyworker maps isSpam=true into TEMPLATE_SPAM).
+  /// and dataset analysis.
   aiIsSpam            Boolean?
   aiIsBrigade         Boolean?
   aiBrigadeConfidence Int?
   /// Raw AI payload for forensics.
   aiSignals           Json?
   aiReasoning         String?
+  aiDecisionReason    CommentRule?
 
   // --- Human verdict (overrides AI) ---
-  humanDecidedAt   DateTime?
-  humanAction      ModerationAction?
-  humanReasoning   String?
-  humanDecidedById Int?
-  humanDecidedBy   User?             @relation("humanDecidedBy", fields: [humanDecidedById], references: [id], onDelete: SetNull)
+  humanDecidedAt      DateTime?
+  humanAction         ModerationAction?
+  humanDecisionReason CommentRule?
+  humanReasoning      String?
+  humanDecidedById    Int?
+  humanDecidedBy      User?             @relation("humanDecidedBy", fields: [humanDecidedById], references: [id], onDelete: SetNull)
 
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @default(now()) @updatedAt
-  /// Computed via trigger when the status is APPROVED or VERIFIED. Do not update through prisma.
-  approvedAt        DateTime?
-  author            User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  authorId          Int
-  service           Service            @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  serviceId         Int
-  parentId          Int?
-  parent            Comment?           @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies           Comment[]          @relation("CommentReplies")
-  karmaTransactions KarmaTransaction[]
-  votes             CommentVote[]
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @default(now()) @updatedAt
+  /// Computed via trigger when the status is APPROVED. Do not update through prisma.
+  approvedAt             DateTime?
+  /// Null once the author deleted their account; posts that were public stay.
+  author                 User?              @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId               Int?
+  statusBeforeWithdrawal CommentStatus?
+  withdrawnAt            DateTime?
+  /// The post's version when it was withdrawn; restore republishes without moderation only if it still matches.
+  withdrawnVersion       Int?
+  /// Withdrawn while it waited for a moderator, which moderators watch for as a way to dodge a rejection.
+  withdrawnWhileWaiting  Boolean            @default(false)
+  /// The reply this one answered was deleted with its author's account.
+  replyTargetDeleted     Boolean            @default(false)
+  service                Service            @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId              Int
+  parentId               Int?
+  parent                 Comment?           @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies                Comment[]          @relation("CommentReplies")
+  /// Replies are one level deep: parentId is always the root post, and
+  /// replyToId names the reply being answered inside that thread.
+  replyToId              Int?
+  replyTo                Comment?           @relation("CommentReplyTo", fields: [replyToId], references: [id], onDelete: SetNull)
+  repliedBy              Comment[]          @relation("CommentReplyTo")
+  karmaTransactions      KarmaTransaction[]
 
   notificationPreferenceswatchedComments NotificationPreferences[] @relation("watchedComments")
   Notification                           Notification[]
 
-  @@unique([serviceId, privateProof], name: "unique_privateProof_per_service")
+  @@index([replyToId])
   @@index([status])
   @@index([moderationState])
   @@index([createdAt])
   @@index([approvedAt])
   @@index([serviceId])
   @@index([authorId])
-  @@index([upvotes])
   @@index([rating])
-  @@index([ratingActive])
-  @@index([ratingMuted])
-  @@index([ratingWeight])
   @@index([aiAction])
   @@index([aiIsBrigade])
   @@index([humanAction])
+  @@index([humanDecisionReason])
   @@index([humanDecidedById])
+  @@index([serviceId, kind, approvedAt])
+}
+
+model CommentExperience {
+  id              Int                  @id @default(autoincrement())
+  commentId       Int                  @unique
+  comment         Comment              @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  occurredMonth   String?              @db.VarChar(7)
+  sentiment       ExperienceSentiment?
+  sentimentSource SentimentSource?
+  outcome         ExperienceOutcome    @default(UNSPECIFIED)
+  classifiedAt    DateTime?
+  updates         ExperienceUpdate[]
+
+  @@index([sentiment])
+}
+
+model ExperienceUpdate {
+  id           Int                  @id @default(autoincrement())
+  experienceId Int
+  experience   CommentExperience    @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  commentId    Int                  @unique
+  comment      Comment              @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  outcome      ExperienceOutcome?
+  sentiment    ExperienceSentiment?
+
+  @@index([experienceId])
+}
+
+model CommentRevision {
+  id             Int               @id @default(autoincrement())
+  commentId      Int
+  comment        Comment           @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  authorId       Int?
+  author         User?             @relation("CommentRevisionAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  baseVersion    Int
+  content        String
+  kind           CommentKind
+  experienceData Json?
+  status         CommentStatus     @default(PENDING)
+  reason         String?
+  redactedAt     DateTime?
+  createdAt      DateTime          @default(now())
+  decidedAt      DateTime?
+  decidedById    Int?
+  decidedBy      User?             @relation("CommentRevisionModerator", fields: [decidedById], references: [id], onDelete: SetNull)
+  /// The rule a rejected edit broke, shown to its author.
+  decisionRule   CommentRule?
+  aiAction       ModerationAction?
+  aiDecidedAt    DateTime?
+  aiReasoning    String?
+
+  @@index([commentId, createdAt])
+  @@index([status])
+}
+
+model CommentEvidence {
+  id           Int                 @id @default(autoincrement())
+  commentId    Int?
+  comment      Comment?            @relation(fields: [commentId], references: [id], onDelete: SetNull)
+  authorId     Int?
+  author       User?               @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  body         String?
+  imagePath    String?             @unique
+  /// Detected from the submitted text and image when the evidence is saved.
+  kind         EvidenceKind        @default(NOTE)
+  /// Order or account ID extracted from the text or a lookup link.
+  normalizedId String?
+  /// Whether normalizedId matches the service's proof pattern; null when there is no pattern.
+  formatValid  Boolean?
+  legacyStatus PrivateProofStatus?
+  needsCheck   Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  removedAt    DateTime?
+  checks       EvidenceCheck[]
+
+  @@index([commentId])
+  @@index([authorId])
+  @@index([needsCheck, removedAt])
+}
+
+enum EvidenceKind {
+  ORDER_ID
+  LOOKUP_LINK
+  TRANSACTION_ID
+  EXTERNAL_LINK
+  SCREENSHOT
+  NOTE
+}
+
+enum ProofRequestSource {
+  MODERATOR
+  SERVICE
+}
+
+/// Asks a post's author for proof. Unanswered by dueAt, a published post reads as Unproven and stops counting;
+/// a held one goes back to the moderators. The rules live in src/lib/proofRequests.ts.
+model ProofRequest {
+  id            Int                @id @default(autoincrement())
+  commentId     Int
+  comment       Comment            @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  source        ProofRequestSource
+  requestedById Int?
+  requestedBy   User?              @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  /// What the moderator asks for; shown to the author. Service disputes leave it empty.
+  message       String?
+  createdAt     DateTime           @default(now())
+  dueAt         DateTime
+  cancelledAt   DateTime?
+
+  @@index([commentId])
+}
+
+model EvidenceCheck {
+  id          Int             @id @default(autoincrement())
+  evidenceId  Int
+  evidence    CommentEvidence @relation(fields: [evidenceId], references: [id])
+  moderatorId Int?
+  moderator   User?           @relation(fields: [moderatorId], references: [id], onDelete: SetNull)
+  finding     EvidenceFinding
+  explanation String
+  checkedAt   DateTime?
+  recordedAt  DateTime        @default(now())
+
+  @@index([evidenceId, recordedAt])
+}
+
+model EvidenceFileCleanup {
+  path      String   @id
+  createdAt DateTime @default(now())
+  attempts  Int      @default(0)
 }
 
 enum VerificationStatus {
@@ -266,6 +447,9 @@ enum AccountStatusChange {
 }
 
 enum NotificationType {
+  COMMENT_EDIT_REVIEWED
+  COMMENT_EVIDENCE_CHECKED
+  COMMENT_PROOF_REQUESTED
   TEST
   COMMENT_STATUS_CHANGE
   REPLY_COMMENT_CREATED
@@ -278,8 +462,6 @@ enum NotificationType {
   CONTACT_MESSAGE
   CONTACT_SEEN
   CONTACT_RESOLVED
-  // KARMA_UNLOCK // TODO: [KARMA_UNLOCK] Will be added later, when karma unloks are in the database, not in the code.
-  KARMA_CHANGE
   /// Marked as spammer, promoted to admin, etc.
   ACCOUNT_STATUS_CHANGE
   EVENT_CREATED
@@ -361,8 +543,6 @@ model Notification {
   aboutCommentStatusChange             CommentStatusChange?
   aboutServiceVerificationStatusChange ServiceVerificationStatusChange?
   aboutSuggestionStatusChange          ServiceSuggestionStatusChange?
-  aboutKarmaTransaction                KarmaTransaction?                @relation(fields: [aboutKarmaTransactionId], references: [id])
-  aboutKarmaTransactionId              Int?
 
   @@index([userId])
   @@index([read])
@@ -383,10 +563,8 @@ model NotificationPreferences {
   userId Int  @unique
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  enableOnMyCommentStatusChange     Boolean @default(true)
-  enableAutowatchMyComments         Boolean @default(true)
-  enableNotifyPendingRepliesOnWatch Boolean @default(false)
-  karmaNotificationThreshold        Int     @default(10)
+  enableOnMyCommentStatusChange Boolean @default(true)
+  enableAutowatchMyComments     Boolean @default(true)
 
   onEventCreatedForServices       Service[] @relation("onEventCreatedForServices")
   onRootCommentCreatedForServices Service[] @relation("onRootCommentCreatedForServices")
@@ -521,12 +699,17 @@ model ServiceSuggestion {
   serviceId        Int
   user             User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   service          Service                    @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  /// Whoever last moved it out of pending: its reviewer while open, who closed it after.
+  assignedToId     Int?
+  assignedTo       User?                      @relation("SuggestionAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedAt       DateTime?
   messages         ServiceSuggestionMessage[]
   Notification     Notification[]
   KarmaTransaction KarmaTransaction[]
 
   @@index([userId])
   @@index([serviceId])
+  @@index([assignedToId])
 }
 
 /// The target is a type and an id rather than a relation: Prisma cannot express
@@ -564,6 +747,8 @@ enum AuditTargetType {
   COMMENT
   CASE
   EVENT
+  ATTRIBUTE
+  ANNOUNCEMENT
 }
 
 model ServiceSuggestionMessage {
@@ -587,6 +772,9 @@ model Service {
   name                    String
   slug                    String                       @unique
   previousSlugs           String[]                     @default([])
+  /// Consecutive weekly checks in which every web address failed; reset by any successful check.
+  unreachableChecks       Int                          @default(0)
+  reachabilityCheckedAt   DateTime?
   description             String
   categories              Category[]                   @relation("ServiceToCategory")
   kycLevel                Int                          @default(4)
@@ -606,24 +794,11 @@ model Service {
   overallScore            Int                          @default(0)
   privacyScore            Int                          @default(0)
   trustScore              Int                          @default(0)
-  /// Computed via trigger. Do not update through prisma.
-  averageUserRating       Float?
-  /// Computed via trigger. Do not update through prisma.
-  trustWeightedUserRating Float?
-  /// Computed via trigger. Do not update through prisma.
-  userRatingCount         Int                          @default(0)
-  /// Computed via trigger. Do not update through prisma.
-  trustedUserRatingCount  Int                          @default(0)
-  /// Computed via trigger. Do not update through prisma.
-  userRatingWeight        Float                        @default(0)
   serviceVisibility       ServiceVisibility            @default(PUBLIC)
   verificationStatus      VerificationStatus           @default(COMMUNITY_CONTRIBUTED)
   verificationSummary     String?
   verificationRequests    ServiceVerificationRequest[]
   verificationProofMd     String?
-  /// [UserSentiment]
-  userSentiment           Json?
-  userSentimentAt         DateTime?
   referral                String?
   acceptedCurrencies      Currency[]                   @default([])
   serviceUrls             String[]
@@ -672,7 +847,12 @@ model Service {
   affiliatedUsers                 ServiceUser[]             @relation("ServiceUsers")
 
   strictCommentingEnabled Boolean @default(false)
-  commentSectionMessage   String?
+  /// Shown under the composer's proof field in place of the default line. Markdown links allowed.
+  proofHint               String?
+  /// Order lookup URL with an {id} placeholder, used to extract IDs and open lookups.
+  proofLookupUrl          String?
+  /// Regular expression a valid order or account ID must fully match.
+  proofIdPattern          String?
 
   stats Stat[]
 
@@ -683,10 +863,6 @@ model Service {
   @@index([overallScore])
   @@index([privacyScore])
   @@index([trustScore])
-  @@index([averageUserRating])
-  @@index([trustWeightedUserRating])
-  @@index([userRatingCount])
-  @@index([trustedUserRatingCount])
   @@index([name])
   @@index([verificationStatus])
   @@index([kycLevel])
@@ -827,11 +1003,16 @@ model User {
   updatedAt                DateTime                     @default(now()) @updatedAt
   lastLoginAt              DateTime                     @default(now())
   comments                 Comment[]
+  commentRevisions         CommentRevision[]            @relation("CommentRevisionAuthor")
+  reviewedCommentRevisions CommentRevision[]            @relation("CommentRevisionModerator")
+  commentEvidence          CommentEvidence[]
+  evidenceChecks           EvidenceCheck[]
+  proofRequests            ProofRequest[]
   humanModerationDecisions Comment[]                    @relation("humanDecidedBy")
   karmaTransactions        KarmaTransaction[]
   grantedKarmaTransactions KarmaTransaction[]           @relation("KarmaGrantedBy")
-  commentVotes             CommentVote[]
   suggestions              ServiceSuggestion[]
+  assignedSuggestions      ServiceSuggestion[]          @relation("SuggestionAssignee")
   suggestionMessages       ServiceSuggestionMessage[]
   internalNotes            InternalUserNote[]           @relation("UserRecievedNotes")
   addedInternalNotes       InternalUserNote[]           @relation("UserAddedNotes")
@@ -858,10 +1039,17 @@ model User {
 }
 
 enum ContactCategory {
+  COMMENT_REPORT
   ACCOUNT_VERIFICATION
   SERVICE_REPORT_URGENT
   BUG
   OTHER
+}
+
+enum CommentReportOutcome {
+  ACTION_TAKEN
+  NO_ACTION
+  WITHDRAWN
 }
 
 enum ContactStatus {
@@ -871,21 +1059,29 @@ enum ContactStatus {
 }
 
 model ContactThread {
-  id            Int              @id @default(autoincrement())
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @default(now()) @updatedAt
-  category      ContactCategory
+  id                Int                   @id @default(autoincrement())
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @default(now()) @updatedAt
+  category          ContactCategory
+  commentId         Int?
+  comment           Comment?              @relation(fields: [commentId], references: [id], onDelete: SetNull)
   /// Affiliation role the author claims on ACCOUNT_VERIFICATION requests. Null
   /// for other categories. A claim until the TXT record is verified.
-  requestedRole ServiceUserRole?
-  status        ContactStatus    @default(AWAITING_STAFF)
-  readAt        DateTime?
-  repliedAt     DateTime?
+  requestedRole     ServiceUserRole?
+  reportReason      CommentRule?
+  /// The reporter represented the post's service when reporting.
+  fromService       Boolean               @default(false)
+  reportOutcome     CommentReportOutcome?
+  /// Shown to the reporter when the report is closed.
+  reportOutcomeNote String?
+  status            ContactStatus         @default(AWAITING_STAFF)
+  readAt            DateTime?
+  repliedAt         DateTime?
   /// Set when a thread is resolved. Resolved threads are auto-deleted 30 days
   /// after this timestamp; deletion is the privacy mechanism, not encryption.
-  resolvedAt    DateTime?
-  adminNote     String?
-  lastMessageAt DateTime         @default(now())
+  resolvedAt        DateTime?
+  adminNote         String?
+  lastMessageAt     DateTime              @default(now())
 
   author   User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
   authorId Int?
@@ -898,6 +1094,7 @@ model ContactThread {
   @@index([lastMessageAt])
   @@index([resolvedAt])
   @@index([readAt])
+  @@index([commentId])
 }
 
 model ContactMessage {
@@ -936,26 +1133,6 @@ model ApiKey {
   @@index([keyHash])
 }
 
-model CommentVote {
-  id        Int      @id @default(autoincrement())
-  downvote  Boolean  @default(false) // false = upvote, true = downvote
-  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  commentId Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    Int
-  createdAt DateTime @default(now())
-
-  /// Karma this vote actually moved, decided once by the trigger and never by
-  /// the application. Removing or flipping the vote hands back exactly this, so
-  /// what a pair of accounts can move stays bounded however the votes are
-  /// churned. Deciding it again at reversal time did not.
-  karmaApplied Int @default(0)
-
-  @@unique([commentId, userId]) // Ensure one vote per user per comment
-  @@index([commentId])
-  @@index([userId])
-}
-
 model ServiceAttribute {
   service     Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   serviceId   Int
@@ -979,16 +1156,15 @@ model KarmaTransaction {
   userId          Int
   action          KarmaTransactionAction
   points          Int                    @default(0)
-  comment         Comment?               @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  comment         Comment?               @relation(fields: [commentId], references: [id], onDelete: SetNull)
   commentId       Int?
-  suggestion      ServiceSuggestion?     @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  suggestion      ServiceSuggestion?     @relation(fields: [suggestionId], references: [id], onDelete: SetNull)
   suggestionId    Int?
   description     String
   processed       Boolean                @default(false)
   createdAt       DateTime               @default(now())
   grantedBy       User?                  @relation("KarmaGrantedBy", fields: [grantedByUserId], references: [id], onDelete: SetNull)
   grantedByUserId Int?
-  Notification    Notification[]
 
   @@index([createdAt])
   @@index([userId])
@@ -1061,26 +1237,28 @@ enum CaseVisibility {
 }
 
 model Case {
-  id             Int           @id @default(autoincrement())
+  id              Int           @id @default(autoincrement())
   /// Non-sequential id used in the public URL so cases can't be enumerated
   /// while the feature is undiscoverable.
-  publicId       String        @unique @default(cuid(2))
-  title          String
-  issueType      CaseIssueType
-  status         CaseStatus    @default(DRAFT)
-  summaryMd      String
-  amountText     String?
-  externalSource String?
+  publicId        String        @unique @default(cuid(2))
+  sourceCommentId Int?
+  sourceComment   Comment?      @relation(fields: [sourceCommentId], references: [id], onDelete: SetNull)
+  title           String
+  issueType       CaseIssueType
+  status          CaseStatus    @default(DRAFT)
+  summaryMd       String
+  amountText      String?
+  externalSource  String?
   /// When the problem happened, as opposed to when it was reported. Null when
   /// the reporter could not date it; timelines fall back to createdAt.
-  occurredAt     DateTime?
+  occurredAt      DateTime?
   /// Set the first time the case leaves DRAFT. Public listings order by this so
   /// a case triaged months after intake still surfaces as newly published.
-  publishedAt    DateTime?
-  resolvedAt     DateTime?
-  resolutionMd   String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @default(now()) @updatedAt
+  publishedAt     DateTime?
+  resolvedAt      DateTime?
+  resolutionMd    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now()) @updatedAt
 
   service      Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   serviceId    Int
@@ -1101,6 +1279,7 @@ model Case {
   @@index([status])
   @@index([createdAt])
   @@index([publishedAt])
+  @@index([sourceCommentId])
   @@index([incidentId])
 }
 
@@ -1199,7 +1378,7 @@ model ServiceScanJob {
   /// runs for listings without terms and costs a fraction of a scan.
   kind              ServiceScanJobKind @default(DEEP_SCAN)
   requestedByUserId Int?
-  createdAt         DateTime  @default(now())
+  createdAt         DateTime           @default(now())
   claimedAt         DateTime?
   processedAt       DateTime?
   error             String?

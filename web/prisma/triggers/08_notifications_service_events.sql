@@ -8,6 +8,7 @@ BEGIN
     FROM "_onEventCreatedForServices" oes
     JOIN "NotificationPreferences" np ON oes."A" = np.id
     WHERE oes."B" = NEW."serviceId"
+      AND NEW.visible
       AND NOT EXISTS (
         SELECT 1 FROM "Notification" n
         WHERE n."userId" = np."userId"

@@ -19,7 +19,9 @@ CREATE OR REPLACE FUNCTION compute_comment_moderation_state(
 )
 RETURNS "CommentModerationState" AS $$
 BEGIN
-  IF p_human_action IN ('APPROVE', 'REJECT') THEN
+  IF p_status::text = 'WITHDRAWN' THEN
+    RETURN 'RESOLVED';
+  ELSIF p_human_action IN ('APPROVE', 'REJECT') THEN
     RETURN 'RESOLVED';
   ELSIF p_human_action = 'HOLD' THEN
     RETURN 'AWAITING_HUMAN';

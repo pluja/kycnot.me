@@ -4,11 +4,13 @@ DECLARE
   suggestion_status_change "ServiceSuggestionStatusChange";
 BEGIN
   IF TG_OP = 'INSERT' AND TG_TABLE_NAME = 'ServiceSuggestion' THEN -- Corresponds to ServiceSuggestion insert
-    -- Notify all admins when a new suggestion is created
+    -- Notify suggestion staff (admins and suggestions:manage holders) when a new suggestion is created,
+    -- except whoever created it
     INSERT INTO "Notification" ("userId", "type", "aboutServiceSuggestionId")
     SELECT u."id", 'SUGGESTION_CREATED', NEW."id"
     FROM "User" u
-    WHERE u."admin" = true
+    WHERE (u."admin" OR 'suggestions:manage' = ANY(u."capabilities"))
+      AND u."id" <> NEW."userId"
       AND NOT EXISTS (
         SELECT 1 FROM "Notification" n
         WHERE n."userId" = u."id"
@@ -30,14 +32,16 @@ BEGIN
           AND n."aboutServiceSuggestionMessageId" = NEW."id"
       );
 
-    -- Notify all admins (except the sender), but only if sender is not admin
+    -- Notify suggestion staff (except the sender), but only when the sender is not staff
     INSERT INTO "Notification" ("userId", "type", "aboutServiceSuggestionId", "aboutServiceSuggestionMessageId")
     SELECT u."id", 'SUGGESTION_MESSAGE', NEW."suggestionId", NEW."id"
     FROM "User" u
-    WHERE u."admin" = true
+    WHERE (u."admin" OR 'suggestions:manage' = ANY(u."capabilities"))
       AND u."id" <> NEW."userId"
-      -- Only notify admins if the message sender is not an admin
-      AND NOT EXISTS (SELECT 1 FROM "User" WHERE "id" = NEW."userId" AND "admin" = true)
+      AND NOT EXISTS (
+        SELECT 1 FROM "User" sender
+        WHERE sender."id" = NEW."userId" AND (sender."admin" OR 'suggestions:manage' = ANY(sender."capabilities"))
+      )
       AND NOT EXISTS (
         SELECT 1 FROM "Notification" n
         WHERE n."userId" = u."id"

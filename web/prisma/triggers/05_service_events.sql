@@ -170,7 +170,7 @@ BEGIN
         event_title := 'Attribute added';
         event_content := 'Attribute "' || attribute_name || '" was added to ' || service_name;
     ELSE
-        event_content := 'An attribute was added (details unavailable)';
+        RETURN NEW;
     END IF;
 
   ELSIF TG_OP = 'DELETE' THEN
@@ -184,8 +184,8 @@ BEGIN
             event_title := 'Attribute removed';
             event_content := 'Attribute "' || attribute_name || '" was removed from ' || service_name;
         ELSE
-            -- This case might happen if attribute was deleted concurrently
-            event_content := 'An attribute was removed (details unavailable)'; 
+            -- The attribute itself was deleted, which cascades to every service using it.
+            RETURN OLD;
         END IF;
     ELSE
         -- Service was deleted, don't create an event
@@ -256,8 +256,9 @@ DECLARE
   is_new_service BOOLEAN := FALSE;
 BEGIN
    -- Determine target service ID and operation type
+  -- In _ServiceToCategory, "A" is the category and "B" the service.
   IF TG_OP = 'INSERT' THEN
-    target_service_id := NEW."A";
+    target_service_id := NEW."B";
     
     -- Check if this is a new service (created within the last minute)
     -- This helps prevent events when categories are initially added to a new service
@@ -267,28 +268,28 @@ BEGIN
       RETURN NEW; -- Skip event creation for new services
     END IF;
     
-    SELECT name INTO category_name FROM "Category" WHERE id = NEW."B";
+    SELECT name INTO category_name FROM "Category" WHERE id = NEW."A";
     SELECT name INTO service_name FROM "Service" WHERE id = target_service_id;
     IF category_name IS NOT NULL AND service_name IS NOT NULL THEN
         event_title := 'Category added';
         event_content := 'Category "' || category_name || '" was added to ' || service_name;
     ELSE
-        event_content := 'A category was added (details unavailable)';
+        RETURN NEW;
     END IF;
 
   ELSIF TG_OP = 'DELETE' THEN
-    target_service_id := OLD."A";
+    target_service_id := OLD."B";
     -- Check if the service still exists before trying to fetch its name or create an event
     SELECT EXISTS (SELECT 1 FROM "Service" WHERE id = target_service_id) INTO service_exists;
     IF service_exists THEN
-        SELECT name INTO category_name FROM "Category" WHERE id = OLD."B";
+        SELECT name INTO category_name FROM "Category" WHERE id = OLD."A";
         SELECT name INTO service_name FROM "Service" WHERE id = target_service_id;
         IF category_name IS NOT NULL AND service_name IS NOT NULL THEN
             event_title := 'Category removed';
             event_content := 'Category "' || category_name || '" was removed from ' || service_name;
         ELSE
-            -- This case might happen if category was deleted concurrently
-            event_content := 'A category was removed (details unavailable)';
+            -- The category itself was deleted, which cascades to every service in it.
+            RETURN OLD;
         END IF;
     ELSE
         -- Service was deleted, don't create an event

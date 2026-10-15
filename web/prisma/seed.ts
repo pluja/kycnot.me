@@ -12,6 +12,8 @@ import {
   CaseStatus,
   CaseVisibility,
   CommentIssueType,
+  CommentReportOutcome,
+  CommentRule,
   CommentStatus,
   ContactCategory,
   ContactStatus,
@@ -27,7 +29,6 @@ import {
   LegalChangeLevel,
   LegalDocumentKind,
   PrismaClient,
-  RatingMuteReason,
   AuditAction,
   AuditTargetType,
   ServiceSuggestionStatus,
@@ -39,15 +40,17 @@ import {
   VerificationStepStatus,
   type VerificationStatus,
 } from '@prisma/client'
-import { differenceInDays, isPast } from 'date-fns'
+import { differenceInDays, isPast, subDays } from 'date-fns'
 import { uniqBy } from 'lodash-es'
 import { generateUsername } from 'unique-username-generator'
 
 import { getCaseStatusInfo } from '../src/constants/caseStatus'
 import { countries } from '../src/constants/countries'
+import { defaultCheckTexts } from '../src/constants/evidenceCheckTexts'
 import { kycLevels } from '../src/constants/kycLevels'
 import { undefinedIfEmpty } from '../src/lib/arrays'
 import { eventKindToFields, type EventKind } from '../src/lib/eventKind'
+import { outcomeForProblems } from '../src/lib/experiences'
 import { transformCase } from '../src/lib/strings'
 
 // Exit if not in development mode
@@ -610,97 +613,6 @@ const tosReviewExamples: PrismaJson.TosReview[] = [
   },
 ]
 
-// User sentiment examples for AI-generated summaries
-const generateFakeUserSentiment = () => {
-  const sentiments = ['positive', 'neutral', 'negative'] as const
-  const sentiment = faker.helpers.arrayElement(sentiments)
-
-  // Generate what users like based on sentiment
-  const likeCount =
-    sentiment === 'positive'
-      ? faker.number.int({ min: 3, max: 6 })
-      : sentiment === 'neutral'
-        ? faker.number.int({ min: 1, max: 4 })
-        : faker.number.int({ min: 0, max: 2 })
-
-  // Generate what users dislike based on sentiment
-  const dislikeCount =
-    sentiment === 'negative'
-      ? faker.number.int({ min: 3, max: 6 })
-      : sentiment === 'neutral'
-        ? faker.number.int({ min: 1, max: 4 })
-        : faker.number.int({ min: 0, max: 2 })
-
-  const whatUsersLike = Array.from({ length: likeCount }, () =>
-    faker.helpers.arrayElement([
-      'Fast transaction times',
-      'No KYC required',
-      'Excellent support team',
-      'Low fees',
-      'Multiple currency options',
-      'Easy to use interface',
-      'Clear documentation',
-      'Tor support',
-      'Strong privacy policies',
-      'No IP logging',
-      'Quick verification process',
-      'Responsive website',
-      'Mobile-friendly design',
-      'Reliable uptime',
-      'Transparent fee structure',
-    ])
-  )
-
-  const whatUsersDislike = Array.from({ length: dislikeCount }, () =>
-    faker.helpers.arrayElement([
-      'Slow transaction times',
-      'High fees',
-      'Poor customer support',
-      'Confusing interface',
-      'Limited currency options',
-      'Website downtime',
-      'Hidden fees',
-      'No mobile support',
-      'Lack of transparency',
-      'Limited payment methods',
-      'Bugs in the platform',
-      'Restrictive limits',
-      'Delayed withdrawals',
-      'Verification issues',
-      'Complicated signup process',
-    ])
-  )
-
-  // Create summary based on sentiment
-  let summary = ''
-  if (sentiment === 'positive') {
-    summary = faker.helpers.arrayElement([
-      `Users overwhelmingly praise this service for its ${faker.helpers.arrayElements(whatUsersLike, 2).join(' and ')}. Many highlight the ${faker.helpers.arrayElement(whatUsersLike)} as a standout feature.`,
-      `Based on multiple user reviews, this service receives high marks for ${faker.helpers.arrayElements(whatUsersLike, 2).join(' and ')}. Most users report positive experiences with minimal issues.`,
-      `Community feedback indicates strong satisfaction with this service, particularly regarding ${faker.helpers.arrayElements(whatUsersLike, 2).join(' and ')}.`,
-    ])
-  } else if (sentiment === 'neutral') {
-    summary = faker.helpers.arrayElement([
-      `User sentiment is mixed. While many appreciate the ${faker.helpers.arrayElement(whatUsersLike)}, common complaints include ${faker.helpers.arrayElement(whatUsersDislike)}.`,
-      `Community feedback shows balanced opinions. Users like the ${faker.helpers.arrayElement(whatUsersLike)} but have concerns about ${faker.helpers.arrayElement(whatUsersDislike)}.`,
-      `Analysis of reviews indicates neither overwhelmingly positive nor negative sentiment. Users value ${faker.helpers.arrayElement(whatUsersLike)} but criticize ${faker.helpers.arrayElement(whatUsersDislike)}.`,
-    ])
-  } else {
-    summary = faker.helpers.arrayElement([
-      `User reviews highlight significant concerns with this service, primarily regarding ${faker.helpers.arrayElements(whatUsersDislike, 2).join(' and ')}. Few users mention positive aspects.`,
-      `Community feedback is predominantly negative, with recurring complaints about ${faker.helpers.arrayElements(whatUsersDislike, 2).join(' and ')}.`,
-      `Analysis of user comments reveals widespread dissatisfaction, especially concerning ${faker.helpers.arrayElements(whatUsersDislike, 2).join(' and ')}.`,
-    ])
-  }
-
-  return {
-    summary,
-    sentiment,
-    whatUsersLike: [...new Set(whatUsersLike)],
-    whatUsersDislike: [...new Set(whatUsersDislike)],
-  }
-}
-
 const eventTitles = [
   'Service maintenance scheduled',
   'Server outage reported',
@@ -982,8 +894,6 @@ const generateFakeService = (users: User[]) => {
     tosReviewAt: tosReview
       ? faker.date.recent()
       : faker.helpers.maybe(() => faker.date.recent(), { probability: 0.5 }),
-    userSentiment: faker.helpers.maybe(() => generateFakeUserSentiment(), { probability: 0.8 }),
-    userSentimentAt: faker.date.recent(),
     internalNotes: faker.helpers.maybe(
       () => ({
         create: {
@@ -994,7 +904,14 @@ const generateFakeService = (users: User[]) => {
       { probability: 0.33 }
     ),
     strictCommentingEnabled: faker.datatype.boolean(0.33333),
-    commentSectionMessage: faker.helpers.maybe(() => faker.lorem.paragraph(), { probability: 0.3 }),
+    proofHint: faker.helpers.maybe(() => 'Your order ID, like aBCDEFg1Hi.', { probability: 0.3 }),
+    ...(faker.datatype.boolean(0.4)
+      ? {
+          proofHint: 'Your order ID from the exchange page, like IXHUTQ.',
+          proofLookupUrl: `https://${faker.internet.domainName()}/exchange/{id}`,
+          proofIdPattern: '[A-Z0-9]{6}',
+        }
+      : {}),
   } as const satisfies Prisma.ServiceCreateInput
 }
 
@@ -1170,30 +1087,16 @@ const commentReplyList = [
 const generateFakeComment = (userId: number, serviceId: number, parentId?: number) => {
   const status =
     Math.random() > 0.1
-      ? faker.helpers.arrayElement([CommentStatus.APPROVED, CommentStatus.REJECTED, CommentStatus.VERIFIED])
+      ? faker.helpers.arrayElement([CommentStatus.APPROVED, CommentStatus.REJECTED])
       : CommentStatus.PENDING
-
-  const ratingMuted = Math.random() > 0.2 ? false : faker.datatype.boolean()
-  const ratingMuteReason = ratingMuted
-    ? faker.helpers.weightedArrayElement<RatingMuteReason>([
-        { weight: 40, value: RatingMuteReason.SUSPICIOUS_PATTERN },
-        { weight: 15, value: RatingMuteReason.AUTHOR_LOW_TRUST },
-        { weight: 15, value: RatingMuteReason.TEMPLATE_SPAM },
-        { weight: 10, value: RatingMuteReason.AUTHOR_AFFILIATED },
-        { weight: 10, value: RatingMuteReason.CONFLICT_OF_INTEREST },
-        { weight: 10, value: RatingMuteReason.MODERATOR_DISCRETION },
-      ])
-    : null
 
   const issues: CommentIssueType[] = []
   if (Math.random() < 0.08) issues.push(CommentIssueType.KYC_REQUESTED)
   if (Math.random() < 0.05) issues.push(CommentIssueType.FUNDS_BLOCKED)
+  if (Math.random() < 0.04) issues.push(CommentIssueType.OTHER)
 
   return {
-    upvotes: faker.number.int({ min: 0, max: 100 }),
     status,
-    ratingMuted,
-    ratingMuteReason,
     issues,
     publicNote: Math.random() > 0.2 ? '' : faker.lorem.paragraph(),
     adminNote: Math.random() > 0.2 ? '' : faker.lorem.paragraph(),
@@ -1203,14 +1106,16 @@ const generateFakeComment = (userId: number, serviceId: number, parentId?: numbe
         ? faker.helpers.arrayElement(commentReplyList)
         : faker.helpers.arrayElement(commentList),
     rating: parentId ? null : Math.random() < 0.33 ? faker.number.int({ min: 1, max: 5 }) : null,
-    ratingActive: false as boolean,
+    kind: parentId ? 'DISCUSSION' : 'EXPERIENCE',
     authorId: userId,
     serviceId,
     parentId,
-    approvedAt:
-      status === CommentStatus.APPROVED || status === CommentStatus.VERIFIED
-        ? faker.date.recent({ days: 30 })
-        : null,
+    approvedAt: status === CommentStatus.APPROVED ? faker.date.recent({ days: 30 }) : null,
+    ...(status === CommentStatus.REJECTED && {
+      humanAction: 'REJECT',
+      humanDecisionReason: faker.helpers.arrayElement(Object.values(CommentRule)),
+      humanDecidedAt: faker.date.recent({ days: 30 }),
+    }),
   } satisfies Prisma.CommentCreateManyInput
 }
 
@@ -1273,7 +1178,6 @@ const specialUsersData = {
     admin: true,
     verified: true,
     verifiedLink: 'https://kycnot.me',
-    totalKarma: 1001,
     link: 'https://kycnot.me',
     picture: 'https://kycnot.me/files/users/pictures/c277dc0f2f.png',
   },
@@ -1285,7 +1189,6 @@ const specialUsersData = {
     capabilities: ['comments:moderate', 'contact:manage'],
     verified: true,
     verifiedLink: 'https://kycnot.me',
-    totalKarma: 1001,
     link: 'https://kycnot.me',
     picture: 'https://kycnot.me/files/users/pictures/c277dc0f2f.png',
   },
@@ -1297,7 +1200,6 @@ const specialUsersData = {
     verified: true,
     verifiedLink: 'https://kycnot.me',
     capabilities: ['cases:manage'],
-    totalKarma: 1001,
     link: 'https://kycnot.me',
     picture: 'https://kycnot.me/files/users/pictures/c277dc0f2f.png',
   },
@@ -1309,7 +1211,6 @@ const specialUsersData = {
     verified: true,
     verifiedLink: 'https://kycnot.me',
     capabilities: ['contact:manage'],
-    totalKarma: 1001,
     link: 'https://kycnot.me',
     picture: 'https://kycnot.me/files/users/pictures/c277dc0f2f.png',
   },
@@ -1321,7 +1222,6 @@ const specialUsersData = {
     verified: true,
     verifiedLink: 'https://kycnot.me',
     capabilities: ['contact:manage-urgent'],
-    totalKarma: 1001,
     link: 'https://kycnot.me',
     picture: 'https://kycnot.me/files/users/pictures/c277dc0f2f.png',
   },
@@ -1332,7 +1232,6 @@ const specialUsersData = {
     admin: false,
     verified: true,
     verifiedLink: 'https://kycnot.me',
-    totalKarma: 1001,
   },
   normal: {
     name: 'normal_dev',
@@ -1347,7 +1246,6 @@ const specialUsersData = {
     defaultToken: 'spam',
     admin: false,
     verified: false,
-    totalKarma: -100,
     spammer: true,
   },
 } as const satisfies Record<
@@ -1415,11 +1313,13 @@ async function createFakeContactThread({
   status,
   authorId,
   staffIds,
+  reportedCommentId,
 }: {
   category: ContactCategory
   status: ContactStatus
   authorId: number
   staffIds: number[]
+  reportedCommentId?: number
 }) {
   const createdAt = faker.date.recent({ days: 30 })
   const hasStaffReply = status !== ContactStatus.AWAITING_STAFF
@@ -1464,6 +1364,15 @@ async function createFakeContactThread({
       repliedAt: hasStaffReply ? lastMessageAt : null,
       resolvedAt: status === ContactStatus.RESOLVED ? lastMessageAt : null,
       adminNote: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.3 }) ?? null,
+      ...(category === ContactCategory.COMMENT_REPORT && {
+        commentId: reportedCommentId,
+        reportReason: faker.helpers.arrayElement(Object.values(CommentRule)),
+        fromService: false,
+        reportOutcome:
+          status === ContactStatus.RESOLVED
+            ? faker.helpers.arrayElement(Object.values(CommentReportOutcome))
+            : null,
+      }),
     },
     select: { id: true },
   })
@@ -1485,7 +1394,6 @@ async function cleanup() {
   console.info('🧹 Cleaning up existing data...')
 
   try {
-    await prisma.commentVote.deleteMany()
     await prisma.karmaTransaction.deleteMany()
     await prisma.comment.deleteMany()
     await prisma.serviceAttribute.deleteMany()
@@ -1895,12 +1803,6 @@ async function main() {
       const commentData = Array.from({ length: commentCount }, () =>
         generateFakeComment(faker.helpers.arrayElement(users).id, service.id)
       )
-      const indexesToUpdate = users.map((user) => {
-        return commentData.findIndex((comment) => comment.authorId === user.id && comment.rating !== null)
-      })
-      commentData.forEach((comment, index) => {
-        if (indexesToUpdate.includes(index)) comment.ratingActive = true
-      })
 
       await prisma.comment.createMany({
         data: commentData,
@@ -1917,27 +1819,105 @@ async function main() {
         take: commentCount,
       })
 
+      for (const comment of comments) {
+        // Half look like older posts: sentiment from a star rating and no outcome, even with problem tags.
+        const isLegacy = Math.random() < 0.5
+        await prisma.commentExperience.upsert({
+          where: { commentId: comment.id },
+          update: {},
+          create: {
+            commentId: comment.id,
+            sentiment:
+              comment.rating === null
+                ? 'NEUTRAL'
+                : comment.rating >= 4
+                  ? 'POSITIVE'
+                  : comment.rating === 3
+                    ? 'NEUTRAL'
+                    : 'NEGATIVE',
+            sentimentSource: isLegacy ? 'LEGACY_RATING' : 'AUTHOR',
+            outcome: isLegacy
+              ? 'UNSPECIFIED'
+              : outcomeForProblems({
+                  noProblems: Math.random() < 0.7,
+                  issues: comment.issues,
+                  resolved: Math.random() < 0.4,
+                }),
+          },
+        })
+        if (comment.status === 'APPROVED') {
+          await prisma.commentRevision.create({
+            data: {
+              commentId: comment.id,
+              authorId: comment.authorId,
+              baseVersion: 1,
+              content: comment.content,
+              kind: 'EXPERIENCE',
+              status: comment.status,
+              createdAt: comment.createdAt,
+              decidedAt: comment.approvedAt,
+            },
+          })
+        }
+      }
+
+      // An author's follow-up that changes the verdict, and a withdrawn post, so both render.
+      const [updatedPost, withdrawnPost] = comments.filter(
+        (comment) => comment.status === CommentStatus.APPROVED
+      )
+      if (updatedPost?.authorId && faker.datatype.boolean(0.5)) {
+        const experience = await prisma.commentExperience.findUniqueOrThrow({
+          where: { commentId: updatedPost.id },
+          select: { id: true },
+        })
+        await prisma.comment.create({
+          data: {
+            content: faker.helpers.arrayElement(commentReplyList),
+            status: CommentStatus.APPROVED,
+            approvedAt: new Date(),
+            kind: 'DISCUSSION',
+            authorId: updatedPost.authorId,
+            serviceId: service.id,
+            parentId: updatedPost.id,
+            experienceUpdate: { create: { experienceId: experience.id, sentiment: 'NEGATIVE' } },
+          },
+        })
+      }
+      if (withdrawnPost && faker.datatype.boolean(0.3)) {
+        await prisma.comment.update({
+          where: { id: withdrawnPost.id },
+          data: {
+            status: CommentStatus.WITHDRAWN,
+            statusBeforeWithdrawal: CommentStatus.APPROVED,
+            withdrawnAt: faker.date.recent({ days: 10 }),
+            withdrawnVersion: withdrawnPost.version,
+          },
+        })
+      }
+
       const affiliatedUsers = undefinedIfEmpty(
         users.filter((user) =>
           user.serviceAffiliations.some((affiliation) => affiliation.serviceId === service.id)
         )
       )
 
-      // Create replies to comments
+      // Replies stay one level deep; some answer an earlier reply in the thread.
       await Promise.all(
         comments.map(async (comment) => {
-          const replyCount = faker.number.int({ min: 0, max: 3 })
-          return Promise.all(
-            Array.from({ length: replyCount }, () => {
-              const user = faker.helpers.arrayElement(
-                faker.helpers.maybe(() => affiliatedUsers, { probability: 0.3 }) ?? users
-              )
-
-              return prisma.comment.create({
-                data: generateFakeComment(user.id, service.id, comment.id),
-              })
+          const replyCount = faker.number.int({ min: 0, max: 4 })
+          let previousReplyId: number | undefined
+          for (let index = 0; index < replyCount; index++) {
+            const user = faker.helpers.arrayElement(
+              faker.helpers.maybe(() => affiliatedUsers, { probability: 0.3 }) ?? users
+            )
+            const reply = await prisma.comment.create({
+              data: {
+                ...generateFakeComment(user.id, service.id, comment.id),
+                replyToId: previousReplyId && faker.datatype.boolean(0.4) ? previousReplyId : undefined,
+              },
             })
-          )
+            previousReplyId = reply.id
+          }
         })
       )
     })
@@ -1983,7 +1963,11 @@ async function main() {
   // Then create 5 EDIT_SERVICE suggestions
   await Promise.all(
     services.slice(0, 5).map(async (service, index) => {
-      const status = faker.helpers.arrayElement(Object.values(ServiceSuggestionStatus))
+      // The first is a claim nobody touched for over a week, so the stale state shows.
+      const isStaleClaim = index === 0
+      const status = isStaleClaim
+        ? ServiceSuggestionStatus.UNDER_REVIEW
+        : faker.helpers.arrayElement(Object.values(ServiceSuggestionStatus))
       // Most carry a field-by-field edit, so the review panel has something to show.
       const fieldEdits: PrismaJson.ServiceFieldEdits | undefined =
         index < 3
@@ -2010,12 +1994,18 @@ async function main() {
             serviceId: service.id,
           }),
           fieldEdits,
+          ...(status !== ServiceSuggestionStatus.PENDING && {
+            assignedTo: {
+              connect: { id: index % 2 === 0 ? specialUsers.moderator.id : specialUsers.admin.id },
+            },
+            assignedAt: isStaleClaim ? subDays(new Date(), 10) : faker.date.recent({ days: 2 }),
+          }),
         },
       })
 
       // Create some messages for each suggestion
       await Promise.all(
-        Array.from({ length: faker.number.int({ min: 0, max: 3 }) }, () =>
+        Array.from({ length: isStaleClaim ? 0 : faker.number.int({ min: 0, max: 3 }) }, () =>
           prisma.serviceSuggestionMessage.create({
             data: generateFakeServiceSuggestionMessage(suggestion.id, [
               specialUsers.normal.id,
@@ -2061,6 +2051,11 @@ async function main() {
   const contactCombos = Object.values(ContactCategory).flatMap((category) =>
     Object.values(ContactStatus).map((status) => ({ category, status }))
   )
+  const reportablePosts = await prisma.comment.findMany({
+    where: { status: CommentStatus.APPROVED, parentId: null },
+    select: { id: true },
+    take: contactCombos.length,
+  })
   for (const [i, { category, status }] of contactCombos.entries()) {
     const authorId = contactAuthorIds[i % contactAuthorIds.length]
     if (authorId === undefined) throw new Error('Seed needs at least one contact author')
@@ -2069,6 +2064,7 @@ async function main() {
       status,
       authorId,
       staffIds: contactStaffIds,
+      reportedCommentId: reportablePosts[i % reportablePosts.length]?.id,
     })
   }
 
@@ -2106,6 +2102,56 @@ async function main() {
       )
     })
   )
+
+  // ---- Create proof requests: one still open, one past due so its post reads as Unproven ----
+  const disputable = await prisma.comment.findMany({
+    where: { status: 'APPROVED', parentId: null, kind: 'EXPERIENCE', experience: { sentiment: 'NEGATIVE' } },
+    select: { id: true },
+    take: 2,
+  })
+  for (const [index, post] of disputable.entries()) {
+    await prisma.proofRequest.create({
+      data: {
+        commentId: post.id,
+        source: index === 0 ? 'MODERATOR' : 'SERVICE',
+        requestedById: specialUsers.moderator.id,
+        message: index === 0 ? 'Add the order ID from the exchange page.' : null,
+        dueAt: new Date(Date.now() + (index === 0 ? 7 : -3) * 24 * 60 * 60 * 1000),
+      },
+    })
+  }
+
+  // ---- Create proof: one per post on some experiences, unchecked or with any check result ----
+  const provable = await prisma.comment.findMany({
+    where: { parentId: null, kind: 'EXPERIENCE', status: { in: ['APPROVED', 'PENDING'] } },
+    select: { id: true, authorId: true },
+  })
+  const findings = Object.keys(defaultCheckTexts) as (keyof typeof defaultCheckTexts)[]
+  for (const post of provable) {
+    if (Math.random() > 0.4) continue
+    const orderId = faker.string.alphanumeric({ length: 10, casing: 'upper' })
+    const finding = faker.helpers.maybe(() => faker.helpers.arrayElement(findings), { probability: 0.6 })
+    await prisma.commentEvidence.create({
+      data: {
+        commentId: post.id,
+        authorId: post.authorId,
+        body: `Order ${orderId}`,
+        kind: 'ORDER_ID',
+        normalizedId: orderId,
+        needsCheck: !finding,
+        checks: finding
+          ? {
+              create: {
+                finding,
+                explanation: defaultCheckTexts[finding].explanation,
+                moderatorId: specialUsers.moderator.id,
+                checkedAt: faker.date.recent({ days: 60 }),
+              },
+            }
+          : undefined,
+      },
+    })
+  }
 
   // ---- Create announcement ----
   await prisma.announcement.create({

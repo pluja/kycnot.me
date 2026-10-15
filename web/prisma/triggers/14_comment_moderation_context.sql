@@ -1,4 +1,6 @@
--- get_comment_moderation_context(p_comment_id)
+-- get_comment_moderation_context(p_comment_id, p_content)
+-- p_content replaces the post's text when moderating an edit, so the similarity and
+-- brigade signals describe the edited text, not the published one.
 -- Returns a single JSONB document with everything the LLM needs to moderate a comment:
 -- the comment itself (with author trust signals and submission tags), the service,
 -- and a context block covering cluster signals (brigade detection), recent service
@@ -10,8 +12,9 @@
 -- are preserved as "absence" signals rather than collapsed.
 
 DROP FUNCTION IF EXISTS get_comment_moderation_context(INT);
+DROP FUNCTION IF EXISTS get_comment_moderation_context(INT, TEXT);
 
-CREATE OR REPLACE FUNCTION get_comment_moderation_context(p_comment_id INT)
+CREATE OR REPLACE FUNCTION get_comment_moderation_context(p_comment_id INT, p_content TEXT DEFAULT NULL)
 RETURNS JSONB AS $$
 DECLARE
     v_cluster_window         INTERVAL := '72 hours'::INTERVAL;
@@ -29,6 +32,10 @@ DECLARE
     v_calibration_content_limit INT   := 400;
     v_affiliated_content_limit  INT   := 400;
     v_event_summary_limit    INT      := 200;
+    -- A wave is this many other experiences with the same sentiment from new accounts on one service in a day.
+    v_wave_window            INTERVAL := '24 hours'::INTERVAL;
+    v_new_account_age        INTERVAL := '7 days'::INTERVAL;
+    v_wave_size              INT      := 4;
 
     v_target            RECORD;
     v_service           RECORD;
@@ -45,16 +52,17 @@ DECLARE
     v_cross_service_obj JSONB;
     v_thread_obj        JSONB;
     v_new_user_spike    INT;
+    v_sentiment         TEXT;
+    v_wave              BOOLEAN;
     v_cross_service_window INTERVAL := '30 days'::INTERVAL;
     v_max_cross_service_samples INT := 5;
     v_cross_service_content_limit INT := 300;
 BEGIN
     SELECT
-        c.id, c.content, c."authorId", c."serviceId", c."parentId",
-        c."createdAt", c.rating, c."privateProof", c."authorNote",
+        c.id, COALESCE(p_content, c.content) AS content, c."authorId", c."serviceId", c."parentId", c."replyToId",
+        c."createdAt", c.kind,
         c.issues,
         u."createdAt"   AS author_created,
-        u."totalKarma"  AS author_karma,
         u.verified      AS author_verified,
         u.name          AS author_name,
         u."displayName" AS author_display_name,
@@ -79,10 +87,10 @@ BEGIN
     WHERE s.id = v_target."serviceId";
 
     SELECT
-        COUNT(*) FILTER (WHERE "serviceId" = v_target."serviceId" AND status IN ('APPROVED', 'VERIFIED') AND id <> p_comment_id),
-        COUNT(*) FILTER (WHERE status IN ('APPROVED', 'VERIFIED') AND id <> p_comment_id),
+        COUNT(*) FILTER (WHERE "serviceId" = v_target."serviceId" AND status = 'APPROVED' AND id <> p_comment_id),
+        COUNT(*) FILTER (WHERE status = 'APPROVED' AND id <> p_comment_id),
         COUNT(*) FILTER (WHERE status = 'REJECTED' AND id <> p_comment_id),
-        MAX("createdAt") FILTER (WHERE "serviceId" = v_target."serviceId" AND status IN ('APPROVED', 'VERIFIED') AND id <> p_comment_id)
+        MAX("createdAt") FILTER (WHERE "serviceId" = v_target."serviceId" AND status = 'APPROVED' AND id <> p_comment_id)
     INTO
         v_author_prior_approved_service,
         v_author_prior_approved_total,
@@ -91,34 +99,78 @@ BEGIN
     FROM "Comment"
     WHERE "authorId" = v_target."authorId";
 
-    SELECT COUNT(*)
-    INTO v_new_user_spike
-    FROM "User" u2
-    WHERE u2.id <> v_target."authorId"
-      AND u2."createdAt" BETWEEN v_target.author_created - INTERVAL '1 hour'
-                              AND v_target.author_created + INTERVAL '1 hour';
+    -- Signups around the author's own signup only hint at a brigade while the account is new.
+    IF v_target."createdAt" - v_target.author_created < INTERVAL '7 days' THEN
+        SELECT COUNT(*)
+        INTO v_new_user_spike
+        FROM "User" u2
+        WHERE u2.id <> v_target."authorId"
+          AND u2."createdAt" BETWEEN v_target.author_created - INTERVAL '1 hour'
+                                  AND v_target.author_created + INTERVAL '1 hour';
+    ELSE
+        v_new_user_spike := 0;
+    END IF;
+
+    SELECT sentiment::TEXT INTO v_sentiment FROM "CommentExperience" WHERE "commentId" = p_comment_id;
+    -- Shilling and brigades both arrive as same-sentiment posts from fresh accounts, so either direction counts.
+    v_wave := v_target."parentId" IS NULL
+        AND v_target."createdAt" - v_target.author_created < v_new_account_age
+        AND (
+            SELECT COUNT(DISTINCT c."authorId")
+            FROM "Comment" c
+            JOIN "User" u ON u.id = c."authorId"
+            JOIN "CommentExperience" e ON e."commentId" = c.id
+            WHERE c."serviceId" = v_target."serviceId" AND c.id <> p_comment_id AND c."parentId" IS NULL
+              AND c."authorId" <> v_target."authorId" AND c.status IN ('APPROVED', 'PENDING')
+              AND c."createdAt" BETWEEN v_target."createdAt" - v_wave_window AND v_target."createdAt"
+              AND c."createdAt" - u."createdAt" < v_new_account_age
+              AND (v_sentiment IS NULL OR e.sentiment::TEXT = v_sentiment)
+        ) >= v_wave_size;
 
     v_comment_obj := jsonb_build_object(
         'content', v_target.content,
-        'contentLength', LENGTH(v_target.content),
         'submission', jsonb_build_object(
             'isRootReview', v_target."parentId" IS NULL,
-            'rating', v_target.rating,
-            'hasPrivateProof', v_target."privateProof" IS NOT NULL,
-            'privateProofPreview',
-                CASE WHEN v_target."privateProof" IS NOT NULL
-                THEN LEFT(v_target."privateProof", 12) || CASE WHEN LENGTH(v_target."privateProof") > 12 THEN '...' ELSE '' END
-                ELSE NULL END,
-            'issues', v_target.issues,
-            'kycIssueClaimed', 'KYC_REQUESTED' = ANY(v_target.issues),
-            'fundsBlockedClaimed', 'FUNDS_BLOCKED' = ANY(v_target.issues),
-            'authorNote', v_target."authorNote"
+            'hasPrivateProof', EXISTS (SELECT 1 FROM "CommentEvidence" WHERE "commentId" = p_comment_id AND "removedAt" IS NULL),
+            'hasAcceptedProof', comment_has_accepted_proof(p_comment_id),
+            'changesVerdict', EXISTS (SELECT 1 FROM "ExperienceUpdate" WHERE "commentId" = p_comment_id AND (sentiment IS NOT NULL OR outcome IS NOT NULL)),
+            'experienceHasCheckedProof', EXISTS (
+                SELECT 1 FROM "ExperienceUpdate" u JOIN "CommentExperience" e ON e.id = u."experienceId"
+                WHERE u."commentId" = p_comment_id AND comment_has_accepted_proof(e."commentId")
+            ),
+            -- The same order ID on another author's post of this service, ignoring case.
+            'proofIdReused', EXISTS (
+                SELECT 1 FROM "CommentEvidence" mine
+                JOIN "CommentEvidence" other ON lower(other."normalizedId") = lower(mine."normalizedId")
+                    AND other."commentId" <> mine."commentId" AND other."removedAt" IS NULL
+                JOIN "Comment" oc ON oc.id = other."commentId" AND oc."serviceId" = v_target."serviceId"
+                    AND oc."authorId" IS DISTINCT FROM v_target."authorId" AND oc.status IN ('APPROVED', 'PENDING')
+                WHERE mine."commentId" = p_comment_id AND mine."removedAt" IS NULL AND mine."normalizedId" IS NOT NULL
+            ),
+            'proofIdOffFormat', EXISTS (
+                SELECT 1 FROM "CommentEvidence"
+                WHERE "commentId" = p_comment_id AND "removedAt" IS NULL AND "formatValid" = false
+                  AND kind IN ('ORDER_ID', 'LOOKUP_LINK')
+            ),
+            'newAccountWave', v_wave,
+            'kind', v_target.kind,
+            'sentiment', v_sentiment,
+            'issues', v_target.issues
         ),
         'author', jsonb_build_object(
             'name', v_target.author_name,
             'displayName', v_target.author_display_name,
             'accountAgeMinutes', GREATEST(0, ROUND(EXTRACT(EPOCH FROM (v_target."createdAt" - v_target.author_created)) / 60)),
-            'totalKarma', v_target.author_karma,
+            'trust', (SELECT jsonb_build_object(
+                'publishedPosts', t."publishedPosts",
+                'postsWithCheckedProof', t."checkedProofPosts",
+                'penalizingRejectionsLast90Days', t."penalizingRejections",
+                'isUntrusted', t.untrusted,
+                'postingDisabled', t."commentsDisabled",
+                'postsWithdrawnWhileWaiting', (
+                    SELECT COUNT(*) FROM "Comment" w WHERE w."authorId" = v_target."authorId" AND w."withdrawnWhileWaiting"
+                )
+            ) FROM user_trust(ARRAY[v_target."authorId"]) t),
             'isVerified', v_target.author_verified,
             'isServiceAffiliated', v_target.author_is_affiliated,
             'priorApprovedCommentsOnThisService', v_author_prior_approved_service,
@@ -145,6 +197,7 @@ BEGIN
             c.content,
             c."createdAt",
             c."parentId",
+            c."authorId",
             u."createdAt" AS author_created,
             EXTRACT(EPOCH FROM (v_target."createdAt" - c."createdAt"))/60::FLOAT AS minutes_before,
             EXTRACT(EPOCH FROM (c."createdAt" - u."createdAt"))/60::FLOAT AS author_age_at_write_min,
@@ -153,6 +206,7 @@ BEGIN
         JOIN "User" u ON u.id = c."authorId"
         WHERE c."serviceId" = v_target."serviceId"
           AND c.id <> p_comment_id
+          AND c."authorId" <> v_target."authorId"
           AND c."createdAt" >= v_target."createdAt" - v_cluster_window
           AND c."createdAt" <= v_target."createdAt"
           AND (c."createdAt" - u."createdAt") < v_fresh_account_window
@@ -164,7 +218,7 @@ BEGIN
         LIMIT v_max_siblings
     )
     SELECT jsonb_build_object(
-        'freshAccountsLast72h', (SELECT COUNT(*) FROM siblings_raw),
+        'freshAccountsLast72h', (SELECT COUNT(DISTINCT "authorId") FROM siblings_raw),
         'similarCommentsCount', (SELECT COUNT(*) FROM siblings_raw WHERE sim > v_similarity_threshold),
         'similarityMax', COALESCE((SELECT ROUND(MAX(sim)::numeric, 2) FROM siblings_raw), 0),
         'newUserCreationSpikeNearAuthor', v_new_user_spike,
@@ -202,14 +256,13 @@ BEGIN
 
     WITH calibration_samples AS (
         SELECT
-            c.id, c.content, c.rating,
+            c.id, c.content,
             ROUND((EXTRACT(EPOCH FROM (v_target."createdAt" - c."createdAt"))/86400)::numeric, 1) AS days_ago
         FROM "Comment" c
         WHERE c."serviceId" = v_target."serviceId"
-          AND c.status IN ('APPROVED', 'VERIFIED')
+          AND c.status = 'APPROVED'
           AND c."parentId" IS NULL
           AND c.id <> p_comment_id
-          AND c."ratingMuted" = FALSE
           AND c."createdAt" >= v_target."createdAt" - v_calibration_window
           AND c."createdAt" <= v_target."createdAt"
         ORDER BY c."createdAt" DESC
@@ -223,7 +276,6 @@ BEGIN
                         SELECT jsonb_agg(jsonb_build_object(
                             'id', cs.id,
                             'daysAgo', cs.days_ago,
-                            'rating', cs.rating,
                             'content', LEFT(cs.content, v_calibration_content_limit)
                         ) ORDER BY cs.days_ago ASC)
                         FROM calibration_samples cs
@@ -237,7 +289,7 @@ BEGIN
                         SELECT ROUND((EXTRACT(EPOCH FROM (v_target."createdAt" - MAX(c."createdAt")))/86400)::numeric, 1)
                         FROM "Comment" c
                         WHERE c."serviceId" = v_target."serviceId"
-                          AND c.status IN ('APPROVED', 'VERIFIED')
+                          AND c.status = 'APPROVED'
                           AND c."parentId" IS NULL
                           AND c.id <> p_comment_id
                     )
@@ -342,29 +394,28 @@ BEGIN
     IF v_target."parentId" IS NOT NULL THEN
         WITH RECURSIVE ancestors AS (
             SELECT
-                c.id, c.content, c.rating, c."parentId", c."createdAt", c."authorId",
+                c.id, c.content, c."parentId", c."replyToId", c."createdAt", c."authorId",
                 1 AS depth
             FROM "Comment" c
-            WHERE c.id = v_target."parentId"
+            WHERE c.id = COALESCE(v_target."replyToId", v_target."parentId")
             UNION ALL
             SELECT
-                c.id, c.content, c.rating, c."parentId", c."createdAt", c."authorId",
+                c.id, c.content, c."parentId", c."replyToId", c."createdAt", c."authorId",
                 a.depth + 1
             FROM "Comment" c
-            JOIN ancestors a ON c.id = a."parentId"
+            JOIN ancestors a ON c.id = COALESCE(a."replyToId", a."parentId")
             WHERE a.depth < v_max_thread_depth
         ),
         ancestors_enriched AS (
             SELECT
-                a.id, a.content, a.rating, a."parentId", a."createdAt", a.depth,
+                a.id, a.content, a."parentId", a."createdAt", a.depth,
                 u.name AS author_name,
                 u."displayName" AS author_display_name,
                 u."createdAt" AS author_created,
-                u."totalKarma" AS author_karma,
                 u.verified AS author_verified,
                 su.role
             FROM ancestors a
-            JOIN "User" u ON u.id = a."authorId"
+            LEFT JOIN "User" u ON u.id = a."authorId"
             LEFT JOIN "ServiceUser" su ON su."userId" = a."authorId" AND su."serviceId" = v_target."serviceId"
         )
         SELECT jsonb_build_object(
@@ -378,18 +429,16 @@ BEGIN
                         ELSE 'ancestor-' || ae.depth::TEXT
                     END,
                 'minutesBefore', ROUND(EXTRACT(EPOCH FROM (v_target."createdAt" - ae."createdAt"))/60),
-                'rating', ae.rating,
                 'content',
                     CASE
                         WHEN ae.depth = 1 THEN LEFT(ae.content, v_parent_content_limit)
                         ELSE LEFT(ae.content, v_ancestor_content_limit)
                     END,
                 'author', jsonb_build_object(
-                    'name', ae.author_name,
+                    'name', COALESCE(ae.author_name, '[deleted account]'),
                     'displayName', ae.author_display_name,
                     'accountAgeMinutes', GREATEST(0, ROUND(EXTRACT(EPOCH FROM (ae."createdAt" - ae.author_created))/60)),
-                    'totalKarma', ae.author_karma,
-                    'isVerified', ae.author_verified,
+                    'isVerified', COALESCE(ae.author_verified, false),
                     'isServiceAffiliated', ae.role IS NOT NULL,
                     'role', ae.role::TEXT
                 )
