@@ -7,23 +7,39 @@ if (!Astro.locals.user) return
 
   const MAX_RECONNECT_ATTEMPTS = 5
   const RECONNECT_DELAY = 2_000
+  // MIN_STABLE_CONNECTION_MS keeps a server that accepts and then drops the stream from resetting the backoff.
+  const MIN_STABLE_CONNECTION_MS = 60_000
 
   let eventSource: EventSource | null = null
   let reconnectTimeout: number | null = null
   let reconnectAttempts = 0
+  let openedAt: number | null = null
 
-  startServerEventsListener()
+  // The client router keeps this module alive across navigations, so a listener that gave up starts over on the next page.
+  document.addEventListener('astro:page-load', () => {
+    if (!document.body.hasAttribute('data-is-logged-in')) return
+    if (!eventSource && !reconnectTimeout) startServerEventsListener()
+  })
 
   // ------------------------------------------------------------
 
   export function startServerEventsListener() {
     stopServerEventsListener()
+    connect()
+  }
 
+  export function stopServerEventsListener() {
+    closeConnection()
+    reconnectAttempts = 0
+    openedAt = null
+  }
+
+  function connect() {
     try {
       eventSource = new EventSource('/internal-api/server-events')
 
       eventSource.onopen = () => {
-        reconnectAttempts = 0
+        openedAt = Date.now()
       }
 
       eventSource.onmessage = (event) => {
@@ -49,12 +65,10 @@ if (!Astro.locals.user) return
         }
       }
 
+      // The browser's own retry has no cap, so every error goes through the capped backoff instead.
       eventSource.onerror = (error) => {
         console.error('Server events error:', error)
-
-        if (eventSource?.readyState === EventSource.CLOSED) {
-          scheduleReconnect()
-        }
+        scheduleReconnect()
       }
     } catch (error) {
       console.error('Failed to start server events listener:', error)
@@ -62,7 +76,7 @@ if (!Astro.locals.user) return
     }
   }
 
-  export function stopServerEventsListener() {
+  function closeConnection() {
     if (reconnectTimeout) {
       clearTimeout(reconnectTimeout)
       reconnectTimeout = null
@@ -73,18 +87,16 @@ if (!Astro.locals.user) return
       eventSource = null
       console.info('Disconnected from server events listener')
     }
-
-    reconnectAttempts = 0
   }
 
   function scheduleReconnect() {
+    if (openedAt !== null && Date.now() - openedAt >= MIN_STABLE_CONNECTION_MS) reconnectAttempts = 0
+    openedAt = null
+    closeConnection()
+
     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       console.error('Max reconnection attempts reached, giving up')
       return
-    }
-
-    if (reconnectTimeout) {
-      clearTimeout(reconnectTimeout)
     }
 
     const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttempts)
@@ -96,7 +108,8 @@ if (!Astro.locals.user) return
     console.info(`Attempting to reconnect in ${delayStr}ms (attempt ${attemptsStr}/${maxAttemptsStr})`)
 
     reconnectTimeout = window.setTimeout(() => {
-      startServerEventsListener()
+      reconnectTimeout = null
+      connect()
     }, delay)
   }
 
