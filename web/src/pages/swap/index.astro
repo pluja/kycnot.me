@@ -1,10 +1,10 @@
 ---
 import { actions } from 'astro:actions'
 
-import type { BreadcrumArray } from '../../components/BaseHead.astro'
 import SwapFormAndResults from '../../components/swap/SwapFormAndResults.astro'
 import SwapPageFooter from '../../components/swap/SwapPageFooter.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import { getSwapCurrencies } from '../../lib/exchange/swapCurrencies'
 import {
   buildBreadcrumbs,
   buildCanonical,
@@ -15,18 +15,31 @@ import {
   buildOrganizationSchema,
   buildTitle,
   buildWebApplicationSchema,
+  hasUnknownSwapCurrency,
   resolveSwapPair,
 } from '../../lib/exchange/swapPageInfo'
 import { setPublicPageCacheHeaders } from '../../lib/pageCacheHeaders'
 import { bump } from '../../lib/stats'
 
+import type { BreadcrumArray } from '../../components/BaseHead.astro'
+
+const quoteResult = Astro.getActionResult(actions.swap.quote)
+const quoteData = quoteResult && !quoteResult.error ? quoteResult.data : null
+
+// A degraded list only holds the popular coins, so real coins are not 404'd during an aggregator outage.
+const currencies = await getSwapCurrencies()
+if (
+  !quoteData &&
+  !currencies.degraded &&
+  hasUnknownSwapCurrency(Astro.url.searchParams, currencies.byValue)
+) {
+  return Astro.rewrite('/404')
+}
+
 const isHtmxRequest = Astro.request.headers.get('hx-request') === 'true'
 if (!isHtmxRequest) {
   void bump({ kind: 'swap.view' }).catch(() => null)
 }
-
-const quoteResult = Astro.getActionResult(actions.swap.quote)
-const quoteData = quoteResult && !quoteResult.error ? quoteResult.data : null
 
 // Post-action renders are personalized (via the action-session cookie),
 // so they must not be cached. Anonymous landings render the same HTML
@@ -76,7 +89,10 @@ const schemas = [
   <div class="mx-auto max-w-5xl px-2 pb-12 sm:px-4">
     <header class="flex flex-col items-center pt-6 pb-2 text-center sm:pt-8 sm:pb-3">
       <div class="flex items-center gap-2">
-        <h1 id="swap-page-heading" class="font-title text-2xl font-bold tracking-tight text-white sm:text-3xl">
+        <h1
+          id="swap-page-heading"
+          class="font-title text-2xl font-bold tracking-tight text-white sm:text-3xl"
+        >
           {heading}
         </h1>
         <span

@@ -6,6 +6,7 @@ import { CANONICAL_SUPPORTED_CURRENCIES } from './fixtures/canonicalSupportedCur
 import {
   buildCanonical,
   formatCurrencyLabel,
+  hasUnknownSwapCurrency,
   lookupLabel,
   POPULAR_SWAP_PAIRS,
   resolveSwapPair,
@@ -29,6 +30,23 @@ test('resolveSwapPair returns null for uncurated pair', () => {
 test('resolveSwapPair lowercases and accepts curated pair', () => {
   const got = resolveSwapPair(new URLSearchParams('from=BTC&to=XMR'))
   assert.deepEqual(got, { from: 'btc', to: 'xmr' })
+})
+
+test('hasUnknownSwapCurrency flags coins missing from the list', () => {
+  const known = new Map([
+    ['btc', null],
+    ['xmr', null],
+    ['usdt@trc20', null],
+  ])
+  const check = (query: string) => hasUnknownSwapCurrency(new URLSearchParams(query), known)
+
+  assert.equal(check(''), false)
+  assert.equal(check('from=btc&to=xmr&sendAmount=0.01'), false)
+  assert.equal(check('from=BTC&to=USDT@TRC20'), false)
+  assert.equal(check('from=btc'), false)
+  assert.equal(check('from=zzz&to=xmr'), true)
+  assert.equal(check('from=btc&to=usdt'), true)
+  assert.equal(check('from=&to=xmr'), true)
 })
 
 test('buildCanonical returns /swap for null pair', () => {

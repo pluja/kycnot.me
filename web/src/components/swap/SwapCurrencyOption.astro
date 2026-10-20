@@ -39,10 +39,11 @@ const href = buildSwapUrl(
 
 <a
   href={href}
+  rel="nofollow"
   data-swap-select-option
   data-swap-option-value={option.value}
   data-swap-option-code={option.code}
-  data-swap-option-network={option.network ?? ''}
+  data-swap-option-network={option.network}
   data-group={group}
   data-search-text={searchText}
   aria-current={isSelected ? 'true' : undefined}

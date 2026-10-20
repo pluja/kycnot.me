@@ -87,6 +87,18 @@ export function formatCurrencyHumanName(slug: string): string {
   return network ? `${name} (${network})` : name
 }
 
+// hasUnknownSwapCurrency lets the page 404 a coin the aggregator does not list instead of rendering a default
+// pair, so crawlers walking made-up pairs get a cheap response.
+export function hasUnknownSwapCurrency(
+  searchParams: URLSearchParams,
+  knownValues: ReadonlyMap<string, unknown>
+): boolean {
+  return (['from', 'to'] as const).some((name) => {
+    const value = searchParams.get(name)
+    return value !== null && !knownValues.has(value.toLowerCase())
+  })
+}
+
 // Null for anything off the curated indexable surface so the page canonicalises
 // back to /swap instead of a long tail of junk URLs.
 export function resolveSwapPair(searchParams: URLSearchParams): SwapPair | null {

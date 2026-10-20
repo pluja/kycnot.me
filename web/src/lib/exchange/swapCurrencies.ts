@@ -21,11 +21,18 @@ export type SwapCurrencies = {
   reason?: string
 }
 
+// The aggregator list is cached for an hour, so its expansion only needs rebuilding when that array changes.
+let lastSource: Currency[] | null = null
+let lastBucketized: SwapCurrencies | null = null
+
 export async function getSwapCurrencies(): Promise<SwapCurrencies> {
   try {
     const currencies = await getCachedCurrencies()
-    const options = expandCurrencies(currencies)
-    return bucketize(options)
+    if (currencies !== lastSource || !lastBucketized) {
+      lastBucketized = bucketize(expandCurrencies(currencies))
+      lastSource = currencies
+    }
+    return lastBucketized
   } catch (err) {
     const options = fallbackOptions()
     return {

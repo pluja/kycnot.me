@@ -3,12 +3,19 @@ import { defineMiddleware, sequence } from 'astro:middleware'
 
 import { hashApiKey } from './lib/apiKey'
 import { ErrorBanners, getMessagesFromUrl } from './lib/errorBanners'
+import {
+  getCachedSwapPage,
+  isStorableSwapResponse,
+  storeSwapPage,
+  swapPageCacheKey,
+} from './lib/exchange/swapPageCache'
 import { FORM_REPLAY_MARKER, FORM_REPLAY_MAX_CHARS, type ActionFormValues } from './lib/formReplay'
 import { getImpersonationInfo } from './lib/impersonation'
 import { adminRouteRequiredCapabilities, userCan, userCanAccessAdmin } from './lib/permissions'
 import { prisma } from './lib/prisma'
 import { makeLoginUrl, makeSafeRedirectUrl } from './lib/redirectUrls'
 import { getRedisActionsSessions } from './lib/redis/redisActionsSessions'
+import { bump } from './lib/stats'
 import { makeUserWithTrust } from './lib/trust'
 import { browserOriginForUrl, cookieSecureForUrl } from './lib/urls'
 import { getUserFromCookies } from './lib/userCookies'
@@ -289,6 +296,36 @@ const lowercaseServiceSlug = defineMiddleware(async (context, next) => {
   return context.redirect(`/service/${slug.toLowerCase()}${rest}${context.url.search}`, 301)
 })
 
+// cacheAnonymousSwapPages serves repeat anonymous /swap views from memory, since every render lists every coin.
+const cacheAnonymousSwapPages = defineMiddleware(async (context, next) => {
+  if (
+    context.request.method !== 'GET' ||
+    context.locals.user ||
+    context.request.headers.get('hx-request') === 'true' ||
+    context.cookies.has(ACTION_SESSION_COOKIE)
+  ) {
+    return next()
+  }
+  const key = swapPageCacheKey(context.url)
+  if (!key) return next()
+
+  const cached = getCachedSwapPage(key)
+  if (cached) {
+    void bump({ kind: 'swap.view' }).catch(() => null)
+    return cached
+  }
+
+  const response = await next()
+  if (!isStorableSwapResponse(response)) return response
+  const body = await response.text()
+  storeSwapPage(key, body, response.headers)
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  })
+})
+
 export const onRequest = sequence(
   lowercaseServiceSlug,
   errors,
@@ -298,5 +335,6 @@ export const onRequest = sequence(
   bindCapabilities,
   protectRoutes,
   preventFormResubmitAndStoreActionErrors,
+  cacheAnonymousSwapPages,
   makeIds
 )
