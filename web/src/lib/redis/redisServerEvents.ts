@@ -34,7 +34,11 @@ export class RedisServerEvents extends RedisGenericManager {
     userId: number,
     callback: (event: T extends 'all' ? ServerEventsEvent : Extract<ServerEventsEvent, { type: T }>) => void
   ): Promise<() => Promise<void>> {
+    // duplicate() does not copy listeners, and an unhandled 'error' event kills the process.
     const subscriber = this.redisClient.duplicate()
+    subscriber.on('error', (err) => {
+      console.error(`[${this.constructor.name}] subscriber`, err)
+    })
     await subscriber.connect()
 
     const channel =
