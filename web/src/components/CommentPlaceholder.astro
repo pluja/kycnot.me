@@ -47,7 +47,7 @@ const fromDeletedAccount = comment.authorId === null && !comment.statusBeforeWit
       class="mr-1 size-5 text-day-400"
     />
     <span class="font-medium text-day-400">
-      {fromDeletedAccount ? 'Post from a deleted account' : 'Post withdrawn by the author'}
+      {fromDeletedAccount ? 'Comment from a deleted account' : 'Comment withdrawn by the author'}
     </span>
     {
       comment.withdrawnAt && !fromDeletedAccount && (

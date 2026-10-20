@@ -1,7 +1,7 @@
 import type { ContactCategory } from '@prisma/client'
 
 export const contactCategoryLabels: Record<ContactCategory, string> = {
-  COMMENT_REPORT: 'Report a post',
+  COMMENT_REPORT: 'Report a comment',
   ACCOUNT_VERIFICATION: 'Account verification',
   SERVICE_REPORT_URGENT: 'Urgent service report',
   BUG: 'Website bug',

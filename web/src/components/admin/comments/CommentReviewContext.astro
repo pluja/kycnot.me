@@ -105,8 +105,8 @@ const authorFacts = author
       {
         text:
           author._count.comments <= 1
-            ? 'first post'
-            : `${countOf(author._count.comments - 1, 'other post', 'other posts')}, ${history.postsOnService.toLocaleString()} here`,
+            ? 'first comment'
+            : `${countOf(author._count.comments - 1, 'other comment', 'other comments')}, ${history.postsOnService.toLocaleString()} here`,
         className: author._count.comments <= 1 ? warn : undefined,
       },
       history.rejectedPosts > 0 && {

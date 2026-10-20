@@ -438,7 +438,7 @@ const publicTrustFacts = trustRecord(user.trust).filter((fact) => fact.count > 0
                   <div>
                     <p class="text-xs text-day-500">Trust (staff only)</p>
                     {user.trust.untrusted && (
-                      <p class="text-sm text-yellow-400">Posts are reviewed before publishing</p>
+                      <p class="text-sm text-yellow-400">Comments are reviewed before publishing</p>
                     )}
                     {user.trust.commentsDisabled && (
                       <p class="text-sm text-red-400">{commentsDisabledMessage}</p>

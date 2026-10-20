@@ -112,8 +112,8 @@ export const adminContactActions = {
             authorId: context.locals.user.id,
             content:
               input.outcome === 'ACTION_TAKEN'
-                ? 'Thanks for the report. We took action on this post.'
-                : `We reviewed this post and took no action: ${note ?? ''}`,
+                ? 'Thanks for the report. We took action on this comment.'
+                : `We reviewed this comment and took no action: ${note ?? ''}`,
           },
         }),
       ])

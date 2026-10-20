@@ -80,7 +80,7 @@ async function lockProofForRemoval(
   if (!user.admin && comment.authorId === user.id) {
     throw new ActionError({
       code: 'FORBIDDEN',
-      message: 'Another moderator must remove proof on your own post.',
+      message: 'Another moderator must remove proof on your own comment.',
     })
   }
   return { evidence: { ...evidence, commentId: evidence.commentId }, comment }
@@ -135,7 +135,7 @@ export const adminExperienceActions = {
           throw new ActionError({
             code: 'BAD_REQUEST',
             message:
-              'The author chose this sentiment. Ask them to correct it or review the post for a rule violation.',
+              'The author chose this sentiment. Ask them to correct it or review the comment for a rule violation.',
           })
         }
         const pendingEdits = await tx.commentRevision.count({
@@ -144,7 +144,7 @@ export const adminExperienceActions = {
         if (pendingEdits) {
           throw new ActionError({
             code: 'CONFLICT',
-            message: 'Review the pending edit first. Changing the post type would make it unpublishable.',
+            message: 'Review the pending edit first. Changing the comment type would make it unpublishable.',
           })
         }
         await tx.comment.update({
@@ -210,7 +210,7 @@ export const adminExperienceActions = {
           throw new ActionError({
             code: 'CONFLICT',
             message:
-              'The author withdrew this post, or it belonged to a deleted account. It can no longer be decided.',
+              'The author withdrew this comment, or it belonged to a deleted account. It can no longer be decided.',
           })
         }
         if (input.seenStatus) {
@@ -224,7 +224,7 @@ export const adminExperienceActions = {
           ) {
             throw new ActionError({
               code: 'CONFLICT',
-              message: 'Someone decided this post while you had it open. Reload to see their decision.',
+              message: 'Someone decided this comment while you had it open. Reload to see their decision.',
             })
           }
         }
@@ -277,7 +277,7 @@ export const adminExperienceActions = {
           throw new ActionError({
             code: 'CONFLICT',
             message: input.approve
-              ? 'The post changed or the edit is no longer pending. Reject this edit and request a new one.'
+              ? 'The comment changed or the edit is no longer pending. Reject this edit and request a new one.'
               : 'This edit is no longer pending.',
           })
         }
@@ -295,7 +295,7 @@ export const adminExperienceActions = {
         if (comment.version !== input.version) {
           throw new ActionError({
             code: 'CONFLICT',
-            message: 'The post changed. Reload it before removing text.',
+            message: 'The comment changed. Reload it before removing text.',
           })
         }
         const post = await tx.comment.findUniqueOrThrow({
@@ -347,7 +347,7 @@ export const adminExperienceActions = {
           data: {
             ...redaction,
             status: 'REJECTED',
-            reason: 'Rejected because sensitive text was removed from the post.',
+            reason: 'Rejected because sensitive text was removed from the comment.',
             decidedById: context.locals.user.id,
             decidedAt: new Date(),
           },
@@ -486,7 +486,7 @@ export const adminExperienceActions = {
         if (selfCheck && !context.locals.user.admin) {
           throw new ActionError({
             code: 'FORBIDDEN',
-            message: 'Another moderator must check proof on your own post.',
+            message: 'Another moderator must check proof on your own comment.',
           })
         }
         await tx.evidenceCheck.create({
@@ -565,7 +565,7 @@ export const adminExperienceActions = {
         if (post.proofRequests.length) {
           throw new ActionError({
             code: 'CONFLICT',
-            message: 'This post already has a request. Cancel it before asking again.',
+            message: 'This comment already has a request. Cancel it before asking again.',
           })
         }
         if (post.evidence.length) {
@@ -643,7 +643,7 @@ export const adminExperienceActions = {
         if (evidence.comment?._count.proofRequests) {
           throw new ActionError({
             code: 'BAD_REQUEST',
-            message: 'This post has a proof request. Publish a result for the note instead.',
+            message: 'This comment has a proof request. Publish a result for the note instead.',
           })
         }
         await checkExperienceModerator(tx, context.locals.user.id, evidence.commentId)
@@ -690,7 +690,7 @@ export const adminExperienceActions = {
           if (alreadyLinked && alreadyLinked.id !== input.caseId) {
             throw new ActionError({
               code: 'CONFLICT',
-              message: 'This post is already linked to another case.',
+              message: 'This comment is already linked to another case.',
             })
           }
           await tx.$queryRaw`SELECT id FROM "Case" WHERE id = ${input.caseId} FOR UPDATE`

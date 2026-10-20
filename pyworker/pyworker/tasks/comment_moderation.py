@@ -178,9 +178,9 @@ def _decide_edit(
     needs_moderator = [
         reason
         for flag, reason in (
-            ("hasOpenReport", "the post has an open report"),
-            ("heldByModerator", "a moderator held the post"),
-            ("changesKind", "the edit changes the post type"),
+            ("hasOpenReport", "the comment has an open report"),
+            ("heldByModerator", "a moderator held the comment"),
+            ("changesKind", "the edit changes the comment type"),
             (
                 "rewritesCheckedExperience",
                 "the edit rewrites most of a proof-checked experience",

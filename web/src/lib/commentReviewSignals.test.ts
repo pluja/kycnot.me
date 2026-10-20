@@ -15,6 +15,6 @@ void test('review signals find disguised contact details and slurs without chang
 void test('a normal refund report is not a recovery solicitation signal', () => {
   assert.deepEqual(commentReviewSignals('Support refunded my order today.').reasons, [])
   assert.deepEqual(commentReviewSignals('Support is available at help@example.com.').reasons, [
-    'Contact details in post',
+    'Contact details in comment',
   ])
 })

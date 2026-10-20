@@ -54,7 +54,7 @@ export const {
     },
     {
       id: 'ROOT_COMMENT_CREATED',
-      label: 'New post',
+      label: 'New comment',
       icon: 'ri:chat-4-line',
     },
     {

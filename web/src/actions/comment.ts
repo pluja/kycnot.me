@@ -187,7 +187,7 @@ export const commentActions = {
             ) {
               throw new ActionError({
                 code: 'BAD_REQUEST',
-                message: 'Reply to a published post on this service.',
+                message: 'Reply to a published comment on this service.',
               })
             }
             const rootId = thread ? (thread.parentId ?? thread.id) : null
@@ -197,7 +197,7 @@ export const commentActions = {
               if (!root || !isPublishedComment(root.status)) {
                 throw new ActionError({
                   code: 'BAD_REQUEST',
-                  message: 'Reply to a published post on this service.',
+                  message: 'Reply to a published comment on this service.',
                 })
               }
             }

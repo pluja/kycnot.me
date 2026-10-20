@@ -93,10 +93,10 @@ const feedbackMessages = {
   savePublicNote: 'Public note saved.',
   reviewRevision: 'Edit review saved.',
   checkEvidence: actionResults.checkEvidence?.data?.publishedPost
-    ? 'Check result published. The proof was the only hold, so the post is now published.'
+    ? 'Check result published. The proof was the only hold, so the comment is now published.'
     : 'Check result published.',
   redactRevision: 'Edited text saved. Matching copies were updated.',
-  classify: 'Post type saved.',
+  classify: 'Comment type saved.',
   linkCase: 'Case linked.',
   removeEvidenceImage: 'Screenshot removed.',
   deleteEvidence: 'Proof deleted.',
@@ -238,7 +238,7 @@ const tabGroup = `moderation-tab-${comment.id.toString()}`
       ) : (
         <p class="flex items-center gap-2 text-yellow-200">
           <Icon name="ri:lock-line" class="size-4" />
-          Another moderator must review your own post or a service you are affiliated with.
+          Another moderator must review your own comment or a service you are affiliated with.
         </p>
       )
     }
@@ -338,7 +338,7 @@ const tabGroup = `moderation-tab-${comment.id.toString()}`
                 <div class="grid gap-2 sm:grid-cols-2">
                   <InputSelect
                     name="kind"
-                    label="Post type"
+                    label="Comment type"
                     selectedValue={comment.kind}
                     options={commentKinds
                       .filter((kind) => kind.classifiable)

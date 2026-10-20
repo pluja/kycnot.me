@@ -90,7 +90,7 @@ const [revisions, evidence, privateEvidence, post, representsService, openThread
       [],
     ],
     [
-      'Failed to load your post',
+      'Failed to load your comment',
       () =>
         tool === 'edit'
           ? prisma.comment.findUnique({ where: { id: comment.id }, select: commentPageSelect })
@@ -122,8 +122,8 @@ const reportReplay = getFormReplay(reportResult?.error ? Astro.locals.actionForm
 const titles = {
   history: 'Edit history',
   evidence: 'Proof checks',
-  edit: 'Your post',
-  report: 'Report this post',
+  edit: 'Your comment',
+  report: 'Report this comment',
 } as const
 // The newest published version is the post as it reads now; the history shows the ones before it that differ.
 const [currentVersion, ...olderVersions] = revisions.filter((revision) => isPublishedComment(revision.status))
@@ -177,7 +177,7 @@ const earlierVersions = distinctVersions(
       <p class="flex items-start gap-1.5 text-sm text-day-300">
         <Icon name="ri:chat-1-line" class="mt-0.5 size-4 shrink-0 text-day-400" />
         <span>
-          You already reported this post.{' '}
+          You already reported this comment.{' '}
           <a href={`/contact/${openThread.id.toString()}`} class="text-green-300 underline">
             Continue the conversation
           </a>
@@ -194,9 +194,9 @@ const earlierVersions = distinctVersions(
               <Icon name="ri:reply-line" class="mt-px size-3.5 shrink-0" />
               <span>
                 You represent this service. To tell your side, a public reply works better: readers see it
-                under the post. If a negative post without checked proof describes something that did not
-                happen, report it as not genuine: its author gets a week to add proof, or the post is marked
-                Unproven and stops counting.{' '}
+                under the comment. If a negative comment without checked proof describes something that did
+                not happen, report it as not genuine: its author gets a week to add proof, or the comment is
+                marked Unproven and stops counting.{' '}
                 <a
                   href={makeCommentUrl({ serviceSlug, commentId: comment.id, tool: 'reply' })}
                   class="underline"
@@ -237,7 +237,7 @@ const earlierVersions = distinctVersions(
               </div>
             </fieldset>
             <p class="hidden text-xs text-yellow-200 group-has-[[data-disputes-genuineness]:checked]/report:block">
-              To dispute a post with checked proof, include your evidence.
+              To dispute a comment with checked proof, include your evidence.
             </p>
             <InputTextArea
               name="message"
@@ -252,7 +252,7 @@ const earlierVersions = distinctVersions(
             />
             <div class="flex flex-wrap items-center justify-between gap-2">
               <p class="text-xs text-day-500">
-                Private. Moderators remove posts that break the rules, not posts that are negative.{' '}
+                Private. Moderators remove comments that break the rules, not comments that are negative.{' '}
                 <a href="/docs/guidelines#rules" class="underline">
                   The rules
                 </a>

@@ -34,14 +34,14 @@ export const {
       value: 'comments:moderate',
       slug: 'comments-moderate',
       label: 'Moderate comments',
-      description: 'Approve, reject and moderate experiences, discussion posts and replies.',
+      description: 'Approve, reject and moderate experiences, discussions and replies.',
       icon: 'ri:chat-check-line',
     },
     {
       value: 'comments:redact',
       slug: 'comments-redact',
       label: 'Remove sensitive text',
-      description: "Edit sensitive details out of an author's post and its history.",
+      description: "Edit sensitive details out of an author's comment and its history.",
       icon: 'ri:eraser-line',
     },
     {

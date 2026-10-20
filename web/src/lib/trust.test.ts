@@ -41,11 +41,11 @@ void test('the veteran badge accepts any one of its paths', () => {
 void test('requirements read as a sentence', () => {
   assert.equal(
     describeTrustRequirement(trustUnlocksById.displayName),
-    '3 published posts, and an account at least 30 days old'
+    '3 published comments, and an account at least 30 days old'
   )
   assert.equal(
     describeTrustRequirement(trustUnlocksById.veteranBadge),
-    '5 posts with checked proof or 20 published posts or 5 approved suggestions, and an account at least 180 days old'
+    '5 comments with checked proof or 20 published comments or 5 approved suggestions, and an account at least 180 days old'
   )
 })
 

@@ -8,7 +8,7 @@ order: 4
 updatedAt: 2026-10-18
 faq:
   - question: How do I get the Veteran badge?
-    answer: "Reach 5 posts with checked proof or 20 published posts or 5 approved suggestions, and an account at least 180 days old. Suggestions only count on services you don't represent."
+    answer: "Reach 5 comments with checked proof or 20 published comments or 5 approved suggestions, and an account at least 180 days old. Suggestions only count on services you don't represent."
   - question: What happened to karma?
     answer: KYCnot.me used karma points until October 2026. Points were easy to farm and said little about whether someone shared real experiences, so they were replaced by the facts above. Old karma totals no longer count for anything.
 ---
@@ -16,7 +16,7 @@ faq:
 import TrustUnlocksList from '../../components/TrustUnlocksList.astro'
 import { commentRules } from '../../constants/commentRules'
 
-Account trust on [KYCnot.me](https://kycnot.me) comes from what you have done on the site, not from a points score. Published posts, proof a moderator has checked, approved service suggestions and the age of your account unlock features. Recent rejections for breaking the rules limit what you can post.
+Account trust on [KYCnot.me](https://kycnot.me) comes from what you have done on the site, not from a points score. Published comments, proof a moderator has checked, approved service suggestions and the age of your account unlock features. Recent rejections for breaking the rules limit what you can post.
 
 Your own numbers and unlocks are on your [account page](/account).
 
@@ -30,8 +30,8 @@ When you create an account, you are given a **login key**. Login keys are **disp
 
 ## What counts toward account trust
 
-- **Published posts:** experiences and discussions that are live on a service page. Replies don't count.
-- **Posts with checked proof:** published posts whose attached proof a moderator checked and accepted.
+- **Published comments:** experiences and discussions that are live on a service page. Replies don't count.
+- **Comments with checked proof:** published comments whose attached proof a moderator checked and accepted.
 - **Approved suggestions:** new services and edits you suggested that were approved. Suggestions on a service you represent don't count.
 - **Account age:** days since you created the account.
 
@@ -48,17 +48,17 @@ Badges next to a name tell you who is posting.
 | Badge          | What it means                                                                                   |
 | -------------- | ----------------------------------------------------------------------------------------------- |
 | Admin          | Runs KYCnot.me.                                                                                 |
-| Moderator      | Reviews posts and checks proof for KYCnot.me.                                                   |
+| Moderator      | Reviews comments and checks proof for KYCnot.me.                                                |
 | _Service_ team | Works for that service. We confirmed it before adding the badge.                                |
 | Veteran        | An older account with a good record. It's earned, see [below](#how-do-i-get-the-veteran-badge). |
 | New account    | The account was less than 30 days old when it posted.                                           |
-| Single post    | The author has posted only once.                                                                |
+| Single comment | The author has posted only once.                                                                |
 
 People who help us with one task, like reviewing cases, don't get a badge.
 
 ## What limits your account
 
-A rejected post counts against you only when it broke one of these rules:
+A rejected comment counts against you only when it broke one of these rules:
 
 <ul>
   {commentRules
@@ -68,9 +68,9 @@ A rejected post counts against you only when it broke one of these rules:
     ))}
 </ul>
 
-Rejections for other reasons, such as duplicates or off-topic posts, don't count. Neither do rejections older than 90 days.
+Rejections for other reasons, such as duplicates or off-topic comments, don't count. Neither do rejections older than 90 days.
 
-- **2 or more counting rejections in 90 days:** your new posts wait for a moderator before they go live.
+- **2 or more counting rejections in 90 days:** your new comments wait for a moderator before they go live.
 - **4 or more spam rejections in 90 days:** you can't post or reply.
 
 While either limit applies, every unlock above is paused. Both limits lift on their own once the older rejections pass 90 days. Accounts that moderators flag as spammers can't post at all.

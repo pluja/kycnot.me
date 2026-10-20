@@ -73,7 +73,7 @@ export function moderationSignals(comment: AdminCommentReview, history: AuthorHi
       icon: 'ri:building-line',
     },
     history.rejectedPosts > 0 && {
-      label: `${countOf(history.rejectedPosts, 'rejected post', 'rejected posts')} before`,
+      label: `${countOf(history.rejectedPosts, 'rejected comment', 'rejected comments')} before`,
       tone: 'bad',
       icon: 'ri:close-circle-line',
     },
@@ -93,7 +93,7 @@ export function moderationSignals(comment: AdminCommentReview, history: AuthorHi
         icon: 'ri:time-line',
       },
     !!author &&
-      author._count.comments <= 1 && { label: 'First post', tone: 'warn', icon: 'ri:user-add-line' },
+      author._count.comments <= 1 && { label: 'First comment', tone: 'warn', icon: 'ri:user-add-line' },
     author?.verified && { label: 'Verified user', tone: 'good', icon: 'ri:verified-badge-line' },
   ]
   return signals.filter((signal): signal is ModerationSignal => !!signal)

@@ -81,7 +81,7 @@ export const {
     {
       value: 'NOT_GENUINE',
       label: 'Not a genuine experience',
-      description: 'The post describes something that did not happen.',
+      description: 'The comment describes something that did not happen.',
       icon: 'ri:question-line',
       penalizes: true,
       reportable: true,
@@ -90,7 +90,7 @@ export const {
     {
       value: 'DUPLICATE',
       label: 'Duplicate',
-      description: 'Repeats a post the same author already made.',
+      description: 'Repeats a comment the same author already made.',
       icon: 'ri:file-copy-line',
       penalizes: false,
       reportable: false,

@@ -43,7 +43,7 @@ export const {
     },
     {
       value: 'WITHDRAWN',
-      label: 'Post withdrawn',
+      label: 'Comment withdrawn',
       icon: 'ri:arrow-go-back-line',
       color: 'slate',
       moderatorChoice: false,

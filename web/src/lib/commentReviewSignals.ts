@@ -8,7 +8,7 @@ export function commentReviewSignals(content: string) {
     ...contactMatches.map((match) => ({
       start: match.index,
       end: match.index + match[0].length,
-      reason: recoveryOffer ? 'Possible recovery solicitation' : 'Contact details in post',
+      reason: recoveryOffer ? 'Possible recovery solicitation' : 'Contact details in comment',
     })),
     ...[...content.matchAll(slurPattern)].map((match) => ({
       start: match.index,

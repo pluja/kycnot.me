@@ -16,7 +16,8 @@ type Props = {
 }
 const { request, evidence, published, showsMessage, addProofHref } = Astro.props
 const state = proofRequestState(request, evidence)
-const asker = request.source === 'SERVICE' ? 'The service disputes this post' : 'A moderator asked for proof'
+const asker =
+  request.source === 'SERVICE' ? 'The service disputes this comment' : 'A moderator asked for proof'
 ---
 
 {

@@ -24,17 +24,17 @@ export const { dataArray: trustFacts, getFn: getTrustFactInfo } = makeHelpersFor
   [
     {
       id: 'publishedPosts',
-      label: 'Published posts',
+      label: 'Published comments',
       icon: 'ri:chat-check-line',
-      one: 'published post',
-      many: 'published posts',
+      one: 'published comment',
+      many: 'published comments',
     },
     {
       id: 'checkedProofPosts',
-      label: 'Posts with checked proof',
+      label: 'Comments with checked proof',
       icon: 'ri:file-shield-2-line',
-      one: 'post with checked proof',
-      many: 'posts with checked proof',
+      one: 'comment with checked proof',
+      many: 'comments with checked proof',
     },
     {
       id: 'approvedSuggestions',

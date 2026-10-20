@@ -13,7 +13,7 @@ const summary =
   facts && memberSince
     ? [
         [
-          facts.publishedPosts > 0 && countOf(facts.publishedPosts, 'post', 'posts'),
+          facts.publishedPosts > 0 && countOf(facts.publishedPosts, 'comment', 'comments'),
           facts.checkedProofPosts > 0 && `${facts.checkedProofPosts.toLocaleString()} with checked proof`,
           `member since ${format(memberSince, 'yyyy')}`,
         ]

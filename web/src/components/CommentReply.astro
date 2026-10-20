@@ -103,7 +103,7 @@ const endsSentence = (text: string) => (/[.!?]$/.test(text.trim()) ? text : `${t
             <span class="font-medium text-day-100">@{replyToName}</span>
             {cancelReplyUrl && (
               <a href={cancelReplyUrl} class="ml-1 text-day-400 underline hover:text-day-200">
-                Reply to the post instead
+                Reply to the main comment instead
               </a>
             )}
           </>
@@ -182,7 +182,7 @@ const endsSentence = (text: string) => (/[.!?]$/.test(text.trim()) ? text : `${t
         <ExperienceFields part="sentiment" replay={replay} />
         <InputTextArea
           name="content"
-          label="Your post"
+          label="Your comment"
           hideLabel
           inputProps={{
             required: true,

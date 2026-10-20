@@ -19,7 +19,7 @@ type Props = {
 const { comment, evidence, panelPath } = Astro.props
 const [request] = comment.proofRequests
 const state = request ? proofRequestState(request, evidence) : null
-const asker = request?.source === 'SERVICE' ? 'The service disputed this post' : 'Proof was requested'
+const asker = request?.source === 'SERVICE' ? 'The service disputed this comment' : 'Proof was requested'
 const statusText = request && {
   open: `${asker}. Answer due ${format(request.dueAt, 'MMM d')}.`,
   answered: `${asker}, and the author sent proof.`,
@@ -68,7 +68,7 @@ const waitsForCheck = evidence.some((item) => item.needsCheck && !item.removedAt
         <InputTextArea
           name="message"
           label="What should the author send?"
-          description={`They're notified and have ${String(PROOF_REQUEST_DAYS)} days. Without an answer, a published post reads as Unproven and stops counting.`}
+          description={`They're notified and have ${String(PROOF_REQUEST_DAYS)} days. Without an answer, a published comment reads as Unproven and stops counting.`}
           inputProps={{
             required: true,
             minlength: PROOF_REQUEST_MESSAGE_LENGTH.min,

@@ -42,7 +42,7 @@ const edits =
     </ul>
   ) : (
     <ol class="divide-y divide-night-600 text-sm">
-      {!edits.length && <li class="text-day-400">This post has not been edited.</li>}
+      {!edits.length && <li class="text-day-400">This comment has not been edited.</li>}
       {edits.map(({ before, after }) => (
         <li class="space-y-1.5 py-2 first:pt-0 last:pb-0">
           <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">

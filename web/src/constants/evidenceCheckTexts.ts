@@ -7,7 +7,7 @@ export const defaultCheckTexts = {
     explanation: "The service's order lookup found this order. Order details were not verified.",
   },
   SCREENSHOT_REVIEWED: {
-    explanation: 'The author sent a screenshot that matches the post. Screenshots can be faked.',
+    explanation: 'The author sent a screenshot that matches the comment. Screenshots can be faked.',
   },
   TRANSACTION_SUPPORTED: {
     explanation: "The author's proof shows the payment went through. It doesn't show who made it.",
@@ -16,16 +16,16 @@ export const defaultCheckTexts = {
     explanation: "The author's proof shows the service issued a refund.",
   },
   CLAIM_SUPPORTED: {
-    explanation: "The author's proof shows the problem the post describes.",
+    explanation: "The author's proof shows the problem the comment describes.",
   },
   ORDER_NOT_FOUND: {
     explanation: "The service's order lookup didn't find this order.",
   },
   UNABLE_TO_CHECK: {
-    explanation: "We couldn't check this proof, so we can't say whether the post is accurate.",
+    explanation: "We couldn't check this proof, so we can't say whether the comment is accurate.",
   },
   INCONSISTENT: {
-    explanation: "The proof doesn't match what the post describes.",
+    explanation: "The proof doesn't match what the comment describes.",
   },
 } as const satisfies Record<Exclude<EvidenceFinding, 'LEGACY'>, { explanation: string }>
 

@@ -51,7 +51,7 @@ const results = {
   restore: Astro.getActionResult(actions.experience.restore),
 }
 const successMessages = {
-  correct: 'Correction sent. Your current post stays up until the correction is reviewed.',
+  correct: 'Correction sent. Your current comment stays up until the correction is reviewed.',
   addProof: 'Proof attached. A moderator will check it.',
   removeProof: 'Proof removed. Published check results stay in the history.',
   withdraw: 'Withdrawn. Only you and the moderators can see it now. You can usually restore it later.',
@@ -117,7 +117,7 @@ const activeTab = tabs.find((tab) => tab.id === requestedTab)?.id ?? tabs[0]?.id
     tabs.length > 1 && (
       <RadioTabs
         name={`author-tab-${id.toString()}`}
-        label="Your post"
+        label="Your comment"
         tabs={tabs}
         activeTab={activeTab}
         accent="green"
@@ -133,7 +133,7 @@ const activeTab = tabs.find((tab) => tab.id === requestedTab)?.id ?? tabs[0]?.id
           'space-y-2.5',
           tabs.length > 1 && 'hidden group-has-[[data-tab=correct]:checked]/author:block'
         )}
-        aria-label="Correct your post"
+        aria-label="Correct your comment"
       >
         {pendingCorrection ? (
           <p class="flex items-start gap-1.5 text-xs text-yellow-200">
@@ -157,7 +157,7 @@ const activeTab = tabs.find((tab) => tab.id === requestedTab)?.id ?? tabs[0]?.id
             )}
             <InputTextArea
               name="content"
-              label="Your post"
+              label="Your comment"
               hideLabel
               inputProps={{
                 required: true,
@@ -180,7 +180,9 @@ const activeTab = tabs.find((tab) => tab.id === requestedTab)?.id ?? tabs[0]?.id
               </>
             )}
             <div class="flex flex-wrap items-center justify-between gap-2">
-              <p class="text-xs text-day-500">It is reviewed first. Your current post stays up until then.</p>
+              <p class="text-xs text-day-500">
+                It is reviewed first. Your current comment stays up until then.
+              </p>
               <Button
                 type="submit"
                 label="Send correction"
@@ -239,7 +241,7 @@ const activeTab = tabs.find((tab) => tab.id === requestedTab)?.id ?? tabs[0]?.id
           </ul>
         )}
         {comment.status === 'REJECTED' ? (
-          <p class="text-xs text-day-400">This post was rejected. To share proof, write a new post.</p>
+          <p class="text-xs text-day-400">This comment was rejected. To share proof, write a new comment.</p>
         ) : (
           !user.spammer &&
           !(currentProof && countsAsProof(currentProof)) && (
@@ -335,7 +337,7 @@ const activeTab = tabs.find((tab) => tab.id === requestedTab)?.id ?? tabs[0]?.id
           'space-y-2.5 text-xs text-day-300',
           tabs.length > 1 && 'hidden group-has-[[data-tab=withdraw]:checked]/author:block'
         )}
-        aria-label={isWithdrawn ? 'Restore your post' : 'Withdraw your post'}
+        aria-label={isWithdrawn ? 'Restore your comment' : 'Withdraw your comment'}
       >
         {isWithdrawn ? (
           <form
@@ -345,8 +347,8 @@ const activeTab = tabs.find((tab) => tab.id === requestedTab)?.id ?? tabs[0]?.id
           >
             <input type="hidden" name="commentId" value={id} />
             <p>
-              You withdrew this post. Restoring it publishes it again if nothing changed since; otherwise it
-              goes back through review first.
+              You withdrew this comment. Restoring it publishes it again if nothing changed since; otherwise
+              it goes back through review first.
             </p>
             <Button type="submit" label="Restore" icon="ri:arrow-go-forward-line" size="sm" color="success" />
           </form>
@@ -365,10 +367,10 @@ const activeTab = tabs.find((tab) => tab.id === requestedTab)?.id ?? tabs[0]?.id
               </p>
             )}
             <p>
-              Withdrawing hides this post{comment.parentId ? '' : ' and your replies under it'} from everyone
-              except you and the moderators.
+              Withdrawing hides this comment{comment.parentId ? '' : ' and your replies under it'} from
+              everyone except you and the moderators.
               {!comment.parentId &&
-                ' If it was published, a short "Post withdrawn by the author" note with the date stays in its place, and other people keep their replies under it.'}{' '}
+                ' If it was published, a short "Comment withdrawn by the author" note with the date stays in its place, and other people keep their replies under it.'}{' '}
               You can usually restore it later.
             </p>
             <Button type="submit" label="Withdraw" icon="ri:arrow-go-back-line" size="sm" color="danger" />

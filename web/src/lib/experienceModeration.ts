@@ -22,7 +22,7 @@ export async function checkExperienceModerator(
     select: { id: true, admin: true },
   })
   if (await tx.comment.count({ where: { id: commentId, ...conflictedCommentWhere(moderator) } })) {
-    throw new ActionError({ code: 'FORBIDDEN', message: 'Another moderator must review this post.' })
+    throw new ActionError({ code: 'FORBIDDEN', message: 'Another moderator must review this comment.' })
   }
   return comment
 }

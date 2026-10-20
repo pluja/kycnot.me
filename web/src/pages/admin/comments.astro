@@ -173,7 +173,7 @@ const historyFor = await Astro.locals.banners.try(
 )
 const queues = [
   { id: 'todo', label: 'To do', icon: 'ri:inbox-line' },
-  { id: 'posts', label: 'Posts', icon: 'ri:pause-circle-line' },
+  { id: 'posts', label: 'Comments', icon: 'ri:pause-circle-line' },
   { id: 'proof', label: 'Proof', icon: 'ri:file-search-line' },
   { id: 'reports', label: 'Reports', icon: 'ri:flag-line' },
   { id: 'edits', label: 'Edits', icon: 'ri:git-pull-request-line' },
@@ -201,19 +201,19 @@ const panelTabFor = (comment: AdminCommentReview) =>
             : undefined
 const emptyMessages: Record<QueueId, string> = {
   todo: 'Nothing to do.',
-  posts: 'No posts waiting for a decision.',
+  posts: 'No comments waiting for a decision.',
   proof: 'No proof to check.',
   reports: 'No open reports.',
   edits: 'No edits to review.',
   oldProof: 'The old proof backlog is done.',
   ai: 'Nothing is waiting for the AI.',
-  all: 'No posts match.',
+  all: 'No comments match.',
 }
 ---
 
 <BaseLayout
   pageTitle="Comment moderation"
-  description="Decide on posts, check proof, and handle reports and edits."
+  description="Decide on comments, check proof, and handle reports and edits."
   noindex
   widthClassName="max-w-5xl"
   htmx
@@ -224,10 +224,10 @@ const emptyMessages: Record<QueueId, string> = {
       <p class="mt-1 text-sm text-day-400">
         {
           params.queue === 'all'
-            ? 'Every post, newest first.'
+            ? 'Every comment, newest first.'
             : params.queue === 'oldProof'
-              ? 'Proof the old system never reviewed, on published posts. Nothing waits on it; work through it as time allows.'
-              : 'Each post once. Most urgent first: serious reports, other reports, held posts, held edits, then proof. Longest wait first within each.'
+              ? 'Proof the old system never reviewed, on published comments. Nothing waits on it; work through it as time allows.'
+              : 'Each comment once. Most urgent first: serious reports, other reports, held comments, held edits, then proof. Longest wait first within each.'
         }
       </p>
     </div>

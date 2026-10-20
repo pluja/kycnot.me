@@ -44,7 +44,7 @@ const versionLink = (revisionId?: number) =>
           aria-current={!selectedRevision ? 'true' : undefined}
           class={!selectedRevision ? 'font-medium text-green-300' : 'text-day-300 underline'}
         >
-          Current post
+          Current comment
         </a>
         {olderVersions.map((revision) => (
           <a
@@ -69,7 +69,7 @@ const versionLink = (revisionId?: number) =>
     <input type="hidden" name="sourceHash" value={commentContentHash(content)} />
     <InputTextArea
       name="content"
-      label={changesCurrentPost ? 'Post text' : 'Older version text'}
+      label={changesCurrentPost ? 'Comment text' : 'Older version text'}
       value={replay.text('content', content)}
       inputProps={{ required: true, minlength: POST_LENGTH.min, maxlength: POST_LENGTH.max, rows: 7 }}
     />

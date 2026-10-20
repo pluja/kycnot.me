@@ -24,7 +24,7 @@ const { service, inputErrors, patternHealth } = Astro.props
   label="Strict mode"
   name="strictCommentingEnabled"
   checked={service?.strictCommentingEnabled ?? false}
-  descriptionInline="Hold every new post and reply for a moderator, for services under attack."
+  descriptionInline="Hold every new comment and reply for a moderator, for services under attack."
   error={inputErrors.strictCommentingEnabled}
 />
 <InputText

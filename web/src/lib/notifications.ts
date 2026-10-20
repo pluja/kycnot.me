@@ -129,7 +129,7 @@ export function makeNotificationTitle(
     case 'COMMENT_EVIDENCE_CHECKED':
       return 'A moderator checked your evidence'
     case 'COMMENT_PROOF_REQUESTED':
-      return 'Proof requested for your post'
+      return 'Proof requested for your comment'
     case 'TEST': {
       return `Test notification #${notification.id.toString()}`
     }
@@ -256,7 +256,7 @@ export function makeNotificationContent(notification: NotificationDisplay): stri
       return null
     }
     case 'COMMENT_PROOF_REQUESTED': {
-      return `You have ${PROOF_REQUEST_DAYS.toString()} days to add proof. Open your post to see what was asked.`
+      return `You have ${PROOF_REQUEST_DAYS.toString()} days to add proof. Open your comment to see what was asked.`
     }
     case 'COMMENT_EDIT_REVIEWED':
     case 'COMMENT_EVIDENCE_CHECKED':
@@ -264,7 +264,7 @@ export function makeNotificationContent(notification: NotificationDisplay): stri
     case 'REPLY_COMMENT_CREATED':
     case 'ROOT_COMMENT_CREATED': {
       if (!notification.aboutComment) return null
-      return 'Open the discussion to read this post.'
+      return 'Open the discussion to read this comment.'
     }
     case 'COMMUNITY_NOTE_ADDED': {
       if (!notification.aboutComment) return null

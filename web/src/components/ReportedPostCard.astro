@@ -51,12 +51,12 @@ const threadUrl = makeCommentUrl({ serviceSlug: comment.service.slug, commentId:
 ---
 
 <section
-  aria-label="Reported post"
+  aria-label="Reported comment"
   class="mb-4 space-y-2.5 rounded-lg border border-amber-500/30 bg-night-800 p-3 text-sm"
 >
   <header class="flex flex-wrap items-center gap-1.5">
     <Icon name="ri:flag-line" class="size-4 text-amber-300" />
-    <h2 class="font-medium text-day-100">Reported post</h2>
+    <h2 class="font-medium text-day-100">Reported comment</h2>
     {reason && <BadgeSmall text={reason.label} icon={reason.icon} color="amber" variant="faded" />}
     {
       thread.fromService && (

@@ -118,7 +118,7 @@ const emptyResult = { comments: [], count: 0, focused: !!targetCommentId, page: 
 const switchCounts = targetCommentId
   ? null
   : await Astro.locals.banners.try(
-      'Failed to count posts',
+      'Failed to count comments',
       async () => {
         // Each count matches its list: the full list shows withdrawn posts as placeholders, a filtered one doesn't.
         const listed = { ...visibleWhere, serviceId: service.id, parentId: null }
@@ -166,7 +166,7 @@ const authorIds = [
 const [watched, currentStates, replyPreviews, internalNotes, authorTrust] =
   await Astro.locals.banners.tryMany([
     [
-      'Failed to load watched posts',
+      'Failed to load watched comments',
       () =>
         user && shownIds.length
           ? prisma.notificationPreferences.findUnique({
@@ -316,7 +316,7 @@ const activeFilters = [
         class="mb-2 inline-flex items-center gap-1 text-sm text-day-300 hover:underline"
       >
         <Icon name="ri:arrow-left-line" class="size-4" />
-        All posts
+        All comments
       </a>
     ) : (
       <>
@@ -332,14 +332,14 @@ const activeFilters = [
             <div class="relative col-start-2 row-start-2 flex items-center gap-1 sm:row-start-1">
               <details name={filterDisclosureName} class="group/search">
                 <summary
-                  aria-label="Search posts"
-                  title="Search posts"
+                  aria-label="Search comments"
+                  title="Search comments"
                   class="flex cursor-pointer list-none rounded-lg focus-visible:ring-2 focus-visible:ring-green-500 [&::-webkit-details-marker]:hidden"
                 >
                   <Button
                     as="span"
                     role="presentation"
-                    label="Search posts"
+                    label="Search comments"
                     icon="ri:search-line"
                     iconOnly
                     size="sm"
@@ -350,7 +350,7 @@ const activeFilters = [
                   method="GET"
                   action={`${Astro.url.pathname}#comments`}
                   role="search"
-                  aria-label="Search posts"
+                  aria-label="Search comments"
                   class="absolute right-0 z-20 mt-2 flex w-72 max-w-[calc(100vw-2rem)] items-end gap-2 rounded-lg border border-night-600 bg-night-800 p-3 shadow-lg"
                 >
                   {params.sentiment && <input type="hidden" name="sentiment" value={params.sentiment} />}
@@ -359,7 +359,7 @@ const activeFilters = [
                   {params.period && <input type="hidden" name="period" value={params.period} />}
                   <InputText
                     name="search"
-                    label="Search posts"
+                    label="Search comments"
                     class="flex-1"
                     inputIcon="ri:search-line"
                     inputIconClass="size-4 text-day-500"
@@ -367,15 +367,15 @@ const activeFilters = [
                       type: 'search',
                       value: params.search,
                       maxlength: 100,
-                      placeholder: 'Search these posts',
-                      'aria-label': 'Search posts',
+                      placeholder: 'Search these comments',
+                      'aria-label': 'Search comments',
                       class: 'h-8 border-night-500 bg-night-800 pr-2 pl-8 text-sm',
                     }}
                   />
                   <Button
                     type="submit"
-                    label="Search posts"
-                    title="Search posts"
+                    label="Search comments"
+                    title="Search comments"
                     icon="ri:search-line"
                     iconOnly
                     size="sm"
@@ -455,12 +455,12 @@ const activeFilters = [
             </div>
             {switchCounts ? (
               <nav
-                aria-label="Posts to show"
+                aria-label="Comments to show"
                 class="col-span-2 row-start-1 flex w-fit max-w-full gap-1 rounded-lg bg-night-800 p-1 sm:col-span-1"
               >
                 {(
                   [
-                    [undefined, 'All posts', switchCounts.all],
+                    [undefined, 'All comments', switchCounts.all],
                     ['checked', 'Checked proof', switchCounts.checked],
                   ] as const
                 ).map(([evidence, label, count]) => (
@@ -480,7 +480,7 @@ const activeFilters = [
               </nav>
             ) : (
               <span class="col-start-1 row-start-1 text-xs whitespace-nowrap text-day-400">
-                {countOf(result.count, 'post', 'posts')}
+                {countOf(result.count, 'comment', 'comments')}
               </span>
             )}
           </div>
@@ -508,7 +508,7 @@ const activeFilters = [
   }
   {
     result.focused && !threadRoot && (
-      <p class="py-8 text-center text-sm text-day-400">This post is not available.</p>
+      <p class="py-8 text-center text-sm text-day-400">This comment is not available.</p>
     )
   }
   {
@@ -602,7 +602,9 @@ const activeFilters = [
             />
           )
         )}
-        {!comments.length && <p class="py-8 text-center text-sm text-day-400">No posts match this view.</p>}
+        {!comments.length && (
+          <p class="py-8 text-center text-sm text-day-400">No comments match this view.</p>
+        )}
         {result.count > LIST_PAGE_SIZE && (
           <Pagination
             currentPage={params.page}

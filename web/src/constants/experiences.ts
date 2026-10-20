@@ -143,7 +143,7 @@ export const { dataArray: evidenceFindings, dataObject: evidenceFindingsByValue 
       counts: true,
       label: 'A moderator reviewed a screenshot',
       shortLabel: 'Screenshot reviewed',
-      guidance: 'A screenshot matches the post. Screenshots can be faked.',
+      guidance: 'A screenshot matches the comment. Screenshots can be faked.',
       icon: 'ri:image-line',
       badgeColor: 'sky',
       classNames: {
@@ -183,9 +183,9 @@ export const { dataArray: evidenceFindings, dataObject: evidenceFindingsByValue 
     {
       value: EvidenceFinding.CLAIM_SUPPORTED,
       counts: true,
-      label: 'Proof of the problem the post reports',
+      label: 'Proof of the problem the comment reports',
       shortLabel: 'Proof of the problem',
-      guidance: 'The proof shows the problem the post reports, such as a KYC request or held funds.',
+      guidance: 'The proof shows the problem the comment reports, such as a KYC request or held funds.',
       icon: 'ri:file-shield-2-line',
       badgeColor: 'green',
       classNames: {
@@ -213,7 +213,7 @@ export const { dataArray: evidenceFindings, dataObject: evidenceFindingsByValue 
       counts: false,
       label: 'We could not check this proof',
       shortLabel: 'Could not check',
-      guidance: 'Lookup locked, expired or unavailable. Says nothing about whether the post is true.',
+      guidance: 'Lookup locked, expired or unavailable. Says nothing about whether the comment is true.',
       icon: 'ri:question-line',
       badgeColor: 'zinc',
       classNames: {
@@ -227,7 +227,7 @@ export const { dataArray: evidenceFindings, dataObject: evidenceFindingsByValue 
       counts: false,
       label: 'Proof does not support the claim',
       shortLabel: 'Proof inconsistent',
-      guidance: 'What was sent contradicts or does not match the post.',
+      guidance: 'What was sent contradicts or does not match the comment.',
       icon: 'ri:error-warning-line',
       badgeColor: 'red',
       classNames: {

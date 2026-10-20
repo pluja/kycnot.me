@@ -130,13 +130,13 @@ export const experienceActions = {
           throw new ActionError({ code: 'NOT_FOUND' })
         }
         if (comment.version !== input.version) {
-          throw new ActionError({ code: 'CONFLICT', message: 'This post changed. Reload before editing.' })
+          throw new ActionError({ code: 'CONFLICT', message: 'This comment changed. Reload before editing.' })
         }
         if (!isServicePubliclyReadable(comment.service.serviceVisibility)) {
           throw new ActionError({ code: 'NOT_FOUND' })
         }
         if (!isPublishedComment(comment.status)) {
-          throw new ActionError({ code: 'BAD_REQUEST', message: 'Only published posts can be revised.' })
+          throw new ActionError({ code: 'BAD_REQUEST', message: 'Only published comments can be revised.' })
         }
         if (comment.experienceUpdate) {
           throw new ActionError({
@@ -335,7 +335,7 @@ export const experienceActions = {
           throw new ActionError({ code: 'NOT_FOUND' })
         }
         if (comment.authorId === context.locals.user.id) {
-          throw new ActionError({ code: 'BAD_REQUEST', message: 'You cannot report your own post.' })
+          throw new ActionError({ code: 'BAD_REQUEST', message: 'You cannot report your own comment.' })
         }
         const recent = await tx.contactThread.count({
           where: { authorId: context.locals.user.id, createdAt: { gte: subDays(new Date(), 1) } },
@@ -350,7 +350,7 @@ export const experienceActions = {
         if (open) {
           throw new ActionError({
             code: 'CONFLICT',
-            message: 'You already reported this post. Continue that conversation from your contact page.',
+            message: 'You already reported this comment. Continue that conversation from your contact page.',
           })
         }
         if (recent >= CONTACT_MAX_PER_USER_PER_DAY) {
@@ -448,7 +448,7 @@ export const experienceActions = {
         if (!withdrawableStatuses.includes(comment.status)) {
           throw new ActionError({
             code: 'BAD_REQUEST',
-            message: 'Only published or pending posts can be withdrawn.',
+            message: 'Only published or pending comments can be withdrawn.',
           })
         }
         // The author's own replies and updates in the thread leave with the post. They are locked too, so a
@@ -543,7 +543,7 @@ export const experienceActions = {
         if (comment.parent && !isPublishedComment(comment.parent.status)) {
           throw new ActionError({
             code: 'BAD_REQUEST',
-            message: 'The post this reply belongs to is no longer published.',
+            message: 'The comment this reply belongs to is no longer published.',
           })
         }
         if (!comment.parentId) {
@@ -593,7 +593,7 @@ export const experienceActions = {
           })
         }
         if (!restored) {
-          throw new ActionError({ code: 'BAD_REQUEST', message: 'This post cannot be restored.' })
+          throw new ActionError({ code: 'BAD_REQUEST', message: 'This comment cannot be restored.' })
         }
         await recordAuditLog(tx, {
           actorId: userId,

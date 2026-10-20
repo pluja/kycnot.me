@@ -46,13 +46,13 @@ const publicNoteReplay = replayAfterError(Astro.getActionResult(actions.admin.ex
     </h4>
     <InputTextArea
       name="publicNote"
-      label="Note below the post"
+      label="Note below the comment"
       hideLabel
       value={publicNoteReplay.text('publicNote', comment.publicNote ?? '')}
       inputProps={{
         maxlength: PUBLIC_NOTE_MAX_LENGTH,
         rows: 2,
-        placeholder: 'Shown under the post. No private details.',
+        placeholder: 'Shown under the comment. No private details.',
       }}
     />
     <Button type="submit" label="Save" color="success" size="sm" class="ml-auto flex" />

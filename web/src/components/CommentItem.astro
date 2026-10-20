@@ -203,7 +203,7 @@ const [proofRequest] = comment.proofRequests
         !comment.replyTo && comment.replyTargetDeleted && (
           <span class="mt-0.5 inline-flex items-center gap-1 text-xs text-day-500">
             <Icon name="ri:reply-line" class="size-3.5" />
-            Replying to a deleted post
+            Replying to a deleted comment
           </span>
         )
       }
@@ -266,7 +266,7 @@ const [proofRequest] = comment.proofRequests
     !isPublishedComment(comment.status) && (
       <p class="mt-2 border-l-2 border-yellow-400 pl-2 text-xs text-yellow-200">
         Hidden · {getCommentStatusInfo(comment.status).publicLabel}. Only the author and moderators can see
-        this post.
+        this comment.
       </p>
     )
   }
