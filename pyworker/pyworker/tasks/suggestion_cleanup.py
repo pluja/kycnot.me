@@ -11,11 +11,11 @@ import threading
 from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import SplitResult, urljoin, urlsplit
 
-import requests
 import urllib3
 
 from pyworker.database import get_db_connection, run_db_query
 from pyworker.tasks.base import Task
+from pyworker.utils.public_http import pinned_get
 
 SUPPORT_USERNAME = "support"
 NO_REPLY_MONTHS = 6
@@ -79,40 +79,14 @@ _CONNECTION_FAILURES = (
 
 
 def fetch_status(parts: SplitResult, address: str) -> Tuple[int, Optional[str]]:
-    """The status and Location of a GET to parts, connecting to address rather than resolving the name again, so the
-    address that was checked is the one requested. Sends Host and SNI for the name, reads no body and ignores any proxy
-    set in the environment."""
-    https = parts.scheme == "https"
-    port = parts.port or (443 if https else 80)
-    host = parts.hostname or ""
-    tls = (
-        {
-            "cert_reqs": "CERT_REQUIRED",
-            "ca_certs": requests.certs.where(),
-            "server_hostname": host,
-            "assert_hostname": host,
-        }
-        if https
-        else {}
-    )
-    pool_class = urllib3.HTTPSConnectionPool if https else urllib3.HTTPConnectionPool
-    with pool_class(
+    """The status and Location of a GET to parts, connecting to address rather than resolving the name again."""
+    status, headers, _ = pinned_get(
+        parts,
         address,
-        port,
+        user_agent=USER_AGENT,
         timeout=urllib3.Timeout(connect=10, read=20),
-        retries=False,
-        **tls,
-    ) as pool:
-        response = pool.urlopen(
-            "GET",
-            (parts.path or "/") + (f"?{parts.query}" if parts.query else ""),
-            headers={"Host": parts.netloc.rsplit("@", 1)[-1], "User-Agent": USER_AGENT},
-            redirect=False,
-            preload_content=False,
-        )
-        status, location = response.status, response.headers.get("Location")
-        response.close()
-    return status, location
+    )
+    return status, headers.get("Location")
 
 
 def _check(url: str) -> Optional[bool]:

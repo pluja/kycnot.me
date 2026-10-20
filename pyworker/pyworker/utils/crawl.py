@@ -11,6 +11,7 @@ from typing import Any
 import requests
 
 from pyworker.config import config
+from pyworker.utils.public_http import require_public_url
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +70,14 @@ def _post_crawl(urls: list[str]) -> list[dict[str, Any]]:
 
     Every request goes through here so the payload stays in one place. Crawl4AI
     0.9 rejects a body carrying keys such as deep_crawl_strategy or magic, so a
-    single definition is what keeps an upgrade to one edit.
+    single definition is what keeps an upgrade to one edit. It is also the one
+    place every crawled URL passes, so it refuses URLs that resolve to a
+    private address. That is a second layer only: the crawler resolves names
+    again and its browser follows redirects on its own, so its network
+    isolation is what keeps it off internal hosts.
     """
+    for url in urls:
+        require_public_url(url)
     response = requests.post(
         f"{config.CRAWL4AI_BASE_URL}/crawl",
         json={
@@ -118,6 +125,12 @@ def fetch_markdown(url: str) -> str:
     """
     if not url:
         raise ValueError("url must not be empty")
+
+    try:
+        require_public_url(url)
+    except requests.RequestException as e:
+        logger.warning(f"Not crawling {url}: {e}")
+        return ""
 
     try:
         return _fetch_crawl4ai(url)
