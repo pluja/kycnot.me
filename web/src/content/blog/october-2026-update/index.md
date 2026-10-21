@@ -47,6 +47,10 @@ Claimed accounts get a team badge, and their replies on their own service are ma
 
 The badges services can embed were redesigned. They are larger and easier to read, show the service's domain instead of its name, so a copycat site can't reuse them, and can optionally show what users say.
 
+<a href="/service/bisq" class="not-prose mx-auto block w-full max-w-[400px]">
+  <img src="/badge/bisq.png?size=lg&score=1&kyc=1&verdict=1" alt="KYCnot.me badge for Bisq with its score, KYC level and what users say" width="920" height="230" class="w-full" />
+</a>
+
 ## Docs and funding
 
 The old About page was split into [docs](/docs): review guidelines, how listings work, how scores work and how trust works. Long pages now have a table of contents.
