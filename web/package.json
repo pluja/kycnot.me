@@ -73,6 +73,7 @@
     "tailwind-merge": "3.5.0",
     "tailwind-variants": "3.2.2",
     "tailwindcss": "4.2.2",
+    "tldts": "7.4.19",
     "unique-username-generator": "1.5.1",
     "unist-util-visit": "5.1.0",
     "web-push": "3.6.7",

@@ -127,6 +127,16 @@ export const {
       label: 'Account deletion warning - 1 day',
       icon: 'ri:alarm-warning-line',
     },
+    {
+      id: 'SERVICE_AFFILIATION_CHECK_FAILED',
+      label: 'Affiliation record missing',
+      icon: 'ri:error-warning-line',
+    },
+    {
+      id: 'SERVICE_AFFILIATION_REVOKED',
+      label: 'Affiliation removed',
+      icon: 'ri:building-4-line',
+    },
   ] as const satisfies NotificationTypeInfo<NotificationType>[]
 )
 

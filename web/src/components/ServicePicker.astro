@@ -33,6 +33,7 @@ type Props = {
   class?: string
   buttonClass?: string
   label?: string
+  placeholder?: string
   error?: string[]
 }
 
@@ -49,6 +50,7 @@ const {
   class: className,
   buttonClass,
   label,
+  placeholder,
   error,
 } = Astro.props
 
@@ -131,7 +133,7 @@ const SearchWrapper = searchForm ? 'div' : 'form'
       )
     }
     <span class="truncate" data-service-label>
-      {selectedService?.name ?? (field ? 'Pick a service' : 'All services')}
+      {selectedService?.name ?? placeholder ?? (field ? 'Pick a service' : 'All services')}
     </span>
     <Icon
       name="ri:arrow-down-s-line"

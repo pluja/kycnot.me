@@ -471,6 +471,9 @@ enum NotificationType {
   ACCOUNT_DELETION_WARNING_15_DAYS
   ACCOUNT_DELETION_WARNING_5_DAYS
   ACCOUNT_DELETION_WARNING_1_DAY
+  /// The daily check did not find the TXT record behind a DNS-claimed affiliation.
+  SERVICE_AFFILIATION_CHECK_FAILED
+  SERVICE_AFFILIATION_REVOKED
 }
 
 enum CommentStatusChange {
@@ -1400,10 +1403,19 @@ model ServiceUser {
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 
+  /// Host whose kycnotme-verify TXT record proves this affiliation; null when staff created it.
+  dnsHost            String?
+  dnsCheckedAt       DateTime?
+  /// Consecutive daily checks that did not find the record; the affiliation is removed at the third.
+  dnsFailedChecks    Int       @default(0)
+  /// When the domain was registered, from RDAP at claim time; a later date means the domain changed hands.
+  domainRegisteredAt DateTime?
+
   @@unique([userId, serviceId])
   @@index([userId])
   @@index([serviceId])
   @@index([role])
+  @@index([dnsHost])
 }
 
 model Announcement {

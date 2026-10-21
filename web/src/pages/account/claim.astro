@@ -1,0 +1,206 @@
+---
+import { Icon } from 'astro-icon/components'
+import { actions } from 'astro:actions'
+
+import Button from '../../components/Button.astro'
+import CopyButton from '../../components/CopyButton.astro'
+import InputSelect from '../../components/InputSelect.astro'
+import MyPicture from '../../components/MyPicture.astro'
+import ServicePicker from '../../components/ServicePicker.astro'
+import { CLAIM_MAX_FAILED_CHECKS, CLAIM_RECORD_PREFIX } from '../../constants/serviceClaim'
+import { claimableServiceUserRoles } from '../../constants/serviceUserRoles'
+import MiniLayout from '../../layouts/MiniLayout.astro'
+import { prisma } from '../../lib/prisma'
+import { makeLoginUrl } from '../../lib/redirectUrls'
+import { claimHosts, recordName } from '../../lib/serviceClaim'
+
+const user = Astro.locals.user
+if (!user) {
+  return Astro.redirect(makeLoginUrl(Astro.url, { message: 'Login to claim a service' }))
+}
+
+const result = Astro.getActionResult(actions.account.claimService)
+if (result && !result.error) {
+  const message = `You are now affiliated with ${result.data.service.name}.`
+  return Astro.redirect(`/account?${new URLSearchParams({ success: message }).toString()}`)
+}
+
+const serviceSlug = Astro.url.searchParams.get('service')
+
+const [service, services] = await Astro.locals.banners.tryMany([
+  [
+    'Failed to load the service',
+    async () =>
+      serviceSlug
+        ? prisma.service.findFirst({
+            where: { slug: serviceSlug, serviceVisibility: 'PUBLIC' },
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              imageUrl: true,
+              serviceUrls: true,
+              affiliatedUsers: { where: { userId: user.id }, select: { id: true } },
+            },
+          })
+        : null,
+    null,
+  ],
+  [
+    'Failed to load services',
+    async () =>
+      serviceSlug
+        ? []
+        : prisma.service.findMany({
+            where: { serviceVisibility: 'PUBLIC' },
+            select: { id: true, name: true, slug: true, imageUrl: true },
+            orderBy: { name: 'asc' },
+          }),
+    [],
+  ],
+])
+
+const hosts = service ? claimHosts(service.serviceUrls) : []
+const recordHost = hosts.find((host) => recordName(host) === '@') ?? hosts[0]
+const isAffiliated = !!service && service.affiliatedUsers.length > 0
+const record = `${CLAIM_RECORD_PREFIX}${user.name}`
+const codeClass = 'rounded-sm bg-night-800 px-1 font-mono text-day-200'
+const stepNumberClass =
+  'flex size-6 shrink-0 items-center justify-center rounded-full bg-day-200 text-xs font-bold text-night-800'
+// The service stays in the address so a failed check comes back to the same step.
+const claimActionUrl = service
+  ? `?service=${encodeURIComponent(service.slug)}&${actions.account.claimService.toString().replace(/^\?/, '')}`
+  : actions.account.claimService.toString()
+---
+
+<MiniLayout
+  size="md"
+  pageTitle="Claim a service"
+  description="Show you run or work for a service listed on KYCnot.me"
+  noindex
+  ogImage={{ template: 'generic', title: 'Claim a service', icon: 'ri:building-4-line' }}
+  layoutHeader={{
+    icon: 'ri:building-4-line',
+    title: 'Claim a service',
+    subtitle: 'Show you run or work for a listed service with a DNS record.',
+  }}
+  breadcrumbs={[{ name: 'Account', url: '/account' }, { name: 'Claim a service' }]}
+>
+  {
+    !service ? (
+      <ServicePicker
+        services={services}
+        suggested={services}
+        selected={serviceSlug ?? undefined}
+        label="Which service?"
+        placeholder="Pick a service"
+        buttonClass="w-full justify-between py-2"
+      />
+    ) : (
+      <div class="space-y-6">
+        <div class="flex items-center gap-3">
+          {service.imageUrl && (
+            <MyPicture src={service.imageUrl} alt="" width={32} height={32} class="size-8 rounded-md" />
+          )}
+          <span class="flex-1 font-title text-lg font-bold text-day-100">{service.name}</span>
+          <a href="/account/claim" class="text-sm text-day-400 hover:text-day-200 hover:underline">
+            Change
+          </a>
+        </div>
+
+        {isAffiliated ? (
+          <p class="text-day-300">
+            You are already affiliated with {service.name}. See it on{' '}
+            <a href="/account" class="underline">
+              your account
+            </a>
+            .
+          </p>
+        ) : hosts.length === 0 ? (
+          <p class="text-day-300">
+            {service.name} lists no website of its own, so it can't be claimed with DNS.{' '}
+            <a href="/contact?category=ACCOUNT_VERIFICATION" class="underline">
+              Contact us
+            </a>{' '}
+            instead.
+          </p>
+        ) : (
+          <form method="POST" action={claimActionUrl} class="space-y-6">
+            <input type="hidden" name="serviceId" value={service.id} />
+
+            <section class="space-y-3">
+              <h2 class="flex items-center gap-2 font-title font-semibold text-day-100">
+                <span class={stepNumberClass}>1</span>
+                Add this DNS record to <code class={codeClass}>{recordHost}</code>
+              </h2>
+              <dl class="grid overflow-hidden rounded-md border border-night-600 text-sm md:grid-cols-[auto_auto_1fr]">
+                <div class="border-b border-night-600 px-3 py-2 md:border-r md:border-b-0">
+                  <dt class="text-xs text-day-500">Type</dt>
+                  <dd class="font-mono text-day-100">TXT</dd>
+                </div>
+                <div class="border-b border-night-600 px-3 py-2 md:border-r md:border-b-0">
+                  <dt class="text-xs text-day-500">Name</dt>
+                  <dd class="font-mono text-day-100">{recordName(recordHost ?? '')}</dd>
+                </div>
+                <div class="flex items-center gap-2 px-3 py-2">
+                  <div class="min-w-0 flex-1">
+                    <dt class="text-xs text-day-500">Value</dt>
+                    <dd class="font-mono break-all text-day-100">{record}</dd>
+                  </div>
+                  <CopyButton copyText={record} size="sm" />
+                </div>
+              </dl>
+              <p class="text-sm text-day-400">
+                Already have a <code class={codeClass}>{CLAIM_RECORD_PREFIX}</code> record? Add your username
+                to it:{' '}
+                <code class={codeClass}>
+                  {CLAIM_RECORD_PREFIX}name1,{user.name}
+                </code>
+              </p>
+              <p class="text-sm text-day-400">DNS changes can take up to an hour to show.</p>
+            </section>
+
+            <section class="space-y-3">
+              <h2 class="flex items-center gap-2 font-title font-semibold text-day-100">
+                <span class={stepNumberClass}>2</span>
+                Choose your role
+              </h2>
+              <InputSelect
+                name="role"
+                label="Your role"
+                hideLabel
+                options={claimableServiceUserRoles.map((role) => ({ value: role.value, label: role.label }))}
+                selectedValue="TEAM_MEMBER"
+              />
+            </section>
+
+            <section class="space-y-3">
+              <h2 class="flex items-center gap-2 font-title font-semibold text-day-100">
+                <span class={stepNumberClass}>3</span>
+                Check the record
+              </h2>
+              <Button type="submit" label="Check and claim" icon="ri:shield-check-line" color="success" />
+            </section>
+
+            <aside class="flex gap-3 rounded-lg border border-yellow-500/40 bg-yellow-900/20 p-4 text-sm text-yellow-100">
+              <Icon name="ri:alert-line" class="mt-0.5 size-5 shrink-0 text-yellow-400" />
+              <div class="space-y-2">
+                <p>
+                  <strong>Keep the record.</strong> We check it every day and notify you when it's missing.
+                  After {CLAIM_MAX_FAILED_CHECKS} misses in a row the affiliation is removed.
+                </p>
+                <p>
+                  Your profile shows the affiliation as claimed. Our team verifies it before it opens the
+                  service's private case files, and only on request lists you as the owner:{' '}
+                  <a href="/contact?category=ACCOUNT_VERIFICATION" class="underline">
+                    contact us
+                  </a>
+                </p>
+              </div>
+            </aside>
+          </form>
+        )}
+      </div>
+    )
+  }
+</MiniLayout>

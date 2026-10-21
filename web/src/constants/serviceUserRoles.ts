@@ -74,3 +74,15 @@ export const {
 )
 
 type _ExpectToHaveAllValues = Assert<Equals<(typeof serviceUserRoles)[number]['value'], ServiceUserRole>>
+
+// claimableServiceUserRoleValues are the roles someone may give themselves with a DNS claim. Owner stays
+// staff-granted because owner replies are highlighted.
+export const claimableServiceUserRoleValues = [
+  'ADMIN',
+  'MODERATOR',
+  'SUPPORT',
+  'TEAM_MEMBER',
+] as const satisfies Exclude<ServiceUserRole, 'OWNER'>[]
+export const claimableServiceUserRoles = serviceUserRoles.filter((role) =>
+  (claimableServiceUserRoleValues as readonly string[]).includes(role.value)
+)

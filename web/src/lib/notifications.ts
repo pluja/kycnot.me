@@ -1,5 +1,6 @@
 import { accountStatusChangesById } from '../constants/accountStatusChange'
 import { commentStatusChangesById } from '../constants/commentStatusChange'
+import { CLAIM_MAX_FAILED_CHECKS } from '../constants/serviceClaim'
 import { serviceVerificationStatusChangesById } from '../constants/serviceStatusChange'
 import { getServiceSuggestionTypeInfo } from '../constants/serviceSuggestionType'
 import { serviceSuggestionStatusChangesById } from '../constants/suggestionStatusChange'
@@ -236,6 +237,16 @@ export function makeNotificationTitle(
     case 'ACCOUNT_DELETION_WARNING_1_DAY': {
       return 'Account deletion warning - 1 day remaining'
     }
+    case 'SERVICE_AFFILIATION_CHECK_FAILED': {
+      return notification.aboutService
+        ? `Your DNS record for ${notification.aboutService.name} is missing`
+        : 'Your affiliation DNS record is missing'
+    }
+    case 'SERVICE_AFFILIATION_REVOKED': {
+      return notification.aboutService
+        ? `Your affiliation with ${notification.aboutService.name} was removed`
+        : 'Your service affiliation was removed'
+    }
   }
 }
 
@@ -283,6 +294,12 @@ export function makeNotificationContent(notification: NotificationDisplay): stri
     case 'ACCOUNT_DELETION_WARNING_5_DAYS':
     case 'ACCOUNT_DELETION_WARNING_1_DAY': {
       return 'Your account will be deleted due to inactivity. Log in and post a comment or create a suggestion to prevent deletion.'
+    }
+    case 'SERVICE_AFFILIATION_CHECK_FAILED': {
+      return `Our daily check could not find your kycnotme-verify TXT record. After ${CLAIM_MAX_FAILED_CHECKS.toString()} misses in a row the affiliation is removed.`
+    }
+    case 'SERVICE_AFFILIATION_REVOKED': {
+      return `The kycnotme-verify TXT record was missing ${CLAIM_MAX_FAILED_CHECKS.toString()} days in a row, or the domain changed owners. Add the record again to claim it back.`
     }
   }
 }
@@ -435,6 +452,19 @@ export function makeNotificationActions(
           title: 'Login & Stay Active',
           ...iconNameAndUrl('ri:login-box-line'),
           url: `${origin}/login`,
+        },
+      ]
+    }
+    case 'SERVICE_AFFILIATION_CHECK_FAILED':
+    case 'SERVICE_AFFILIATION_REVOKED': {
+      return [
+        {
+          action: 'view',
+          title: 'Check the record',
+          ...iconNameAndUrl('ri:arrow-right-line'),
+          url: notification.aboutService
+            ? `${origin}/account/claim?service=${notification.aboutService.slug}`
+            : `${origin}/account`,
         },
       ]
     }

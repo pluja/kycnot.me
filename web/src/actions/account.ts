@@ -1,10 +1,13 @@
+import { Prisma } from '@prisma/client'
 import { ActionError } from 'astro:actions'
 import { z } from 'astro:content'
 import { pick } from 'lodash-es'
 
+import { claimableServiceUserRoleValues } from '../constants/serviceUserRoles'
 import { trustUnlocksById } from '../constants/trustUnlocks'
 import { createAccount } from '../lib/accountCreate'
 import { generateApiKey, getApiKeyPrefix, hashApiKey } from '../lib/apiKey'
+import { recordAuditLog } from '../lib/auditLog'
 import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../lib/captchaValidation'
 import { cleanupCommentEvidenceFiles } from '../lib/commentEvidenceCleanup'
 import { deleteUserAccount } from '../lib/dbFunctions'
@@ -14,6 +17,7 @@ import { startImpersonating, stopImpersonating } from '../lib/impersonation'
 import { prisma } from '../lib/prisma'
 import { makeSafeRedirectUrl } from '../lib/redirectUrls'
 import { getRedisPreGeneratedSecretTokens } from '../lib/redis/redisPreGeneratedSecretTokens'
+import { claimHosts, domainChangedHands, domainRegisteredAt, findClaimHost } from '../lib/serviceClaim'
 import { handleHoneypotTrap } from '../lib/spamDetection'
 import { makeTrustUnlockMessage, makeUserWithTrust } from '../lib/trust'
 import { login, logout, setUserSessionIdCookie } from '../lib/userCookies'
@@ -33,6 +37,11 @@ function toPublicUser<T extends { secretTokenHash: string; feedId: string }>(use
   const { secretTokenHash, feedId, ...publicUser } = user
   return publicUser
 }
+
+// CLAIM_CHECK_INTERVAL_MS spaces out one user's DNS checks; the lookups go to hosts we list, but each costs a few
+// seconds of DNS and RDAP traffic.
+const CLAIM_CHECK_INTERVAL_MS = 15_000
+const lastClaimCheckByUser = new Map<number, number>()
 
 export const accountActions = {
   login: defineProtectedAction({
@@ -282,6 +291,115 @@ export const accountActions = {
       }
 
       return { deletedUser }
+    },
+  }),
+
+  claimService: defineProtectedAction({
+    accept: 'form',
+    permissions: 'not-spammer',
+    input: z.object({
+      serviceId: z.coerce.number().int().positive(),
+      role: z.enum(claimableServiceUserRoleValues),
+    }),
+    handler: async (input, context) => {
+      const user = context.locals.user
+
+      const now = Date.now()
+      const lastCheck = lastClaimCheckByUser.get(user.id)
+      if (lastCheck && now - lastCheck < CLAIM_CHECK_INTERVAL_MS) {
+        throw new ActionError({
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Wait a few seconds before checking again.',
+        })
+      }
+      lastClaimCheckByUser.set(user.id, now)
+      if (lastClaimCheckByUser.size > 1000) {
+        for (const [userId, checkedAt] of lastClaimCheckByUser) {
+          if (now - checkedAt >= CLAIM_CHECK_INTERVAL_MS) lastClaimCheckByUser.delete(userId)
+        }
+      }
+
+      const service = await prisma.service.findUnique({
+        where: { id: input.serviceId, serviceVisibility: 'PUBLIC' },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          serviceUrls: true,
+          listedAt: true,
+          unreachableChecks: true,
+          affiliatedUsers: { where: { userId: user.id }, select: { id: true } },
+        },
+      })
+      if (!service) throw new ActionError({ code: 'NOT_FOUND', message: 'Service not found.' })
+      if (service.affiliatedUsers.length > 0) {
+        throw new ActionError({
+          code: 'CONFLICT',
+          message: `You are already affiliated with ${service.name}.`,
+        })
+      }
+      if (service.unreachableChecks > 0) {
+        throw new ActionError({
+          code: 'BAD_REQUEST',
+          message: `The ${service.name} website did not answer our last check. Contact us to verify instead.`,
+        })
+      }
+
+      const hosts = claimHosts(service.serviceUrls)
+      if (hosts.length === 0) {
+        throw new ActionError({
+          code: 'BAD_REQUEST',
+          message: `${service.name} lists no website of its own, so it can't be claimed with DNS. Contact us instead.`,
+        })
+      }
+
+      const host = await findClaimHost(hosts, user.name)
+      if (!host) {
+        throw new ActionError({
+          code: 'BAD_REQUEST',
+          message: `No record for ${user.name} on ${hosts.join(' or ')} yet. DNS changes can take a while to show up.`,
+        })
+      }
+
+      const registeredAt = await domainRegisteredAt(host)
+      if (domainChangedHands(registeredAt, service.listedAt)) {
+        throw new ActionError({
+          code: 'FORBIDDEN',
+          message: `${host} was registered after ${service.name} was listed here, so it may have changed owners. Contact us to verify instead.`,
+        })
+      }
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.serviceUser.create({
+            data: {
+              userId: user.id,
+              serviceId: service.id,
+              role: input.role,
+              dnsHost: host,
+              dnsCheckedAt: new Date(),
+              domainRegisteredAt: registeredAt,
+            },
+          })
+          await recordAuditLog(tx, {
+            actorId: user.id,
+            action: 'CREATED',
+            targetType: 'USER',
+            targetId: user.id,
+            summary: `Claimed affiliation with ${service.name} as ${input.role.toLowerCase().replace('_', ' ')} through the DNS record on ${host}`,
+          })
+        })
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          throw new ActionError({
+            code: 'CONFLICT',
+            message: `You are already affiliated with ${service.name}.`,
+          })
+        }
+        throw error
+      }
+
+      return { service: { name: service.name, slug: service.slug } }
     },
   }),
 

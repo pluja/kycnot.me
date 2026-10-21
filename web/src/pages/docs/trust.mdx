@@ -5,7 +5,7 @@ pageTitle: Anonymous accounts, badges and account trust
 description: 'How KYCnot.me accounts work: anonymous sign-up with a login key, what accounts unlock, what each badge means and how services verify team accounts.'
 icon: 'ri:shield-check-line'
 order: 4
-updatedAt: 2026-10-18
+updatedAt: 2026-10-21
 faq:
   - question: How do I get the Veteran badge?
     answer: "Reach 5 comments with checked proof or 20 published comments or 5 approved suggestions, and an account at least 180 days old. Suggestions only count on services you don't represent."
@@ -81,12 +81,14 @@ While either limit applies, every unlock above is paused. Both limits lift on th
 
 **Affiliated users** are users who represent a service listed in the directory, such as owners, support staff, or team members. If you represent a service and want to become affiliated, you can request it [in your profile](/account).
 
-### Account verification
+### Claiming a service
 
-To prove your account represents a listed service:
+If you run or work for a listed service, you can claim it yourself with a DNS record:
 
-1. Add a TXT record to the service's domain with the value `kycnotme-verify=<your-username>`, replacing `<your-username>` with your KYCnot.me username.
-2. [Send a verification request](/contact?category=ACCOUNT_VERIFICATION) including your KYCnot.me username and the domain where the TXT record is published.
-3. Once we confirm the TXT record matches your username, we'll mark your account as affiliated with the service.
+1. Open [Claim a service](/account/claim), or "I work for this service" on the service's page.
+2. Add a TXT record to the service's website domain with the value `kycnotme-verify=<your-username>`. Several people can share one record: `kycnotme-verify=name1,name2`.
+3. Pick your role and press **Check and claim**. The affiliation is added as soon as the record is found.
 
-The TXT record can be removed after we confirm. The affiliation persists.
+Only the website the service lists as its own counts, not pages on shared platforms or hosts behind a CNAME. Keep the record: we check it every day and notify you when it's missing. After three misses in a row, or if the domain changes owners, the affiliation is removed.
+
+A claimed affiliation shows on your profile and comments as **claimed**. Our team verifies it before it opens the private files of cases against the service, and lists you as the owner only on request. To ask for either, or if the service has no website of its own, [contact us](/contact?category=ACCOUNT_VERIFICATION).

@@ -1,0 +1,10 @@
+ALTER TYPE "NotificationType" ADD VALUE 'SERVICE_AFFILIATION_CHECK_FAILED';
+ALTER TYPE "NotificationType" ADD VALUE 'SERVICE_AFFILIATION_REVOKED';
+
+ALTER TABLE "ServiceUser"
+  ADD COLUMN "dnsHost" TEXT,
+  ADD COLUMN "dnsCheckedAt" TIMESTAMP(3),
+  ADD COLUMN "dnsFailedChecks" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "domainRegisteredAt" TIMESTAMP(3);
+
+CREATE INDEX "ServiceUser_dnsHost_idx" ON "ServiceUser"("dnsHost");
