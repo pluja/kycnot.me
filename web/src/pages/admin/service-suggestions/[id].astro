@@ -318,31 +318,37 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
     }
 
     {
-      !serviceSuggestion.proposedEdits && (
-        <form
-          method="POST"
-          action={actions.admin.serviceSuggestions.update}
-          class="mt-6 flex items-end gap-2"
-        >
-          <input type="hidden" name="suggestionId" value={serviceSuggestion.id} />
-          <input type="hidden" name="seenStatus" value={serviceSuggestion.status} />
-          <input type="hidden" name="seenAssigneeId" value={assignee?.id ?? ''} />
-          <InputSelect
-            name="status"
-            label="Update status"
-            options={serviceSuggestionStatuses
-              // An edit is approved by applying it, never by setting the status.
-              .filter((status) => !serviceSuggestion.fieldEdits || status.value !== 'APPROVED')
-              .map((status) => ({
-                label: status.label,
-                value: status.value,
-              }))}
-            selectedValue={serviceSuggestion.status}
-            class="flex-1"
-            error={serviceSuggestionUpdateInputErrors.status}
-          />
-          <Button as="button" type="submit" color="success" size="md" icon="ri:save-line" label="Update" />
-        </form>
+      serviceSuggestion.fieldEdits && serviceSuggestion.status === 'APPROVED' ? (
+        <p class="mt-6 text-sm text-day-400">
+          Approved when the changes were applied. To change the listing again, suggest a new edit.
+        </p>
+      ) : (
+        !serviceSuggestion.proposedEdits && (
+          <form
+            method="POST"
+            action={actions.admin.serviceSuggestions.update}
+            class="mt-6 flex items-end gap-2"
+          >
+            <input type="hidden" name="suggestionId" value={serviceSuggestion.id} />
+            <input type="hidden" name="seenStatus" value={serviceSuggestion.status} />
+            <input type="hidden" name="seenAssigneeId" value={assignee?.id ?? ''} />
+            <InputSelect
+              name="status"
+              label="Update status"
+              options={serviceSuggestionStatuses
+                // An edit is approved by applying it, never by setting the status.
+                .filter((status) => !serviceSuggestion.fieldEdits || status.value !== 'APPROVED')
+                .map((status) => ({
+                  label: status.label,
+                  value: status.value,
+                }))}
+              selectedValue={serviceSuggestion.status}
+              class="flex-1"
+              error={serviceSuggestionUpdateInputErrors.status}
+            />
+            <Button as="button" type="submit" color="success" size="md" icon="ri:save-line" label="Update" />
+          </form>
+        )
       )
     }
   </section>
