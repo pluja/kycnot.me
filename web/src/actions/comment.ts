@@ -144,6 +144,13 @@ export const commentActions = {
       const proofImage = attachesProof && !context.locals.user.spammer ? input.proofImage : undefined
       // Admins are trusted: their posts skip the queue and publish as their own decision.
       const publishesDirectly = context.locals.user.admin
+      // A service's team answering on its own page publishes at once; reports still reach moderators.
+      const repliesForService =
+        !publishesDirectly &&
+        !!input.parentId &&
+        (await prisma.serviceUser.count({
+          where: { userId: context.locals.user.id, serviceId: input.serviceId },
+        })) > 0
       const created = { updatesVerdict: false }
       const hasProof = attachesProof && (!!input.orderId?.trim() || !!proofImage)
       const waitsForProofCheck = !publishesDirectly && hasProof && issuesNeedingProof(issueTypes).length > 0
@@ -279,14 +286,15 @@ export const commentActions = {
               })
             }
 
-            if (publishesDirectly) {
+            if (publishesDirectly || repliesForService) {
               await tx.comment.update({
                 where: { id: newComment.id },
                 data: {
                   status: 'APPROVED',
                   humanAction: 'APPROVE',
                   humanDecidedAt: new Date(),
-                  humanDecidedById: context.locals.user.id,
+                  humanDecidedById: publishesDirectly ? context.locals.user.id : null,
+                  humanReasoning: repliesForService ? "Reply from the service's team" : undefined,
                 },
               })
             }
