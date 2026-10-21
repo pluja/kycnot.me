@@ -2,7 +2,12 @@ import { CaseEvidenceType, CaseIssueType, CaseStatus, CaseVisibility } from '@pr
 import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
-import { canParticipateInCase, isCaseStaff, isCasePublished } from '../../lib/caseAccess'
+import {
+  canParticipateInCase,
+  isCaseStaff,
+  isCasePublished,
+  verifiedAffiliatesSelect,
+} from '../../lib/caseAccess'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { deleteFileLocally, saveFileLocally } from '../../lib/fileStorage'
 import { prisma } from '../../lib/prisma'
@@ -269,7 +274,7 @@ export const adminCaseActions = {
             status: true,
             reportedById: true,
             participants: { select: { id: true } },
-            service: { select: { affiliatedUsers: { select: { userId: true } } } },
+            service: { select: { affiliatedUsers: verifiedAffiliatesSelect } },
           },
         })
         if (!caseRow) {

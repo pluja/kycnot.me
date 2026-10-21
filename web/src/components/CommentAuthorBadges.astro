@@ -30,14 +30,25 @@ if (!isTeam && !newAccount && !onlyPost) return null
     )
   }
   {
-    affiliations.map((item) => (
-      <BadgeSmall
-        icon={getServiceUserRoleInfo(item.role).icon}
-        color="cyan"
-        text={`${item.service.name} team`}
-        inlineIcon
-      />
-    ))
+    affiliations.map((item) =>
+      item.dnsHost ? (
+        <Tooltip size="sm" text={`Claimed with a DNS record on ${item.dnsHost}. Not verified by KYCnot.me.`}>
+          <BadgeSmall
+            icon={getServiceUserRoleInfo(item.role).icon}
+            color="gray"
+            text={`${item.service.name} team (claimed)`}
+            inlineIcon
+          />
+        </Tooltip>
+      ) : (
+        <BadgeSmall
+          icon={getServiceUserRoleInfo(item.role).icon}
+          color="cyan"
+          text={`${item.service.name} team`}
+          inlineIcon
+        />
+      )
+    )
   }
   {
     newAccount && (

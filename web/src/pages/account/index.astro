@@ -3,19 +3,16 @@ import { Icon } from 'astro-icon/components'
 import { actions } from 'astro:actions'
 import { differenceInCalendarDays } from 'date-fns'
 
-import BadgeSmall from '../../components/BadgeSmall.astro'
 import Button from '../../components/Button.astro'
 import MyPicture from '../../components/MyPicture.astro'
+import ServiceAffiliationLink from '../../components/ServiceAffiliationLink.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import Tooltip from '../../components/Tooltip.astro'
 import TrustUnlocksList from '../../components/TrustUnlocksList.astro'
 import { getServiceSuggestionStatusInfo } from '../../constants/serviceSuggestionStatus'
 import { getServiceSuggestionTypeInfo } from '../../constants/serviceSuggestionType'
-import { getServiceUserRoleInfo } from '../../constants/serviceUserRoles'
 import { trustUnlocksById } from '../../constants/trustUnlocks'
-import { verificationStatusesByValue } from '../../constants/verificationStatus'
 import BaseLayout from '../../layouts/BaseLayout.astro'
-import { cn } from '../../lib/cn'
 import { safeHttpUrl } from '../../lib/exchange/safeUrl'
 import { staffBadgeLabel } from '../../lib/permissions'
 import { pluralize } from '../../lib/pluralize'
@@ -97,6 +94,7 @@ const user = await Astro.locals.banners.try('user', async () => {
         serviceAffiliations: {
           select: {
             role: true,
+            dnsHost: true,
             service: {
               select: {
                 id: true,
@@ -454,59 +452,15 @@ const trustFacts = [
         <Icon name="ri:building-4-line" class="mr-2 inline-block size-5" />
         Service Affiliations
       </h2>
-      <Button as="a" href="/contact?category=ACCOUNT_VERIFICATION" label="Request" size="md" />
+      <Button as="a" href="/account/claim" label="Claim a service" icon="ri:add-line" size="md" />
     </header>
 
     {
       user.serviceAffiliations.length > 0 ? (
         <ul class="grid gap-4 2xs:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
-          {user.serviceAffiliations.map((affiliation) => {
-            const roleInfo = getServiceUserRoleInfo(affiliation.role)
-            const statusIcon = {
-              ...verificationStatusesByValue,
-              APPROVED: undefined,
-            }[affiliation.service.verificationStatus]
-
-            return (
-              <li class="shrink-0">
-                <a
-                  href={`/service/${affiliation.service.slug}`}
-                  class="group flex min-w-32 items-center gap-2 text-sm text-day-300"
-                >
-                  <MyPicture
-                    src={affiliation.service.imageUrl}
-                    fallback="service"
-                    alt={affiliation.service.name}
-                    width={40}
-                    height={40}
-                    class="size-10 shrink-0 rounded-lg object-contain"
-                  />
-                  <div class="flex min-w-0 flex-1 flex-col justify-center">
-                    <div class="flex items-center gap-1.5">
-                      <BadgeSmall color={roleInfo.color} text={roleInfo.label} icon={roleInfo.icon} />
-                      <span class="text-day-500">of</span>
-                    </div>
-
-                    <div class="flex items-center gap-1 font-semibold text-day-300">
-                      <span class="min-w-0 truncate group-hover:underline">{affiliation.service.name}</span>
-                      {statusIcon && (
-                        <Tooltip text={statusIcon.label} position="right" class="-m-1 shrink-0">
-                          <Icon
-                            name={statusIcon.icon}
-                            class={cn(
-                              'inline-block size-6 shrink-0 rounded-lg p-1',
-                              statusIcon.classNames.icon
-                            )}
-                          />
-                        </Tooltip>
-                      )}
-                      <Icon name="ri:external-link-line" class="size-4 shrink-0" />
-                    </div>
-                  </div>
-                </a>
-              </li>
-            )
-          })}
+          {user.serviceAffiliations.map((affiliation) => (
+            <ServiceAffiliationLink affiliation={affiliation} />
+          ))}
         </ul>
       ) : (
         <p class="mb-6 text-day-400">No service affiliations yet.</p>

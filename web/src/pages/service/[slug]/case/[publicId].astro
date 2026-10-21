@@ -20,6 +20,7 @@ import {
   caseVisibilityTiersFor,
   isCasePublished,
   UNPUBLISHED_CASE_STATUSES,
+  verifiedAffiliatesSelect,
 } from '../../../../lib/caseAccess'
 import { prisma } from '../../../../lib/prisma'
 
@@ -98,7 +99,7 @@ const caseRow = await Astro.locals.banners.try(
           },
         },
         participants: { select: { id: true } },
-        service: { select: { name: true, slug: true, affiliatedUsers: { select: { userId: true } } } },
+        service: { select: { name: true, slug: true, affiliatedUsers: verifiedAffiliatesSelect } },
       },
     }),
   null

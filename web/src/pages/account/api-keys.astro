@@ -34,8 +34,7 @@ const apiKeys = await prisma.apiKey.findMany({
   orderBy: { createdAt: 'desc' },
 })
 
-const hasAffiliation = await prisma.serviceUser.count({ where: { userId: user.id } })
-const canCreate = user.canCreateApiKeys && (user.verified || hasAffiliation > 0)
+const canCreate = user.canCreateApiKeys
 const rawKey = createResult && !createResult.error ? createResult.data.rawKey : null
 ---
 
@@ -128,22 +127,24 @@ const rawKey = createResult && !createResult.error ? createResult.data.rawKey : 
           name="name"
           inputProps={{ required: true, maxlength: 100, placeholder: 'e.g. My Application' }}
         />
-        <Button type="submit" icon="ri:add-line" label="Create API Key" color="success" shadow class="w-full" />
+        <Button
+          type="submit"
+          icon="ri:add-line"
+          label="Create API Key"
+          color="success"
+          shadow
+          class="w-full"
+        />
       </form>
     ) : canCreate && apiKeys.length > 0 ? (
       <p class="text-center text-sm text-day-400">
         You already have an API key. Delete it to create a new one.
       </p>
-    ) : !user.canCreateApiKeys ? (
+    ) : (
       <div class="rounded-lg border border-night-400 bg-night-600 p-6 text-center">
         <Icon name="ri:lock-line" class="mx-auto mb-2 size-8 text-day-500" />
         <p class="text-day-300">API key creation is not enabled for your account.</p>
         <p class="mt-1 text-sm text-day-500">Contact an admin to request access.</p>
-      </div>
-    ) : (
-      <div class="rounded-lg border border-night-400 bg-night-600 p-6 text-center">
-        <Icon name="ri:lock-line" class="mx-auto mb-2 size-8 text-day-500" />
-        <p class="text-day-300">You must be verified or affiliated with a service to create API keys.</p>
       </div>
     )
   }

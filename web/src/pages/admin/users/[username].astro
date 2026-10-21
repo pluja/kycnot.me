@@ -15,6 +15,7 @@ import InputTextArea from '../../../components/InputTextArea.astro'
 import Markdown from '../../../components/Markdown.astro'
 import MyPicture from '../../../components/MyPicture.astro'
 import TimeFormatted from '../../../components/TimeFormatted.astro'
+import Tooltip from '../../../components/Tooltip.astro'
 import { capabilities, capabilityRequirements, getCapabilityInfo } from '../../../constants/capabilities'
 import { capabilityPresets } from '../../../constants/capabilityPresets'
 import { getServiceUserRoleInfo, serviceUserRoles } from '../../../constants/serviceUserRoles'
@@ -83,6 +84,7 @@ const [user, allServices] = await Astro.locals.banners.tryMany([
               id: true,
               role: true,
               createdAt: true,
+              dnsHost: true,
               service: {
                 select: {
                   id: true,
@@ -434,6 +436,18 @@ const staffLabel = staffBadgeLabel(user)
                   <span>{affiliation.service.name}</span>
                   <Icon name="ri:external-link-line" class="size-3.5 text-day-400" />
                 </a>
+                {affiliation.dnsHost && (
+                  <form method="POST" action={actions.admin.user.serviceAffiliations.add} class="contents">
+                    <input type="hidden" name="userId" value={user.id} />
+                    <input type="hidden" name="serviceId" value={affiliation.service.id} />
+                    <input type="hidden" name="role" value={affiliation.role} />
+                    <Tooltip
+                      text={`Claimed with the DNS record on ${affiliation.dnsHost}, re-checked daily. Verify it to open the service's cases to this user.`}
+                    >
+                      <Button type="submit" size="sm" variant="faded" label="Verify" icon="ri:global-line" />
+                    </Tooltip>
+                  </form>
+                )}
                 <TimeFormatted
                   date={affiliation.createdAt}
                   hourPrecision
