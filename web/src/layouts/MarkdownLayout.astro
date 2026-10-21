@@ -24,7 +24,14 @@ type Props = ComponentProps<typeof BaseLayout> &
     faq?: { question: string; answer: string }[]
   }>
 
-const { frontmatter, schemas, ...baseLayoutProps } = Astro.props
+const { frontmatter, headings, schemas, ...baseLayoutProps } = Astro.props
+
+const FAQ_SLUG = 'frequently-asked-questions'
+const MIN_SECTIONS_FOR_CONTENTS = 3
+const sections = [
+  ...headings.filter((heading) => heading.depth === 2),
+  ...(frontmatter.faq?.length ? [{ slug: FAQ_SLUG, text: 'Frequently asked questions' }] : []),
+]
 const publishDate = frontmatter.updatedAt ? new Date(frontmatter.updatedAt) : null
 const ogImageTemplateData = {
   template: 'generic',
@@ -73,7 +80,7 @@ const ogImageTemplateData = {
 >
   <div class="custom-bg-dots-fade absolute inset-x-0 top-0 -z-1 h-128 opacity-15"></div>
   <div
-    class="mx-auto prose prose-invert prose-headings:text-green-400 prose-h1:my-8 prose-h1:text-[2.5rem] prose-h1:font-bold prose-h1:drop-shadow-[0_0_10px_rgba(0,255,0,0.3)] prose-h2:my-6 prose-h2:border-b prose-h2:border-green-900 prose-h2:pb-1 prose-h2:text-[1.8rem] prose-h2:font-semibold prose-h2:text-green-500 prose-h3:my-4 prose-h3:text-[1.4rem] prose-h3:font-semibold prose-h3:text-green-600 prose-h4:my-3 prose-h4:text-[1.2rem] prose-h4:font-semibold prose-h4:text-green-700 prose-p:my-4 prose-p:leading-relaxed prose-p:text-gray-300 prose-a:border-b prose-a:border-green-900 prose-a:text-green-400 prose-a:no-underline prose-a:transition-all prose-a:hover:border-green-400 prose-a:hover:text-green-400 prose-a:hover:drop-shadow-[0_0_8px_rgba(0,255,0,0.4)] prose-strong:font-semibold prose-strong:drop-shadow-[0_0_5px_rgba(0,255,0,0.2)] prose-ol:text-gray-300 prose-ul:text-gray-300 prose-li:my-2 prose-li:leading-relaxed"
+    class="mx-auto prose prose-invert prose-headings:scroll-mt-24 prose-headings:text-green-400 prose-h1:my-8 prose-h1:text-[2.5rem] prose-h1:font-bold prose-h1:drop-shadow-[0_0_10px_rgba(0,255,0,0.3)] prose-h2:my-6 prose-h2:border-b prose-h2:border-green-900 prose-h2:pb-1 prose-h2:text-[1.8rem] prose-h2:font-semibold prose-h2:text-green-500 prose-h3:my-4 prose-h3:text-[1.4rem] prose-h3:font-semibold prose-h3:text-green-600 prose-h4:my-3 prose-h4:text-[1.2rem] prose-h4:font-semibold prose-h4:text-green-700 prose-p:my-4 prose-p:leading-relaxed prose-p:text-gray-300 prose-a:border-b prose-a:border-green-900 prose-a:text-green-400 prose-a:no-underline prose-a:transition-all prose-a:hover:border-green-400 prose-a:hover:text-green-400 prose-a:hover:drop-shadow-[0_0_8px_rgba(0,255,0,0.4)] prose-strong:font-semibold prose-strong:drop-shadow-[0_0_5px_rgba(0,255,0,0.2)] prose-ol:text-gray-300 prose-ul:text-gray-300 prose-li:my-2 prose-li:leading-relaxed"
   >
     <h1 class="mb-0!">{frontmatter.title}</h1>
     {
@@ -84,11 +91,31 @@ const ogImageTemplateData = {
       )
     }
 
+    {
+      sections.length >= MIN_SECTIONS_FOR_CONTENTS && (
+        <nav
+          aria-label="On this page"
+          class="not-prose my-6 rounded-lg border border-night-600 bg-night-800/50 px-4 py-3"
+        >
+          <p class="text-xs font-semibold tracking-wider text-day-400 uppercase">On this page</p>
+          <ol class="mt-2 gap-x-6 text-sm sm:columns-2">
+            {sections.map((section) => (
+              <li class="mb-1 break-inside-avoid">
+                <a href={`#${section.slug}`} class="text-green-400 hover:text-green-300 hover:underline">
+                  {section.text}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      )
+    }
+
     <slot />
     {
       !!frontmatter.faq?.length && (
         <section>
-          <h2>Frequently asked questions</h2>
+          <h2 id={FAQ_SLUG}>Frequently asked questions</h2>
           {frontmatter.faq.map((item) => (
             <>
               <h3>{item.question}</h3>
