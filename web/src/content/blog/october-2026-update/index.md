@@ -43,6 +43,8 @@ When a comment is rejected, you now see the reason. Some reasons, like off-topic
 
 People who run a listed service can now claim it themselves. Add a TXT record with your username to the service's website domain, press a button, and that's it. No waiting for support.
 
+![The claim page: pick the service, then add the TXT record shown, with its type, name and value, to the service's domain](./claim-a-service.webp)
+
 Claimed accounts get a team badge, and their replies on their own service are marked as coming from the team and published right away. We check the record every day, so the claim lasts only while the record does. Owner status, and access to private case files, still go through us. Services flagged as scams can't be claimed. [How to claim a service](/docs/trust#claiming-a-service).
 
 ## Badges for your site
