@@ -111,12 +111,18 @@ export default defineConfig({
   trailingSlash: 'never',
   experimental: {
     fonts: [
+      // Served from the repo so a build never depends on a font CDN being reachable.
       {
-        provider: fontProviders.fontsource(),
+        provider: fontProviders.local(),
         name: 'Space Grotesk',
         cssVariable: '--font-title-base',
-        weights: [400, 500, 700],
-        styles: ['normal'],
+        options: {
+          variants: [
+            { weight: 400, style: 'normal', src: ['./src/assets/fonts/SpaceGrotesk-latin-400.woff2'] },
+            { weight: 500, style: 'normal', src: ['./src/assets/fonts/SpaceGrotesk-latin-500.woff2'] },
+            { weight: 700, style: 'normal', src: ['./src/assets/fonts/SpaceGrotesk-latin-700.woff2'] },
+          ],
+        },
       },
     ],
   },
