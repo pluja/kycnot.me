@@ -22,6 +22,13 @@ type Props = HTMLAttributes<'section'> & {
 }
 const { comment, actionPath, class: className, ...props } = Astro.props
 if (!Astro.locals.userCan('comments:moderate')) return null
+// hiddenForDecision hides a reason while the other decision is picked. The !important beats the open list's
+// display rule, so it holds even while the list is open.
+const hiddenForDecision = {
+  both: undefined,
+  hold: 'group-has-[[data-decision=REJECTED]:checked]/decision:hidden!',
+  reject: 'group-has-[[data-decision=PENDING]:checked]/decision:hidden!',
+} as const
 const decisions = [
   {
     value: 'APPROVED',
@@ -122,17 +129,21 @@ const selectedDecision = replay.text('status', currentDecision)
       <InputRichSelect
         name="decisionReason"
         label="Reason"
+        groupClass={hiddenForDecision.reject}
         selectedValue={replay.text('decisionReason', '')}
         options={[
           { value: '', label: 'Choose a reason', description: 'Without one, explain in Details.' },
-          ...commentRules.map((rule) => ({
-            value: rule.value,
-            label: rule.label,
-            icon: rule.icon,
-            iconClass: rule.penalizes ? 'text-red-400' : undefined,
-            description: rule.description,
-            tag: rule.penalizes ? 'Counts against trust' : undefined,
-          })),
+          ...[...commentRules]
+            .sort((a, b) => Number(b.penalizes) - Number(a.penalizes))
+            .map((rule) => ({
+              value: rule.value,
+              label: rule.label,
+              icon: rule.icon,
+              iconClass: rule.penalizes ? 'text-red-400' : undefined,
+              description: rule.description,
+              group: rule.penalizes ? 'Counts against trust' : "Doesn't count against trust",
+              class: hiddenForDecision[rule.appliesTo],
+            })),
         ]}
       />
       <InputText

@@ -15,11 +15,15 @@ type Props = Omit<ComponentProps<typeof InputWrapper>, 'children' | 'inputId'> &
     iconClass?: string
     description?: string
     tag?: string
+    // group starts a labelled section when it differs from the previous option's.
+    group?: string
+    class?: string
   }[]
   selectedValue?: string
+  groupClass?: string
 }
 
-const { options, selectedValue, class: className, ...wrapperProps } = Astro.props
+const { options, selectedValue, groupClass, class: className, ...wrapperProps } = Astro.props
 
 const checkedValue = options.some((option) => option.value === selectedValue)
   ? selectedValue
@@ -41,39 +45,52 @@ const checkedValue = options.some((option) => option.value === selectedValue)
       )}
     >
       {
-        options.map((option) => (
-          <li class="hidden group-focus-within/rich-select:block has-checked:block">
-            <label class="flex cursor-pointer items-start gap-2.5 px-3 py-2 hover:bg-night-700 has-checked:bg-night-700/60 has-focus-visible:ring-2 has-focus-visible:ring-day-300 has-focus-visible:ring-inset">
-              <input
-                type="radio"
-                name={wrapperProps.name}
-                value={option.value}
-                checked={option.value === checkedValue}
-                class="sr-only"
-              />
-              {option.icon ? (
-                <Icon
-                  name={option.icon}
-                  class={cn('mt-0.5 size-4 shrink-0 text-day-300', option.iconClass)}
-                />
-              ) : (
-                <span class="size-4 shrink-0" />
-              )}
-              <span class="min-w-0 flex-1">
-                <span class="flex flex-wrap items-center gap-x-2 text-sm text-day-100">
-                  {option.label}
-                  {option.tag && <span class="text-2xs font-medium text-red-300">{option.tag}</span>}
-                </span>
-                {option.description && (
-                  <span class="block text-xs text-pretty text-day-400">{option.description}</span>
+        options.map((option, index) => (
+          <>
+            {option.group && option.group !== options[index - 1]?.group && (
+              <li
+                class={cn(
+                  'hidden px-3 pt-3 pb-1 text-2xs font-semibold tracking-wider text-day-500 uppercase group-focus-within/rich-select:block',
+                  groupClass
                 )}
-              </span>
-              <Icon
-                name="ri:arrow-down-s-line"
-                class="mt-0.5 size-4 shrink-0 text-day-400 group-focus-within/rich-select:hidden"
-              />
-            </label>
-          </li>
+                aria-hidden="true"
+              >
+                {option.group}
+              </li>
+            )}
+            <li class={cn('hidden group-focus-within/rich-select:block has-checked:block', option.class)}>
+              <label class="flex cursor-pointer items-start gap-2.5 px-3 py-2 hover:bg-night-700 has-checked:bg-night-700/60 has-focus-visible:ring-2 has-focus-visible:ring-day-300 has-focus-visible:ring-inset">
+                <input
+                  type="radio"
+                  name={wrapperProps.name}
+                  value={option.value}
+                  checked={option.value === checkedValue}
+                  class="sr-only"
+                />
+                {option.icon ? (
+                  <Icon
+                    name={option.icon}
+                    class={cn('mt-0.5 size-4 shrink-0 text-day-300', option.iconClass)}
+                  />
+                ) : (
+                  <span class="size-4 shrink-0" />
+                )}
+                <span class="min-w-0 flex-1">
+                  <span class="flex flex-wrap items-center gap-x-2 text-sm text-day-100">
+                    {option.label}
+                    {option.tag && <span class="text-2xs font-medium text-red-300">{option.tag}</span>}
+                  </span>
+                  {option.description && (
+                    <span class="block text-xs text-pretty text-day-400">{option.description}</span>
+                  )}
+                </span>
+                <Icon
+                  name="ri:arrow-down-s-line"
+                  class="mt-0.5 size-4 shrink-0 text-day-400 group-focus-within/rich-select:hidden"
+                />
+              </label>
+            </li>
+          </>
         ))
       }
     </ul>

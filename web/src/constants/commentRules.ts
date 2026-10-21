@@ -15,6 +15,8 @@ type CommentRuleInfo<T extends string | null | undefined = string> = {
   // Readers can pick it when reporting a post.
   reportable: boolean
   requiresDetails: boolean
+  // appliesTo says whether moderators can pick it when holding a comment, rejecting it, or both.
+  appliesTo: 'both' | 'hold' | 'reject'
 }
 
 export const {
@@ -31,25 +33,29 @@ export const {
     penalizes: false,
     reportable: false,
     requiresDetails: false,
+    appliesTo: 'reject',
   }),
   [
     {
       value: 'SPAM',
       label: 'Spam or advertising',
-      description: 'Promotes a product, a referral link or another service.',
+      description: 'Promotes a product, a referral link or another service, or is gibberish or a test.',
       icon: 'ri:megaphone-line',
       penalizes: true,
       reportable: true,
       requiresDetails: false,
+      appliesTo: 'reject',
     },
     {
       value: 'SCAM_CONTACT',
       label: 'Scam link or contact',
-      description: 'Points readers to a phishing site, a fake support contact or a scam.',
+      description:
+        'Points readers to a phishing site, a fake support contact, a scam or a risky offer such as a cash meetup.',
       icon: 'ri:error-warning-line',
       penalizes: true,
       reportable: true,
       requiresDetails: false,
+      appliesTo: 'reject',
     },
     {
       value: 'HARASSMENT',
@@ -59,6 +65,7 @@ export const {
       penalizes: true,
       reportable: true,
       requiresDetails: false,
+      appliesTo: 'reject',
     },
     {
       value: 'SLUR',
@@ -68,6 +75,7 @@ export const {
       penalizes: true,
       reportable: true,
       requiresDetails: false,
+      appliesTo: 'reject',
     },
     {
       value: 'PRIVATE_INFO',
@@ -77,33 +85,37 @@ export const {
       penalizes: true,
       reportable: true,
       requiresDetails: false,
+      appliesTo: 'reject',
     },
     {
       value: 'NOT_GENUINE',
       label: 'Not a genuine experience',
-      description: 'The comment describes something that did not happen.',
+      description: 'Describes something that did not happen, or is part of a coordinated wave of comments.',
       icon: 'ri:question-line',
       penalizes: true,
       reportable: true,
       requiresDetails: false,
+      appliesTo: 'reject',
     },
     {
       value: 'PAID_PROMOTION',
-      label: 'Paid promotion',
-      description: 'Written for pay or a reward from the service, not from real use.',
+      label: 'Promotion',
+      description: 'Written to promote the service: paid, by its own team, or copied from its marketing.',
       icon: 'ri:money-dollar-circle-line',
       penalizes: true,
       reportable: true,
       requiresDetails: false,
+      appliesTo: 'reject',
     },
     {
       value: 'DUPLICATE',
-      label: 'Duplicate',
-      description: 'Repeats a comment the same author already made.',
+      label: 'Duplicate or superseded',
+      description: 'Repeats a comment the same author already made, or a newer one replaces it.',
       icon: 'ri:file-copy-line',
       penalizes: false,
       reportable: false,
       requiresDetails: false,
+      appliesTo: 'reject',
     },
     {
       value: 'NO_LONGER_APPLIES',
@@ -113,6 +125,7 @@ export const {
       penalizes: false,
       reportable: false,
       requiresDetails: false,
+      appliesTo: 'reject',
     },
     {
       value: 'AUTHOR_REQUEST',
@@ -122,15 +135,17 @@ export const {
       penalizes: false,
       reportable: false,
       requiresDetails: false,
+      appliesTo: 'reject',
     },
     {
       value: 'OFF_TOPIC',
-      label: 'Off-topic',
-      description: 'Not about this service.',
+      label: 'Off-topic or wrong service',
+      description: 'Not about this service. If it is about another listed service, post it there.',
       icon: 'ri:question-answer-line',
       penalizes: false,
       reportable: false,
       requiresDetails: false,
+      appliesTo: 'reject',
     },
     {
       value: 'NOT_ENOUGH_DETAIL',
@@ -141,6 +156,70 @@ export const {
       penalizes: false,
       reportable: false,
       requiresDetails: false,
+      appliesTo: 'both',
+    },
+    {
+      value: 'PROOF_INVALID',
+      label: 'Proof missing or invalid',
+      description:
+        'The order ID was not found, belongs to another service, or does not show the experience. Post again with valid proof.',
+      icon: 'ri:file-warning-line',
+      penalizes: false,
+      reportable: false,
+      requiresDetails: false,
+      appliesTo: 'reject',
+    },
+    {
+      value: 'BELONGS_ELSEWHERE',
+      label: 'Belongs elsewhere',
+      description:
+        'A question for the service, a listing correction or a message for us. Use their support, a suggestion or the contact page.',
+      icon: 'ri:direction-line',
+      penalizes: false,
+      reportable: false,
+      requiresDetails: false,
+      appliesTo: 'reject',
+    },
+    {
+      value: 'REPORT_HANDLED',
+      label: 'Report handled',
+      description: 'We acted on what the comment reported, for example by updating the listing.',
+      icon: 'ri:checkbox-circle-line',
+      penalizes: false,
+      reportable: false,
+      requiresDetails: false,
+      appliesTo: 'reject',
+    },
+    {
+      value: 'AWAITING_PROOF',
+      label: 'Awaiting proof',
+      description: 'Waiting for the author to send proof.',
+      icon: 'ri:hourglass-line',
+      penalizes: false,
+      reportable: false,
+      requiresDetails: false,
+      appliesTo: 'hold',
+    },
+    {
+      value: 'CHECKING_CLAIM',
+      label: 'Checking the claim',
+      description: 'We are verifying it with the service or testing it ourselves.',
+      icon: 'ri:search-eye-line',
+      penalizes: false,
+      reportable: false,
+      requiresDetails: false,
+      appliesTo: 'hold',
+    },
+    {
+      value: 'LISTING_CHECK',
+      label: 'Listing check needed',
+      description:
+        'It reports a change to the service, such as an outage or a new policy, that we need to verify.',
+      icon: 'ri:list-check-3',
+      penalizes: false,
+      reportable: false,
+      requiresDetails: false,
+      appliesTo: 'hold',
     },
     {
       value: 'OTHER',
@@ -150,6 +229,7 @@ export const {
       penalizes: false,
       reportable: false,
       requiresDetails: true,
+      appliesTo: 'both',
     },
   ] as const satisfies CommentRuleInfo<CommentRule>[]
 )

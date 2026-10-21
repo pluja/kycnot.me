@@ -8,13 +8,25 @@ import { evidenceCheckInput, publicationInput } from './experienceModerationInpu
 void test('decisions must be explicit and preset reasons are validated', () => {
   assert.equal(publicationInput.safeParse({ commentId: 1 }).success, false)
   for (const status of ['PENDING', 'REJECTED']) {
-    assert.equal(publicationInput.safeParse({ commentId: 1, status, decisionReason: 'SPAM' }).success, true)
+    assert.equal(
+      publicationInput.safeParse({ commentId: 1, status, decisionReason: 'NOT_ENOUGH_DETAIL' }).success,
+      true
+    )
     assert.equal(publicationInput.safeParse({ commentId: 1, status, decisionReason: 'OTHER' }).success, false)
     assert.equal(
       publicationInput.safeParse({ commentId: 1, status, decisionReason: 'MADE_UP' }).success,
       false
     )
   }
+})
+
+void test('each reason fits only the decisions it applies to', () => {
+  const parse = (status: string, decisionReason: string) =>
+    publicationInput.safeParse({ commentId: 1, status, decisionReason }).success
+  assert.equal(parse('REJECTED', 'SPAM'), true)
+  assert.equal(parse('PENDING', 'SPAM'), false)
+  assert.equal(parse('PENDING', 'AWAITING_PROOF'), true)
+  assert.equal(parse('REJECTED', 'AWAITING_PROOF'), false)
 })
 
 void test('switching to publish discards hidden hold and rejection fields', () => {

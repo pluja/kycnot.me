@@ -65,13 +65,15 @@ These are the only reasons we reject a review. Reports use the same list.
     </tr>
   </thead>
   <tbody>
-    {commentRules.map((rule) => (
-      <tr>
-        <td>{rule.label}</td>
-        <td>{rule.description}</td>
-        <td>{rule.penalizes ? 'Yes' : 'No'}</td>
-      </tr>
-    ))}
+    {commentRules
+      .filter((rule) => rule.appliesTo !== 'hold')
+      .map((rule) => (
+        <tr>
+          <td>{rule.label}</td>
+          <td>{rule.description}</td>
+          <td>{rule.penalizes ? 'Yes' : 'No'}</td>
+        </tr>
+      ))}
   </tbody>
 </table>
 

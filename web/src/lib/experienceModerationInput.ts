@@ -47,6 +47,20 @@ export const publicationInput = z
       })
     }
     const decisionReason = input.decisionReason || undefined
+    const appliesTo = decisionReason ? getCommentRuleInfo(decisionReason).appliesTo : 'both'
+    if (
+      (input.status === 'REJECTED' && appliesTo === 'hold') ||
+      (input.status === 'PENDING' && appliesTo === 'reject')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['decisionReason'],
+        message:
+          input.status === 'REJECTED'
+            ? 'That reason is for holding a comment.'
+            : 'That reason is for rejecting a comment.',
+      })
+    }
     const needsDetails =
       input.status !== 'APPROVED' && (!decisionReason || getCommentRuleInfo(decisionReason).requiresDetails)
     if ((needsDetails || input.reason.length > 0) && input.reason.length < MODERATOR_REASON_LENGTH.min) {
