@@ -94,7 +94,6 @@ const user = await Astro.locals.banners.try('user', async () => {
         serviceAffiliations: {
           select: {
             role: true,
-            dnsHost: true,
             service: {
               select: {
                 id: true,

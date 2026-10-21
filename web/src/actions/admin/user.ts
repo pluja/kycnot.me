@@ -319,12 +319,8 @@ export const adminUserActions = {
                     serviceId: input.serviceId,
                   },
                 },
-                // Staff setting the role takes the affiliation over: it is verified and no longer depends on DNS.
                 data: {
                   role: input.role as ServiceUserRole,
-                  dnsHost: null,
-                  dnsFailedChecks: 0,
-                  domainRegisteredAt: null,
                 },
               })
               await recordAuditLog(tx, {
@@ -332,7 +328,7 @@ export const adminUserActions = {
                 action: 'UPDATED',
                 targetType: 'USER',
                 targetId: input.userId,
-                summary: `Affiliation with ${service.name} verified as ${input.role.toLowerCase().replace('_', ' ')}`,
+                summary: `Affiliation with ${service.name} changed to ${input.role.toLowerCase().replace('_', ' ')}`,
               })
               return updated
             })

@@ -6,7 +6,7 @@ import {
   canParticipateInCase,
   isCaseStaff,
   isCasePublished,
-  verifiedAffiliatesSelect,
+  caseAccessAffiliatesSelect,
 } from '../../lib/caseAccess'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { deleteFileLocally, saveFileLocally } from '../../lib/fileStorage'
@@ -274,7 +274,7 @@ export const adminCaseActions = {
             status: true,
             reportedById: true,
             participants: { select: { id: true } },
-            service: { select: { affiliatedUsers: verifiedAffiliatesSelect } },
+            service: { select: { affiliatedUsers: caseAccessAffiliatesSelect } },
           },
         })
         if (!caseRow) {

@@ -15,7 +15,6 @@ type Props = {
   affiliation: Prisma.ServiceUserGetPayload<{
     select: {
       role: true
-      dnsHost: true
       service: { select: { name: true; slug: true; imageUrl: true; verificationStatus: true } }
     }
   }>
@@ -45,13 +44,6 @@ const statusIcon = { ...verificationStatusesByValue, APPROVED: undefined }[
       <div class="flex items-center gap-1.5">
         <BadgeSmall color={roleInfo.color} text={roleInfo.label} icon={roleInfo.icon} />
         <span class="text-day-500">of</span>
-        {
-          affiliation.dnsHost && (
-            <Tooltip text={`Claimed with a DNS record on ${affiliation.dnsHost}. Not verified by KYCnot.me.`}>
-              <span class="text-xs text-day-500 underline decoration-dotted">claimed</span>
-            </Tooltip>
-          )
-        }
       </div>
 
       <div class="flex items-center gap-1 font-semibold text-day-300">

@@ -4,6 +4,8 @@ import { getCaseStatusInfo } from '../constants/caseStatus'
 
 import { userCan } from './permissions'
 
+import type { Prisma } from '@prisma/client'
+
 type CaseAccessUser = { id: number; admin: boolean; capabilities: string[] } | null | undefined
 
 type CaseForAccess = {
@@ -27,9 +29,13 @@ export function isCasePublished(status: CaseStatus): boolean {
   return getCaseStatusInfo(status).public
 }
 
-// verifiedAffiliatesSelect loads the affiliations that open a case to its service: staff-verified ones. A DNS claim
-// alone shows a badge but must not reveal reporters' evidence, since a lapsed domain can be bought by anyone.
-export const verifiedAffiliatesSelect = { where: { dnsHost: null }, select: { userId: true } } as const
+// caseAccessAffiliatesSelect loads the affiliations that open a case to its service: owners, whom staff appoint, and
+// affiliations staff added by hand. A DNS claim alone must not reveal reporters' evidence, since a lapsed domain can be
+// bought by anyone.
+export const caseAccessAffiliatesSelect = {
+  where: { OR: [{ role: 'OWNER' }, { dnsHost: null }] },
+  select: { userId: true },
+} as const satisfies Prisma.ServiceUserFindManyArgs
 
 // Staff can always participate. Otherwise a user must be the reporter, an
 // attached participant, or affiliated with the reported service.

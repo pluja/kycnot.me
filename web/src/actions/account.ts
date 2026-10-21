@@ -328,6 +328,7 @@ export const accountActions = {
           serviceUrls: true,
           listedAt: true,
           unreachableChecks: true,
+          verificationStatus: true,
           affiliatedUsers: { where: { userId: user.id }, select: { id: true } },
         },
       })
@@ -336,6 +337,12 @@ export const accountActions = {
         throw new ActionError({
           code: 'CONFLICT',
           message: `You are already affiliated with ${service.name}.`,
+        })
+      }
+      if (service.verificationStatus === 'VERIFICATION_FAILED') {
+        throw new ActionError({
+          code: 'FORBIDDEN',
+          message: `${service.name} is flagged as a scam, so it can't be claimed.`,
         })
       }
       if (service.unreachableChecks > 0) {

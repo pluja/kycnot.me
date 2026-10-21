@@ -4,7 +4,7 @@ import path from 'node:path'
 import { UPLOAD_DIR } from 'astro:env/server'
 import { lookup } from 'mime-types'
 
-import { canViewCaseEvidence, verifiedAffiliatesSelect } from '../../lib/caseAccess'
+import { canViewCaseEvidence, caseAccessAffiliatesSelect } from '../../lib/caseAccess'
 import { prisma } from '../../lib/prisma'
 
 import type { APIRoute } from 'astro'
@@ -37,7 +37,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
           status: true,
           reportedById: true,
           participants: { select: { id: true } },
-          service: { select: { affiliatedUsers: verifiedAffiliatesSelect } },
+          service: { select: { affiliatedUsers: caseAccessAffiliatesSelect } },
         },
       },
     },

@@ -437,16 +437,9 @@ const staffLabel = staffBadgeLabel(user)
                   <Icon name="ri:external-link-line" class="size-3.5 text-day-400" />
                 </a>
                 {affiliation.dnsHost && (
-                  <form method="POST" action={actions.admin.user.serviceAffiliations.add} class="contents">
-                    <input type="hidden" name="userId" value={user.id} />
-                    <input type="hidden" name="serviceId" value={affiliation.service.id} />
-                    <input type="hidden" name="role" value={affiliation.role} />
-                    <Tooltip
-                      text={`Claimed with the DNS record on ${affiliation.dnsHost}, re-checked daily. Verify it to open the service's cases to this user.`}
-                    >
-                      <Button type="submit" size="sm" variant="faded" label="Verify" icon="ri:global-line" />
-                    </Tooltip>
-                  </form>
+                  <Tooltip text={`Claimed with the DNS record on ${affiliation.dnsHost}, re-checked daily.`}>
+                    <Icon name="ri:global-line" class="size-4 text-day-400" aria-label="Claimed with DNS" />
+                  </Tooltip>
                 )}
                 <TimeFormatted
                   date={affiliation.createdAt}

@@ -102,7 +102,6 @@ const user = await Astro.locals.banners.try('user', async () => {
           where: { service: profileServiceWhere },
           select: {
             role: true,
-            dnsHost: true,
             service: {
               select: {
                 id: true,

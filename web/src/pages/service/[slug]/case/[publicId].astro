@@ -1,5 +1,4 @@
 ---
-import { makeCommentUrl } from '../../../../lib/commentsWithReplies'
 import { Icon } from 'astro-icon/components'
 import { actions, isInputError } from 'astro:actions'
 
@@ -20,8 +19,9 @@ import {
   caseVisibilityTiersFor,
   isCasePublished,
   UNPUBLISHED_CASE_STATUSES,
-  verifiedAffiliatesSelect,
+  caseAccessAffiliatesSelect,
 } from '../../../../lib/caseAccess'
+import { makeCommentUrl } from '../../../../lib/commentsWithReplies'
 import { prisma } from '../../../../lib/prisma'
 
 import type { Prisma } from '@prisma/client'
@@ -99,7 +99,7 @@ const caseRow = await Astro.locals.banners.try(
           },
         },
         participants: { select: { id: true } },
-        service: { select: { name: true, slug: true, affiliatedUsers: verifiedAffiliatesSelect } },
+        service: { select: { name: true, slug: true, affiliatedUsers: caseAccessAffiliatesSelect } },
       },
     }),
   null

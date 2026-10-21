@@ -68,7 +68,6 @@ const commentThreadSelect = {
       serviceAffiliations: {
         select: {
           role: true,
-          dnsHost: true,
           service: {
             select: {
               name: true,
@@ -101,7 +100,7 @@ export const commentFeedSelect = {
       capabilities: true,
       _count: { select: { comments: { where: { status: { in: publishedCommentStatuses } } } } },
       serviceAffiliations: {
-        select: { role: true, dnsHost: true, service: { select: { name: true, slug: true } } },
+        select: { role: true, service: { select: { name: true, slug: true } } },
       },
     },
   },
@@ -160,7 +159,6 @@ export type CommentBadgeFields = {
     _count: { comments: number }
     serviceAffiliations: {
       role: ServiceUserRole
-      dnsHost: string | null
       service: { name: string; slug: string }
     }[]
   } | null

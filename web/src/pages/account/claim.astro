@@ -40,6 +40,7 @@ const [service, services] = await Astro.locals.banners.tryMany([
               slug: true,
               imageUrl: true,
               serviceUrls: true,
+              verificationStatus: true,
               affiliatedUsers: { where: { userId: user.id }, select: { id: true } },
             },
           })
@@ -116,6 +117,8 @@ const claimActionUrl = service
             </a>
             .
           </p>
+        ) : service.verificationStatus === 'VERIFICATION_FAILED' ? (
+          <p class="text-day-300">{service.name} is flagged as a scam, so it can't be claimed.</p>
         ) : hosts.length === 0 ? (
           <p class="text-day-300">
             {service.name} lists no website of its own, so it can't be claimed with DNS.{' '}
@@ -190,8 +193,8 @@ const claimActionUrl = service
                   After {CLAIM_MAX_FAILED_CHECKS} misses in a row the affiliation is removed.
                 </p>
                 <p>
-                  Your profile shows the affiliation as claimed. Our team verifies it before it opens the
-                  service's private case files, and only on request lists you as the owner:{' '}
+                  Your replies on {service.name} show as coming from its team and publish right away. To be
+                  listed as the owner, which also opens the private files of cases against the service,{' '}
                   <a href="/contact?category=ACCOUNT_VERIFICATION" class="underline">
                     contact us
                   </a>
