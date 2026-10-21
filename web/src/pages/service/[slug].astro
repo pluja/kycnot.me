@@ -930,11 +930,15 @@ const showsSingleThread = Astro.url.searchParams.has('comment')
             label="Share an experience"
             icon="ri:chat-new-line"
           />
-          <DropdownButtonItemLink
-            href={`/account/claim?service=${service.slug}`}
-            label="I work for this service"
-            icon="ri:building-4-line"
-          />
+          {
+            !user?.admin && service.affiliatedUsers.length === 0 && (
+              <DropdownButtonItemLink
+                href={`/account/claim?service=${service.slug}`}
+                label="Claim this service"
+                icon="ri:building-4-line"
+              />
+            )
+          }
           {
             canEmbedServiceBadge && (
               <DropdownButtonItemLink
