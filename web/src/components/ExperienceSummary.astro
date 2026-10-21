@@ -9,6 +9,7 @@ import { summaryVerdict, verdictCounts, type VerdictTone } from '../lib/experien
 import { formatDaysAgo } from '../lib/timeAgo'
 
 import SentimentBar from './SentimentBar.astro'
+import Tooltip from './Tooltip.astro'
 
 type Props = {
   summary: ExperienceSummaryData
@@ -87,14 +88,17 @@ const proofPhrase =
                 </a>
               ))}
             </div>
-            <a
+            <Tooltip
+              as="a"
               href={filterUrl({ ...recent, evidence: 'checked' })}
               class="inline-flex items-center gap-1 text-xs text-day-400 hover:text-day-200 hover:underline"
               rel="nofollow"
+              size="sm"
+              text="A moderator checked the proof, usually on the service's own order lookup."
             >
               <Icon name="ri:shield-check-line" class="size-3.5" />
               {proofPhrase}
-            </a>
+            </Tooltip>
           </div>
         </>
       )}
