@@ -21,6 +21,7 @@ from pyworker.database import (
 )
 from pyworker.scheduler import TaskScheduler
 from .tasks import (
+    AffiliationDnsTask,
     CommentModerationTask,
     ContactCleanupTask,
     SuggestionCleanupTask,
@@ -41,6 +42,7 @@ _TASKS_WITHOUT_SCHEDULER_INSTANCE = {
     "scan_sweep",
     "service_score_recalc_all",
     "suggestion_cleanup",
+    "affiliation_dns",
 }
 
 
@@ -147,6 +149,11 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     subparsers.add_parser(
         "contact-cleanup",
         help="Delete resolved contact threads past their 30-day retention window",
+    )
+
+    subparsers.add_parser(
+        "affiliation-dns",
+        help="Re-check DNS-claimed service affiliations and remove the ones whose record is gone",
     )
 
     cleanup_parser = subparsers.add_parser(
@@ -600,6 +607,20 @@ def run_suggestion_cleanup_task(close_pool: bool = True, dry_run: bool = False) 
             close_db_pool()
 
 
+def run_affiliation_dns_task(close_pool: bool = True) -> int:
+    logger.info("Starting affiliation DNS task")
+    try:
+        with AffiliationDnsTask() as task:  # type: ignore
+            task.run()  # type: ignore
+        return 0
+    except Exception as e:
+        logger.exception(f"Error running affiliation DNS task: {e}")
+        return 1
+    finally:
+        if close_pool:
+            close_db_pool()
+
+
 def run_worker_mode() -> int:
     """
     Run in worker mode, scheduling tasks to run periodically.
@@ -629,6 +650,7 @@ def run_worker_mode() -> int:
         "inactive_users": partial(run_inactive_users_task, close_pool=False),
         "contact_cleanup": partial(run_contact_cleanup_task, close_pool=False),
         "suggestion_cleanup": partial(run_suggestion_cleanup_task, close_pool=False),
+        "affiliation_dns": partial(run_affiliation_dns_task, close_pool=False),
         "service_score_recalc": partial(
             run_service_score_recalc_task, close_pool=False
         ),
@@ -714,6 +736,8 @@ def main() -> int:
             return run_contact_cleanup_task()
         elif args.task == "suggestion-cleanup":
             return run_suggestion_cleanup_task(dry_run=args.dry_run)
+        elif args.task == "affiliation-dns":
+            return run_affiliation_dns_task()
         elif args.task == "scan-sweep":
             return run_scan_sweep_task(args.limit)
         elif args.task == "deep-scan":

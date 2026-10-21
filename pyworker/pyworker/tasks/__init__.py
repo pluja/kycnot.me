@@ -1,5 +1,6 @@
 """Task modules for the pyworker package."""
 
+from .affiliation_dns import AffiliationDnsTask
 from .base import Task
 from .comment_moderation import CommentModerationTask
 from .contact_cleanup import ContactCleanupTask
@@ -11,6 +12,7 @@ from .suggestion_cleanup import SuggestionCleanupTask
 
 __all__ = [
     "Task",
+    "AffiliationDnsTask",
     "CommentModerationTask",
     "ContactCleanupTask",
     "DeepScanTask",
