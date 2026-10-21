@@ -1,0 +1,110 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../lib/cn'
+
+import InputWrapper from './InputWrapper.astro'
+
+import type { ComponentProps } from 'astro/types'
+
+type Props = Omit<ComponentProps<typeof InputWrapper>, 'children' | 'inputId'> & {
+  options: {
+    value: string
+    label: string
+    icon?: string
+    iconClass?: string
+    description?: string
+    tag?: string
+  }[]
+  selectedValue?: string
+}
+
+const { options, selectedValue, class: className, ...wrapperProps } = Astro.props
+
+const checkedValue = options.some((option) => option.value === selectedValue)
+  ? selectedValue
+  : options[0]?.value
+const inputId = Astro.locals.makeId(`input-${wrapperProps.name}`)
+---
+
+{
+  /* Radios rather than a select, so each option can carry an icon and a line of text. Closed, only the checked
+    row shows; focus anywhere inside opens the full list over the content below. */
+}
+<InputWrapper inputId={inputId} class={cn('group/rich-select', className)} {...wrapperProps}>
+  <div class="relative min-h-14" data-rich-select>
+    <ul
+      tabindex="-1"
+      class={cn(
+        'outline-none',
+        'rounded-md border border-night-400 bg-night-800',
+        'group-focus-within/rich-select:absolute group-focus-within/rich-select:inset-x-0 group-focus-within/rich-select:top-0 group-focus-within/rich-select:z-20',
+        'group-focus-within/rich-select:max-h-80 group-focus-within/rich-select:overflow-y-auto group-focus-within/rich-select:overscroll-contain group-focus-within/rich-select:shadow-lg'
+      )}
+    >
+      {
+        options.map((option, index) => (
+          <li class="hidden group-focus-within/rich-select:block has-checked:block">
+            <label class="flex cursor-pointer items-start gap-2.5 px-3 py-2 hover:bg-night-700 has-checked:bg-night-700/60 has-focus-visible:ring-2 has-focus-visible:ring-day-300 has-focus-visible:ring-inset">
+              <input
+                type="radio"
+                id={index === 0 ? inputId : undefined}
+                name={wrapperProps.name}
+                value={option.value}
+                checked={option.value === checkedValue}
+                class="sr-only"
+              />
+              {option.icon ? (
+                <Icon
+                  name={option.icon}
+                  class={cn('mt-0.5 size-4 shrink-0 text-day-300', option.iconClass)}
+                />
+              ) : (
+                <span class="size-4 shrink-0" />
+              )}
+              <span class="min-w-0 flex-1">
+                <span class="flex flex-wrap items-center gap-x-2 text-sm text-day-100">
+                  {option.label}
+                  {option.tag && <span class="text-2xs font-medium text-red-300">{option.tag}</span>}
+                </span>
+                {option.description && (
+                  <span class="block text-xs text-pretty text-day-400">{option.description}</span>
+                )}
+              </span>
+              <Icon
+                name="ri:arrow-down-s-line"
+                class="mt-0.5 size-4 shrink-0 text-day-400 group-focus-within/rich-select:hidden"
+              />
+            </label>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</InputWrapper>
+
+<script>
+  ////////////////////////////////////////////////////////////
+  // Optional script for rich selects.                      //
+  // Closes the list after a pick with the pointer, since   //
+  // the list stays open while focus is inside it. Arrow    //
+  // keys keep it open so a keyboard reader can browse.     //
+  ////////////////////////////////////////////////////////////
+  // Delegated from the document, so selects that arrive later in an htmx swap behave the same.
+  let pickedWithPointer = false
+  document.addEventListener('pointerdown', (event) => {
+    pickedWithPointer = event.target instanceof Element && !!event.target.closest('[data-rich-select]')
+  })
+  document.addEventListener('keydown', () => {
+    pickedWithPointer = false
+  })
+  document.addEventListener('change', (event) => {
+    if (
+      !pickedWithPointer ||
+      !(event.target instanceof Element) ||
+      !event.target.closest('[data-rich-select]')
+    )
+      return
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+  })
+</script>
