@@ -142,8 +142,8 @@ export const commentActions = {
 
       const attachesProof = !input.parentId
       const proofImage = attachesProof && !context.locals.user.spammer ? input.proofImage : undefined
-      // Admins are trusted: their posts skip the queue and publish as their own decision.
-      const publishesDirectly = context.locals.user.admin
+      // Comment moderators are trusted: their posts skip the queue and publish as their own decision.
+      const publishesDirectly = context.locals.userCan('comments:moderate')
       // A service's team answering on its own page publishes at once; reports still reach moderators.
       const repliesForService =
         !publishesDirectly &&
