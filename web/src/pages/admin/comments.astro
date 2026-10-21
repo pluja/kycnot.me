@@ -11,6 +11,7 @@ import { commentStatus } from '../../constants/commentStatus'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import {
   adminCommentReviewSelect,
+  aiGraceHours,
   compareTodo,
   moderatorTodoReasons,
   oldProofWhere,
@@ -172,15 +173,58 @@ const historyFor = await Astro.locals.banners.try(
   () => ({ rejectedPosts: 0, postsOnService: 0 })
 )
 const queues = [
-  { id: 'todo', label: 'To do', icon: 'ri:inbox-line' },
-  { id: 'posts', label: 'Comments', icon: 'ri:pause-circle-line' },
-  { id: 'proof', label: 'Proof', icon: 'ri:file-search-line' },
-  { id: 'reports', label: 'Reports', icon: 'ri:flag-line' },
-  { id: 'edits', label: 'Edits', icon: 'ri:git-pull-request-line' },
-  { id: 'oldProof', label: 'Old proof', icon: 'ri:archive-line' },
-  { id: 'ai', label: 'Waiting for AI', icon: 'ri:robot-2-line' },
-  { id: 'all', label: 'All', icon: 'ri:search-line' },
-] as const satisfies { id: QueueId; label: string; icon: string }[]
+  {
+    id: 'todo',
+    label: 'To do',
+    icon: 'ri:inbox-line',
+    description:
+      'Everything that needs a moderator, each comment once. Most urgent first: serious reports, other reports, held comments, held edits, then proof.',
+  },
+  {
+    id: 'posts',
+    label: 'Held',
+    icon: 'ri:pause-circle-line',
+    description: `New comments waiting for you to publish or reject them: the AI held them, or did not check them within ${String(aiGraceHours)} hours.`,
+  },
+  {
+    id: 'proof',
+    label: 'Proof',
+    icon: 'ri:file-search-line',
+    description: 'Proof authors attached, such as order IDs and screenshots, waiting for a check.',
+  },
+  {
+    id: 'reports',
+    label: 'Reports',
+    icon: 'ri:flag-line',
+    description: 'Comments readers reported. Serious reports first.',
+  },
+  {
+    id: 'edits',
+    label: 'Edits',
+    icon: 'ri:git-pull-request-line',
+    description: `Changes to published comments that the AI held, or did not check within ${String(aiGraceHours)} hours.`,
+  },
+  {
+    id: 'oldProof',
+    label: 'Old proof',
+    icon: 'ri:archive-line',
+    description:
+      'Proof the old system never reviewed, on published comments. Nothing waits on it; work through it as time allows.',
+  },
+  {
+    id: 'ai',
+    label: 'Waiting for AI',
+    icon: 'ri:robot-2-line',
+    description: `New comments the AI has not checked yet. After ${String(aiGraceHours)} hours they also show in Held.`,
+  },
+  {
+    id: 'all',
+    label: 'All',
+    icon: 'ri:search-line',
+    description: 'Every comment, newest first.',
+  },
+] as const satisfies { id: QueueId; label: string; icon: string; description: string }[]
+const activeQueue = queues.find((queue) => queue.id === params.queue)
 const queueUrl = (queue: QueueId, serviceId = params.serviceId) => {
   const search = new URLSearchParams({ queue })
   if (serviceId) search.set('serviceId', serviceId.toString())
@@ -222,13 +266,7 @@ const emptyMessages: Record<QueueId, string> = {
     <div>
       <h1 class="font-title text-2xl font-bold">Comment moderation</h1>
       <p class="mt-1 text-sm text-day-400">
-        {
-          params.queue === 'all'
-            ? 'Every comment, newest first.'
-            : params.queue === 'oldProof'
-              ? 'Proof the old system never reviewed, on published comments. Nothing waits on it; work through it as time allows.'
-              : 'Each comment once. Most urgent first: serious reports, other reports, held comments, held edits, then proof. Longest wait first within each.'
-        }
+        {activeQueue?.description}
       </p>
     </div>
     {
@@ -254,6 +292,7 @@ const emptyMessages: Record<QueueId, string> = {
         return (
           <a
             href={queueUrl(queue.id)}
+            title={queue.description}
             aria-current={active ? 'page' : undefined}
             class={cn(
               'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm',

@@ -1,6 +1,6 @@
 import { getVerificationStatusInfo } from '../constants/verificationStatus'
 
-import type { CommentRule, Prisma, VerificationStatus } from '@prisma/client'
+import type { CommentRule, Prisma } from '@prisma/client'
 
 export const adminCommentReviewSelect = {
   id: true,
@@ -68,7 +68,7 @@ export type AdminCommentReview = Prisma.CommentGetPayload<{ select: typeof admin
 export const proofsToCheck = (comment: Pick<AdminCommentReview, '_count' | 'status'>) =>
   comment.status === 'WITHDRAWN' ? 0 : comment._count.evidence
 
-const aiGraceHours = 3
+export const aiGraceHours = 3
 
 // moderatorTodoReasons are the reasons a post needs a moderator. "To do" lists a post once if any applies.
 // Posts and edits wait for the AI first, unless it held them or has not answered within the grace period.
