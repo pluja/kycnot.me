@@ -10,13 +10,20 @@ export const minimumCheckedBasis = 5
 
 const rated = (counts: SentimentCounts) => counts.positive + counts.neutral + counts.negative
 
+// mostlyNegativeShare warns early: half the experiences being negative is enough. mostlyPositiveShare applies to the
+// positive share with each mixed experience counted as half positive, since it is neither praise nor a complaint.
+export const mostlyNegativeShare = 0.5
+export const mostlyPositiveShare = 0.75
+
 // sentimentVerdict needs enough rated posts, then reads the shares from weights, where a newcomer's unproven post
 // counts half.
 export function sentimentVerdict(counts: SentimentCounts, weights: SentimentCounts = counts): Verdict | null {
   if (rated(counts) < minimumVerdictPosts) return null
   const total = rated(weights)
-  if (weights.negative / total >= 0.5) return { label: 'Mostly negative', tone: 'bad' }
-  if (weights.positive / total >= 0.7) return { label: 'Mostly positive', tone: 'good' }
+  if (weights.negative / total >= mostlyNegativeShare) return { label: 'Mostly negative', tone: 'bad' }
+  if ((weights.positive + weights.neutral / 2) / total >= mostlyPositiveShare) {
+    return { label: 'Mostly positive', tone: 'good' }
+  }
   return { label: 'Mixed', tone: 'caution' }
 }
 

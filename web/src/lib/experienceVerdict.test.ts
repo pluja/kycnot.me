@@ -18,6 +18,14 @@ void test('the verdict follows the share of positive and negative experiences', 
   assert.equal(sentimentVerdict({ positive: 3, neutral: 2, negative: 2 })?.label, 'Mixed')
 })
 
+void test('a mixed experience counts as half positive, and never toward Mostly negative', () => {
+  assert.equal(sentimentVerdict({ positive: 11, neutral: 3, negative: 2 })?.label, 'Mostly positive')
+  assert.equal(sentimentVerdict({ positive: 15, neutral: 0, negative: 5 })?.label, 'Mostly positive')
+  assert.equal(sentimentVerdict({ positive: 14, neutral: 0, negative: 6 })?.label, 'Mixed')
+  assert.equal(sentimentVerdict({ positive: 0, neutral: 10, negative: 0 })?.label, 'Mixed')
+  assert.equal(sentimentVerdict({ positive: 6, neutral: 4, negative: 10 })?.label, 'Mostly negative')
+})
+
 void test('the verdict counts only checked posts once at least 5 have checked proof', () => {
   const fiveChecked = summary({ total: 5, positive: 5, neutral: 0, negative: 0 })
   assert.equal(verdictCounts(fiveChecked).checkedOnly, true)
