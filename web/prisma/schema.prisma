@@ -140,7 +140,7 @@ model Comment {
   publicNote String?
   /// Visible only to admins and moderators.
   adminNote  String?
-  /// Submitted by the author; visible only to the author and admins.
+  /// Moderators' private context from the old moderation system (formerly privateContext). Nothing writes it now.
   authorNote String?
 
   // --- Issue tags ---
