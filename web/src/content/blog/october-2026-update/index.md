@@ -21,6 +21,8 @@ Now you share an **experience**: what you used the service for, whether it went 
 
 Above the reviews there is a short **summary** of recent experiences: mostly positive, mixed or mostly negative. Each person counts once, brand new accounts count half, and once enough reviews have checked proof, only those decide. The full rules are in the [review guidelines](/docs/guidelines#how-the-summary-is-calculated).
 
+![The experiences summary on a service page: a verdict, how many experiences in the last 90 days, and a bar of positive, mixed and negative ones](./experiences-summary.webp)
+
 ## Proof stays private
 
 You can back a review with an order ID or a screenshot. Only you and the moderators see it. It is not shown to readers, not sent to AI and not shared with the service. A moderator checks it, usually on the service's own order lookup, and your review gets a badge with the result.
