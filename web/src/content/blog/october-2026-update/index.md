@@ -33,9 +33,9 @@ Karma points were easy to farm and said almost nothing about whether someone sha
 
 ## Moderation
 
-Every comment is checked before it goes live. An automatic check holds comments that look risky, never because of whether they are positive or negative. Harassment and made-up stories are always decided by a person.
+Comments were already checked before going live. The checks are now finer. The automatic check looks for specific warning signs, like a reused order ID or a sudden wave of reviews from new accounts, and never holds a comment just for being positive or negative. It only rejects clear rule breaks. Anything it is unsure about goes to a person, and harassment and made-up stories are always decided by one.
 
-When a comment is rejected, you see the reason. Some reasons, like off-topic or not enough detail, don't count against you. You can also withdraw your own comment at any time, and restore it later.
+When a comment is rejected, you now see the reason. Some reasons, like off-topic or not enough detail, don't count against you. You can also withdraw your own comment at any time, and restore it later.
 
 ## Services can claim their page
 
