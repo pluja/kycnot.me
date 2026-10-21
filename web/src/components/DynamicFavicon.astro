@@ -4,17 +4,22 @@ import { prisma } from '../lib/prisma'
 
 const user = Astro.locals.user
 
-const hasUnreadNotifications = await Astro.locals.banners.try(
-  'Error getting unread notification count',
-  async () =>
-    user
-      ? !!(await prisma.notification.findFirst({
-          where: { userId: user.id, read: false },
-          select: { id: true },
-        }))
-      : false,
-  false
-)
+// The 500/404 fallback renders without middleware, so banners is missing there; the plain icon must not hide the
+// real error.
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+const hasUnreadNotifications = !Astro.locals.banners
+  ? false
+  : await Astro.locals.banners.try(
+      'Error getting unread notification count',
+      async () =>
+        user
+          ? !!(await prisma.notification.findFirst({
+              where: { userId: user.id, read: false },
+              select: { id: true },
+            }))
+          : false,
+      false
+    )
 
 function addBadgeIfUnread(href: string) {
   if (hasUnreadNotifications) return href.replace('.svg', '-badge.svg')
