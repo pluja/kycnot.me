@@ -10,7 +10,6 @@ import {
 } from '../constants/characters'
 
 import { typedJoin } from './arrays'
-import { DEPLOYMENT_MODE } from './client/envVariables'
 import { transformCase } from './strings'
 
 const DIGEST = 'sha512'
@@ -20,8 +19,9 @@ const USER_SECRET_TOKEN_LETTERS_SEGMENT_REGEX =
 const USER_SECRET_TOKEN_DIGITS_SEGMENT_REGEX = `(?:[${typedJoin(DIGIT_CHARACTERS)}]{4})` as const
 const USER_SECRET_TOKEN_SEPARATOR_REGEX = '(?:(-| )+)'
 
-// includeDevUsers stays off on staging: preprod holds a copy of production data, so fixed dev tokens would open it to anyone.
-export const includeDevUsers = DEPLOYMENT_MODE === 'development'
+// includeDevUsers is only on for `astro dev`: every build, whatever its mode, may hold production data, so fixed dev
+// tokens would open it to anyone.
+export const includeDevUsers = !import.meta.env.PROD
 
 const USER_SECRET_TOKEN_DEV_USERS_REGEX = (() => {
   const specialUsersData = [
