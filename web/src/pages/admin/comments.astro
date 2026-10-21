@@ -184,7 +184,7 @@ const queues = [
     id: 'posts',
     label: 'Held',
     icon: 'ri:pause-circle-line',
-    description: `New comments waiting for you to publish or reject them: the AI held them, or did not check them within ${String(aiGraceHours)} hours.`,
+    description: `New comments waiting for a moderator to publish or reject them: held by the AI or a moderator, or not checked by the AI within ${String(aiGraceHours)} hours. One waiting on a proof request shows up once the author answers or it is due.`,
   },
   {
     id: 'proof',
