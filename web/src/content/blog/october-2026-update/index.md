@@ -2,6 +2,7 @@
 title: 'KYCnot.me October 2026 update: reviews, trust and claims'
 summary: 'The KYCnot.me October 2026 update rebuilds reviews around real experiences and private proof, swaps karma for account trust, and lets services claim their page.'
 author: pluja
+coverImage: ./cover.webp
 publishedAt: 2026-10-21T12:00:00Z
 tags:
   - update
