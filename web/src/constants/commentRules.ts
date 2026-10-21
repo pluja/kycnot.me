@@ -99,8 +99,17 @@ export const {
     {
       value: 'NO_LONGER_APPLIES',
       label: 'No longer applies',
-      description: 'Outdated, or the author asked for it to come down.',
+      description: 'Outdated: no longer true or relevant.',
       icon: 'ri:history-line',
+      penalizes: false,
+      reportable: false,
+      requiresDetails: false,
+    },
+    {
+      value: 'AUTHOR_REQUEST',
+      label: "Author's request",
+      description: 'The author asked for it to come down.',
+      icon: 'ri:user-shared-line',
       penalizes: false,
       reportable: false,
       requiresDetails: false,
