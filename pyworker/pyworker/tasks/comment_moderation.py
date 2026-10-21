@@ -44,7 +44,15 @@ CLAIM_GATE_REASON = "claim awaiting a proof check"
 
 # Rejections for these rules count against the author's trust (web/prisma/triggers/18_user_trust.sql).
 _PENALIZING_RULES = frozenset(
-    {"SPAM", "SCAM_CONTACT", "HARASSMENT", "SLUR", "PRIVATE_INFO", "NOT_GENUINE"}
+    {
+        "SPAM",
+        "SCAM_CONTACT",
+        "HARASSMENT",
+        "SLUR",
+        "PRIVATE_INFO",
+        "NOT_GENUINE",
+        "PAID_PROMOTION",
+    }
 )
 # The AI applies only these on its own, and only when sure; a person judges every other strike.
 _CLEAR_CUT_RULES = frozenset({"SPAM", "SCAM_CONTACT", "SLUR", "PRIVATE_INFO"})

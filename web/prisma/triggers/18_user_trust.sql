@@ -58,7 +58,7 @@ RETURNS TABLE (
   ),
   recent_rejections AS (
     SELECT user_id,
-      COUNT(*) FILTER (WHERE rule IN ('SPAM', 'SCAM_CONTACT', 'HARASSMENT', 'SLUR', 'PRIVATE_INFO', 'NOT_GENUINE'))::INT AS penalizing,
+      COUNT(*) FILTER (WHERE rule IN ('SPAM', 'SCAM_CONTACT', 'HARASSMENT', 'SLUR', 'PRIVATE_INFO', 'NOT_GENUINE', 'PAID_PROMOTION'))::INT AS penalizing,
       COUNT(*) FILTER (WHERE rule = 'SPAM')::INT AS spam
     FROM rejections
     WHERE decided_at > NOW() - INTERVAL '90 days'

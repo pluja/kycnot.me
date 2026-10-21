@@ -128,8 +128,8 @@ def _validate_deep_scan(data: dict[str, Any]) -> None:
             )
 
 
-# COMMENT_RULES mirrors the CommentRule enum in web/prisma/schema.prisma, except AUTHOR_REQUEST: only a moderator can
-# know the author asked.
+# COMMENT_RULES mirrors the CommentRule enum in web/prisma/schema.prisma, except AUTHOR_REQUEST and PAID_PROMOTION, which
+# need a person: only a moderator knows the author asked, or can weigh signs of payment.
 COMMENT_RULES = frozenset(
     {
         "SPAM",

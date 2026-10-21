@@ -88,6 +88,15 @@ export const {
       requiresDetails: false,
     },
     {
+      value: 'PAID_PROMOTION',
+      label: 'Paid promotion',
+      description: 'Written for pay or a reward from the service, not from real use.',
+      icon: 'ri:money-dollar-circle-line',
+      penalizes: true,
+      reportable: true,
+      requiresDetails: false,
+    },
+    {
       value: 'DUPLICATE',
       label: 'Duplicate',
       description: 'Repeats a comment the same author already made.',
