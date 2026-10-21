@@ -10,7 +10,7 @@ import { getFormReplay } from '../lib/formReplay'
 
 import Button from './Button.astro'
 import FormReplay from './FormReplay.astro'
-import InputSelect from './InputSelect.astro'
+import InputCardGroup from './InputCardGroup.astro'
 import InputText from './InputText.astro'
 
 import type { CommentStatus } from '@prisma/client'
@@ -117,14 +117,19 @@ const selectedDecision = replay.text('status', currentDecision)
       </div>
     </div>
     <div
-      class="hidden gap-2 group-has-[:is([data-decision=PENDING],[data-decision=REJECTED]):not([data-current]):checked]/decision:grid sm:grid-cols-2"
+      class="hidden gap-3 group-has-[:is([data-decision=PENDING],[data-decision=REJECTED]):not([data-current]):checked]/decision:grid"
     >
-      <InputSelect
+      <InputCardGroup
         name="decisionReason"
         label="Reason"
         selectedValue={replay.text('decisionReason', '')}
-        options={[{ value: '', label: 'Choose a reason' }, ...commentRules]}
-        selectProps={{ class: 'text-sm' }}
+        options={commentRules.map((rule) => ({
+          value: rule.value,
+          label: rule.label,
+          icon: rule.icon,
+          iconClass: rule.penalizes ? 'text-red-400' : undefined,
+          description: rule.penalizes ? `${rule.description} **Counts against trust.**` : rule.description,
+        }))}
       />
       <InputText
         name="reason"
