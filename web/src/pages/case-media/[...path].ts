@@ -61,7 +61,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
         // Private evidence must never land in a shared cache.
         'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',
-        'Content-Security-Policy': "default-src 'none'",
+        'Content-Security-Policy': "default-src 'none'; sandbox",
       },
     })
   } catch {

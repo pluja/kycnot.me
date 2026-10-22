@@ -4,6 +4,7 @@ import path from 'node:path'
 import sharp from 'sharp'
 
 import { confineToRoot } from './confinePath'
+import { MAX_IMAGE_PIXELS } from './imageUpload'
 import { reportMissingAsset } from './missingAssets'
 import { isPublicUploadSubpath } from './uploadAccess'
 import { extractFilesSubpath, resolveUploadPath } from './uploadPaths'
@@ -39,10 +40,10 @@ export async function readLocalImageAsDataUri(
       return null
     }
 
-    // Always re-encoded rather than trusted by extension: upload filenames come
-    // from the client, so the extension does not prove the format. sharp sniffs
+    // Always re-encoded rather than trusted by extension: older uploads kept the
+    // client's filename, so the extension does not prove the format. sharp sniffs
     // the real one and satori only ever sees PNG.
-    let image = sharp(buffer).png()
+    let image = sharp(buffer, { limitInputPixels: MAX_IMAGE_PIXELS }).png()
     if (resize) {
       image = image.resize(resize.width, resize.height, {
         fit: resize.fit,

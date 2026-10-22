@@ -13,6 +13,7 @@ import rehypeRaw from 'rehype-raw'
 import rehypeSlug from 'rehype-slug'
 import devtoolsJson from 'vite-plugin-devtools-json'
 
+import { MAX_IMAGE_PIXELS } from './src/lib/imageUpload'
 import { postgresListener } from './src/lib/postgresListenerIntegration'
 import { getServerEnvVariable } from './src/lib/serverEnvVariables'
 
@@ -207,7 +208,7 @@ export default defineConfig({
     },
     service: {
       entrypoint: './src/lib/imageService.ts',
-      config: { limitInputPixels: 40_000_000 },
+      config: { limitInputPixels: MAX_IMAGE_PIXELS },
     },
   },
   redirects: {

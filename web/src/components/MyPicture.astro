@@ -10,7 +10,7 @@ import type { ComponentProps } from 'astro/types'
 // Astro's <Picture> requires the `src` to match a `remotePatterns` entry to
 // run the WebP transform on a string URL. Database-backed image URLs come
 // in as relative `/files/...` paths, so we absolutize them to the canonical
-// public origin. No network roundtrip ever happens for these — the custom
+// public origin. No network roundtrip ever happens for these, the custom
 // image endpoint at `src/lib/imageEndpoint.ts` short-circuits and reads
 // the file from disk via UPLOAD_DIR.
 
@@ -54,15 +54,17 @@ const importedSvg =
       alt={alt}
       width={width}
       height={height}
-      class={cn('shrink-0', pictureAttributes?.class)}
+      loading="lazy"
+      decoding="async"
       {...(props as any)}
+      class={cn('shrink-0', props.class)}
     />
   ) : (
-    !!finalSrc && (
+    finalSrc && (
       <Picture
         src={finalSrc}
         alt={alt}
-        formats={typeof finalSrc === 'string' && finalSrc.toLowerCase().endsWith('.svg') ? ['svg'] : ['webp']}
+        formats={['webp']}
         height={height ? Number(height) * 2 : undefined}
         width={width ? Number(width) * 2 : undefined}
         pictureAttributes={{

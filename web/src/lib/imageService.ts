@@ -1,46 +1,42 @@
 import sharpService from 'astro/assets/services/sharp'
+import sharp from 'sharp'
 
-function leadingTag(buffer: Uint8Array): string | null {
-  let i = 0
-  if (buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) i = 3
-  while (
-    i < buffer.length &&
-    (buffer[i] === 0x09 || buffer[i] === 0x0a || buffer[i] === 0x0d || buffer[i] === 0x20)
-  ) {
-    i++
-  }
-  if (buffer[i] !== 0x3c) return null
-  return String.fromCharCode(...buffer.slice(i + 1, i + 10)).toLowerCase()
-}
+import { MAX_IMAGE_PIXELS } from './imageUpload'
 
-function isMarkup(buffer: Uint8Array): boolean {
-  const tag = leadingTag(buffer)
-  return tag !== null && ['!doctype', 'html', 'head', 'svg', '?xml'].some((prefix) => tag.startsWith(prefix))
-}
+import type { ImageTransform } from 'astro'
+import type { FormatEnum } from 'sharp'
 
-function isSvgMarkup(buffer: Uint8Array): boolean {
-  const tag = leadingTag(buffer)
-  return tag !== null && (tag.startsWith('svg') || tag.startsWith('?xml'))
+const MAX_SVG_SCALE = 8
+
+// rasterizeSvg renders an SVG at the density the requested width needs, so a small-viewBox logo stays sharp
+// instead of being rendered at 72 dpi and scaled up. MAX_SVG_SCALE bounds the render cost, which grows with
+// the square of the scale and cannot be interrupted once librsvg starts.
+async function rasterizeSvg(input: Uint8Array, intrinsicWidth: number, transform: ImageTransform) {
+  const width = Number(transform.width) || undefined
+  const scale = width ? Math.min(Math.max(width / intrinsicWidth, 1), MAX_SVG_SCALE) : 1
+  const format = (typeof transform.format === 'string' ? transform.format : 'webp') as keyof FormatEnum
+  const data = await sharp(input, { density: 72 * scale, limitInputPixels: MAX_IMAGE_PIXELS })
+    .resize({ width, withoutEnlargement: true })
+    .toFormat(format)
+    .toBuffer()
+  return { data: new Uint8Array(data), format }
 }
 
 const imageService: typeof sharpService = {
   ...sharpService,
   async transform(inputBuffer, transform, config) {
-    const src =
-      typeof transform.src === 'string'
-        ? transform.src
-        : ((transform.src as { src?: string }).src ?? 'unknown')
-
-    // SVG reaches sharp and is rasterized, never passed through, since /_image refuses f=svg. Other markup
-    // (HTML saved under an image name) is not an image at all.
-    if (isMarkup(inputBuffer) && !isSvgMarkup(inputBuffer)) {
-      console.warn(`[imageService] Rejected non-image markup input for: ${src}`)
-      throw new Error('Input buffer contains unsupported image format')
-    }
-
+    // Astro's sharp service returns the input untouched for SVG output, so it is never requested.
+    if (transform.format === 'svg') throw new Error('SVG output is not served')
     try {
+      // sharp sniffs the real format, so markup under an image name is refused rather than trusted by extension.
+      const { format, width } = await sharp(inputBuffer).metadata()
+      if (format === 'svg') return await rasterizeSvg(inputBuffer, width, transform)
       return await sharpService.transform(inputBuffer, transform, config)
     } catch (error) {
+      const src =
+        typeof transform.src === 'string'
+          ? transform.src
+          : ((transform.src as { src?: string }).src ?? 'unknown')
       console.error(`[imageService] Failed to process image: ${src}`, {
         format: transform.format,
         width: transform.width,
