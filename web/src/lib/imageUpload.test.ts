@@ -45,10 +45,13 @@ void test('a trailing payload appended to a real image does not survive', async 
   assert.equal(output.includes('<script>'), false)
 })
 
-void test('large images are scaled down to the limit', async () => {
-  const big = await sharp({ create: { width: 3000, height: 1000, channels: 3, background: '#fff' } })
+void test('wide images are scaled to the width limit, tall screenshots keep their height', async () => {
+  const wide = await sharp({ create: { width: 3000, height: 1000, channels: 3, background: '#fff' } })
     .png()
     .toBuffer()
-  const metadata = await sharp(await reencodeUploadedImage(big, 2000)).metadata()
-  assert.equal(metadata.width, 2000)
+  assert.equal((await sharp(await reencodeUploadedImage(wide, 2000)).metadata()).width, 2000)
+  const tall = await sharp({ create: { width: 1000, height: 9000, channels: 3, background: '#fff' } })
+    .png()
+    .toBuffer()
+  assert.equal((await sharp(await reencodeUploadedImage(tall, 2000)).metadata()).height, 9000)
 })

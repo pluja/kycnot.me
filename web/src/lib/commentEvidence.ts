@@ -17,7 +17,7 @@ export async function withEvidenceImage(
   run: (imagePath: string | null) => Promise<void>
 ) {
   const imagePath = imageFile
-    ? await saveImageUpload(imageFile, `comment-evidence/${randomUUID()}`, { maxDimension: 2000 })
+    ? await saveImageUpload(imageFile, `comment-evidence/${randomUUID()}`, { maxWidth: 2000 })
     : null
   try {
     await run(imagePath)

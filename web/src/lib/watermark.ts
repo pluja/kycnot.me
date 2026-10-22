@@ -36,8 +36,8 @@ function buildWatermarkSvg(width: number, height: number, luminance: number): Bu
   return Buffer.from(svg)
 }
 
-// watermarkImage tiles WATERMARK_TEXT diagonally over the image and re-encodes
-// in the original format. Input that sharp cannot decode is returned untouched.
+// watermarkImage tiles WATERMARK_TEXT diagonally over the image and re-encodes it
+// as WebP. Input that sharp cannot decode is returned untouched.
 export async function watermarkImage(input: Buffer): Promise<Buffer> {
   let width = 0
   let height = 0
@@ -61,5 +61,6 @@ export async function watermarkImage(input: Buffer): Promise<Buffer> {
   const overlay = buildWatermarkSvg(width, height, luminance)
   return sharp(input)
     .composite([{ input: overlay, blend: 'over' }])
+    .webp({ quality: 90 })
     .toBuffer()
 }

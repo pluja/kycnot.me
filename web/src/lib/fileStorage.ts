@@ -54,10 +54,10 @@ const uploadSemaphore = new Semaphore(2, 20)
 export async function saveImageUpload(
   file: File,
   subDir: string,
-  { watermark = false, maxDimension = 4096 }: { watermark?: boolean; maxDimension?: number } = {}
+  { watermark = false, maxWidth = 4096 }: { watermark?: boolean; maxWidth?: number } = {}
 ): Promise<string> {
   const processing = uploadSemaphore.run(async () => {
-    const image = await reencodeUploadedImage(Buffer.from(await file.arrayBuffer()), maxDimension)
+    const image = await reencodeUploadedImage(Buffer.from(await file.arrayBuffer()), maxWidth)
     return watermark ? watermarkImage(image) : image
   })
   if (!processing) {
