@@ -61,18 +61,15 @@ export function defineProtectedAction<
     handler: ((input, context) => {
       // api-key actions are only reachable through /api/ routes, where the middleware has verified the key;
       // the same action called at /_actions/ carries no key and is refused.
-      if (permissions === 'api-key') {
-        if (!context.locals.apiKeyAuthenticated) {
-          throw new ActionError({ code: 'UNAUTHORIZED', message: 'API key required' })
-        }
-        return handler(
-          input,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-          context as any
-        )
+      if (permissions === 'api-key' && !context.locals.apiKeyAuthenticated) {
+        throw new ActionError({ code: 'UNAUTHORIZED', message: 'API key required' })
       }
 
-      if (permissions === 'guest' || (Array.isArray(permissions) && permissions.length === 0)) {
+      if (
+        permissions === 'guest' ||
+        permissions === 'api-key' ||
+        (Array.isArray(permissions) && permissions.length === 0)
+      ) {
         return handler(
           input,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
