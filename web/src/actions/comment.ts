@@ -149,8 +149,6 @@ export const commentActions = {
       // Comment moderators are trusted: their posts skip the queue and publish as their own decision,
       // except on a service they represent, which another moderator has to decide.
       const publishesDirectly = context.locals.userCan('comments:moderate') && !affiliatedWithService
-      // A service's team answering on its own page publishes at once; reports still reach moderators.
-      const repliesForService = !!input.parentId && affiliatedWithService
       const created = { updatesVerdict: false }
       const hasProof = attachesProof && (!!input.orderId?.trim() || !!proofImage)
       const waitsForProofCheck = !publishesDirectly && hasProof && issuesNeedingProof(issueTypes).length > 0
@@ -286,7 +284,10 @@ export const commentActions = {
               })
             }
 
-            if (publishesDirectly || repliesForService) {
+            // A service's team replying on its own page publishes at once, unless the reply changes the verdict
+            // of their own experience; reports still reach moderators.
+            const publishesAsTeam = !!input.parentId && affiliatedWithService && !created.updatesVerdict
+            if (publishesDirectly || publishesAsTeam) {
               await tx.comment.update({
                 where: { id: newComment.id },
                 data: {
@@ -294,7 +295,7 @@ export const commentActions = {
                   humanAction: 'APPROVE',
                   humanDecidedAt: new Date(),
                   humanDecidedById: publishesDirectly ? context.locals.user.id : null,
-                  humanReasoning: repliesForService ? "Reply from the service's team" : undefined,
+                  humanReasoning: publishesAsTeam ? "Reply from the service's team" : undefined,
                 },
               })
             }
