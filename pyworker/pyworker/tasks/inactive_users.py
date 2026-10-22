@@ -2,7 +2,7 @@
 Task for handling inactive users - sending deletion warnings and cleaning up accounts.
 """
 
-from datetime import datetime, timedelta, date
+from datetime import timedelta, date
 from typing import Any, Dict
 
 from pyworker.database import delete_user_account, execute_db_command, run_db_query
@@ -26,20 +26,23 @@ _HAS_NO_STANDING = """
     AND NOT EXISTS (SELECT 1 FROM "_CaseParticipants" cp WHERE cp."B" = u."id")
 """
 
-# _STILL_INACTIVE holds for a scheduled account that has not logged in, posted or suggested anything
-# since it was scheduled (scheduledDeletionAt is set 30 days ahead).
+_INACTIVITY_DAYS = 365
+_NOTICE_DAYS = 30
+
+# _STILL_INACTIVE holds for a scheduled account that had not logged in for a year when it was scheduled,
+# and has not logged in, posted or suggested anything since.
 _STILL_INACTIVE = f"""
     {_HAS_NO_STANDING}
-    AND u."lastLoginAt" < (u."scheduledDeletionAt" - INTERVAL '30 days')
+    AND u."lastLoginAt" < (u."scheduledDeletionAt" - INTERVAL '{_INACTIVITY_DAYS + _NOTICE_DAYS} days')
     AND NOT EXISTS (
         SELECT 1 FROM "Comment" c
         WHERE c."authorId" = u."id"
-            AND c."createdAt" > (u."scheduledDeletionAt" - INTERVAL '30 days')
+            AND c."createdAt" > (u."scheduledDeletionAt" - INTERVAL '{_NOTICE_DAYS} days')
     )
     AND NOT EXISTS (
         SELECT 1 FROM "ServiceSuggestion" ss
         WHERE ss."userId" = u."id"
-            AND ss."createdAt" > (u."scheduledDeletionAt" - INTERVAL '30 days')
+            AND ss."createdAt" > (u."scheduledDeletionAt" - INTERVAL '{_NOTICE_DAYS} days')
     )
 """
 
@@ -99,8 +102,8 @@ class InactiveUsersTask(Task):
         A user is inactive when the account is over a year old, has not logged in for a year, never
         posted or suggested anything, and has no standing (see _HAS_NO_STANDING).
         """
-        one_year_ago = datetime.now() - timedelta(days=365)
-        deletion_date = date.today() + timedelta(days=30)  # 30 days from today
+        one_year_ago = date.today() - timedelta(days=_INACTIVITY_DAYS)
+        deletion_date = date.today() + timedelta(days=_NOTICE_DAYS)
 
         # Find inactive users
         query = f"""
@@ -152,7 +155,7 @@ class InactiveUsersTask(Task):
                     SELECT 1 FROM "Notification" n
                     WHERE n."userId" = u."id"
                         AND n."type" = %s
-                        AND n."createdAt" > (u."scheduledDeletionAt" - INTERVAL '30 days')
+                        AND n."createdAt" > (u."scheduledDeletionAt" - INTERVAL '{_NOTICE_DAYS} days')
                 )
             """
 
