@@ -9,6 +9,41 @@ from pyworker.database import delete_user_account, execute_db_command, run_db_qu
 from pyworker.tasks.base import Task
 
 
+# _HAS_NO_STANDING holds for accounts with no staff role and nothing tying them to the site beyond posts:
+# no service affiliation, API key, contact thread or case.
+_HAS_NO_STANDING = """
+    u."admin" = false
+    AND cardinality(u.capabilities) = 0
+    AND u."verified" = false
+    AND u."totalKarma" = 0
+    AND NOT EXISTS (SELECT 1 FROM "ServiceUser" su WHERE su."userId" = u."id")
+    AND NOT EXISTS (SELECT 1 FROM "ApiKey" ak WHERE ak."userId" = u."id")
+    AND NOT EXISTS (SELECT 1 FROM "ContactThread" ct WHERE ct."authorId" = u."id")
+    AND NOT EXISTS (
+        SELECT 1 FROM "Case" ca WHERE ca."reportedById" = u."id" OR ca."createdById" = u."id"
+    )
+    AND NOT EXISTS (SELECT 1 FROM "CaseUpdate" cu WHERE cu."authorId" = u."id")
+    AND NOT EXISTS (SELECT 1 FROM "_CaseParticipants" cp WHERE cp."B" = u."id")
+"""
+
+# _STILL_INACTIVE holds for a scheduled account that has not logged in, posted or suggested anything
+# since it was scheduled (scheduledDeletionAt is set 30 days ahead).
+_STILL_INACTIVE = f"""
+    {_HAS_NO_STANDING}
+    AND u."lastLoginAt" < (u."scheduledDeletionAt" - INTERVAL '30 days')
+    AND NOT EXISTS (
+        SELECT 1 FROM "Comment" c
+        WHERE c."authorId" = u."id"
+            AND c."createdAt" > (u."scheduledDeletionAt" - INTERVAL '30 days')
+    )
+    AND NOT EXISTS (
+        SELECT 1 FROM "ServiceSuggestion" ss
+        WHERE ss."userId" = u."id"
+            AND ss."createdAt" > (u."scheduledDeletionAt" - INTERVAL '30 days')
+    )
+"""
+
+
 class InactiveUsersTask(Task):
     """Task for handling inactive users"""
 
@@ -61,38 +96,29 @@ class InactiveUsersTask(Task):
         """
         Schedule inactive users for deletion.
 
-        A user is considered inactive if:
-        - Account was created more than 1 year ago
-        - Has 0 karma
-        - Has no comments or service suggestions
-        - Is not scheduled for deletion already
-        - Is not an admin and holds no capabilities
+        A user is inactive when the account is over a year old, has not logged in for a year, never
+        posted or suggested anything, and has no standing (see _HAS_NO_STANDING).
         """
         one_year_ago = datetime.now() - timedelta(days=365)
         deletion_date = date.today() + timedelta(days=30)  # 30 days from today
 
         # Find inactive users
-        query = """
-        UPDATE "User" 
+        query = f"""
+        UPDATE "User"
         SET "scheduledDeletionAt" = %s, "updatedAt" = NOW()
         WHERE "id" IN (
-            SELECT u."id" 
+            SELECT u."id"
             FROM "User" u
             WHERE u."createdAt" < %s
+                AND u."lastLoginAt" < %s
                 AND u."scheduledDeletionAt" IS NULL
-                AND u."admin" = false
-                AND cardinality(u.capabilities) = 0
-                AND u."totalKarma" = 0
-                AND NOT EXISTS (
-                    SELECT 1 FROM "Comment" c WHERE c."authorId" = u."id"
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM "ServiceSuggestion" ss WHERE ss."userId" = u."id"
-                )
+                AND {_HAS_NO_STANDING}
+                AND NOT EXISTS (SELECT 1 FROM "Comment" c WHERE c."authorId" = u."id")
+                AND NOT EXISTS (SELECT 1 FROM "ServiceSuggestion" ss WHERE ss."userId" = u."id")
         )
         """
 
-        count = execute_db_command(query, (deletion_date, one_year_ago))
+        count = execute_db_command(query, (deletion_date, one_year_ago, one_year_ago))
         self.logger.info(
             f"Scheduled {count} inactive users for deletion on {deletion_date}"
         )
@@ -117,30 +143,16 @@ class InactiveUsersTask(Task):
             # Find users who should receive this warning (exact date match)
             target_date = today + timedelta(days=days_before)
 
-            # Check if user is still inactive (no recent activity)
-            users_query = """
+            users_query = f"""
             SELECT u."id", u."name", u."scheduledDeletionAt"
             FROM "User" u
             WHERE u."scheduledDeletionAt" = %s
-                AND u."admin" = false
-                AND cardinality(u.capabilities) = 0
-                AND u."totalKarma" = 0
+                AND {_STILL_INACTIVE}
                 AND NOT EXISTS (
-                    SELECT 1 FROM "Notification" n 
-                    WHERE n."userId" = u."id" 
-                        AND n."type" = %s 
+                    SELECT 1 FROM "Notification" n
+                    WHERE n."userId" = u."id"
+                        AND n."type" = %s
                         AND n."createdAt" > (u."scheduledDeletionAt" - INTERVAL '30 days')
-                )
-                -- Still check if user is inactive (no activity since being scheduled)
-                AND NOT EXISTS (
-                    SELECT 1 FROM "Comment" c 
-                    WHERE c."authorId" = u."id" 
-                        AND c."createdAt" > (u."scheduledDeletionAt" - INTERVAL '30 days')
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM "ServiceSuggestion" ss 
-                    WHERE ss."userId" = u."id" 
-                        AND ss."createdAt" > (u."scheduledDeletionAt" - INTERVAL '30 days')
                 )
             """
 
@@ -173,24 +185,11 @@ class InactiveUsersTask(Task):
         today = date.today()
 
         # Find users scheduled for deletion who are still inactive
-        users_to_delete_query = """
+        users_to_delete_query = f"""
         SELECT u."id", u."name", u."scheduledDeletionAt"
         FROM "User" u
         WHERE u."scheduledDeletionAt" <= %s
-            AND u."admin" = false
-            AND cardinality(u.capabilities) = 0
-            AND u."totalKarma" = 0
-            -- Double-check they're still inactive
-            AND NOT EXISTS (
-                SELECT 1 FROM "Comment" c 
-                WHERE c."authorId" = u."id" 
-                    AND c."createdAt" > (u."scheduledDeletionAt" - INTERVAL '30 days')
-            )
-            AND NOT EXISTS (
-                SELECT 1 FROM "ServiceSuggestion" ss 
-                WHERE ss."userId" = u."id" 
-                    AND ss."createdAt" > (u."scheduledDeletionAt" - INTERVAL '30 days')
-            )
+            AND {_STILL_INACTIVE}
         """
 
         users_to_delete = run_db_query(users_to_delete_query, (today,))
@@ -217,24 +216,15 @@ class InactiveUsersTask(Task):
         """
         Cancel scheduled deletion for users who have become active again.
         """
-        # Find users scheduled for deletion who have recent activity or gained karma
-        query = """
-        UPDATE "User" 
+        query = f"""
+        UPDATE "User"
         SET "scheduledDeletionAt" = NULL, "updatedAt" = NOW()
-        WHERE "scheduledDeletionAt" IS NOT NULL
-            AND (
-                "totalKarma" > 0
-                OR EXISTS (
-                    SELECT 1 FROM "Comment" c 
-                    WHERE c."authorId" = "User"."id" 
-                        AND c."createdAt" > ("User"."scheduledDeletionAt" - INTERVAL '30 days')
-                )
-                OR EXISTS (
-                    SELECT 1 FROM "ServiceSuggestion" ss 
-                    WHERE ss."userId" = "User"."id" 
-                        AND ss."createdAt" > ("User"."scheduledDeletionAt" - INTERVAL '30 days')
-                )
-            )
+        WHERE "id" IN (
+            SELECT u."id"
+            FROM "User" u
+            WHERE u."scheduledDeletionAt" IS NOT NULL
+                AND NOT ({_STILL_INACTIVE})
+        )
         """
 
         count = execute_db_command(query)
