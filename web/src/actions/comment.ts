@@ -142,15 +142,15 @@ export const commentActions = {
 
       const attachesProof = !input.parentId
       const proofImage = attachesProof && !context.locals.user.spammer ? input.proofImage : undefined
-      // Comment moderators are trusted: their posts skip the queue and publish as their own decision.
-      const publishesDirectly = context.locals.userCan('comments:moderate')
-      // A service's team answering on its own page publishes at once; reports still reach moderators.
-      const repliesForService =
-        !publishesDirectly &&
-        !!input.parentId &&
+      const affiliatedWithService =
         (await prisma.serviceUser.count({
           where: { userId: context.locals.user.id, serviceId: input.serviceId },
         })) > 0
+      // Comment moderators are trusted: their posts skip the queue and publish as their own decision,
+      // except on a service they represent, which another moderator has to decide.
+      const publishesDirectly = context.locals.userCan('comments:moderate') && !affiliatedWithService
+      // A service's team answering on its own page publishes at once; reports still reach moderators.
+      const repliesForService = !!input.parentId && affiliatedWithService
       const created = { updatesVerdict: false }
       const hasProof = attachesProof && (!!input.orderId?.trim() || !!proofImage)
       const waitsForProofCheck = !publishesDirectly && hasProof && issuesNeedingProof(issueTypes).length > 0
