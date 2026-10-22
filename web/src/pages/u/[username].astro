@@ -21,7 +21,12 @@ import { isStaff, staffBadgeLabel } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
 import { formatDateShort } from '../../lib/timeAgo'
-import { commentsDisabledMessage, makeUserWithTrust, trustRecord } from '../../lib/trust'
+import {
+  commentsDisabledMessage,
+  countPublishedReplies,
+  makeUserWithTrust,
+  trustRecord,
+} from '../../lib/trust'
 import { absoluteSiteUrl, urlDomain } from '../../lib/urls'
 import { isUserProfileIndexable, profileServiceWhere } from '../../lib/userProfileSeo'
 
@@ -142,7 +147,8 @@ const staffLabel = staffBadgeLabel(user)
 const isCurrentUser = !!Astro.locals.user && user.id === Astro.locals.user.id
 const viewerIsStaff = isStaff(Astro.locals.user)
 
-const publicTrustFacts = trustRecord(user.trust).filter((fact) => fact.count > 0)
+const replyCount = await Astro.locals.banners.try('reply count', () => countPublishedReplies(user.id), 0)
+const publicTrustFacts = trustRecord(user.trust, replyCount).filter((fact) => fact.count > 0)
 ---
 
 <BaseLayout
@@ -589,7 +595,6 @@ const publicTrustFacts = trustRecord(user.trust).filter((fact) => fact.count > 0
           <Icon name="ri:chat-3-line" class="mr-2 inline-block size-5" />
           Recent Comments
         </h2>
-        <span class="text-day-500">{user._count.comments.toLocaleString()} comments</span>
       </header>
 
       {

@@ -24,7 +24,7 @@ export const { dataArray: trustFacts, getFn: getTrustFactInfo } = makeHelpersFor
   [
     {
       id: 'publishedPosts',
-      label: 'Published comments',
+      label: 'Comments',
       icon: 'ri:chat-check-line',
       one: 'published comment',
       many: 'published comments',

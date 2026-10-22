@@ -9,6 +9,7 @@ import {
 } from '../constants/trustUnlocks'
 
 import { userTrustRows, type UserTrustRow } from './dbFunctions'
+import { publishedCommentStatuses } from './experiences'
 import { countOf } from './pluralize'
 import { prisma } from './prisma'
 
@@ -16,9 +17,20 @@ export type TrustFacts = Omit<UserTrustRow, 'userId'>
 
 export type TrustUnlocks = Record<TrustUnlockId, boolean>
 
-// trustRecord is the account's public record: what it published and what moderators accepted.
-export const trustRecord = (trust: TrustFacts) =>
-  trustFacts.map((fact) => ({ label: fact.label, icon: fact.icon, count: trust[fact.id] }))
+// trustRecord is the account's public record: what it published and what moderators accepted. Replies don't
+// count toward trust; they sit next to comments so the two numbers aren't mistaken for one.
+export const trustRecord = (trust: TrustFacts, replyCount: number) =>
+  trustFacts.flatMap((fact) => {
+    const entry = { label: fact.label, icon: fact.icon, count: trust[fact.id] }
+    return fact.id === 'publishedPosts'
+      ? [entry, { label: 'Replies', icon: 'ri:reply-line', count: replyCount }]
+      : [entry]
+  })
+
+export const countPublishedReplies = (userId: number) =>
+  prisma.comment.count({
+    where: { authorId: userId, parentId: { not: null }, status: { in: publishedCommentStatuses } },
+  })
 
 export type UserTrust = TrustFacts & { unlocks: TrustUnlocks }
 

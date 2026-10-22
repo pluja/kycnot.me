@@ -21,6 +21,7 @@ import { makeLoginUrl } from '../../lib/redirectUrls'
 import { formatDateShort } from '../../lib/timeAgo'
 import {
   commentsDisabledMessage,
+  countPublishedReplies,
   makeTrustUnlockMessage,
   makeUserWithTrust,
   trustRecord,
@@ -120,8 +121,12 @@ const daysUntilDeletion = user.scheduledDeletionAt
   ? differenceInCalendarDays(user.scheduledDeletionAt, new Date())
   : null
 
+const replyCount = await Astro.locals.banners.try('reply count', () => countPublishedReplies(user.id), 0)
 const trustFacts = [
-  ...trustRecord(user.trust).map(({ count, ...fact }) => ({ ...fact, value: count.toLocaleString() })),
+  ...trustRecord(user.trust, replyCount).map(({ count, ...fact }) => ({
+    ...fact,
+    value: count.toLocaleString(),
+  })),
   {
     label: 'Member since',
     icon: 'ri:calendar-line',
