@@ -6,7 +6,7 @@ export const MAX_IMAGE_DIMENSION = 4096
 // ALLOWED_OUTPUT_FORMATS mirrors Astro's VALID_OUTPUT_FORMATS. `gif` is
 // deliberately excluded: it is input-only for Astro and would trigger an
 // expensive palette-quantization encode.
-const ALLOWED_OUTPUT_FORMATS = new Set(['avif', 'png', 'webp', 'jpeg', 'jpg', 'svg'])
+const ALLOWED_OUTPUT_FORMATS = new Set(['avif', 'png', 'webp', 'jpeg', 'jpg'])
 
 // NAMED_QUALITIES are the presets sharp accepts in place of a numeric 1-100 value.
 const NAMED_QUALITIES = new Set(['low', 'mid', 'high', 'max'])
@@ -61,17 +61,6 @@ export function validateImageParams(params: URLSearchParams): string | null {
   const format = params.get('f')
   if (format !== null && !ALLOWED_OUTPUT_FORMATS.has(format)) {
     return 'Invalid "f" parameter'
-  }
-
-  // Astro only emits `f=svg` for an SVG source (MyPicture keys on the `.svg`
-  // extension). A tampered `f=svg` on a raster would otherwise be returned by
-  // sharp's service as the raster bytes labelled `image/svg+xml`, so gate it on
-  // the href actually being an SVG.
-  if (format === 'svg') {
-    const hrefPath = (params.get('href') ?? '').split(/[?#]/)[0] ?? ''
-    if (!hrefPath.toLowerCase().endsWith('.svg')) {
-      return 'Invalid "f" parameter'
-    }
   }
 
   return null

@@ -26,6 +26,7 @@ type Props = Omit<ComponentProps<typeof Picture>, 'formats' | 'src'> & {
 const {
   src,
   fallback = undefined as keyof typeof fallbackImages | undefined,
+  alt,
   height,
   width,
   pictureAttributes,
@@ -36,29 +37,40 @@ const fallbackImage = fallback ? fallbackImages[fallback] : undefined
 
 const rawSrc = typeof src === 'string' ? src : (src ?? fallbackImage)
 const finalSrc = typeof rawSrc === 'string' && rawSrc.startsWith('/') ? `${siteOrigin}${rawSrc}` : rawSrc
-
-const isSvg =
-  (typeof finalSrc === 'string' && finalSrc.toLowerCase().endsWith('.svg')) ||
-  (typeof finalSrc === 'object' &&
-    finalSrc !== null &&
-    'src' in finalSrc &&
-    typeof finalSrc.src === 'string' &&
-    finalSrc.src.toLowerCase().endsWith('.svg'))
+// Imported SVGs are trusted build assets that Astro can only emit as SVG, which /_image refuses to serve.
+const importedSvg =
+  (typeof finalSrc === 'object' || typeof finalSrc === 'function') &&
+  'format' in finalSrc &&
+  finalSrc.format === 'svg'
+    ? finalSrc
+    : null
 ---
 
 {/* eslint-disable @typescript-eslint/no-explicit-any */}
 {
-  !!finalSrc && (
-    <Picture
-      src={finalSrc}
-      formats={isSvg ? ['svg'] : ['webp']}
-      height={height ? Number(height) * 2 : undefined}
-      width={width ? Number(width) * 2 : undefined}
-      pictureAttributes={{
-        ...pictureAttributes,
-        class: cn('shrink-0', pictureAttributes?.class),
-      }}
+  importedSvg ? (
+    <img
+      src={importedSvg.src}
+      alt={alt}
+      width={width}
+      height={height}
+      class={cn('shrink-0', pictureAttributes?.class)}
       {...(props as any)}
     />
+  ) : (
+    !!finalSrc && (
+      <Picture
+        src={finalSrc}
+        alt={alt}
+        formats={typeof finalSrc === 'string' && finalSrc.toLowerCase().endsWith('.svg') ? ['svg'] : ['webp']}
+        height={height ? Number(height) * 2 : undefined}
+        width={width ? Number(width) * 2 : undefined}
+        pictureAttributes={{
+          ...pictureAttributes,
+          class: cn('shrink-0', pictureAttributes?.class),
+        }}
+        {...(props as any)}
+      />
+    )
   )
 }

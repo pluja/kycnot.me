@@ -50,7 +50,7 @@ export const GET: APIRoute = async ({ params }) => {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=31536000',
         'X-Content-Type-Options': 'nosniff',
-        'Content-Security-Policy': "default-src 'none'",
+        'Content-Security-Policy': "default-src 'none'; sandbox",
       },
     })
   } catch {

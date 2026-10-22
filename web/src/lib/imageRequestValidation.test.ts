@@ -9,7 +9,7 @@ function check(query: string): string | null {
 
 void test('accepts the parameters Astro generates', () => {
   assert.equal(check('href=/files/x.png&w=1200&h=64&f=webp&q=80'), null)
-  assert.equal(check('href=/files/logo.svg&f=svg'), null)
+  assert.equal(check('href=/files/logo.svg&f=webp'), null)
   assert.equal(check('href=/files/x.png&q=high'), null)
   assert.equal(check('href=/files/x.png'), null)
   assert.equal(check(`href=/files/x.png&w=${MAX_IMAGE_DIMENSION.toString()}`), null)
@@ -77,11 +77,7 @@ void test('rejects malformed href before it can 500 the default endpoint', () =>
   assert.notEqual(check('href=ftp://x/y&w=96'), null) // non-http scheme
 })
 
-void test('only allows f=svg for an svg source', () => {
-  // Astro emits f=svg solely for .svg sources; a tampered f=svg on a raster
-  // would otherwise be served as image/svg+xml (the reported XML-error bug).
-  assert.equal(check('href=/files/logo.svg&f=svg'), null)
-  assert.equal(check('href=https://kycnot.me/files/logo.svg&f=svg'), null)
-  assert.notEqual(check('href=/files/services/pictures/135b5950cd.png&f=svg'), null)
+void test('never outputs svg, so no markup is served from /_image', () => {
+  assert.notEqual(check('href=/files/logo.svg&f=svg'), null)
   assert.notEqual(check('href=/files/x.png&f=svg'), null)
 })

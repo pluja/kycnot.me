@@ -207,6 +207,7 @@ export default defineConfig({
     },
     service: {
       entrypoint: './src/lib/imageService.ts',
+      config: { limitInputPixels: 40_000_000 },
     },
   },
   redirects: {

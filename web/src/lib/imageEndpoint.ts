@@ -162,6 +162,8 @@ function imageResponse(data: Uint8Array<ArrayBuffer>, format: string): Response 
     headers: {
       'Content-Type': mime.lookup(format) ?? `image/${format}`,
       'Cache-Control': 'public, max-age=31536000, immutable',
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'; sandbox",
     },
   })
 }
