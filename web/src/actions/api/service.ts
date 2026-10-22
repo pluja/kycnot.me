@@ -14,7 +14,7 @@ import { zodUrlOptionalProtocol } from '../../lib/zodUtils'
 export const apiServiceActions = {
   get: defineProtectedAction({
     accept: 'json',
-    permissions: 'guest',
+    permissions: 'api-key',
     input: z.object({
       id: z.coerce.number().int().positive().optional(),
       slug: z

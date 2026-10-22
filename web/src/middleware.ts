@@ -184,8 +184,10 @@ const apiKeyAuth = defineMiddleware(async (context, next) => {
   }
 
   const keyHash = hashApiKey(rawKey)
-  const apiKey = await prisma.apiKey.findUnique({
-    where: { keyHash, isActive: true },
+  // A key stops working as soon as its owner loses API access or is marked a spammer.
+  const apiKey = await prisma.apiKey.findFirst({
+    where: { keyHash, isActive: true, user: { canCreateApiKeys: true, spammer: false } },
+    select: { id: true },
   })
 
   if (!apiKey) {

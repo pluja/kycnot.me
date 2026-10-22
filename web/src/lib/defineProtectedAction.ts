@@ -17,6 +17,7 @@ type SpecialUserPermission = 'admin' | 'verified'
 type Permission =
   | CapabilityPermission
   | SpecialUserPermission
+  | 'api-key'
   | 'authenticated'
   | 'guest'
   | 'not-spammer'
@@ -49,7 +50,7 @@ export function defineProtectedAction<
 }: {
   input?: TInputSchema
   accept?: TAccept
-  handler: P extends 'guest'
+  handler: P extends 'api-key' | 'guest'
     ? ActionHandler<TInputSchema, TOutput>
     : ActionHandlerWithUser<TInputSchema, TOutput>
   permissions: P
@@ -58,6 +59,19 @@ export function defineProtectedAction<
     accept,
     input: inputSchema,
     handler: ((input, context) => {
+      // api-key actions are only reachable through /api/ routes, where the middleware has verified the key;
+      // the same action called at /_actions/ carries no key and is refused.
+      if (permissions === 'api-key') {
+        if (!context.locals.apiKeyAuthenticated) {
+          throw new ActionError({ code: 'UNAUTHORIZED', message: 'API key required' })
+        }
+        return handler(
+          input,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+          context as any
+        )
+      }
+
       if (permissions === 'guest' || (Array.isArray(permissions) && permissions.length === 0)) {
         return handler(
           input,
