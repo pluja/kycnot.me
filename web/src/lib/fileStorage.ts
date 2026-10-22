@@ -2,8 +2,11 @@ import { createHash } from 'crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
+import { ActionError } from 'astro:actions'
 import { UPLOAD_DIR } from 'astro:env/server'
 
+import { reencodeUploadedImage } from './imageUpload'
+import { Semaphore } from './semaphore'
 import { watermarkImage } from './watermark'
 
 /**
@@ -41,34 +44,45 @@ function hashContent(buffer: Buffer): string {
   return createHash('sha1').update(buffer).digest('hex').substring(0, 10)
 }
 
+// uploadSemaphore caps concurrent image decodes, each of which can hold tens of MB of native memory.
+const uploadSemaphore = new Semaphore(2, 20)
+
 /**
- * Save a file locally and return its web-accessible URL path. When
- * `watermark` is set, the image is tiled with the KYCNOT.ME watermark before
- * being written; the content hash (and therefore the filename) is derived from
- * the final bytes, so an unwatermarked save keeps its previous filename.
+ * Save an uploaded image and return its web-accessible URL path. When `watermark` is set, the image is
+ * tiled with the KYCNOT.ME watermark; the filename is the hash of the final bytes.
  */
-export async function saveFileLocally(
+export async function saveImageUpload(
   file: File,
-  originalFileName: string,
-  subDir?: string,
-  { watermark = false }: { watermark?: boolean } = {}
+  subDir: string,
+  { watermark = false, maxDimension = 4096 }: { watermark?: boolean; maxDimension?: number } = {}
 ): Promise<string> {
-  let buffer: Buffer = Buffer.from(await file.arrayBuffer())
-  if (watermark) {
-    buffer = await watermarkImage(buffer)
+  const processing = uploadSemaphore.run(async () => {
+    const image = await reencodeUploadedImage(Buffer.from(await file.arrayBuffer()), maxDimension)
+    return watermark ? watermarkImage(image) : image
+  })
+  if (!processing) {
+    throw new ActionError({
+      code: 'TOO_MANY_REQUESTS',
+      message: 'Too many images are being processed. Try again in a minute.',
+    })
+  }
+  let buffer: Buffer
+  try {
+    buffer = await processing
+  } catch (error) {
+    console.warn('[fileStorage] Rejected image upload:', error instanceof Error ? error.message : error)
+    throw new ActionError({
+      code: 'BAD_REQUEST',
+      message: 'The image could not be read. Use a PNG, JPEG, WebP or AVIF under 5 MB.',
+    })
   }
 
-  const fileExtension = path.extname(originalFileName)
-  const fileName = `${hashContent(buffer)}${fileExtension}`
-
-  // Use the provided subDir or default to 'services/pictures'
-  const { fsPath: uploadDir, webPath: webUploadPath } = getUploadDir(subDir ?? 'services/pictures')
+  const fileName = `${hashContent(buffer)}.webp`
+  const { fsPath: uploadDir, webPath: webUploadPath } = getUploadDir(subDir)
 
   await fs.mkdir(uploadDir, { recursive: true })
-  const filePath = path.join(uploadDir, fileName)
-  await fs.writeFile(filePath, buffer)
-  const url = sanitizePath(`${webUploadPath}/${fileName}`)
-  return url
+  await fs.writeFile(path.join(uploadDir, fileName), buffer)
+  return sanitizePath(`${webUploadPath}/${fileName}`)
 }
 
 /**

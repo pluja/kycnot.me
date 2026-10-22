@@ -9,7 +9,7 @@ import {
   caseAccessAffiliatesSelect,
 } from '../../lib/caseAccess'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
-import { deleteFileLocally, saveFileLocally } from '../../lib/fileStorage'
+import { deleteFileLocally, saveImageUpload } from '../../lib/fileStorage'
 import { prisma } from '../../lib/prisma'
 import { emptyToUndefined, imageFileSchema } from '../../lib/zodUtils'
 
@@ -388,7 +388,7 @@ export const adminCaseActions = {
         }
 
         const imageUrl = input.imageFile
-          ? await saveFileLocally(input.imageFile, input.imageFile.name, `cases/${input.caseId.toString()}`, {
+          ? await saveImageUpload(input.imageFile, `cases/${input.caseId.toString()}`, {
               watermark: input.watermark,
             })
           : null

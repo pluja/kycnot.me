@@ -5,7 +5,7 @@ import { ActionError } from 'astro:actions'
 import { capabilitiesZodEnum } from '../../constants/capabilities'
 import { recordAuditLog } from '../../lib/auditLog'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
-import { saveFileLocally } from '../../lib/fileStorage'
+import { saveImageUpload } from '../../lib/fileStorage'
 import { cap, withoutOrphanCapabilities } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { displayNameSchema, httpUrlSchema } from '../../lib/zodUtils'
@@ -138,9 +138,7 @@ export const adminUserActions = {
       }
 
       const pictureUrl =
-        pictureFile && pictureFile.size > 0
-          ? await saveFileLocally(pictureFile, pictureFile.name, 'users/pictures/')
-          : null
+        pictureFile && pictureFile.size > 0 ? await saveImageUpload(pictureFile, 'users/pictures/') : null
 
       const updatedUser = await prisma.$transaction(async (tx) => {
         const updated = await tx.user.update({

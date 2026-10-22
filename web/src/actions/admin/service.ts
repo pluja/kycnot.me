@@ -14,7 +14,7 @@ import {
   descriptionOpeningRefinement,
   descriptionSchema,
 } from '../../lib/descriptionRules'
-import { saveFileLocally, deleteFileLocally } from '../../lib/fileStorage'
+import { saveImageUpload, deleteFileLocally } from '../../lib/fileStorage'
 import { cap, userCan } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { proofIdRegex } from '../../lib/proofEvidence'
@@ -157,7 +157,7 @@ export const adminServiceActions = {
       }
 
       const imageUrl = input.imageFile
-        ? await saveFileLocally(input.imageFile, input.imageFile.name)
+        ? await saveImageUpload(input.imageFile, 'services/pictures')
         : undefined
 
       // Setting the verification status is gated by services:approve; others
@@ -308,7 +308,7 @@ export const adminServiceActions = {
       const imageUrl = input.removeImage
         ? null
         : input.imageFile
-          ? await saveFileLocally(input.imageFile, input.imageFile.name)
+          ? await saveImageUpload(input.imageFile, 'services/pictures')
           : undefined
 
       // Changing the verification status is gated by services:approve; for
@@ -563,12 +563,9 @@ export const adminServiceActions = {
           })
         }
 
-        const imageUrl = await saveFileLocally(
-          input.imageFile,
-          input.imageFile.name,
-          `evidence/${service.slug}`,
-          { watermark: input.watermark }
-        )
+        const imageUrl = await saveImageUpload(input.imageFile, `evidence/${service.slug}`, {
+          watermark: input.watermark,
+        })
 
         return { imageUrl }
       },
