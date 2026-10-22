@@ -39,7 +39,7 @@ const fromDeletedAccount = comment.authorId === null && !comment.statusBeforeWit
 <article
   {...props}
   id={`comment-${comment.id.toString()}`}
-  class={cn('max-w-[720px] scroll-mt-20 border-b border-night-500 py-5 last:border-b-0', className)}
+  class={cn('scroll-mt-20 border-b border-night-500 py-5 last:border-b-0', className)}
 >
   <p class="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm">
     <Icon
