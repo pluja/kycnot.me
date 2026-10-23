@@ -2,6 +2,7 @@ import { getActionContext, isInputError } from 'astro:actions'
 import { defineMiddleware, sequence } from 'astro:middleware'
 
 import { hashApiKey } from './lib/apiKey'
+import { APP_RESPONSE_HEADER } from './lib/appResponseHeader'
 import { ErrorBanners, getMessagesFromUrl } from './lib/errorBanners'
 import {
   getCachedSwapPage,
@@ -328,7 +329,20 @@ const cacheAnonymousSwapPages = defineMiddleware(async (context, next) => {
   })
 })
 
+const markHtmxResponses = defineMiddleware(async (context, next) => {
+  const response = await next()
+  if (context.request.headers.get('hx-request') !== 'true') return response
+  try {
+    response.headers.set(APP_RESPONSE_HEADER, '1')
+  } catch {
+    // Response.redirect() and proxied responses have immutable headers; htmx follows a redirect to an app page that
+    // carries the header.
+  }
+  return response
+})
+
 export const onRequest = sequence(
+  markHtmxResponses,
   lowercaseServiceSlug,
   errors,
   authenticate,

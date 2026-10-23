@@ -1,3 +1,5 @@
+import { APP_RESPONSE_HEADER } from './appResponseHeader'
+
 const markControls = (expanded: string) =>
   `document.querySelectorAll('[aria-controls="' + slot.id + '"]').forEach((link) => link.setAttribute('aria-expanded', ${expanded}))`
 
@@ -38,6 +40,5 @@ export const inlinePanelClose = {
 }
 
 // swapRejectedActions lets htmx swap in a rejected action's 4xx response, which carries the form and its error
-// message; htmx skips those by default.
-export const swapRejectedActions =
-  'const status = event.detail.xhr.status; if (status >= 400 && status < 500 && status !== 404) { event.detail.shouldSwap = true; event.detail.isError = false }'
+// message; htmx skips those by default. A 4xx the app didn't render (a bot challenge) is still left out.
+export const swapRejectedActions = `const xhr = event.detail.xhr; if (xhr.getResponseHeader('${APP_RESPONSE_HEADER}') && xhr.status >= 400 && xhr.status < 500 && xhr.status !== 404) { event.detail.shouldSwap = true; event.detail.isError = false }`

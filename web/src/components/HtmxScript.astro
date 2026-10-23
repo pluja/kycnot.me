@@ -5,6 +5,10 @@
 <script>
   import htmx from 'htmx.org'
 
+  import { APP_RESPONSE_HEADER } from '../lib/appResponseHeader'
+
+  import type { HtmxBeforeSwapDetails } from 'htmx.org'
+
   htmx.config.globalViewTransitions = false
   // The swap page's full HTML (with all currency options) is too large to
   // cache to localStorage on every HTMX-driven navigation; HTMX's default
@@ -17,6 +21,25 @@
   // reflow on mobile when this ran against document.body).
   document.addEventListener('astro:after-swap', () => {
     htmx.process(document.querySelector('main') ?? document.body)
+  })
+
+  // A response the app didn't render (a bot challenge, a proxy error page) is never swapped in. When a person
+  // triggered the request, it is repeated as a full page so the challenge can run; a form submission asks first,
+  // since reloading drops what was typed. Background requests, rate limits and server errors are left alone.
+  document.addEventListener('htmx:beforeSwap', (event) => {
+    const { detail } = event as CustomEvent<HtmxBeforeSwapDetails>
+    if (detail.xhr.getResponseHeader(APP_RESPONSE_HEADER)) return
+    detail.shouldSwap = false
+    const { status } = detail.xhr
+    if (status === 429 || status >= 500 || !detail.requestConfig.triggeringEvent?.isTrusted) return
+    if (detail.requestConfig.verb !== 'get') {
+      if (window.confirm('This was blocked by a security check. Reload the page to continue?'))
+        window.location.reload()
+    } else if (detail.boosted) {
+      window.location.assign(detail.pathInfo.finalRequestPath)
+    } else {
+      window.location.reload()
+    }
   })
 
   window.htmx = htmx
