@@ -5,6 +5,8 @@ import { Icon } from 'astro-icon/components'
 import { mapValues } from 'lodash-es'
 
 import ModerationQueueItem from '../../components/admin/comments/ModerationQueueItem.astro'
+import EditFeedbackScript from '../../components/EditFeedbackScript.astro'
+import EvidenceCheckTextsScript from '../../components/EvidenceCheckTextsScript.astro'
 import Lightbox from '../../components/Lightbox.astro'
 import Pagination from '../../components/Pagination.astro'
 import { commentStatus } from '../../constants/commentStatus'
@@ -384,4 +386,6 @@ const emptyMessages: Record<QueueId, string> = {
     )
   }
   <Lightbox />
+  <EvidenceCheckTextsScript />
+  <EditFeedbackScript />
 </BaseLayout>

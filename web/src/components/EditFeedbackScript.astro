@@ -1,0 +1,22 @@
+<script>
+  ////////////////////////////////////////////////////////////
+  // Optional script for the edit review form.              //
+  // Picking a ready-made note fills an empty field or      //
+  // replaces another ready-made note; text the moderator   //
+  // wrote stays and the note goes on a new line. Listens   //
+  // on the document because htmx swaps the panel in.       //
+  ////////////////////////////////////////////////////////////
+  import { editFeedbackGroups } from '../constants/editFeedbackTexts'
+
+  const readyMadeNotes = new Set<string>(editFeedbackGroups.flatMap((group) => group.texts))
+
+  document.addEventListener('change', (event) => {
+    const select = event.target
+    if (!(select instanceof HTMLSelectElement) || !('editFeedback' in select.dataset) || !select.value) return
+    const field = select.form?.elements.namedItem('reason')
+    if (!(field instanceof HTMLTextAreaElement)) return
+    const current = field.value.trim()
+    field.value = !current || readyMadeNotes.has(current) ? select.value : `${current}\n${select.value}`
+    field.focus()
+  })
+</script>

@@ -1,13 +1,14 @@
 ---
 import { actions } from 'astro:actions'
 
-import { getCommentKindInfo } from '../constants/commentKinds'
+import { editFeedbackGroups } from '../constants/editFeedbackTexts'
 import { MODERATOR_REASON_LENGTH } from '../lib/commentLimits'
 import { experienceInput, isPublishedComment } from '../lib/experiences'
 import { getFormReplay } from '../lib/formReplay'
 
 import Button from './Button.astro'
 import CommentEditDiff from './CommentEditDiff.astro'
+import EditFeedbackScript from './EditFeedbackScript.astro'
 import FormReplay from './FormReplay.astro'
 import InputTextArea from './InputTextArea.astro'
 import TimeFormatted from './TimeFormatted.astro'
@@ -44,17 +45,13 @@ const reviewFailed = !!Astro.getActionResult(actions.admin.experience.reviewRevi
               AI held this edit: {revision.aiReasoning}
             </p>
           )}
-          {revision.kind !== comment.kind && (
-            <p class="text-xs text-day-300">
-              Type: {getCommentKindInfo(comment.kind).label} → {getCommentKindInfo(revision.kind).label}
-            </p>
-          )}
           <CommentEditDiff
             before={{
               content: comment.content,
+              kind: comment.kind,
               experienceData: { ...comment.experience, issues: comment.issues },
             }}
-            after={{ content: revision.content, experienceData: revision.experienceData }}
+            after={revision}
           />
           {!canPublish && (
             <p class="text-xs text-yellow-200">
@@ -69,6 +66,24 @@ const reviewFailed = !!Astro.getActionResult(actions.admin.experience.reviewRevi
           >
             <FormReplay />
             <input type="hidden" name="revisionId" value={revision.id} />
+            <label class="flex flex-wrap items-center gap-2 text-xs text-day-400">
+              Ready-made feedback
+              <select
+                data-edit-feedback
+                class="h-8 max-w-full rounded-md border border-night-500 bg-night-900 px-2 text-xs text-day-100"
+              >
+                <option value="">Pick one to start from…</option>
+                {editFeedbackGroups
+                  .filter((group) => canPublish || !group.publishes)
+                  .map((group) => (
+                    <optgroup label={group.label}>
+                      {group.texts.map((text) => (
+                        <option value={text}>{text}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+              </select>
+            </label>
             {/* A textarea, so Enter adds a line instead of submitting with the first button, Publish. */}
             <InputTextArea
               name="reason"
@@ -110,3 +125,5 @@ const reviewFailed = !!Astro.getActionResult(actions.admin.experience.reviewRevi
     })
   }
 </div>
+
+<EditFeedbackScript />

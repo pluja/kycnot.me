@@ -43,6 +43,7 @@ import Button from './Button.astro'
 import CommentItem from './CommentItem.astro'
 import CommentPlaceholder from './CommentPlaceholder.astro'
 import CommentReply from './CommentReply.astro'
+import EditFeedbackScript from './EditFeedbackScript.astro'
 import EvidenceCheckTextsScript from './EvidenceCheckTextsScript.astro'
 import ExperienceSummary from './ExperienceSummary.astro'
 import FilterPill from './FilterPill.astro'
@@ -618,4 +619,11 @@ const activeFilters = [
   }
 </section>
 
-{canModerate && <EvidenceCheckTextsScript />}
+{
+  canModerate && (
+    <>
+      <EvidenceCheckTextsScript />
+      <EditFeedbackScript />
+    </>
+  )
+}
