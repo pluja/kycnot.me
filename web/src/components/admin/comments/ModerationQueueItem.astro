@@ -51,15 +51,12 @@ const reportReasonLabels = [
 ]
   .map((reason) => getCommentRuleInfo(reason).label)
   .join(', ')
-const taskBorder = {
-  red: 'border-l-red-600',
-  yellow: 'border-l-yellow-500',
-  violet: 'border-l-violet-600',
-  blue: 'border-l-blue-600',
-  gray: 'border-l-day-500',
-} as const
-const urgency = ['red', 'yellow', 'violet', 'blue', 'gray'] as const
-type Task = { label: string; icon: string; color: keyof typeof taskBorder; href?: string }
+type Task = {
+  label: string
+  icon: string
+  color: 'blue' | 'gray' | 'red' | 'violet' | 'yellow'
+  href?: string
+}
 const pendingEdit = comment.revisions[0]
 // heldForProofOnly marks a post whose only hold is its proof: accepting the proof publishes it, so it is one task.
 const heldForProofOnly = proofsToCheck(comment) > 0 && isHeldOnlyForProof(comment, 0)
@@ -101,15 +98,11 @@ const tasks = (
 ).filter((task) => task !== false)
 const taskBadge = (task: Task) =>
   ({ text: task.label, icon: task.icon, color: task.color, variant: 'solid', size: 'md' }) as const
-const mainTask = urgency.find((color) => tasks.some((task) => task.color === color))
 ---
 
 <article
   id={`review-${idText}`}
-  class={cn(
-    'group/item scroll-mt-20 border-b border-l-4 border-b-night-600 border-l-transparent py-4 pl-3 last:border-b-0',
-    mainTask && taskBorder[mainTask]
-  )}
+  class="group/item scroll-mt-20 border-b border-night-600 py-4 last:border-b-0"
   aria-labelledby={`review-${idText}-title`}
 >
   <header class="flex flex-wrap items-center gap-x-2 gap-y-1">
