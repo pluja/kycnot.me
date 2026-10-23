@@ -23,6 +23,7 @@ import {
 } from '../lib/commentsWithReplies'
 import {
   currentExperienceStates,
+  moderatorResolution,
   experienceSummary,
   filterExperienceIds,
   summaryWindowDays,
@@ -212,14 +213,16 @@ const [watched, currentStates, replyPreviews, internalNotes, authorTrust] =
     ],
     ['Failed to load author facts', () => getTrustFacts(authorIds), new Map<number, TrustFacts>()],
   ])
-const comments: ThreadComment[] = result.comments.map((comment) => ({
-  ...comment,
-  experience: comment.experience
-    ? { ...comment.experience, ...currentStates.find((state) => state.commentId === comment.id) }
-    : null,
-  isWatchingReplies: watched?.watchedComments.some((item) => item.id === comment.id) ?? false,
-  authorTrust: comment.authorId === null ? null : (authorTrust.get(comment.authorId) ?? null),
-}))
+const comments: ThreadComment[] = result.comments.map((comment) => {
+  const state = currentStates.find((item) => item.commentId === comment.id)
+  return {
+    ...comment,
+    experience: comment.experience ? { ...comment.experience, ...state } : null,
+    resolution: moderatorResolution(state),
+    isWatchingReplies: watched?.watchedComments.some((item) => item.id === comment.id) ?? false,
+    authorTrust: comment.authorId === null ? null : (authorTrust.get(comment.authorId) ?? null),
+  }
+})
 const internalNoteById = new Map(internalNotes.map((note) => [note.id, note.adminNote]))
 const [threadRoot, ...threadReplies] = result.focused ? comments : []
 const replyTarget =

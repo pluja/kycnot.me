@@ -8,6 +8,8 @@ import { experienceSentiments } from '../constants/experiences'
 import { getModerationActionInfo } from '../constants/moderationActions'
 import { lastActionFeedback } from '../lib/actionFeedback'
 import { MODERATOR_REASON_LENGTH } from '../lib/commentLimits'
+import { moderatorResolution, type ExperienceState } from '../lib/experienceQueries'
+import { isPublishedComment } from '../lib/experiences'
 import { inlinePanelClose, swapRejectedActions } from '../lib/inlinePanel'
 import { userCan } from '../lib/permissions'
 
@@ -21,6 +23,7 @@ import CommentEvidenceChecks from './CommentEvidenceChecks.astro'
 import CommentModeration from './CommentModeration.astro'
 import CommentModeratorNotes from './CommentModeratorNotes.astro'
 import CommentNotes from './CommentNotes.astro'
+import CommentProblemResolution from './CommentProblemResolution.astro'
 import CommentSensitiveText from './CommentSensitiveText.astro'
 import CommentStatusChip from './CommentStatusChip.astro'
 import InlineLoadErrors from './InlineLoadErrors.astro'
@@ -52,11 +55,22 @@ type Props = {
     summary: string
     actor: { name: string; displayName: string | null } | null
   }[]
+  experienceState: ExperienceState | null
   canModerate: boolean
   inline: boolean
 }
-const { comment, context, evidence, privateEvidence, reusedProof, revisions, activity, canModerate, inline } =
-  Astro.props
+const {
+  comment,
+  context,
+  evidence,
+  privateEvidence,
+  reusedProof,
+  revisions,
+  activity,
+  experienceState,
+  canModerate,
+  inline,
+} = Astro.props
 const panelPath = `/admin/comments/moderate/${comment.id.toString()}`
 const canRequestProof =
   !comment.parentId &&
@@ -66,6 +80,14 @@ const panelId = `moderation-panel-${comment.id.toString()}`
 const user = Astro.locals.user
 const canRedact = canModerate && userCan(user, 'comments:redact')
 const canClassify = canModerate && !comment.parentId && comment.experience?.sentimentSource !== 'AUTHOR'
+const canResolveProblem =
+  canModerate &&
+  !!experienceState &&
+  isPublishedComment(comment.status) &&
+  !comment.parentId &&
+  comment.kind === 'EXPERIENCE' &&
+  comment.issues.length > 0 &&
+  (experienceState.outcome !== 'RESOLVED' || !!experienceState.moderatorResolvedAt)
 const pendingEdits = revisions.filter((revision) => revision.status === 'PENDING').length
 const editDecisions = revisions.filter((revision) => revision.reason)
 const activeEvidence = evidence.filter((item) => !item.removedAt)
@@ -81,6 +103,8 @@ const actionResults = {
   redactRevision: Astro.getActionResult(actions.admin.experience.redactRevision),
   classify: Astro.getActionResult(actions.admin.experience.classify),
   linkCase: Astro.getActionResult(actions.admin.experience.linkCase),
+  markResolved: Astro.getActionResult(actions.admin.experience.markResolved),
+  undoResolved: Astro.getActionResult(actions.admin.experience.undoResolved),
   removeEvidenceImage: Astro.getActionResult(actions.admin.experience.removeEvidenceImage),
   deleteEvidence: Astro.getActionResult(actions.admin.experience.deleteEvidence),
   dismissNote: Astro.getActionResult(actions.admin.experience.dismissNote),
@@ -98,6 +122,8 @@ const feedbackMessages = {
   redactRevision: 'Edited text saved. Matching copies were updated.',
   classify: 'Comment type saved.',
   linkCase: 'Case linked.',
+  markResolved: 'Marked resolved.',
+  undoResolved: 'Moderator resolution removed.',
   removeEvidenceImage: 'Screenshot removed.',
   deleteEvidence: 'Proof deleted.',
   dismissNote: 'Note cleared. It no longer waits for a check.',
@@ -125,6 +151,12 @@ const tabs = [
   },
   { id: 'history', label: 'History', icon: 'ri:history-line', show: !!context || activity.length > 0 },
   { id: 'notes', label: 'Notes', icon: 'ri:sticky-note-line', show: !!context },
+  {
+    id: 'problem',
+    label: 'Problem',
+    icon: 'ri:error-warning-line',
+    show: canResolveProblem,
+  },
   { id: 'redact', label: 'Redact', icon: 'ri:eraser-line', show: canRedact },
   { id: 'label', label: 'Label', icon: 'ri:price-tag-3-line', show: canClassify },
 ].filter((tab) => tab.show)
@@ -137,6 +169,8 @@ const tabForAction = {
   redactRevision: 'redact',
   classify: 'label',
   linkCase: undefined,
+  markResolved: 'problem',
+  undoResolved: 'problem',
   removeEvidenceImage: 'evidence',
   deleteEvidence: 'evidence',
   dismissNote: 'evidence',
@@ -172,6 +206,7 @@ const tabGroup = `moderation-tab-${comment.id.toString()}`
         commentId={comment.id}
         publicNote={context.publicNote}
         internalNote={context.adminNote}
+        resolution={moderatorResolution(experienceState)}
         outOfBand
       />
     )
@@ -319,6 +354,16 @@ const tabGroup = `moderation-tab-${comment.id.toString()}`
           {context && (
             <div class="hidden group-has-[[data-tab=notes]:checked]/tabs:block">
               <CommentModeratorNotes comment={context} panelPath={panelPath} />
+            </div>
+          )}
+          {canResolveProblem && (
+            <div class="hidden group-has-[[data-tab=problem]:checked]/tabs:block">
+              <CommentProblemResolution
+                commentId={comment.id}
+                issues={comment.issues}
+                state={experienceState}
+                panelPath={panelPath}
+              />
             </div>
           )}
           {canRedact && (

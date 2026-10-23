@@ -247,6 +247,11 @@ export function makeNotificationTitle(
         ? `Your affiliation with ${notification.aboutService.name} was removed`
         : 'Your service affiliation was removed'
     }
+    case 'EXPERIENCE_RESOLVED_BY_MODERATORS': {
+      return notification.aboutComment
+        ? `Your problem with ${notification.aboutComment.service.name} was marked resolved`
+        : 'Your problem was marked resolved'
+    }
   }
 }
 
@@ -300,6 +305,9 @@ export function makeNotificationContent(notification: NotificationDisplay): stri
     }
     case 'SERVICE_AFFILIATION_REVOKED': {
       return `The kycnotme-verify TXT record was missing ${CLAIM_MAX_FAILED_CHECKS.toString()} days in a row, or the domain changed owners. Add the record again to claim it back.`
+    }
+    case 'EXPERIENCE_RESOLVED_BY_MODERATORS': {
+      return 'Your review shows the reason. If it isn\'t solved, reply to your review and set "Any problem now?" to "Yes, unresolved".'
     }
   }
 }
@@ -467,6 +475,22 @@ export function makeNotificationActions(
             : `${origin}/account`,
         },
       ]
+    }
+    case 'EXPERIENCE_RESOLVED_BY_MODERATORS': {
+      return notification.aboutComment
+        ? [
+            {
+              action: 'view',
+              title: 'View comment',
+              ...iconNameAndUrl('ri:arrow-right-line'),
+              url: makeCommentUrl({
+                serviceSlug: notification.aboutComment.service.slug,
+                commentId: notification.aboutComment.id,
+                origin,
+              }),
+            },
+          ]
+        : []
     }
   }
 }

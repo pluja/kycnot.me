@@ -75,7 +75,14 @@ BEGIN
         "occurredMonth" = EXCLUDED."occurredMonth",
         sentiment = EXCLUDED.sentiment,
         "sentimentSource" = EXCLUDED."sentimentSource",
-        outcome = EXCLUDED.outcome;
+        outcome = EXCLUDED.outcome,
+        -- An author who changes the outcome in an edit overrides a moderator's resolution.
+        "moderatorResolvedAt" = CASE WHEN EXCLUDED.outcome IS DISTINCT FROM "CommentExperience".outcome
+          THEN NULL ELSE "CommentExperience"."moderatorResolvedAt" END,
+        "moderatorResolvedById" = CASE WHEN EXCLUDED.outcome IS DISTINCT FROM "CommentExperience".outcome
+          THEN NULL ELSE "CommentExperience"."moderatorResolvedById" END,
+        "moderatorResolutionNote" = CASE WHEN EXCLUDED.outcome IS DISTINCT FROM "CommentExperience".outcome
+          THEN NULL ELSE "CommentExperience"."moderatorResolutionNote" END;
       -- Edits written before the problem chips carry no tags and leave the post's tags as they are.
       IF v_data ? 'issues' THEN
         UPDATE "Comment" SET issues = ARRAY(

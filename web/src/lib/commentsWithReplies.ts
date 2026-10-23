@@ -2,6 +2,7 @@ import { filterExperienceIds, publicExperienceSelect, publicEvidenceSelect } fro
 import { canReadComment, publishedCommentStatuses, withdrawnPlaceholderWhere } from './experiences'
 import { prisma } from './prisma'
 
+import type { ModeratorResolution } from './experienceQueries'
 import type { TrustFacts } from './trust'
 import type { CommentIssueType, ExperienceSentiment, Prisma, ServiceUserRole } from '@prisma/client'
 
@@ -120,6 +121,7 @@ export type CommentForFeed = Prisma.CommentGetPayload<{ select: typeof commentFe
 export type ThreadComment = Prisma.CommentGetPayload<{ select: typeof commentThreadSelect }> & {
   isWatchingReplies: boolean
   authorTrust?: TrustFacts | null
+  resolution?: ModeratorResolution | null
 }
 
 export const commentTools = ['edit', 'report', 'history', 'evidence', 'reply'] as const

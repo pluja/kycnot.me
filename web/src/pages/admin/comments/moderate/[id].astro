@@ -11,6 +11,7 @@ import {
   commentPageSelect,
 } from '../../../../lib/commentPage'
 import { makeCommentUrl } from '../../../../lib/commentsWithReplies'
+import { currentExperienceStates } from '../../../../lib/experienceQueries'
 import { hasModerationConflict } from '../../../../lib/experiences'
 import { prisma } from '../../../../lib/prisma'
 
@@ -33,7 +34,7 @@ const canModerate =
     affiliatedUserIds: comment.service.affiliatedUsers.map((item) => item.userId),
   })
 
-const [context, evidence, privateEvidence, revisions, activity] = canModerate
+const [context, evidence, privateEvidence, revisions, activity, experienceStates] = canModerate
   ? await Astro.locals.banners.tryMany([
       [
         'Failed to load moderator context',
@@ -95,8 +96,9 @@ const [context, evidence, privateEvidence, revisions, activity] = canModerate
           }),
         [],
       ],
+      ['Failed to load the problem status', () => currentExperienceStates([id]), []],
     ])
-  : [null, [], [], [], []]
+  : [null, [], [], [], [], []]
 
 const proofIds = [
   ...new Set(privateEvidence.flatMap((item) => (item.normalizedId ? [item.normalizedId] : []))),
@@ -128,6 +130,7 @@ const panelProps = {
   reusedProof,
   revisions,
   activity,
+  experienceState: experienceStates[0] ?? null,
   canModerate,
   inline,
 }

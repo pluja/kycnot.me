@@ -324,7 +324,12 @@ const [proofRequest] = comment.proofRequests
       </p>
     )
   }
-  <CommentNotes commentId={comment.id} publicNote={comment.publicNote} internalNote={internalNote} />
+  <CommentNotes
+    commentId={comment.id}
+    publicNote={comment.publicNote}
+    internalNote={internalNote}
+    resolution={comment.resolution}
+  />
   {
     comment.sourceCases.map((item) => (
       <a

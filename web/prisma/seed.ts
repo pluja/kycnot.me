@@ -1861,6 +1861,20 @@ async function main() {
         }
       }
 
+      // A problem a moderator marked resolved, so its public note renders.
+      const resolvedProblem = comments.find(
+        (comment) => comment.status === CommentStatus.APPROVED && comment.issues.length > 0
+      )
+      if (resolvedProblem) {
+        await prisma.commentExperience.update({
+          where: { commentId: resolvedProblem.id },
+          data: {
+            moderatorResolvedAt: new Date(),
+            moderatorResolutionNote: 'The author confirmed by email that the funds were released.',
+          },
+        })
+      }
+
       // An author's follow-up that changes the verdict, and a withdrawn post, so both render.
       const [updatedPost, withdrawnPost] = comments.filter(
         (comment) => comment.status === CommentStatus.APPROVED

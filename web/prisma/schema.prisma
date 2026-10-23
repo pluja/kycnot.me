@@ -232,6 +232,13 @@ model CommentExperience {
   classifiedAt    DateTime?
   updates         ExperienceUpdate[]
 
+  /// Set when a moderator confirms the reported problem was resolved. It stands until the author publishes a later
+  /// update or changes the outcome in an edit.
+  moderatorResolvedAt     DateTime?
+  moderatorResolvedBy     User?     @relation("ExperienceModeratorResolutions", fields: [moderatorResolvedById], references: [id], onDelete: SetNull)
+  moderatorResolvedById   Int?
+  moderatorResolutionNote String?   @db.VarChar(500)
+
   @@index([sentiment])
 }
 
@@ -481,6 +488,7 @@ enum NotificationType {
   /// The daily check did not find the TXT record behind a DNS-claimed affiliation.
   SERVICE_AFFILIATION_CHECK_FAILED
   SERVICE_AFFILIATION_REVOKED
+  EXPERIENCE_RESOLVED_BY_MODERATORS
 }
 
 enum CommentStatusChange {
@@ -1015,6 +1023,7 @@ model User {
   lastLoginAt              DateTime                     @default(now())
   comments                 Comment[]
   commentRevisions         CommentRevision[]            @relation("CommentRevisionAuthor")
+  experienceResolutions    CommentExperience[]          @relation("ExperienceModeratorResolutions")
   reviewedCommentRevisions CommentRevision[]            @relation("CommentRevisionModerator")
   commentEvidence          CommentEvidence[]
   evidenceChecks           EvidenceCheck[]

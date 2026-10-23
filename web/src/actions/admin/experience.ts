@@ -17,6 +17,7 @@ import { applyCommentRevision } from '../../lib/dbFunctions'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { checkExperienceModerator, publishIfHeldOnlyForProof } from '../../lib/experienceModeration'
 import { publicationInput, evidenceCheckInput } from '../../lib/experienceModerationInput'
+import { currentExperienceStates } from '../../lib/experienceQueries'
 import { classifiedKindSchema, isPublishedComment } from '../../lib/experiences'
 import { cap, userCan } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
@@ -656,6 +657,84 @@ export const adminExperienceActions = {
           summary: 'Cleared a note that holds no proof',
         })
         await publishIfHeldOnlyForProof(tx, evidence.commentId, context.locals.user.id)
+      })
+    },
+  }),
+  markResolved: defineProtectedAction({
+    accept: 'form',
+    permissions: cap('comments:moderate'),
+    input: z.object({ commentId, reason: moderatorReasonSchema }),
+    handler: async (input, context) => {
+      await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "Comment" WHERE id=${input.commentId} FOR UPDATE`
+        const post = await checkExperienceModerator(tx, context.locals.user.id, input.commentId)
+        const details = await tx.comment.findUniqueOrThrow({
+          where: { id: input.commentId },
+          select: { parentId: true, kind: true, issues: true },
+        })
+        const [state] = await currentExperienceStates([input.commentId], tx)
+        if (
+          !isPublishedComment(post.status) ||
+          details.parentId ||
+          details.kind !== 'EXPERIENCE' ||
+          !details.issues.length ||
+          !state
+        ) {
+          throw new ActionError({
+            code: 'BAD_REQUEST',
+            message: 'Only a published experience that reports a problem can be resolved.',
+          })
+        }
+        if (state.outcome === 'RESOLVED') {
+          throw new ActionError({ code: 'CONFLICT', message: 'This problem is already marked resolved.' })
+        }
+        await tx.commentExperience.update({
+          where: { commentId: input.commentId },
+          data: {
+            moderatorResolvedAt: new Date(),
+            moderatorResolvedById: context.locals.user.id,
+            moderatorResolutionNote: input.reason,
+          },
+        })
+        await recordAuditLog(tx, {
+          actorId: context.locals.user.id,
+          action: 'UPDATED',
+          targetType: 'COMMENT',
+          targetId: input.commentId,
+          summary: `Marked the problem resolved: ${input.reason}`,
+        })
+        if (post.authorId !== null && post.authorId !== context.locals.user.id) {
+          await tx.notification.create({
+            data: {
+              userId: post.authorId,
+              type: 'EXPERIENCE_RESOLVED_BY_MODERATORS',
+              aboutCommentId: input.commentId,
+            },
+          })
+        }
+      })
+    },
+  }),
+  undoResolved: defineProtectedAction({
+    accept: 'form',
+    permissions: cap('comments:moderate'),
+    input: z.object({ commentId }),
+    handler: async (input, context) => {
+      await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "Comment" WHERE id=${input.commentId} FOR UPDATE`
+        await checkExperienceModerator(tx, context.locals.user.id, input.commentId)
+        const { count } = await tx.commentExperience.updateMany({
+          where: { commentId: input.commentId, moderatorResolvedAt: { not: null } },
+          data: { moderatorResolvedAt: null, moderatorResolvedById: null, moderatorResolutionNote: null },
+        })
+        if (!count) throw new ActionError({ code: 'CONFLICT', message: 'No moderator resolution to undo.' })
+        await recordAuditLog(tx, {
+          actorId: context.locals.user.id,
+          action: 'UPDATED',
+          targetType: 'COMMENT',
+          targetId: input.commentId,
+          summary: 'Undid the moderator resolution',
+        })
       })
     },
   }),

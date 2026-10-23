@@ -137,6 +137,11 @@ export const {
       label: 'Affiliation removed',
       icon: 'ri:building-4-line',
     },
+    {
+      id: 'EXPERIENCE_RESOLVED_BY_MODERATORS',
+      label: 'Problem marked resolved',
+      icon: 'ri:checkbox-circle-line',
+    },
   ] as const satisfies NotificationTypeInfo<NotificationType>[]
 )
 

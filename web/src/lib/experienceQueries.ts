@@ -68,15 +68,28 @@ const unprovenSql = (commentId: Prisma.Sql) => Prisma.sql`(
 
 const publishedStatusesSql = Prisma.raw(publishedCommentStatuses.map((status) => `'${status}'`).join(','))
 
-// latestUpdateSql is the sentiment or outcome set by an experience's latest published update, if any.
-const latestUpdateSql = (field: 'outcome' | 'sentiment') => Prisma.sql`(
-  SELECT u.${Prisma.raw(field)} FROM "ExperienceUpdate" u JOIN "Comment" p ON p.id=u."commentId"
+// latestUpdateSql selects value (the field itself by default) from the latest published update that set the field.
+const latestUpdateSql = (
+  field: 'outcome' | 'sentiment',
+  value = Prisma.sql`u.${Prisma.raw(field)}`
+) => Prisma.sql`(
+  SELECT ${value} FROM "ExperienceUpdate" u JOIN "Comment" p ON p.id=u."commentId"
   WHERE u."experienceId"=e.id AND u.${Prisma.raw(field)} IS NOT NULL AND p.status IN (${publishedStatusesSql})
   ORDER BY p."approvedAt" DESC, p.id DESC LIMIT 1)`
 
-// currentVerdictSql is an experience's sentiment or outcome after its latest published update, as text.
+// moderatorResolutionStandsSql holds while no published update from the author set an outcome after a moderator
+// marked the experience resolved.
+const moderatorResolutionStandsSql = Prisma.sql`(
+  e."moderatorResolvedAt" IS NOT NULL
+  AND e."moderatorResolvedAt" > COALESCE(${latestUpdateSql('outcome', Prisma.sql`p."approvedAt"`)}, '-infinity'::timestamp)
+)`
+
+// currentVerdictSql is an experience's sentiment or outcome after its latest published update or moderator
+// resolution, as text.
 const currentVerdictSql = (field: 'outcome' | 'sentiment') =>
-  Prisma.sql`COALESCE(${latestUpdateSql(field)}, e.${Prisma.raw(field)})::text`
+  field === 'outcome'
+    ? Prisma.sql`CASE WHEN ${moderatorResolutionStandsSql} THEN 'RESOLVED' ELSE COALESCE(${latestUpdateSql(field)}, e.outcome)::text END`
+    : Prisma.sql`COALESCE(${latestUpdateSql(field)}, e.sentiment)::text`
 
 export const summaryWindowDays = 90
 
@@ -138,14 +151,34 @@ export async function experienceFeedPage({
   return page ?? { total: 0, ids: [] }
 }
 
-export async function currentExperienceStates(commentIds: number[]) {
+export type ExperienceState = Pick<
+  CommentExperience,
+  | 'commentId'
+  | 'moderatorResolutionNote'
+  | 'moderatorResolvedAt'
+  | 'outcome'
+  | 'sentiment'
+  | 'sentimentSource'
+>
+
+export type ModeratorResolution = { resolvedAt: Date; note: string }
+
+export const moderatorResolution = (state: ExperienceState | null | undefined): ModeratorResolution | null =>
+  state?.moderatorResolvedAt && state.moderatorResolutionNote
+    ? { resolvedAt: state.moderatorResolvedAt, note: state.moderatorResolutionNote }
+    : null
+
+export async function currentExperienceStates(
+  commentIds: number[],
+  client: Pick<typeof prisma, '$queryRaw'> = prisma
+) {
   if (!commentIds.length) return []
-  return prisma.$queryRaw<
-    Pick<CommentExperience, 'commentId' | 'outcome' | 'sentiment' | 'sentimentSource'>[]
-  >(Prisma.sql`
+  return client.$queryRaw<ExperienceState[]>(Prisma.sql`
     SELECT e."commentId", ${currentVerdictSql('sentiment')}::"ExperienceSentiment" AS sentiment,
       CASE WHEN ${latestUpdateSql('sentiment')} IS NOT NULL THEN 'AUTHOR'::"SentimentSource" ELSE e."sentimentSource" END AS "sentimentSource",
-      ${currentVerdictSql('outcome')}::"ExperienceOutcome" AS outcome
+      ${currentVerdictSql('outcome')}::"ExperienceOutcome" AS outcome,
+      CASE WHEN ${moderatorResolutionStandsSql} THEN e."moderatorResolvedAt" END AS "moderatorResolvedAt",
+      CASE WHEN ${moderatorResolutionStandsSql} THEN e."moderatorResolutionNote" END AS "moderatorResolutionNote"
     FROM "CommentExperience" e
     WHERE e."commentId" IN (${Prisma.join(commentIds)})
   `)

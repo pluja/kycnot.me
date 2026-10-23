@@ -1,0 +1,68 @@
+---
+import { actions, isInputError } from 'astro:actions'
+
+import { MODERATOR_REASON_LENGTH } from '../lib/commentLimits'
+import { getFormReplay } from '../lib/formReplay'
+
+import Button from './Button.astro'
+import ExperienceProblems from './ExperienceProblems.astro'
+import InputTextArea from './InputTextArea.astro'
+import TimeFormatted from './TimeFormatted.astro'
+
+import type { ExperienceState } from '../lib/experienceQueries'
+import type { CommentIssueType } from '@prisma/client'
+
+type Props = { commentId: number; issues: CommentIssueType[]; state: ExperienceState; panelPath: string }
+const { commentId, issues, state, panelPath } = Astro.props
+const result = Astro.getActionResult(actions.admin.experience.markResolved)
+const replay = getFormReplay(result?.error ? Astro.locals.actionFormValues : null)
+const inputErrors = isInputError(result?.error) ? result.error.fields : {}
+---
+
+<p class="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-day-200">
+  <span class="text-xs text-day-400">Reported:</span>
+  <ExperienceProblems issues={issues} outcome={state.outcome} />
+</p>
+
+{
+  state.moderatorResolvedAt ? (
+    <form
+      method="POST"
+      action={`${panelPath}${actions.admin.experience.undoResolved}`}
+      class="space-y-2 text-sm"
+    >
+      <input type="hidden" name="commentId" value={commentId} />
+      <p class="text-day-300">
+        Marked resolved by moderators <TimeFormatted date={state.moderatorResolvedAt} />:{' '}
+        <span class="text-day-100">{state.moderatorResolutionNote}</span>
+      </p>
+      <Button type="submit" label="Undo" color="gray" variant="faded" size="sm" />
+    </form>
+  ) : (
+    <form
+      method="POST"
+      action={`${panelPath}${actions.admin.experience.markResolved}`}
+      class="space-y-3 text-sm"
+    >
+      <input type="hidden" name="commentId" value={commentId} />
+      <InputTextArea
+        name="reason"
+        label="Resolution public reason"
+        value={replay.text('reason', '')}
+        error={inputErrors.reason}
+        inputProps={{
+          required: true,
+          minlength: MODERATOR_REASON_LENGTH.min,
+          maxlength: MODERATOR_REASON_LENGTH.max,
+          rows: 2,
+          placeholder: 'e.g. The author told us by email that the funds were released on Oct 20.',
+        }}
+      />
+      <p class="text-xs text-day-400">
+        Readers see this reason under the review, and it stops counting as an open problem. The author is
+        notified and can reopen it.
+      </p>
+      <Button type="submit" label="Mark resolved" color="success" size="sm" />
+    </form>
+  )
+}
