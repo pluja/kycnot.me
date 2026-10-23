@@ -6,7 +6,7 @@
 -- Precedence (a human decision always wins; every PENDING row is forced into
 -- one of the two AWAITING_* buckets so it can never be silently invisible):
 --   1. human approved/rejected            -> RESOLVED
---   2. human held                         -> AWAITING_HUMAN
+--   2. human held, still pending          -> AWAITING_HUMAN (a hold left on a published post is stale)
 --   3. AI held, still pending             -> AWAITING_HUMAN
 --   4. pending, AI never decided          -> AWAITING_AI
 --   5. pending, anything else (safety)    -> AWAITING_HUMAN
@@ -23,7 +23,7 @@ BEGIN
     RETURN 'RESOLVED';
   ELSIF p_human_action IN ('APPROVE', 'REJECT') THEN
     RETURN 'RESOLVED';
-  ELSIF p_human_action = 'HOLD' THEN
+  ELSIF p_status = 'PENDING' AND p_human_action = 'HOLD' THEN
     RETURN 'AWAITING_HUMAN';
   ELSIF p_status = 'PENDING' AND p_ai_action = 'HOLD' THEN
     RETURN 'AWAITING_HUMAN';

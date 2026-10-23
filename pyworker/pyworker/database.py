@@ -981,7 +981,7 @@ def get_pending_revisions(service_id: int) -> List[Dict[str, Any]]:
                     SELECT r.id, r."commentId", r.content, r.kind, c.content AS "publishedContent",
                       r."experienceData"->'issues' AS "editedIssues", c.issues::text[] AS "publishedIssues",
                       r.kind <> c.kind AS "changesKind",
-                      c."humanAction" = 'HOLD' AS "heldByModerator",
+                      c."humanAction" = 'HOLD' AND c.status = 'PENDING' AS "heldByModerator",
                       EXISTS (
                         SELECT 1 FROM "ContactThread" t
                         WHERE t."commentId" = c.id AND t.category = 'COMMENT_REPORT' AND t.status <> 'RESOLVED'
