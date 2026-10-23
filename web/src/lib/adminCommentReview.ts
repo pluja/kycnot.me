@@ -12,6 +12,7 @@ export const adminCommentReviewSelect = {
   publicNote: true,
   moderationState: true,
   aiAction: true,
+  humanAction: true,
   aiQuality: true,
   aiIsSpam: true,
   aiIsBrigade: true,

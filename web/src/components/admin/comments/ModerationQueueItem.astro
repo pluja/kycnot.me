@@ -13,7 +13,7 @@ import { commentReviewSignals } from '../../../lib/commentReviewSignals'
 import { makeCommentUrl } from '../../../lib/commentsWithReplies'
 import { inlinePanelToggle } from '../../../lib/inlinePanel'
 import { moderationSignals } from '../../../lib/moderationSignals'
-import { getAiHardGateReason } from '../../../lib/proofEvidence'
+import { getAiHardGateReason, isHeldOnlyForProof } from '../../../lib/proofEvidence'
 import BadgeSmall from '../../BadgeSmall.astro'
 import Button from '../../Button.astro'
 import CommentEditDiff from '../../CommentEditDiff.astro'
@@ -61,13 +61,12 @@ const taskBorder = {
 const urgency = ['red', 'yellow', 'violet', 'blue', 'gray'] as const
 type Task = { label: string; icon: string; color: keyof typeof taskBorder; href?: string }
 const pendingEdit = comment.revisions[0]
+// heldForProofOnly marks a post whose only hold is its proof: accepting the proof publishes it, so it is one task.
+const heldForProofOnly = proofsToCheck(comment) > 0 && isHeldOnlyForProof(comment, 0)
 const tasks = (
   [
     proofsToCheck(comment) > 0 && {
-      label:
-        proofsToCheck(comment) > 1
-          ? `${proofsToCheck(comment).toString()} proofs to check`
-          : 'Proof to check',
+      label: `${proofsToCheck(comment) > 1 ? `${proofsToCheck(comment).toString()} proofs to check` : 'Proof to check'}${heldForProofOnly ? ', publishes once accepted' : ''}`,
       icon: 'ri:file-search-line',
       color: 'blue',
     },
@@ -92,7 +91,8 @@ const tasks = (
         ? { label: `No AI answer after ${String(aiGraceHours)}h`, icon: 'ri:robot-2-line', color: 'yellow' }
         : { label: 'Waiting for AI', icon: 'ri:robot-2-line', color: 'gray' }),
     comment.status === 'PENDING' &&
-      comment.moderationState === 'AWAITING_HUMAN' && {
+      comment.moderationState === 'AWAITING_HUMAN' &&
+      !heldForProofOnly && {
         label: heldReason ? `AI held: ${heldReason}` : 'Needs a decision',
         icon: 'ri:pause-circle-line',
         color: 'yellow',
