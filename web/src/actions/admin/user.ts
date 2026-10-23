@@ -3,6 +3,7 @@ import { z } from 'astro/zod'
 import { ActionError } from 'astro:actions'
 
 import { capabilitiesZodEnum } from '../../constants/capabilities'
+import { affiliationServiceWhere } from '../../constants/serviceClaim'
 import { recordAuditLog } from '../../lib/auditLog'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { saveImageUpload } from '../../lib/fileStorage'
@@ -281,16 +282,15 @@ export const adminUserActions = {
           })
         }
 
-        // Check if the service exists
         const service = await prisma.service.findUnique({
-          where: { id: input.serviceId },
+          where: { id: input.serviceId, ...affiliationServiceWhere },
           select: { id: true, name: true },
         })
 
         if (!service) {
           throw new ActionError({
             code: 'BAD_REQUEST',
-            message: 'Service not found',
+            message: 'Only listed services can have affiliations.',
           })
         }
 

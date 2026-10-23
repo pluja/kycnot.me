@@ -7,7 +7,11 @@ import CopyButton from '../../components/CopyButton.astro'
 import InputSelect from '../../components/InputSelect.astro'
 import MyPicture from '../../components/MyPicture.astro'
 import ServicePicker from '../../components/ServicePicker.astro'
-import { CLAIM_MAX_FAILED_CHECKS, CLAIM_RECORD_PREFIX } from '../../constants/serviceClaim'
+import {
+  affiliationServiceWhere,
+  CLAIM_MAX_FAILED_CHECKS,
+  CLAIM_RECORD_PREFIX,
+} from '../../constants/serviceClaim'
 import { claimableServiceUserRoles } from '../../constants/serviceUserRoles'
 import MiniLayout from '../../layouts/MiniLayout.astro'
 import { prisma } from '../../lib/prisma'
@@ -33,7 +37,7 @@ const [service, services] = await Astro.locals.banners.tryMany([
     async () =>
       serviceSlug
         ? prisma.service.findFirst({
-            where: { slug: serviceSlug, serviceVisibility: 'PUBLIC' },
+            where: { slug: serviceSlug, ...affiliationServiceWhere },
             select: {
               id: true,
               name: true,
@@ -53,7 +57,7 @@ const [service, services] = await Astro.locals.banners.tryMany([
       serviceSlug
         ? []
         : prisma.service.findMany({
-            where: { serviceVisibility: 'PUBLIC' },
+            where: affiliationServiceWhere,
             select: { id: true, name: true, slug: true, imageUrl: true },
             orderBy: { name: 'asc' },
           }),
@@ -89,14 +93,17 @@ const claimActionUrl = service
 >
   {
     !service ? (
-      <ServicePicker
-        services={services}
-        suggested={services}
-        selected={serviceSlug ?? undefined}
-        label="Which service?"
-        placeholder="Pick a service"
-        buttonClass="w-full justify-between py-2"
-      />
+      <div class="space-y-2">
+        <ServicePicker
+          services={services}
+          suggested={services}
+          selected={serviceSlug ?? undefined}
+          label="Which service?"
+          placeholder="Pick a service"
+          buttonClass="w-full justify-between py-2"
+        />
+        <p class="text-sm text-day-400">Don't see your service? Only listed services can be claimed.</p>
+      </div>
     ) : (
       <div class="space-y-6">
         <div class="flex items-center gap-3">

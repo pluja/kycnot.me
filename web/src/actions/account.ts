@@ -3,6 +3,7 @@ import { ActionError } from 'astro:actions'
 import { z } from 'astro:content'
 import { pick } from 'lodash-es'
 
+import { affiliationServiceWhere } from '../constants/serviceClaim'
 import { claimableServiceUserRoleValues } from '../constants/serviceUserRoles'
 import { trustUnlocksById } from '../constants/trustUnlocks'
 import { createAccount } from '../lib/accountCreate'
@@ -316,7 +317,7 @@ export const accountActions = {
       }
 
       const service = await prisma.service.findUnique({
-        where: { id: input.serviceId, serviceVisibility: 'PUBLIC' },
+        where: { id: input.serviceId, ...affiliationServiceWhere },
         select: {
           id: true,
           name: true,

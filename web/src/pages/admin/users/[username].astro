@@ -18,7 +18,9 @@ import TimeFormatted from '../../../components/TimeFormatted.astro'
 import Tooltip from '../../../components/Tooltip.astro'
 import { capabilities, capabilityRequirements, getCapabilityInfo } from '../../../constants/capabilities'
 import { capabilityPresets } from '../../../constants/capabilityPresets'
+import { isAffiliableService } from '../../../constants/serviceClaim'
 import { getServiceUserRoleInfo, serviceUserRoles } from '../../../constants/serviceUserRoles'
+import { getServiceVisibilityInfo } from '../../../constants/serviceVisibility'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
 import { staffBadgeLabel } from '../../../lib/permissions'
 import { prisma } from '../../../lib/prisma'
@@ -109,6 +111,7 @@ const [user, allServices] = await Astro.locals.banners.tryMany([
         select: {
           id: true,
           name: true,
+          serviceVisibility: true,
         },
         orderBy: {
           name: 'asc',
@@ -475,10 +478,16 @@ const staffLabel = staffBadgeLabel(user)
       <InputSelect
         name="serviceId"
         label="Service"
-        options={allServices.map((service) => ({
-          label: service.name,
-          value: service.id.toString(),
-        }))}
+        options={allServices.map((service) => {
+          const listed = isAffiliableService(service)
+          return {
+            label: listed
+              ? service.name
+              : `${service.name} (${getServiceVisibilityInfo(service.serviceVisibility).label}, can't be affiliated)`,
+            value: service.id.toString(),
+            disabled: !listed,
+          }
+        })}
         selectProps={{ required: true }}
       />
 
