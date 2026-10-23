@@ -5,6 +5,7 @@ import type { CommentRule, Prisma } from '@prisma/client'
 export const adminCommentReviewSelect = {
   id: true,
   content: true,
+  issues: true,
   status: true,
   kind: true,
   createdAt: true,
@@ -47,8 +48,11 @@ export const adminCommentReviewSelect = {
       affiliatedUsers: { select: { userId: true } },
     },
   },
-  experience: { select: { sentiment: true } },
-  revisions: { where: { status: 'PENDING' }, select: { content: true } },
+  experience: { select: { sentiment: true, outcome: true } },
+  revisions: {
+    where: { status: 'PENDING' },
+    select: { content: true, kind: true, experienceData: true, aiDecidedAt: true, createdAt: true },
+  },
   contactThreads: {
     where: { category: 'COMMENT_REPORT', status: { not: 'RESOLVED' } },
     select: { id: true, reportReason: true, fromService: true },
@@ -69,11 +73,12 @@ export const proofsToCheck = (comment: Pick<AdminCommentReview, '_count' | 'stat
   comment.status === 'WITHDRAWN' ? 0 : comment._count.evidence
 
 export const aiGraceHours = 3
+export const aiGraceCutoff = (now = new Date()) => new Date(now.getTime() - aiGraceHours * 60 * 60 * 1000)
 
 // moderatorTodoReasons are the reasons a post needs a moderator. "To do" lists a post once if any applies.
 // Posts and edits wait for the AI first, unless it held them or has not answered within the grace period.
 export const moderatorTodoReasons = (now = new Date()) => {
-  const aiGraceCutoff = new Date(now.getTime() - aiGraceHours * 60 * 60 * 1000)
+  const graceCutoff = aiGraceCutoff(now)
   return {
     posts: {
       OR: [
@@ -82,7 +87,7 @@ export const moderatorTodoReasons = (now = new Date()) => {
           moderationState: 'AWAITING_HUMAN',
           NOT: { proofRequests: { some: { cancelledAt: null, dueAt: { gt: now } } } },
         },
-        { moderationState: 'AWAITING_AI', createdAt: { lt: aiGraceCutoff } },
+        { moderationState: 'AWAITING_AI', createdAt: { lt: graceCutoff } },
       ],
     },
     // Proof the old system never reviewed waits in its own list, oldProofWhere, unless its post is held. Proof on a
@@ -102,7 +107,7 @@ export const moderatorTodoReasons = (now = new Date()) => {
       revisions: {
         some: {
           status: 'PENDING',
-          OR: [{ aiAction: 'HOLD' }, { aiDecidedAt: null, createdAt: { lt: aiGraceCutoff } }],
+          OR: [{ aiAction: 'HOLD' }, { aiDecidedAt: null, createdAt: { lt: graceCutoff } }],
         },
       },
     },

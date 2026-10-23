@@ -36,7 +36,13 @@ const queueWheres = {
   todo: { ...notWithdrawn, OR: Object.values(todoReasons) },
   ...mapValues(todoReasons, (reason) => ({ ...notWithdrawn, ...reason })),
   oldProof: oldProofWhere,
-  ai: { moderationState: 'AWAITING_AI' },
+  ai: {
+    ...notWithdrawn,
+    OR: [
+      { moderationState: 'AWAITING_AI' },
+      { revisions: { some: { status: 'PENDING', aiDecidedAt: null } } },
+    ],
+  },
   all: {},
 } satisfies Record<string, Prisma.CommentWhereInput>
 type QueueId = keyof typeof queueWheres
@@ -215,7 +221,7 @@ const queues = [
     id: 'ai',
     label: 'Waiting for AI',
     icon: 'ri:robot-2-line',
-    description: `New comments the AI has not checked yet. After ${String(aiGraceHours)} hours they also show in Held.`,
+    description: `New comments and edits the AI has not checked yet. After ${String(aiGraceHours)} hours they also show in To do.`,
   },
   {
     id: 'all',

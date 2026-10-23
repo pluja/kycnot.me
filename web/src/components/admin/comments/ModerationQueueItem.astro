@@ -6,7 +6,7 @@ import { getCommentKindInfo } from '../../../constants/commentKinds'
 import { getCommentRuleInfo } from '../../../constants/commentRules'
 import { getExperienceSentimentInfo } from '../../../constants/experiences'
 import { getVerificationStatusInfo } from '../../../constants/verificationStatus'
-import { proofsToCheck } from '../../../lib/adminCommentReview'
+import { aiGraceCutoff, aiGraceHours, proofsToCheck } from '../../../lib/adminCommentReview'
 import { DELETED_ACCOUNT_LABEL } from '../../../lib/authorName'
 import { cn } from '../../../lib/cn'
 import { commentReviewSignals } from '../../../lib/commentReviewSignals'
@@ -16,6 +16,7 @@ import { moderationSignals } from '../../../lib/moderationSignals'
 import { getAiHardGateReason } from '../../../lib/proofEvidence'
 import BadgeSmall from '../../BadgeSmall.astro'
 import Button from '../../Button.astro'
+import CommentEditDiff from '../../CommentEditDiff.astro'
 import CommentNotes from '../../CommentNotes.astro'
 import CommentStatusChip from '../../CommentStatusChip.astro'
 
@@ -42,6 +43,7 @@ const heldReason = getAiHardGateReason(comment)
 const sentiment = comment.experience?.sentiment
   ? getExperienceSentimentInfo(comment.experience.sentiment)
   : null
+const graceCutoff = aiGraceCutoff()
 const verification = getVerificationStatusInfo(comment.service.verificationStatus)
 const reports = comment.contactThreads
 const reportReasonLabels = [
@@ -49,47 +51,65 @@ const reportReasonLabels = [
 ]
   .map((reason) => getCommentRuleInfo(reason).label)
   .join(', ')
-const reasons = [
-  proofsToCheck(comment) > 0 && {
-    label:
-      proofsToCheck(comment) > 1 ? `${proofsToCheck(comment).toString()} proofs to check` : 'Proof to check',
-    icon: 'ri:file-search-line',
-    color: 'blue',
-  },
-  reports.length > 0 && {
-    label: `${reports.length > 1 ? `Reported ${reports.length.toString()} times` : 'Reported'}: ${reportReasonLabels}`,
-    icon: 'ri:flag-line',
-    color: 'red',
-    href: `/admin/contact/${reports[0]?.id.toString() ?? ''}`,
-  },
-  reports.some((report) => report.fromService) && {
-    label: 'Reported by the service',
-    icon: 'ri:store-2-line',
-    color: 'blue',
-  },
-  comment.revisions.length > 0 && {
-    label: 'Edit to review',
-    icon: 'ri:git-pull-request-line',
-    color: 'violet',
-  },
-  comment.status === 'PENDING' &&
-    comment.moderationState === 'AWAITING_AI' && {
-      label: 'Waiting for AI',
-      icon: 'ri:robot-2-line',
-      color: 'gray',
+const taskBorder = {
+  red: 'border-l-red-600',
+  yellow: 'border-l-yellow-500',
+  violet: 'border-l-violet-600',
+  blue: 'border-l-blue-600',
+  gray: 'border-l-day-500',
+} as const
+const urgency = ['red', 'yellow', 'violet', 'blue', 'gray'] as const
+type Task = { label: string; icon: string; color: keyof typeof taskBorder; href?: string }
+const pendingEdit = comment.revisions[0]
+const tasks = (
+  [
+    proofsToCheck(comment) > 0 && {
+      label:
+        proofsToCheck(comment) > 1
+          ? `${proofsToCheck(comment).toString()} proofs to check`
+          : 'Proof to check',
+      icon: 'ri:file-search-line',
+      color: 'blue',
     },
-  comment.status === 'PENDING' &&
-    comment.moderationState === 'AWAITING_HUMAN' && {
-      label: heldReason ? `AI held: ${heldReason}` : 'Needs a decision',
-      icon: 'ri:pause-circle-line',
-      color: 'yellow',
+    reports.length > 0 && {
+      label: `${reports.length > 1 ? `Reported ${reports.length.toString()} times` : 'Reported'}: ${reportReasonLabels}`,
+      icon: 'ri:flag-line',
+      color: 'red',
+      href: `/admin/contact/${reports[0]?.id.toString() ?? ''}`,
     },
-].filter((reason) => !!reason)
+    reports.some((report) => report.fromService) && {
+      label: 'Reported by the service',
+      icon: 'ri:store-2-line',
+      color: 'blue',
+    },
+    !!pendingEdit &&
+      (!pendingEdit.aiDecidedAt && pendingEdit.createdAt >= graceCutoff
+        ? { label: 'Edit waiting for AI', icon: 'ri:git-pull-request-line', color: 'gray' }
+        : { label: 'Edit to review', icon: 'ri:git-pull-request-line', color: 'violet' }),
+    comment.status === 'PENDING' &&
+      comment.moderationState === 'AWAITING_AI' &&
+      (comment.createdAt < graceCutoff
+        ? { label: `No AI answer after ${String(aiGraceHours)}h`, icon: 'ri:robot-2-line', color: 'yellow' }
+        : { label: 'Waiting for AI', icon: 'ri:robot-2-line', color: 'gray' }),
+    comment.status === 'PENDING' &&
+      comment.moderationState === 'AWAITING_HUMAN' && {
+        label: heldReason ? `AI held: ${heldReason}` : 'Needs a decision',
+        icon: 'ri:pause-circle-line',
+        color: 'yellow',
+      },
+  ] satisfies (Task | false)[]
+).filter((task) => task !== false)
+const taskBadge = (task: Task) =>
+  ({ text: task.label, icon: task.icon, color: task.color, variant: 'solid', size: 'md' }) as const
+const mainTask = urgency.find((color) => tasks.some((task) => task.color === color))
 ---
 
 <article
   id={`review-${idText}`}
-  class="group/item scroll-mt-20 border-b border-night-600 py-4 last:border-b-0"
+  class={cn(
+    'group/item scroll-mt-20 border-b border-l-4 border-b-night-600 border-l-transparent py-4 pl-3 last:border-b-0',
+    mainTask && taskBorder[mainTask]
+  )}
   aria-labelledby={`review-${idText}-title`}
 >
   <header class="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -128,22 +148,14 @@ const reasons = [
   </header>
 
   {
-    reasons.length > 0 && (
-      <ul class="mt-2 flex flex-wrap gap-1.5" aria-label="Why it is in the queue">
-        {reasons.map((reason) => (
+    tasks.length > 0 && (
+      <ul class="mt-2 flex flex-wrap gap-1.5" aria-label="What it needs">
+        {tasks.map((task) => (
           <li>
-            {'href' in reason ? (
-              <BadgeSmall
-                as="a"
-                href={reason.href}
-                class="hover:underline"
-                text={reason.label}
-                icon={reason.icon}
-                color={reason.color}
-                variant="faded"
-              />
+            {task.href ? (
+              <BadgeSmall as="a" href={task.href} class="hover:underline" {...taskBadge(task)} />
             ) : (
-              <BadgeSmall text={reason.label} icon={reason.icon} color={reason.color} variant="faded" />
+              <BadgeSmall {...taskBadge(task)} />
             )}
           </li>
         ))}
@@ -174,6 +186,24 @@ const reasons = [
   {
     textSignals.reasons.length > 0 && (
       <p class="mt-1 text-xs text-yellow-200">Highlighted: {textSignals.reasons.join(', ')}</p>
+    )
+  }
+  {
+    pendingEdit && (
+      <div class="mt-2 max-w-[75ch] rounded-md border border-violet-500/40 bg-violet-500/10 px-3 py-2">
+        <p class="mb-1 flex items-center gap-1 text-xs font-medium text-violet-200">
+          <Icon name="ri:git-pull-request-line" class="size-3.5" />
+          Proposed edit
+        </p>
+        <CommentEditDiff
+          before={{
+            content: comment.content,
+            kind: comment.kind,
+            experienceData: { ...comment.experience, issues: comment.issues },
+          }}
+          after={pendingEdit}
+        />
+      </div>
     )
   }
 

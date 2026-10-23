@@ -42,6 +42,10 @@ const badge = tv({
       solid: '',
       faded: '',
     },
+    size: {
+      sm: '',
+      md: { base: 'h-auto min-h-6 gap-1 px-2 py-0.5 text-xs', icon: 'size-3.5', text: 'whitespace-normal' },
+    },
   },
   compoundVariants: [
     // Red
@@ -75,25 +79,25 @@ const badge = tv({
     { color: 'sky', variant: 'solid', class: { base: 'bg-sky-500 text-black' } },
     { color: 'sky', variant: 'faded', class: { base: 'bg-sky-500/30 text-sky-300' } },
     // Blue
-    { color: 'blue', variant: 'solid', class: { base: 'bg-blue-500 text-white' } },
+    { color: 'blue', variant: 'solid', class: { base: 'bg-blue-600 text-white' } },
     { color: 'blue', variant: 'faded', class: { base: 'bg-blue-500/30 text-blue-300' } },
     // Indigo
-    { color: 'indigo', variant: 'solid', class: { base: 'bg-indigo-500 text-white' } },
+    { color: 'indigo', variant: 'solid', class: { base: 'bg-indigo-600 text-white' } },
     { color: 'indigo', variant: 'faded', class: { base: 'bg-indigo-500/30 text-indigo-300' } },
     // Violet
-    { color: 'violet', variant: 'solid', class: { base: 'bg-violet-500 text-white' } },
+    { color: 'violet', variant: 'solid', class: { base: 'bg-violet-600 text-white' } },
     { color: 'violet', variant: 'faded', class: { base: 'bg-violet-500/30 text-violet-300' } },
     // Purple
-    { color: 'purple', variant: 'solid', class: { base: 'bg-purple-500 text-white' } },
+    { color: 'purple', variant: 'solid', class: { base: 'bg-purple-600 text-white' } },
     { color: 'purple', variant: 'faded', class: { base: 'bg-purple-500/30 text-purple-300' } },
     // Fuchsia
-    { color: 'fuchsia', variant: 'solid', class: { base: 'bg-fuchsia-500 text-white' } },
+    { color: 'fuchsia', variant: 'solid', class: { base: 'bg-fuchsia-600 text-white' } },
     { color: 'fuchsia', variant: 'faded', class: { base: 'bg-fuchsia-500/30 text-fuchsia-300' } },
     // Pink
-    { color: 'pink', variant: 'solid', class: { base: 'bg-pink-500 text-white' } },
+    { color: 'pink', variant: 'solid', class: { base: 'bg-pink-600 text-white' } },
     { color: 'pink', variant: 'faded', class: { base: 'bg-pink-500/30 text-pink-300' } },
     // Rose
-    { color: 'rose', variant: 'solid', class: { base: 'bg-rose-500 text-white' } },
+    { color: 'rose', variant: 'solid', class: { base: 'bg-rose-600 text-white' } },
     { color: 'rose', variant: 'faded', class: { base: 'bg-rose-500/30 text-rose-300' } },
     // Slate
     { color: 'slate', variant: 'solid', class: { base: 'bg-slate-500 text-white' } },
@@ -120,6 +124,7 @@ const badge = tv({
   defaultVariants: {
     color: 'gray',
     variant: 'solid',
+    size: 'sm',
   },
 })
 
@@ -152,12 +157,13 @@ const {
 
   color,
   variant,
+  size,
 
   class: className,
   ...props
 } = Astro.props
 
-const { base, icon: iconSlot, text: textSlot } = badge({ color, variant })
+const { base, icon: iconSlot, text: textSlot } = badge({ color, variant, size })
 ---
 
 <Tag {...props} class={base({ class: className })}>
