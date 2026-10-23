@@ -18,7 +18,7 @@ import {
 } from '../lib/experiences'
 import { getOrCreateNotificationPreferences } from '../lib/notificationPreferences'
 import { prisma } from '../lib/prisma'
-import { classifyProof } from '../lib/proofEvidence'
+import { classifyProof, imageHostLinkMessage, linksToImageHost } from '../lib/proofEvidence'
 import { handleHoneypotTrap, handleXSSDetection } from '../lib/spamDetection'
 import { commentsDisabledMessage } from '../lib/trust'
 import { formCheckbox, imageFileSchema } from '../lib/zodUtils'
@@ -47,7 +47,11 @@ export const commentActions = {
         issues: z.array(commentIssueTypesZodEnumByValue).default([]),
         noProblems: formCheckbox,
         resolvedSince: formCheckbox,
-        orderId: z.string().max(COMMENT_ORDER_ID_MAX_LENGTH).optional(),
+        orderId: z
+          .string()
+          .max(COMMENT_ORDER_ID_MAX_LENGTH)
+          .refine((text) => !linksToImageHost(text), imageHostLinkMessage)
+          .optional(),
         proofImage: imageFileSchema,
       })
       .superRefine((data, ctx) => {

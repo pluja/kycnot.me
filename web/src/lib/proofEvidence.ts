@@ -11,7 +11,7 @@ import type {
   PrivateProofStatus,
 } from '@prisma/client'
 
-export const defaultProofHint = 'Order ID, order link or screenshot.'
+export const defaultProofHint = 'Order ID, order link or an uploaded screenshot.'
 
 type ProofSettings = { proofLookupUrl: string | null; proofIdPattern: string | null }
 
@@ -30,6 +30,52 @@ const transactionPatterns = [
 ]
 const orderIdShape = /^[A-Za-z0-9_-]{3,64}$/
 const linkShape = /^https?:\/\/\S+$/i
+
+// urlInText finds links inside free text; unlike linkShape it stops at separators and drops trailing punctuation.
+const urlInText = /https?:\/\/[^\s;,<>"']*[^\s;,<>"'.)]/gi
+const imageHosts = [
+  'ibb.co',
+  'imgbb.com',
+  'imgur.com',
+  'postimg.cc',
+  'postimages.org',
+  'prnt.sc',
+  'gyazo.com',
+  'imgbox.com',
+  'catbox.moe',
+]
+
+type ProofTextPart = { text: string; url?: string }
+
+export function proofTextParts(text: string): ProofTextPart[] {
+  const parts: ProofTextPart[] = []
+  let consumedUntil = 0
+  for (const match of text.matchAll(urlInText)) {
+    if (match.index > consumedUntil) parts.push({ text: text.slice(consumedUntil, match.index) })
+    parts.push({ text: match[0], url: match[0] })
+    consumedUntil = match.index + match[0].length
+  }
+  if (consumedUntil < text.length) parts.push({ text: text.slice(consumedUntil) })
+  return parts
+}
+
+const linksIn = (text: string) => text.match(urlInText) ?? []
+
+export const countProofLinks = (text: string) => linksIn(text).length
+
+export function linksToImageHost(text: string) {
+  return linksIn(text).some((link) => {
+    try {
+      const host = new URL(link).hostname.toLowerCase().replace(/\.$/, '')
+      return imageHosts.some((imageHost) => host === imageHost || host.endsWith(`.${imageHost}`))
+    } catch {
+      return false
+    }
+  })
+}
+
+export const imageHostLinkMessage =
+  "Links to image sites aren't accepted. Upload the screenshot in the Screenshot field instead. If you have several, combine them into one image."
 
 const isTransactionLike = (value: string) => transactionPatterns.some((pattern) => pattern.test(value))
 

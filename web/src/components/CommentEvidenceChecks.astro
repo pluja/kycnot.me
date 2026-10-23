@@ -10,7 +10,13 @@ import {
 } from '../constants/experiences'
 import { cn } from '../lib/cn'
 import { getFormReplay } from '../lib/formReplay'
-import { checkTimeline, lookupUrlFor, proofStatus } from '../lib/proofEvidence'
+import {
+  checkTimeline,
+  countProofLinks,
+  linksToImageHost,
+  lookupUrlFor,
+  proofStatus,
+} from '../lib/proofEvidence'
 
 import DeleteConfirmButton from './admin/DeleteConfirmButton.astro'
 import Button from './Button.astro'
@@ -99,11 +105,16 @@ const openEvidenceId = result?.error
         const statusDetails = latestCheck
           ? [latestCheck.explanation, ...checkTimeline(item.checks)].filter(Boolean).join(' · ')
           : undefined
+        const evidenceBody = rawEvidence?.body ?? ''
+        const linkCount = countProofLinks(evidenceBody)
+        const imageHostLink = linksToImageHost(evidenceBody)
         const hasInfo =
           !!rawEvidence &&
           ((rawEvidence.formatValid !== null && rawEvidence.kind !== 'TRANSACTION_ID') ||
             reusedOn.length > 0 ||
-            !!lookupUrl)
+            !!lookupUrl ||
+            linkCount > 1 ||
+            imageHostLink)
         return (
           <li
             id={`moderation-evidence-${item.id.toString()}`}
@@ -146,6 +157,16 @@ const openEvidenceId = result?.error
                     <div class="flex flex-wrap items-center gap-1.5 border-t border-night-700 px-2.5 py-1.5 text-xs">
                       {rawEvidence.formatValid === true && (
                         <span class="rounded-md bg-green-500/15 px-1.5 py-0.5 text-green-200">Format OK</span>
+                      )}
+                      {linkCount > 1 && (
+                        <span class="rounded-md bg-yellow-500/15 px-1.5 py-0.5 text-yellow-200">
+                          {linkCount} links, check each
+                        </span>
+                      )}
+                      {imageHostLink && (
+                        <span class="rounded-md bg-yellow-500/15 px-1.5 py-0.5 text-yellow-200">
+                          Image site link: open it with Tor or a VPN
+                        </span>
                       )}
                       {rawEvidence.formatValid === false && rawEvidence.kind !== 'TRANSACTION_ID' && (
                         <span class="rounded-md bg-yellow-500/15 px-1.5 py-0.5 text-yellow-200">

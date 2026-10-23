@@ -30,7 +30,13 @@ import {
   issuesNeedingProof,
 } from '../lib/experiences'
 import { prisma } from '../lib/prisma'
-import { checkedProofStaysMessage, countsAsProof, summarizeProof } from '../lib/proofEvidence'
+import {
+  checkedProofStaysMessage,
+  countsAsProof,
+  imageHostLinkMessage,
+  linksToImageHost,
+  summarizeProof,
+} from '../lib/proofEvidence'
 import { createProofRequest, MAX_DISPUTES_PER_SERVICE_PER_WEEK } from '../lib/proofRequests'
 import { handleHoneypotTrap, handleXSSDetection } from '../lib/spamDetection'
 import { commentsDisabledMessage } from '../lib/trust'
@@ -216,7 +222,15 @@ export const experienceActions = {
   addEvidence: defineProtectedAction({
     accept: 'form',
     permissions: 'user',
-    input: idInput.extend({ body: z.string().trim().max(4000).optional(), imageFile: imageFileSchema }),
+    input: idInput.extend({
+      body: z
+        .string()
+        .trim()
+        .max(4000)
+        .refine((text) => !linksToImageHost(text), imageHostLinkMessage)
+        .optional(),
+      imageFile: imageFileSchema,
+    }),
     handler: async (input, context) => {
       if (context.locals.user.trust.commentsDisabled) {
         throw new ActionError({ code: 'FORBIDDEN', message: commentsDisabledMessage })

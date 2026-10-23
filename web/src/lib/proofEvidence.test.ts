@@ -8,13 +8,16 @@ import { countingFindings } from '../constants/experiences'
 
 import {
   classifyProof,
+  countProofLinks,
   isHeldOnlyForProof,
   proofGateReasons,
   suggestProofIdPattern,
   countsAsProof,
+  linksToImageHost,
   lookupUrlFor,
   proofIdRegex,
   proofStatus,
+  proofTextParts,
   publicProofView,
   shownProofKind,
   summarizeProof,
@@ -218,4 +221,33 @@ void test('readers see the kind the check was about', () => {
   assert.equal(shownProofKind('ORDER_ID', 'SCREENSHOT_REVIEWED'), 'SCREENSHOT')
   assert.equal(shownProofKind('SCREENSHOT', 'CLAIM_SUPPORTED'), 'SCREENSHOT')
   assert.equal(shownProofKind('NOTE', undefined), 'NOTE')
+})
+
+void test('every link in proof text opens on its own', () => {
+  const text = 'https://ibb.co/a ; https://ibb.co/b ; see https://ibb.co/c'
+  const links = proofTextParts(text).filter((part) => part.url)
+  assert.deepEqual(
+    links.map((part) => part.url),
+    ['https://ibb.co/a', 'https://ibb.co/b', 'https://ibb.co/c']
+  )
+  assert.equal(
+    proofTextParts(text)
+      .map((part) => part.text)
+      .join(''),
+    text
+  )
+  assert.equal(countProofLinks(text), 3)
+  assert.equal(countProofLinks('ORDER-123'), 0)
+  assert.deepEqual(
+    proofTextParts('see (https://x.example/a). done').flatMap((part) => (part.url ? [part.url] : [])),
+    ['https://x.example/a']
+  )
+})
+
+void test('links to image sites are recognised, lookup links are not', () => {
+  assert.equal(linksToImageHost('https://i.ibb.co/x/y.png'), true)
+  assert.equal(linksToImageHost('proof: https://imgur.com/abc'), true)
+  assert.equal(linksToImageHost('https://exchange.example/order/123'), false)
+  assert.equal(linksToImageHost('https://notibb.co/x'), false)
+  assert.equal(linksToImageHost('https://ibb.co./x'), true)
 })
