@@ -134,12 +134,7 @@ export const stringListOfContactMethodsSchema = z.preprocess(
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB
 
-export const ACCEPTED_IMAGE_TYPES = [
-  'image/png',
-  'image/jpeg',
-  'image/avif',
-  'image/webp',
-] as const satisfies string[]
+export const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const satisfies string[]
 
 export const imageFileSchema = z
   .instanceof(File)
@@ -152,7 +147,7 @@ export const imageFileSchema = z
   )
   .refine(
     (file) => !file || ACCEPTED_IMAGE_TYPES.some((type) => file.type === type),
-    'Only PNG, JPG, AVIF, WebP formats are supported.'
+    'Only PNG, JPEG and WebP images are supported.'
   )
 
 export const imageFileSchemaRequired = imageFileSchema.refine((file) => !!file, 'Required')

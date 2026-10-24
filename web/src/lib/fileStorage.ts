@@ -73,7 +73,7 @@ export async function saveImageUpload(
     console.warn('[fileStorage] Rejected image upload:', error instanceof Error ? error.message : error)
     throw new ActionError({
       code: 'BAD_REQUEST',
-      message: 'The image could not be read. Use a PNG, JPEG, WebP or AVIF under 5 MB.',
+      message: 'The image could not be read. Use a PNG, JPEG or WebP image under 5 MB.',
     })
   }
 

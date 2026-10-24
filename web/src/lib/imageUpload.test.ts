@@ -55,3 +55,25 @@ void test('wide images are scaled to the width limit, tall screenshots keep thei
     .toBuffer()
   assert.equal((await sharp(await reencodeUploadedImage(tall, 2000)).metadata()).height, 9000)
 })
+
+void test('only PNG, JPEG and WebP signatures reach a decoder', async () => {
+  const avif = await pixel().avif().toBuffer()
+  const tiff = await pixel().tiff().toBuffer()
+  const heicHeader = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypheic'), Buffer.alloc(16)])
+  const svgBehindWebpSignature = Buffer.concat([
+    Buffer.from('RIFFAAAAWEBP'),
+    Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+  ])
+  // Markup behind a WebP signature is claimed and refused by the WebP loader, never the SVG one.
+  await assert.rejects(reencodeUploadedImage(svgBehindWebpSignature, 4096), /webp/)
+  for (const input of [avif, tiff, heicHeader]) {
+    await assert.rejects(reencodeUploadedImage(input, 4096), /Unsupported image format/)
+  }
+  for (const input of [
+    await pixel().png().toBuffer(),
+    await pixel().jpeg().toBuffer(),
+    await pixel().webp().toBuffer(),
+  ]) {
+    assert.equal((await sharp(await reencodeUploadedImage(input, 4096)).metadata()).format, 'webp')
+  }
+})
