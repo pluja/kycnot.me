@@ -81,3 +81,7 @@ void test('never outputs svg, so no markup is served from /_image', () => {
   assert.notEqual(check('href=/files/logo.svg&f=svg'), null)
   assert.notEqual(check('href=/files/x.png&f=svg'), null)
 })
+
+void test('never outputs avif, which costs far more CPU than webp', () => {
+  assert.notEqual(check('href=/files/x.png&f=avif'), null)
+})

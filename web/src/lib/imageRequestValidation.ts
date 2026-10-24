@@ -5,8 +5,9 @@ export const MAX_IMAGE_DIMENSION = 4096
 
 // ALLOWED_OUTPUT_FORMATS mirrors Astro's VALID_OUTPUT_FORMATS. `gif` is
 // deliberately excluded: it is input-only for Astro and would trigger an
-// expensive palette-quantization encode.
-const ALLOWED_OUTPUT_FORMATS = new Set(['avif', 'png', 'webp', 'jpeg', 'jpg'])
+// expensive palette-quantization encode. `avif` is too: no page requests it,
+// and an AVIF encode costs far more CPU than WebP.
+const ALLOWED_OUTPUT_FORMATS = new Set(['png', 'webp', 'jpeg', 'jpg'])
 
 // NAMED_QUALITIES are the presets sharp accepts in place of a numeric 1-100 value.
 const NAMED_QUALITIES = new Set(['low', 'mid', 'high', 'max'])

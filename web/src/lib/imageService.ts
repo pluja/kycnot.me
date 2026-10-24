@@ -31,7 +31,12 @@ const imageService: typeof sharpService = {
       // sharp sniffs the real format, so markup under an image name is refused rather than trusted by extension.
       const { format, width } = await sharp(inputBuffer).metadata()
       if (format === 'svg') return await rasterizeSvg(inputBuffer, width, transform)
-      return await sharpService.transform(inputBuffer, transform, config)
+      // Without a format sharp keeps the source's, which would turn a stored AVIF into an AVIF encode.
+      return await sharpService.transform(
+        inputBuffer,
+        { ...transform, format: transform.format ?? 'webp' },
+        config
+      )
     } catch (error) {
       const src =
         typeof transform.src === 'string'
