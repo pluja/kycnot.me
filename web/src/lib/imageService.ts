@@ -6,17 +6,30 @@ import { MAX_IMAGE_PIXELS } from './imageUpload'
 import type { ImageTransform } from 'astro'
 import type { FormatEnum } from 'sharp'
 
-const MAX_SVG_SCALE = 8
+const MAX_OUTPUT_DIMENSION = 2560
+const MAX_SVG_DIMENSION = 1024
 
-// rasterizeSvg renders an SVG at the density the requested width needs, so a small-viewBox logo stays sharp
-// instead of being rendered at 72 dpi and scaled up. MAX_SVG_SCALE bounds the render cost, which grows with
-// the square of the scale and cannot be interrupted once librsvg starts.
-async function rasterizeSvg(input: Uint8Array, intrinsicWidth: number, transform: ImageTransform) {
+// outputBox bounds a transform to `max` on both sides, so one request's work stays small whatever the
+// source's size. A requested height is dropped when a width is set, as Astro does without a fit, so w+h
+// requests keep the source aspect. With a fit set, Astro's sharp service also refuses to enlarge.
+function outputBox(transform: ImageTransform, max = MAX_OUTPUT_DIMENSION) {
   const width = Number(transform.width) || undefined
-  const scale = width ? Math.min(Math.max(width / intrinsicWidth, 1), MAX_SVG_SCALE) : 1
+  const height = Number(transform.height) || undefined
+  return {
+    fit: 'inside' as const,
+    width: Math.min(width ?? max, max),
+    height: width ? max : Math.min(height ?? max, max),
+  }
+}
+
+// rasterizeSvg relies on sharp rendering vector input straight at the resize target, so logos stay sharp at
+// any size. An SVG's render cost grows with its filters times its output area, and librsvg cannot be
+// interrupted mid-render, so SVGs (only legacy logos and avatars) get a smaller box and a time limit.
+async function rasterizeSvg(input: Uint8Array, transform: ImageTransform) {
   const format = (typeof transform.format === 'string' ? transform.format : 'webp') as keyof FormatEnum
-  const data = await sharp(input, { density: 72 * scale, limitInputPixels: MAX_IMAGE_PIXELS })
-    .resize({ width, withoutEnlargement: true })
+  const data = await sharp(input, { limitInputPixels: MAX_IMAGE_PIXELS })
+    .timeout({ seconds: 2 })
+    .resize(outputBox(transform, MAX_SVG_DIMENSION))
     .toFormat(format)
     .toBuffer()
   return { data: new Uint8Array(data), format }
@@ -29,12 +42,12 @@ const imageService: typeof sharpService = {
     if (transform.format === 'svg') throw new Error('SVG output is not served')
     try {
       // sharp sniffs the real format, so markup under an image name is refused rather than trusted by extension.
-      const { format, width } = await sharp(inputBuffer).metadata()
-      if (format === 'svg') return await rasterizeSvg(inputBuffer, width, transform)
+      const { format } = await sharp(inputBuffer).metadata()
+      if (format === 'svg') return await rasterizeSvg(inputBuffer, transform)
       // Without a format sharp keeps the source's, which would turn a stored AVIF into an AVIF encode.
       return await sharpService.transform(
         inputBuffer,
-        { ...transform, format: transform.format ?? 'webp' },
+        { ...transform, ...outputBox(transform), format: transform.format ?? 'webp' },
         config
       )
     } catch (error) {

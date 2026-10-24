@@ -114,7 +114,6 @@ export const GET: APIRoute = async (context) => {
       transform.width ?? '',
       transform.height ?? '',
       transform.format ?? '',
-      transform.quality ?? '',
     ].join('|')
 
     const cached = transformCache.get(cacheKey)
@@ -122,8 +121,10 @@ export const GET: APIRoute = async (context) => {
       return imageResponse(cached.data, cached.format)
     }
 
-    const inputBuffer = await fs.readFile(uploadPath)
-    const pending = transformSemaphore.run(() => imageService.transform(inputBuffer, transform, imageConfig))
+    // Read inside the slot, so a long queue holds no file buffers.
+    const pending = transformSemaphore.run(async () =>
+      imageService.transform(await fs.readFile(uploadPath), transform, imageConfig)
+    )
     if (!pending) {
       return busyResponse()
     }

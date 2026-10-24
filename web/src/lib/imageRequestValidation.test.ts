@@ -8,9 +8,8 @@ function check(query: string): string | null {
 }
 
 void test('accepts the parameters Astro generates', () => {
-  assert.equal(check('href=/files/x.png&w=1200&h=64&f=webp&q=80'), null)
+  assert.equal(check('href=/files/x.png&w=1200&h=64&f=webp'), null)
   assert.equal(check('href=/files/logo.svg&f=webp'), null)
-  assert.equal(check('href=/files/x.png&q=high'), null)
   assert.equal(check('href=/files/x.png'), null)
   assert.equal(check(`href=/files/x.png&w=${MAX_IMAGE_DIMENSION.toString()}`), null)
 })
@@ -48,18 +47,14 @@ void test('rejects formats Astro never encodes, including gif', () => {
   assert.notEqual(check('href=/files/x.png&f='), null)
 })
 
-void test('rejects out-of-range quality', () => {
-  assert.notEqual(check('href=/files/x.png&q=0'), null)
-  assert.notEqual(check('href=/files/x.png&q=101'), null)
-  assert.notEqual(check('href=/files/x.png&q=abc'), null)
-})
-
-void test('allows position and background params that Astro can emit', () => {
-  // These are legitimate Astro transform params (e.g. background to flatten a
-  // transparent PNG). They are not a DoS vector, so validation must not reject
-  // them or it would 400 a site-generated URL.
-  assert.equal(check('href=/files/x.png&w=100&h=100&fit=cover&position=top'), null)
-  assert.equal(check('href=/files/x.png&background=%23ffffff'), null)
+void test('accepts only the parameters the site image URLs carry', () => {
+  assert.equal(check('href=/files/x.png&w=2400&h=1260&f=png'), null)
+  assert.equal(check('href=/files/x.png&w=2733&h=1572&f=webp'), null)
+  // quality turns on slow PNG palette quantization; fit, position and background change the output without being
+  // part of the cache key.
+  for (const extra of ['q=80', 'q=high', 'fit=fill', 'position=top', 'background=%23000000', 'unknown=1']) {
+    assert.notEqual(check(`href=/files/x.png&w=96&f=webp&${extra}`), null)
+  }
 })
 
 void test('accepts the href shapes Astro emits', () => {

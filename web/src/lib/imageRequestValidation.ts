@@ -1,7 +1,11 @@
-// MAX_IMAGE_DIMENSION caps a requested output dimension. It bounds the work a
-// single `/_image` request can trigger (output pixels grow with width*height),
-// while staying well above any dimension the site legitimately requests.
+// MAX_IMAGE_DIMENSION rejects absurd requested sizes; the transform itself bounds
+// the output (imageService.ts).
 export const MAX_IMAGE_DIMENSION = 4096
+
+// ACCEPTED_PARAMS are the only ones the site's own image URLs carry. Anything
+// else (quality, fit, position, background) changes the output without being
+// part of the cache key, or makes the transform far more expensive.
+const ACCEPTED_PARAMS = new Set(['href', 'w', 'h', 'f'])
 
 // ALLOWED_OUTPUT_FORMATS mirrors Astro's VALID_OUTPUT_FORMATS. `gif` is
 // deliberately excluded: it is input-only for Astro and would trigger an
@@ -9,13 +13,10 @@ export const MAX_IMAGE_DIMENSION = 4096
 // and an AVIF encode costs far more CPU than WebP.
 const ALLOWED_OUTPUT_FORMATS = new Set(['png', 'webp', 'jpeg', 'jpg'])
 
-// NAMED_QUALITIES are the presets sharp accepts in place of a numeric 1-100 value.
-const NAMED_QUALITIES = new Set(['low', 'mid', 'high', 'max'])
-
 // parsedIntInRange parses the way Astro's baseService.parseURL does, with
 // parseInt(). Validating with Number() instead would let scientific-notation
 // values (e.g. "40960000e-4" -> 4096) pass here while parseURL feeds sharp the
-// mantissa (40960000), reopening the upscaling DoS.
+// mantissa (40960000), so the size checked would not be the size used.
 function parsedIntInRange(raw: string, min: number, max: number): boolean {
   const value = parseInt(raw, 10)
   return !Number.isNaN(value) && value >= min && value <= max
@@ -36,12 +37,15 @@ function isProcessableHref(href: string): boolean {
   }
 }
 
-// validateImageParams rejects `/_image` requests whose parameters fall outside
-// what Astro generates. Without it a user-supplied `w`/`h` reaches sharp
-// unbounded, so one request can upscale a tiny source into a multi-gigapixel
-// bitmap and exhaust CPU and memory. Returns an error message when invalid, or
-// null when safe to process.
+// validateImageParams rejects `/_image` requests outside what the site's own
+// image URLs carry, so every option that changes the output is in the cache key
+// and no request can choose a costly one. Returns an error message when
+// invalid, or null when safe to process.
 export function validateImageParams(params: URLSearchParams): string | null {
+  for (const key of params.keys()) {
+    if (!ACCEPTED_PARAMS.has(key)) return `Invalid "${key}" parameter`
+  }
+
   const href = params.get('href')
   if (href === null || !isProcessableHref(href)) {
     return 'Invalid "href" parameter'
@@ -52,11 +56,6 @@ export function validateImageParams(params: URLSearchParams): string | null {
     if (raw !== null && !parsedIntInRange(raw, 1, MAX_IMAGE_DIMENSION)) {
       return `Invalid "${key}" parameter`
     }
-  }
-
-  const quality = params.get('q')
-  if (quality !== null && !NAMED_QUALITIES.has(quality) && !parsedIntInRange(quality, 1, 100)) {
-    return 'Invalid "q" parameter'
   }
 
   const format = params.get('f')
