@@ -8,7 +8,7 @@ import {
 } from '../../constants/commentReports'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { conflictedCommentWhere } from '../../lib/experiences'
-import { cap, contactCategoriesForUser } from '../../lib/permissions'
+import { cap, contactCategoriesForUser, userCan } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { announceClosedReports, closeCommentReport, notifyContactThreadAuthor } from '../../lib/reportedPost'
 import { sendContactChatMessageEvents } from '../../lib/sendChatEvents'
@@ -17,9 +17,9 @@ import type { ContactCategory } from '@prisma/client'
 
 const threadId = z.coerce.number().int().positive()
 
-// Either contact capability unlocks the queue route; scoped holders
-// (contact:manage-urgent) may only act on the categories they manage.
-const contactPermissions = [cap('contact:manage'), cap('contact:manage-urgent')]
+// Any of these unlocks the contact actions; scoped holders may only act on the categories they manage
+// (contactCategoriesForUser).
+const contactPermissions = [cap('contact:manage'), cap('contact:manage-urgent'), cap('comments:moderate')]
 
 // ensureThreadInScope rejects (as not-found, to avoid leaking existence) when the acting user may
 // not manage the thread's category, or the thread is about a post they must leave to someone else.
@@ -176,6 +176,13 @@ export const adminContactActions = {
           })
           return
         case 'delete':
+          // Deleting erases the reporter's history and leaves no trail, so it stays with full contact managers.
+          if (!userCan(context.locals.user, 'contact:manage')) {
+            throw new ActionError({
+              code: 'FORBIDDEN',
+              message: 'Only contact managers can delete conversations.',
+            })
+          }
           await prisma.contactThread.delete({ where: { id: thread.id } })
           return
       }

@@ -23,8 +23,7 @@ if (!staff || (allowedCategories !== 'all' && allowedCategories.length === 0)) {
   return Astro.rewrite('/404')
 }
 
-// Scope every query to the categories this user may manage: urgent-only staff
-// (contact:manage-urgent) see just urgent reports, full managers see everything.
+// Scope every query to the categories this user may manage (contactCategoriesForUser).
 // Threads about posts they must leave to someone else are hidden as well.
 const categoryScope: Prisma.ContactThreadWhereInput = {
   ...(allowedCategories === 'all' ? {} : { category: { in: allowedCategories } }),

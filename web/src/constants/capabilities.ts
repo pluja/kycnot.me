@@ -34,7 +34,8 @@ export const {
       value: 'comments:moderate',
       slug: 'comments-moderate',
       label: 'Moderate comments',
-      description: 'Approve, reject and moderate experiences, discussions and replies.',
+      description:
+        'Approve, reject and moderate experiences, discussions and replies, and handle comment reports.',
       icon: 'ri:chat-check-line',
     },
     {

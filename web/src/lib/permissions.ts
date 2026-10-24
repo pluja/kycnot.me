@@ -62,7 +62,10 @@ export const cap = (capability: Capability) => ({ capability })
 const adminRouteCapabilities = [
   { prefix: '/admin/cases', capabilities: ['cases:manage'] },
   { prefix: '/admin/comments', capabilities: ['comments:moderate'] },
-  { prefix: '/admin/contact', capabilities: ['contact:manage', 'contact:manage-urgent'] },
+  {
+    prefix: '/admin/contact',
+    capabilities: ['contact:manage', 'contact:manage-urgent', 'comments:moderate'],
+  },
   { prefix: '/admin/service-suggestions', capabilities: ['suggestions:manage'] },
   { prefix: '/admin/audit', capabilities: ['audit:read'] },
   { prefix: '/admin/services', capabilities: ['services:edit'] },
@@ -123,14 +126,15 @@ export function hasAnyCapability(user: UserForPermissions | null | undefined): b
   return !!user && user.capabilities.length > 0
 }
 
-// contactCategoriesForUser returns which contact categories a user may manage.
-// 'all' means unrestricted (admins and full contact:manage holders); a holder
-// of only contact:manage-urgent is scoped to urgent service reports. Used to
-// filter the contact queue and to re-check access on every contact mutation.
+// contactCategoriesForUser returns which contact categories a user may manage: 'all' for admins and
+// contact:manage holders, otherwise urgent service reports for contact:manage-urgent and comment reports for
+// comment moderators.
 export function contactCategoriesForUser(
   user: UserForPermissions | null | undefined
 ): ContactCategory[] | 'all' {
   if (userCan(user, 'contact:manage')) return 'all'
-  if (userCan(user, 'contact:manage-urgent')) return [ContactCategory.SERVICE_REPORT_URGENT]
-  return []
+  return [
+    ...(userCan(user, 'contact:manage-urgent') ? [ContactCategory.SERVICE_REPORT_URGENT] : []),
+    ...(userCan(user, 'comments:moderate') ? [ContactCategory.COMMENT_REPORT] : []),
+  ]
 }

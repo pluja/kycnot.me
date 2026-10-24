@@ -194,16 +194,27 @@ const messages: ChatMessage[] = thread.messages.map((m) => ({
         )
       }
 
-      <form
-        method="POST"
-        action={actions.admin.contact.update}
-        class="ml-auto"
-        data-confirm="Delete this conversation permanently?"
-      >
-        <input type="hidden" name="threadId" value={thread.id} />
-        <input type="hidden" name="action" value="delete" />
-        <Button as="button" type="submit" size="sm" color="danger" icon="ri:delete-bin-line" label="Delete" />
-      </form>
+      {
+        Astro.locals.userCan('contact:manage') && (
+          <form
+            method="POST"
+            action={actions.admin.contact.update}
+            class="ml-auto"
+            data-confirm="Delete this conversation permanently?"
+          >
+            <input type="hidden" name="threadId" value={thread.id} />
+            <input type="hidden" name="action" value="delete" />
+            <Button
+              as="button"
+              type="submit"
+              size="sm"
+              color="danger"
+              icon="ri:delete-bin-line"
+              label="Delete"
+            />
+          </form>
+        )
+      }
     </div>
 
     <form method="POST" action={actions.admin.contact.update} class="space-y-1">

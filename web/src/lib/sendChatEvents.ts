@@ -41,12 +41,24 @@ export async function sendContactChatMessageEvents(threadId: number, senderUserI
   })
   if (!thread) throw new Error('Contact thread not found')
 
-  // Mirror the notification trigger: urgent reports also reach
-  // contact:manage-urgent holders; other categories only full managers.
-  const staffWhere: Prisma.UserWhereInput =
+  // Mirror the notification trigger: urgent reports also reach contact:manage-urgent holders, comment reports
+  // reach comment moderators, and other categories only full managers.
+  const scopedCapability =
     thread.category === 'SERVICE_REPORT_URGENT'
-      ? { OR: [{ admin: true }, { capabilities: { hasSome: ['contact:manage', 'contact:manage-urgent'] } }] }
-      : { OR: [{ admin: true }, { capabilities: { has: 'contact:manage' } }] }
+      ? 'contact:manage-urgent'
+      : thread.category === 'COMMENT_REPORT'
+        ? 'comments:moderate'
+        : null
+  const staffWhere: Prisma.UserWhereInput = {
+    OR: [
+      { admin: true },
+      {
+        capabilities: {
+          hasSome: scopedCapability ? ['contact:manage', scopedCapability] : ['contact:manage'],
+        },
+      },
+    ],
+  }
 
   const staffIds = (await prisma.user.findMany({ where: staffWhere, select: { id: true } })).map((u) => u.id)
 

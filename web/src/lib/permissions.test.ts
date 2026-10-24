@@ -34,21 +34,24 @@ void test('full manage outranks the urgent scope when both are held', () => {
   assert.equal(contactCategoriesForUser(make(false, ['contact:manage', 'contact:manage-urgent'])), 'all')
 })
 
-void test('no contact capability means no categories', () => {
-  assert.deepEqual(contactCategoriesForUser(make(false, ['comments:moderate'])), [])
+void test('comment moderators manage comment reports', () => {
+  assert.deepEqual(contactCategoriesForUser(make(false, ['comments:moderate'])), ['COMMENT_REPORT'])
+  assert.deepEqual(contactCategoriesForUser(make(false, ['contact:manage-urgent', 'comments:moderate'])), [
+    'SERVICE_REPORT_URGENT',
+    'COMMENT_REPORT',
+  ])
+})
+
+void test('no contact or comment capability means no categories', () => {
+  assert.deepEqual(contactCategoriesForUser(make(false, ['services:edit'])), [])
   assert.deepEqual(contactCategoriesForUser(null), [])
 })
 
-void test('contact route is unlocked by either contact capability', () => {
-  assert.deepEqual(adminRouteRequiredCapabilities('/admin/contact'), [
-    'contact:manage',
-    'contact:manage-urgent',
-  ])
+void test('contact route is unlocked by either contact capability or comment moderation', () => {
+  const expected = ['contact:manage', 'contact:manage-urgent', 'comments:moderate']
+  assert.deepEqual(adminRouteRequiredCapabilities('/admin/contact'), expected)
   // Sub-paths match the same prefix.
-  assert.deepEqual(adminRouteRequiredCapabilities('/admin/contact/42'), [
-    'contact:manage',
-    'contact:manage-urgent',
-  ])
+  assert.deepEqual(adminRouteRequiredCapabilities('/admin/contact/42'), expected)
 })
 
 void test('single-capability routes are unchanged by the any-of widening', () => {
