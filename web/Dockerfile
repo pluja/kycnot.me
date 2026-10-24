@@ -23,15 +23,18 @@ RUN npm run build:astro -- --mode ${ASTRO_BUILD_MODE} && npm run build:server-in
 RUN npm prune --omit=dev && \
     rm -rf node_modules/@img/sharp-libvips-linuxmusl-x64 \
            node_modules/@img/sharp-linuxmusl-x64 \
+           node_modules/@img/sharp-wasm32 \
            node_modules/lightningcss-linux-x64-musl
 
 # ── Stage 2: Runtime ───────────────────────────────────────────
 FROM node:lts-slim AS runtime
 WORKDIR /app
 
+# sharp bundles its own libvips. fontconfig-config and the DejaVu font are for the watermark text it draws on evidence.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    libvips42 \
+    fontconfig-config \
+    fonts-dejavu-core \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/dist ./dist

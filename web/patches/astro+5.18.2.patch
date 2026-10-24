@@ -1,0 +1,13 @@
+diff --git a/node_modules/astro/dist/assets/services/sharp.js b/node_modules/astro/dist/assets/services/sharp.js
+index 674bd1b..63147cf 100644
+--- a/node_modules/astro/dist/assets/services/sharp.js
++++ b/node_modules/astro/dist/assets/services/sharp.js
+@@ -41,7 +41,7 @@ const sharpService = {
+     const kernel = config.service.config.kernel;
+     if (transform.format === "svg") return { data: inputBuffer, format: "svg" };
+     const result = sharp(inputBuffer, {
+-      failOnError: false,
++      failOn: "none",
+       pages: -1,
+       limitInputPixels: config.service.config.limitInputPixels
+     });

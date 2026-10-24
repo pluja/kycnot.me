@@ -68,7 +68,7 @@
     "satori": "0.25.0",
     "schema-dts": "1.1.5",
     "seedrandom": "3.0.5",
-    "sharp": "0.34.5",
+    "sharp": "0.35.5",
     "slugify": "1.6.9",
     "tailwind-merge": "3.5.0",
     "tailwind-variants": "3.2.2",
@@ -128,6 +128,7 @@
     "workbox-precaching": "7.4.0"
   },
   "overrides": {
+    "sharp": "$sharp",
     "vite": "^6.4.2"
   }
 }
