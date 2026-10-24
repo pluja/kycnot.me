@@ -77,3 +77,12 @@ void test('only PNG, JPEG and WebP signatures reach a decoder', async () => {
     assert.equal((await sharp(await reencodeUploadedImage(input, 4096)).metadata()).format, 'webp')
   }
 })
+
+void test('a bounded upload fits both sides', async () => {
+  const tall = await sharp({ create: { width: 400, height: 8000, channels: 3, background: '#fff' } })
+    .png()
+    .toBuffer()
+  const metadata = await sharp(await reencodeUploadedImage(tall, 1024, 1024)).metadata()
+  assert.equal(metadata.height, 1024)
+  assert.equal(metadata.width, 51)
+})

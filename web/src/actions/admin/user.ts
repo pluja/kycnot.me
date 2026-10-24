@@ -6,7 +6,7 @@ import { capabilitiesZodEnum } from '../../constants/capabilities'
 import { affiliationServiceWhere } from '../../constants/serviceClaim'
 import { recordAuditLog } from '../../lib/auditLog'
 import { defineProtectedAction } from '../../lib/defineProtectedAction'
-import { saveImageUpload } from '../../lib/fileStorage'
+import { PICTURE_SIZE, saveImageUpload } from '../../lib/fileStorage'
 import { cap, withoutOrphanCapabilities } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { displayNameSchema, httpUrlSchema } from '../../lib/zodUtils'
@@ -139,7 +139,9 @@ export const adminUserActions = {
       }
 
       const pictureUrl =
-        pictureFile && pictureFile.size > 0 ? await saveImageUpload(pictureFile, 'users/pictures/') : null
+        pictureFile && pictureFile.size > 0
+          ? await saveImageUpload(pictureFile, 'users/pictures/', PICTURE_SIZE)
+          : null
 
       const updatedUser = await prisma.$transaction(async (tx) => {
         const updated = await tx.user.update({

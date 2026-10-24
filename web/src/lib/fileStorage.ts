@@ -47,6 +47,9 @@ function hashContent(buffer: Buffer): string {
 // uploadSemaphore caps concurrent image decodes, each of which can hold tens of MB of native memory.
 const uploadSemaphore = new Semaphore(2, 20)
 
+// PICTURE_SIZE bounds logos and avatars, which are shown small: a smaller stored file keeps every later resize cheap.
+export const PICTURE_SIZE = { maxWidth: 1024, maxHeight: 1024 }
+
 /**
  * Save an uploaded image and return its web-accessible URL path. When `watermark` is set, the image is
  * tiled with the KYCNOT.ME watermark; the filename is the hash of the final bytes.
@@ -54,10 +57,14 @@ const uploadSemaphore = new Semaphore(2, 20)
 export async function saveImageUpload(
   file: File,
   subDir: string,
-  { watermark = false, maxWidth = 4096 }: { watermark?: boolean; maxWidth?: number } = {}
+  {
+    watermark = false,
+    maxWidth = 4096,
+    maxHeight,
+  }: { watermark?: boolean; maxWidth?: number; maxHeight?: number } = {}
 ): Promise<string> {
   const processing = uploadSemaphore.run(async () => {
-    const image = await reencodeUploadedImage(Buffer.from(await file.arrayBuffer()), maxWidth)
+    const image = await reencodeUploadedImage(Buffer.from(await file.arrayBuffer()), maxWidth, maxHeight)
     return watermark ? watermarkImage(image) : image
   })
   if (!processing) {

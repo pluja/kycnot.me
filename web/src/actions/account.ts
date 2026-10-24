@@ -13,7 +13,7 @@ import { captchaFormSchemaProperties, captchaFormSchemaSuperRefine } from '../li
 import { cleanupCommentEvidenceFiles } from '../lib/commentEvidenceCleanup'
 import { deleteUserAccount } from '../lib/dbFunctions'
 import { defineProtectedAction } from '../lib/defineProtectedAction'
-import { saveImageUpload } from '../lib/fileStorage'
+import { PICTURE_SIZE, saveImageUpload } from '../lib/fileStorage'
 import { startImpersonating, stopImpersonating } from '../lib/impersonation'
 import { prisma } from '../lib/prisma'
 import { makeSafeRedirectUrl } from '../lib/redirectUrls'
@@ -237,7 +237,11 @@ export const accountActions = {
 
       const pictureUrl =
         input.pictureFile && input.pictureFile.size > 0
-          ? await saveImageUpload(input.pictureFile, `users/pictures/${String(context.locals.user.id)}`)
+          ? await saveImageUpload(
+              input.pictureFile,
+              `users/pictures/${String(context.locals.user.id)}`,
+              PICTURE_SIZE
+            )
           : undefined
 
       const user = await prisma.user.update({

@@ -14,7 +14,7 @@ import {
   descriptionOpeningRefinement,
   descriptionSchema,
 } from '../../lib/descriptionRules'
-import { saveImageUpload, deleteFileLocally } from '../../lib/fileStorage'
+import { deleteFileLocally, PICTURE_SIZE, saveImageUpload } from '../../lib/fileStorage'
 import { cap, userCan } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { proofIdRegex } from '../../lib/proofEvidence'
@@ -157,7 +157,7 @@ export const adminServiceActions = {
       }
 
       const imageUrl = input.imageFile
-        ? await saveImageUpload(input.imageFile, 'services/pictures')
+        ? await saveImageUpload(input.imageFile, 'services/pictures', PICTURE_SIZE)
         : undefined
 
       // Setting the verification status is gated by services:approve; others
@@ -308,7 +308,7 @@ export const adminServiceActions = {
       const imageUrl = input.removeImage
         ? null
         : input.imageFile
-          ? await saveImageUpload(input.imageFile, 'services/pictures')
+          ? await saveImageUpload(input.imageFile, 'services/pictures', PICTURE_SIZE)
           : undefined
 
       // Changing the verification status is gated by services:approve; for

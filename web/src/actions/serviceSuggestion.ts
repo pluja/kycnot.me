@@ -14,7 +14,7 @@ import {
   descriptionSchema,
 } from '../lib/descriptionRules'
 import { isServicePubliclyReadable } from '../lib/experiences'
-import { saveImageUpload } from '../lib/fileStorage'
+import { PICTURE_SIZE, saveImageUpload } from '../lib/fileStorage'
 import { findServicesBySimilarity } from '../lib/findServicesBySimilarity'
 import { prisma } from '../lib/prisma'
 import { sendChatMessageEvents } from '../lib/sendChatEvents'
@@ -335,7 +335,7 @@ export const serviceSuggestionActions = {
         if (serviceWithSameSlug) throw slugInUse
       }
 
-      const imageUrl = await saveImageUpload(input.imageFile, 'services/pictures')
+      const imageUrl = await saveImageUpload(input.imageFile, 'services/pictures', PICTURE_SIZE)
 
       const {
         web: serviceUrls,

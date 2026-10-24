@@ -14,7 +14,11 @@ const startsLikeAcceptedImage = (input: Buffer) =>
 
 // reencodeUploadedImage decodes an upload and writes a fresh WebP, so only pixels reach the disk: no
 // markup, polyglot payload or EXIF/GPS metadata survives, whatever the client claimed the file was.
-export async function reencodeUploadedImage(input: Buffer, maxWidth: number): Promise<Buffer> {
+export async function reencodeUploadedImage(
+  input: Buffer,
+  maxWidth: number,
+  maxHeight = WEBP_MAX_DIMENSION
+): Promise<Buffer> {
   if (!startsLikeAcceptedImage(input)) throw new Error('Unsupported image format')
   const image = sharp(input, { limitInputPixels: MAX_IMAGE_PIXELS, failOn: 'error' })
   const metadata = await image.metadata()
@@ -23,7 +27,7 @@ export async function reencodeUploadedImage(input: Buffer, maxWidth: number): Pr
   }
   return image
     .rotate()
-    .resize({ width: maxWidth, height: WEBP_MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
+    .resize({ width: maxWidth, height: maxHeight, fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 90 })
     .toBuffer()
 }
