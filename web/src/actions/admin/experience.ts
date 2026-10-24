@@ -23,6 +23,7 @@ import { cap, userCan } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
 import { countsAsProof } from '../../lib/proofEvidence'
 import { createProofRequest } from '../../lib/proofRequests'
+import { announceClosedReports, closeCommentReport } from '../../lib/reportedPost'
 import { absoluteSiteUrl } from '../../lib/urls'
 
 const commentId = z.coerce.number().int().positive()
@@ -204,7 +205,7 @@ export const adminExperienceActions = {
     handler: async (input, context) => {
       const decisionReason = input.decisionReason || null
       const reason = input.reason || null
-      await prisma.$transaction(async (tx) => {
+      const closedReports = await prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM "Comment" WHERE id = ${input.commentId} FOR UPDATE`
         const current = await checkExperienceModerator(tx, context.locals.user.id, input.commentId)
         if (current.status === 'WITHDRAWN') {
@@ -249,7 +250,24 @@ export const adminExperienceActions = {
           targetId: input.commentId,
           summary: [input.status, decisionReason, reason].filter(Boolean).join(': '),
         })
+        // Rejecting a reported comment is the action its reports asked for.
+        if (input.status !== 'REJECTED') return []
+        const openReports = await tx.contactThread.findMany({
+          where: { commentId: input.commentId, category: 'COMMENT_REPORT', reportOutcome: null },
+          select: { id: true, authorId: true },
+        })
+        const reportsClosedNow = []
+        for (const report of openReports) {
+          const closed = await closeCommentReport(tx, {
+            threadId: report.id,
+            staffId: context.locals.user.id,
+            outcome: 'ACTION_TAKEN',
+          })
+          if (closed) reportsClosedNow.push(report)
+        }
+        return reportsClosedNow
       })
+      await announceClosedReports(closedReports, context.locals.user.id)
     },
   }),
   reviewRevision: defineProtectedAction({

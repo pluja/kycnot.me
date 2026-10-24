@@ -10,6 +10,7 @@ import { defineProtectedAction } from '../../lib/defineProtectedAction'
 import { conflictedCommentWhere } from '../../lib/experiences'
 import { cap, contactCategoriesForUser } from '../../lib/permissions'
 import { prisma } from '../../lib/prisma'
+import { announceClosedReports, closeCommentReport, notifyContactThreadAuthor } from '../../lib/reportedPost'
 import { sendContactChatMessageEvents } from '../../lib/sendChatEvents'
 
 import type { ContactCategory } from '@prisma/client'
@@ -33,21 +34,6 @@ async function ensureThreadInScope(
   if ((allowed !== 'all' && !allowed.includes(thread.category)) || conflicted) {
     throw new ActionError({ code: 'NOT_FOUND', message: 'Conversation not found' })
   }
-}
-
-// Notify the thread author about a thread-level event (seen / resolved), once
-// per thread per type. The Notification insert triggers SSE + push delivery.
-async function notifyContactThreadAuthor(
-  id: number,
-  userId: number,
-  type: 'CONTACT_RESOLVED' | 'CONTACT_SEEN'
-) {
-  const exists = await prisma.notification.findFirst({
-    where: { userId, type, aboutContactThreadId: id },
-    select: { id: true },
-  })
-  if (exists) return
-  await prisma.notification.create({ data: { userId, type, aboutContactThreadId: id } })
 }
 
 export const adminContactActions = {
@@ -77,48 +63,28 @@ export const adminContactActions = {
       await ensureThreadInScope(context.locals.user, thread)
       if (thread.reportOutcome) throw new ActionError({ code: 'CONFLICT', message: 'This report is closed.' })
 
-      const note = input.outcome === 'NO_ACTION' ? (input.note ?? null) : null
-      const now = new Date()
-      await prisma.$transaction([
+      await prisma.$transaction(async (tx) => {
         // A report closed without action ends the service dispute it opened.
-        ...(input.outcome === 'NO_ACTION' && thread.commentId
-          ? [
-              prisma.proofRequest.updateMany({
-                where: {
-                  commentId: thread.commentId,
-                  source: 'SERVICE',
-                  requestedById: thread.authorId,
-                  cancelledAt: null,
-                },
-                data: { cancelledAt: now },
-              }),
-            ]
-          : []),
-        prisma.contactThread.update({
-          where: { id: thread.id },
-          data: {
-            reportOutcome: input.outcome,
-            reportOutcomeNote: note,
-            status: 'RESOLVED',
-            resolvedAt: now,
-            readAt: now,
-            lastMessageAt: now,
-          },
-        }),
-        prisma.contactMessage.create({
-          data: {
-            threadId: thread.id,
-            fromStaff: true,
-            authorId: context.locals.user.id,
-            content:
-              input.outcome === 'ACTION_TAKEN'
-                ? 'Thanks for the report. We took action on this comment.'
-                : `We reviewed this comment and took no action: ${note ?? ''}`,
-          },
-        }),
-      ])
-      sendContactChatMessageEvents(thread.id, context.locals.user.id).catch(console.error)
-      if (thread.authorId) await notifyContactThreadAuthor(thread.id, thread.authorId, 'CONTACT_RESOLVED')
+        if (input.outcome === 'NO_ACTION' && thread.commentId) {
+          await tx.proofRequest.updateMany({
+            where: {
+              commentId: thread.commentId,
+              source: 'SERVICE',
+              requestedById: thread.authorId,
+              cancelledAt: null,
+            },
+            data: { cancelledAt: new Date() },
+          })
+        }
+        const closed = await closeCommentReport(tx, {
+          threadId: thread.id,
+          staffId: context.locals.user.id,
+          outcome: input.outcome,
+          note: input.outcome === 'NO_ACTION' ? (input.note ?? null) : null,
+        })
+        if (!closed) throw new ActionError({ code: 'CONFLICT', message: 'This report is closed.' })
+      })
+      await announceClosedReports([thread], context.locals.user.id)
     },
   }),
 
@@ -133,10 +99,12 @@ export const adminContactActions = {
     handler: async (input, context) => {
       const thread = await prisma.contactThread.findUnique({
         where: { id: input.threadId },
-        select: { id: true, category: true, commentId: true },
+        select: { id: true, category: true, commentId: true, reportOutcome: true },
       })
       if (!thread) throw new ActionError({ code: 'NOT_FOUND', message: 'Conversation not found' })
       await ensureThreadInScope(context.locals.user, thread)
+      // A message would reopen the thread while its outcome stays, leaving a closed report stuck in the queue.
+      if (thread.reportOutcome) throw new ActionError({ code: 'CONFLICT', message: 'This report is closed.' })
 
       const now = new Date()
       await prisma.$transaction([
