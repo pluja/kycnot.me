@@ -37,6 +37,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-dejavu-core \
   && rm -rf /var/lib/apt/lists/*
 
+# Image transforms each hold a libuv thread; a larger pool keeps file reads moving during a burst of them.
+ENV UV_THREADPOOL_SIZE=12
+
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
