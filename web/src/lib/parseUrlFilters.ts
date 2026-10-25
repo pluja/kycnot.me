@@ -241,17 +241,21 @@ function makeCleanUrl<K extends string, T extends Record<K, MyZodUnknown>>(
 ) {
   if (!options) return null
 
-  const paramsToRemove = [
-    ...(options.removeUneededObjectParams ? getUneededObjectParams(shape, url) : []),
-    ...(options.removeParams ? getParamsToRemove(shape, url, options.removeParams, data, defaultData) : []),
-  ]
-  if (!paramsToRemove.length) return null
-
   const cleanUrl = new URL(url)
-  paramsToRemove.forEach(([key, value]) => {
-    cleanUrl.searchParams.delete(key, value)
-  })
-  return cleanUrl.pathname + cleanUrl.search
+  const removeFromCleanUrl = (params: [string, string][]) => {
+    params.forEach(([key, value]) => {
+      cleanUrl.searchParams.delete(key, value)
+    })
+  }
+  // Empty object params are dropped first so `another-is-unset` treats them as unset; otherwise their
+  // dependents would only go on a second redirect.
+  if (options.removeUneededObjectParams) removeFromCleanUrl(getUneededObjectParams(shape, cleanUrl))
+  if (options.removeParams) {
+    removeFromCleanUrl(getParamsToRemove(shape, cleanUrl, options.removeParams, data, defaultData))
+  }
+
+  const cleanPath = cleanUrl.pathname + cleanUrl.search
+  return cleanPath === url.pathname + url.search ? null : cleanPath
 }
 
 function getUneededObjectParams<T extends Record<string, MyZodUnknown>>(shape: T, url: URL) {
