@@ -135,7 +135,15 @@ const hasDefaultFiltersIgnoringQ = areEqualObjectsWithoutOrder(
   omit(defaultFilters, [...ignoredKeysForDefaultData, 'q'])
 )
 
-if (redirectUrl) return Astro.redirect(redirectUrl)
+if (redirectUrl) {
+  if (Astro.request.headers.get('HX-Request') !== 'true') return Astro.redirect(redirectUrl)
+  // htmx would follow a redirect with a second request, so render the clean URL now and have htmx show it.
+  // Never cached: a stored copy of this 200 would replace the redirect for the no-JS form and crawlers.
+  const response = await Astro.rewrite(redirectUrl)
+  response.headers.set('HX-Push-Url', redirectUrl)
+  response.headers.set('Cache-Control', 'private, no-store')
+  return response
+}
 
 const includeScams =
   !!filters.q &&
