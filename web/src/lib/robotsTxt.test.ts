@@ -80,6 +80,14 @@ void test('a token is never both allowed and blocked', () => {
   }
 })
 
+void test('crawl traps stay closed in every allowing group', () => {
+  for (const group of groups(robots).filter((candidate) => candidate.rules.includes('Allow: /'))) {
+    for (const rule of ['Disallow: /*sort-seed=', 'Disallow: /account/']) {
+      assert.ok(group.rules.includes(rule), `${group.agents.join(',')} must carry ${rule}`)
+    }
+  }
+})
+
 void test('names the sitemap', () => {
   assert.ok(robots.includes('Sitemap: https://kycnot.me/sitemaps/index.xml'))
 })

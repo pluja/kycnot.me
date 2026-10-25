@@ -3,8 +3,16 @@
  *
  * `/go/` is the outbound redirect hop. Its links already carry
  * `rel="nofollow"`, so this only adds cover for crawlers that ignore that.
+ * `/account/` is private or `noindex`, yet every page links to the login with
+ * the current URL as its redirect, so each listing URL spawns its own login URL.
  */
-const DISALLOWED_PATHS = ['/admin/', '/internal-api/', '/api/', '/feeds/user/', '/go/']
+const DISALLOWED_PATHS = ['/admin/', '/internal-api/', '/api/', '/feeds/user/', '/go/', '/account/']
+
+/**
+ * Listing pagination links carry a seed that is new on every render of page 1:
+ * an unbounded URL space whose canonical already drops it.
+ */
+const DISALLOWED_PARAMS = ['sort-seed']
 
 /**
  * Swap query parameters that turn one page into an unbounded set of
@@ -68,6 +76,7 @@ const allowGroup = (agents: string[]) =>
     ...userAgentLines(agents),
     'Allow: /',
     ...DISALLOWED_PATHS.map((path) => `Disallow: ${path}`),
+    ...DISALLOWED_PARAMS.map((param) => `Disallow: /*${param}=`),
     ...DISALLOWED_SWAP_PARAMS.map((param) => `Disallow: /swap?*${param}=`),
   ].join('\n')
 
