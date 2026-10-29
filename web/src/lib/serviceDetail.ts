@@ -40,7 +40,10 @@ export function serviceDetailSelect(viewerId: number) {
     tosChangedAt: true,
     legalDocuments: {
       select: { checkedAt: true },
-      orderBy: { checkedAt: 'desc' },
+      // The oldest fetch among readable documents, so one stuck page cannot hide
+      // behind a fresh one. A removed page keeps its last checkedAt forever.
+      where: { unreachableAt: null, removedAt: null },
+      orderBy: { checkedAt: 'asc' },
       take: 1,
     },
     legalRevisions: {
