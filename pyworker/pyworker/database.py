@@ -506,6 +506,32 @@ def fetch_scan_declines(service_id: int) -> set:
         return set()
 
 
+_SCANNABLE_SERVICE_CONDITIONS = """
+    s."serviceVisibility" = 'PUBLIC'
+    AND s."verificationStatus" IN ('VERIFICATION_SUCCESS', 'APPROVED')
+    AND array_length(s."tosUrls", 1) > 0
+"""
+
+
+def fetch_services_with_legal_documents() -> List[Dict[str, Any]]:
+    """Every service the scan sweep can cover, for the daily document recheck."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    f"""
+                    SELECT s.id, s.name, s."tosUrls"
+                    FROM "Service" s
+                    WHERE {_SCANNABLE_SERVICE_CONDITIONS}
+                    ORDER BY s.id
+                    """
+                )
+                return list(cursor.fetchall())
+    except Exception as e:
+        logger.error(f"Error selecting services for the legal recheck: {e}")
+        return []
+
+
 def fetch_services_needing_scan(limit: int) -> List[Dict[str, Any]]:
     """Services whose legal documents moved since a scan last looked at them.
 
@@ -522,12 +548,10 @@ def fetch_services_needing_scan(limit: int) -> List[Dict[str, Any]]:
         with get_db_connection() as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 cursor.execute(
-                    """
+                    f"""
                     SELECT s.id, s.name, s.slug, s."tosChangedAt", s."lastLegalScanAt"
                     FROM "Service" s
-                    WHERE s."serviceVisibility" = 'PUBLIC'
-                      AND s."verificationStatus" IN ('VERIFICATION_SUCCESS', 'APPROVED')
-                      AND array_length(s."tosUrls", 1) > 0
+                    WHERE {_SCANNABLE_SERVICE_CONDITIONS}
                       AND (
                         s."lastLegalScanAt" IS NULL
                         OR (

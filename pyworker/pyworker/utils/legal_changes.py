@@ -17,7 +17,7 @@ from pyworker.database import (
     upsert_legal_document,
 )
 from pyworker.utils.ai import prompt_legal_change_summary
-from pyworker.utils.legal_crawl import LegalCorpus
+from pyworker.utils.legal_crawl import LegalCorpus, fetch_legal_corpus
 from pyworker.utils.legal_text import (
     LegalChangeLevel,
     diff_legal_text,
@@ -39,6 +39,18 @@ def tracked_document_urls(service_id: int) -> list[str]:
         for document in get_legal_documents(service_id).values()
         if document.get("url")
     ]
+
+
+def recheck_service_documents(
+    service_id: int, tos_urls: list[str], service_name: str = ""
+) -> None:
+    """Fetch a service's legal documents again and record what moved.
+
+    Moving a document advances the service's tosChangedAt, which is what makes
+    the scan sweep pick the service up. The review itself is not rerun here.
+    """
+    corpus = fetch_legal_corpus(tos_urls, known_urls=tracked_document_urls(service_id))
+    record_document_changes(service_id, corpus, service_name)
 
 
 def record_document_changes(

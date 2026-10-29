@@ -16,6 +16,7 @@ from pyworker.database import (
     close_db_pool,
     fetch_all_services,
     fetch_services_needing_scan,
+    fetch_services_with_legal_documents,
     fetch_services_with_pending_comments,
     mark_scan_job_done,
 )
@@ -32,14 +33,18 @@ from .tasks import (
 )
 from pyworker.tasks.deep_scan import REVIEWABLE_STATUSES
 from pyworker.utils.app_logging import configure_logging
+from pyworker.utils.legal_changes import recheck_service_documents
 
 configure_logging()
 logger = logging.getLogger(__name__)
+
+PAUSE_BETWEEN_RECHECKS_SECONDS = 2.0
 
 _DISABLED_SCHEDULE_VALUES = {"", "disabled", "off", "false", "none"}
 _TASKS_WITHOUT_SCHEDULER_INSTANCE = {
     "deep_scan",
     "scan_sweep",
+    "legal_recheck",
     "service_score_recalc_all",
     "suggestion_cleanup",
     "affiliation_dns",
@@ -149,6 +154,11 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     subparsers.add_parser(
         "contact-cleanup",
         help="Delete resolved contact threads past their 30-day retention window",
+    )
+
+    subparsers.add_parser(
+        "legal-recheck",
+        help="Fetch and hash every sweep-covered service's legal documents, no review",
     )
 
     subparsers.add_parser(
@@ -381,6 +391,42 @@ def run_service_score_recalc_all_task(close_pool: bool = True) -> int:
     Run the service score recalculation task for all services.
     """
     return run_service_score_recalc_task(all_services=True, close_pool=close_pool)
+
+
+def run_legal_recheck_task(close_pool: bool = True) -> int:
+    """Fetch and hash the legal documents of every service the sweep covers.
+
+    Runs no review: a document whose text moved advances the service's
+    tosChangedAt and the scan sweep takes it from there. Services are read one
+    at a time with a pause between them, and one failing never stops the rest.
+    """
+    logger.info("Starting legal document recheck")
+
+    try:
+        services = fetch_services_with_legal_documents()
+        failed = 0
+        for index, service in enumerate(services):
+            if index:
+                time.sleep(PAUSE_BETWEEN_RECHECKS_SECONDS)
+            service_id = int(service["id"])
+            try:
+                recheck_service_documents(
+                    service_id, list(service["tosUrls"]), service["name"]
+                )
+            except Exception as e:
+                failed += 1
+                logger.error(f"Legal recheck failed for service {service_id}: {e}")
+
+        logger.info(
+            f"Legal recheck covered {len(services)} service(s), {failed} failed"
+        )
+        return 0
+    except Exception as e:
+        logger.error(f"Error in legal recheck task: {e}")
+        return 1
+    finally:
+        if close_pool:
+            close_db_pool()
 
 
 def run_scan_sweep_task(limit: int = 5, close_pool: bool = True) -> int:
@@ -658,6 +704,7 @@ def run_worker_mode() -> int:
             run_service_score_recalc_all_task, close_pool=False
         ),
         "deep_scan": partial(run_deep_scan_task, close_pool=False),
+        "legal_recheck": partial(run_legal_recheck_task, close_pool=False),
         "scan_sweep": partial(
             run_scan_sweep_task,
             limit=int(os.environ.get("SCAN_SWEEP_LIMIT", "5")),
@@ -738,6 +785,8 @@ def main() -> int:
             return run_suggestion_cleanup_task(dry_run=args.dry_run)
         elif args.task == "affiliation-dns":
             return run_affiliation_dns_task()
+        elif args.task == "legal-recheck":
+            return run_legal_recheck_task()
         elif args.task == "scan-sweep":
             return run_scan_sweep_task(args.limit)
         elif args.task == "deep-scan":

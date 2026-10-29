@@ -35,7 +35,8 @@ Required environment variables:
 - `OPENAI_API_KEY`: API key for AI tasks
 - `OPENAI_MODEL`, `OPENAI_MODEL_FAST`: models for scans and moderation
 - `CLASSIFICATION_MODEL`: model for `classify-experiences`
-- `CRON_TOSREVIEW_TASK`: Cron expression for TOS review task
+- `CRON_LEGAL_RECHECK_TASK`: Cron expression for the daily legal document recheck
+- `CRON_SCAN_SWEEP_TASK`: Cron expression for the scan sweep
 - `CRON_COMMENT_MODERATION_TASK`: Cron expression for comment moderation task
 - `CRON_FORCE_TRIGGERS_TASK`: Cron expression for force triggers task
 - `CRON_SERVICE_SCORE_RECALC_TASK`: Cron expression for service score recalculation task
@@ -85,11 +86,12 @@ Tasks will run according to their configured cron schedules.
 
 ## Tasks
 
-### TOS Review Task
+### Legal Recheck Task
 
-- Retrieves and analyzes Terms of Service documents
-- Updates service records with TOS information
-- Scheduled via `CRON_TOSREVIEW_TASK`
+- Fetches and hashes the legal documents of every service the sweep covers, with no review
+- A document whose text moved advances the service's `tosChangedAt`, so the next sweep scans it
+- Reads one service at a time and isolates failures
+- Scheduled via `CRON_LEGAL_RECHECK_TASK`, ahead of the scan sweep
 
 ### Scan Sweep Task
 
