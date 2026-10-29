@@ -38,6 +38,11 @@ export function serviceDetailSelect(viewerId: number) {
     tosReview: true,
     tosReviewAt: true,
     tosChangedAt: true,
+    legalDocuments: {
+      select: { checkedAt: true },
+      orderBy: { checkedAt: 'desc' },
+      take: 1,
+    },
     legalRevisions: {
       select: {
         id: true,

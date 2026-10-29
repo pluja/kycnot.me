@@ -21,7 +21,13 @@ import type { ServiceDetail } from '../../lib/serviceDetail'
 type Props = {
   service: Pick<
     ServiceDetail,
-    'legalRevisions' | 'tosChangedAt' | 'tosReview' | 'tosReviewAt' | 'tosUrls' | 'verificationStatus'
+    | 'legalDocuments'
+    | 'legalRevisions'
+    | 'tosChangedAt'
+    | 'tosReview'
+    | 'tosReviewAt'
+    | 'tosUrls'
+    | 'verificationStatus'
   >
   statusLabel: string
 }
@@ -29,6 +35,7 @@ type Props = {
 const { service, statusLabel } = Astro.props
 
 const isReviewable = isTosReviewable(service.verificationStatus)
+const lastCheckedAt = service.legalDocuments[0]?.checkedAt ?? null
 
 const highlights = sortBy(
   (service.tosReview?.highlights ?? []).map((highlight) => {
@@ -126,11 +133,17 @@ const highlights = sortBy(
         </details>
       )}
 
-      {/* The nightly scan sweep (CRON_SCAN_SWEEP_TASK) re-reads the documents; a review is only rewritten when they change, so an old review date is not neglect. */}
+      {/* The daily legal recheck (CRON_LEGAL_RECHECK_TASK) re-fetches the documents and the scan sweep reviews those that moved; a review is only rewritten when they change, so an old review date is not neglect. */}
       <TosSourceLinks urls={service.tosUrls} class="mt-5 justify-start text-left text-day-400" />
       <p class="mt-1 text-xs text-day-500">
-        Reviewed <TimeFormatted date={service.tosReviewAt} hourPrecision prefix={false} />. Checked daily,
-        reviewed on changes.
+        Reviewed <TimeFormatted date={service.tosReviewAt} hourPrecision prefix={false} />.
+        {lastCheckedAt !== null && (
+          <>
+            {' '}
+            Documents last fetched <TimeFormatted date={lastCheckedAt} hourPrecision prefix={false} />.
+          </>
+        )}{' '}
+        Reviewed again when they change.
         {service.legalRevisions.length > 0 && service.tosChangedAt !== null && (
           <>
             {' '}
