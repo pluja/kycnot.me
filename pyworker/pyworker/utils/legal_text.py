@@ -82,6 +82,33 @@ _DATE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# A clock reading next to a date is a render timestamp ("Server Time: 30 October
+# 2026 10:08:39 (GMT+0100)"). A time on its own is left alone: support hours and
+# processing windows are real terms.
+_TIME_AFTER_DATE_RE = re.compile(
+    r"(<date>),?\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s?[AP]M)?(?:\s?\((?:GMT|UTC)[+-]?\d*(?::?\d{2})?\))?",
+    re.IGNORECASE,
+)
+# Live widgets: relative timestamps, presence counters and exchange-rate tickers
+# change on every fetch and say nothing about the terms.
+_RELATIVE_TIME_RE = re.compile(
+    r"\b(just now|(an?|\d+)\s+(second|minute|hour)s?\s+ago)\b", re.IGNORECASE
+)
+_PRESENCE_COUNT_RE = re.compile(
+    r"\b\d+\s+(online|users? online|visitors?)\b", re.IGNORECASE
+)
+_RATE_TICKER_RE = re.compile(r"^\W*1\s+[A-Z]{2,6}\s*=\s*[$€£]\s*[\d,]+(\.\d+)?")
+# Ad and analytics beacons render as images, and their address carries the
+# session, so the same page never reads the same twice.
+_TRACKING_PIXEL_RE = re.compile(
+    r"!\[[^\]]*\]\(https?://[^)\s]*(?:/adsct|facebook\.com/tr\b|doubleclick\.net|bat\.bing\.com|px\.ads\.linkedin\.com)[^)]*\)",
+    re.IGNORECASE,
+)
+# Jina Reader prefixes its own envelope, which the primary crawler never emits.
+_READER_ENVELOPE_RE = re.compile(
+    r"^(Title|URL Source|Published Time|Markdown Content):(\s|$)"
+)
+
 # Tracking and session parameters on links churn without the target changing.
 _LINK_TARGET_RE = re.compile(r"\]\(([^)\s]+)(\s+\"[^\"]*\")?\)")
 
@@ -202,7 +229,13 @@ def normalize_legal_markdown(markdown: str) -> str:
 
     lines: List[str] = []
     for raw_line in text.splitlines():
-        line = _DATE_RE.sub(_DATE_PLACEHOLDER, raw_line)
+        if _READER_ENVELOPE_RE.match(raw_line) or _RATE_TICKER_RE.match(raw_line):
+            continue
+        line = _TRACKING_PIXEL_RE.sub("", raw_line)
+        line = _DATE_RE.sub(_DATE_PLACEHOLDER, line)
+        line = _TIME_AFTER_DATE_RE.sub(r"\1", line)
+        line = _RELATIVE_TIME_RE.sub("<ago>", line)
+        line = _PRESENCE_COUNT_RE.sub(r"<n> \1", line)
         # A bare year is substantive in a clause ("opened before 2026") but is
         # just the publication year next to a copyright mark, where it would
         # otherwise move the hash once a year.

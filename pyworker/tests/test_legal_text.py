@@ -82,6 +82,56 @@ class TestNormalizeLegalMarkdown(unittest.TestCase):
         self.assertEqual(normalize_legal_markdown("We​ may ｋyc"), "We may kyc")
 
 
+class TestRenderNoise(unittest.TestCase):
+    """Per-fetch widgets must not read as edits, and real terms must survive."""
+
+    BODY = "We may freeze funds pending a review of the transfer."
+
+    def _same(self, before: str, after: str) -> None:
+        self.assertEqual(
+            normalize_legal_markdown(f"{self.BODY}\n{before}"),
+            normalize_legal_markdown(f"{self.BODY}\n{after}"),
+        )
+
+    def test_render_timestamps_after_a_date_are_ignored(self):
+        self._same(
+            "Server Time: 30 October 2026 10:08:39 (GMT+0100)",
+            "Server Time: 30 October 2026 10:08:47 (GMT+0100)",
+        )
+        self._same("30.10.2026, 09:43:14 AM", "30.10.2026, 09:43:24 AM")
+
+    def test_a_time_on_its_own_is_still_a_term(self):
+        self.assertNotEqual(
+            normalize_legal_markdown("Support answers 15:00-00:00 UTC on weekdays."),
+            normalize_legal_markdown("Support answers 09:00-17:00 UTC on weekdays."),
+        )
+
+    def test_live_widgets_are_ignored(self):
+        self._same("Trollbox (18 online) Open", "Trollbox (17 online) Open")
+        self._same("Maxime: hello. Just now", "Maxime: hello. A minute ago")
+        self._same(
+            "[1 BTC = $77,978.25](https://x.example)",
+            "[1 BTC = $77,979.01](https://x.example)",
+        )
+
+    def test_a_stated_conversion_without_a_currency_sign_is_kept(self):
+        self.assertNotEqual(
+            normalize_legal_markdown("1 BTC = 100000000 satoshi"),
+            normalize_legal_markdown("1 BTC = 10000000 satoshi"),
+        )
+
+    def test_tracking_pixels_are_ignored(self):
+        self._same(
+            "![](https://t.co/1/i/adsct?bci=4&tw_document_href=a)",
+            "![](https://t.co/1/i/adsct?bci=9&tw_document_href=b)",
+        )
+
+    def test_reader_envelope_is_ignored(self):
+        self._same(
+            "Title: Terms\nURL Source: https://x.example/tos\nMarkdown Content:", ""
+        )
+
+
 class TestLegalContentHash(unittest.TestCase):
     """The hash must be stable across cosmetic republishes."""
 
