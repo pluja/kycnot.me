@@ -11,6 +11,7 @@ Run these commands from `web/`:
 | `nvm install`             | Installs and uses the correct version of node                       |
 | `npm install`             | Installs dependencies                                               |
 | `npm run patch-deps`      | Applies the fixes in `patches/` to dependencies, after each install |
+| `npm run setup-hooks`     | Runs the commit checks before every commit (once per clone)         |
 | `npm run dev`             | Starts local dev server at `localhost:4321`                         |
 | `npm run build`           | Build your production site to `./dist/`                             |
 | `npm run preview`         | Preview your build locally, before deploying                        |

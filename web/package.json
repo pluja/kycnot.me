@@ -3,6 +3,7 @@
   "type": "module",
   "version": "0.0.1",
   "scripts": {
+    "setup-hooks": "git config core.hooksPath .githooks",
     "dev": "astro dev",
     "build": "npm run db-gen && npm run build:astro && npm run build:server-init",
     "build:astro": "astro build --remote",

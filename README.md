@@ -28,6 +28,7 @@ cd web
 nvm install
 npm i
 npm run patch-deps
+npm run setup-hooks # runs the commit checks before every commit
 cp -n .env.example .env
 npm run db-reset
 ```
