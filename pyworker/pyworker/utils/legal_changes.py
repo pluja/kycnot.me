@@ -65,7 +65,7 @@ def recheck_service_documents(
     if any(_has_moved(stored.get(page.url_key), page) for page in corpus.pages):
         time.sleep(CONFIRMATION_PAUSE_SECONDS)
         second = fetch_legal_corpus(tos_urls, known_urls=known_urls)
-        corpus = _keep_confirmed_pages(corpus, second, stored)
+        corpus = _keep_confirmed_pages(service_id, corpus, second, stored)
     record_document_changes(service_id, corpus, service_name)
 
 
@@ -77,7 +77,7 @@ def _has_moved(previous: Optional[Dict[str, Any]], page: Any) -> bool:
 
 
 def _keep_confirmed_pages(
-    first: LegalCorpus, second: LegalCorpus, stored: Dict[str, Any]
+    service_id: int, first: LegalCorpus, second: LegalCorpus, stored: Dict[str, Any]
 ) -> LegalCorpus:
     """Keep a moved page only if the second fetch read it the same way.
 
@@ -101,7 +101,9 @@ def _keep_confirmed_pages(
                 content_hash=legal_content_hash(text),
             )
         )
-        logger.info(f"Unconfirmed difference ignored: {page.url}")
+        logger.info(
+            f"Unconfirmed difference ignored for service {service_id}: {page.url}"
+        )
     return replace(first, pages=pages)
 
 
