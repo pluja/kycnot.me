@@ -6,6 +6,8 @@ stays pure in legal_text.py; nothing in that module touches the database.
 """
 
 import logging
+import time
+from dataclasses import replace
 from typing import Any, Dict, Optional
 
 from pyworker.database import (
@@ -22,9 +24,12 @@ from pyworker.utils.legal_text import (
     LegalChangeLevel,
     diff_legal_text,
     is_usable_legal_page,
+    legal_content_hash,
 )
 
 logger = logging.getLogger(__name__)
+
+CONFIRMATION_PAUSE_SECONDS = 2.0
 
 
 def tracked_document_urls(service_id: int) -> list[str]:
@@ -48,9 +53,56 @@ def recheck_service_documents(
 
     Moving a document advances the service's tosChangedAt, which is what makes
     the scan sweep pick the service up. The review itself is not rerun here.
+
+    A page that differs from what is stored is fetched once more before it
+    counts. Tickers, rotating lists and consent banners differ on every fetch,
+    so a difference that does not repeat is noise, and each one accepted would
+    cost a model scan.
     """
-    corpus = fetch_legal_corpus(tos_urls, known_urls=tracked_document_urls(service_id))
+    known_urls = tracked_document_urls(service_id)
+    corpus = fetch_legal_corpus(tos_urls, known_urls=known_urls)
+    stored = get_legal_documents(service_id)
+    if any(_has_moved(stored.get(page.url_key), page) for page in corpus.pages):
+        time.sleep(CONFIRMATION_PAUSE_SECONDS)
+        second = fetch_legal_corpus(tos_urls, known_urls=known_urls)
+        corpus = _keep_confirmed_pages(corpus, second, stored)
     record_document_changes(service_id, corpus, service_name)
+
+
+def _has_moved(previous: Optional[Dict[str, Any]], page: Any) -> bool:
+    if previous is None or not is_usable_legal_page(page.normalized_text):
+        return False
+    diff = diff_legal_text(previous["normalizedText"], page.normalized_text)
+    return diff.level is not LegalChangeLevel.NONE
+
+
+def _keep_confirmed_pages(
+    first: LegalCorpus, second: LegalCorpus, stored: Dict[str, Any]
+) -> LegalCorpus:
+    """Keep a moved page only if the second fetch read it the same way.
+
+    An unconfirmed page is replaced by its stored text, so it is still counted
+    as checked without being recorded as changed.
+    """
+    second_hashes = {page.url_key: page.content_hash for page in second.pages}
+    pages = []
+    for page in first.pages:
+        previous = stored.get(page.url_key)
+        confirmed = second_hashes.get(page.url_key) == page.content_hash
+        if confirmed or not _has_moved(previous, page):
+            pages.append(page)
+            continue
+        text = previous["normalizedText"]
+        pages.append(
+            replace(
+                page,
+                markdown=text,
+                normalized_text=text,
+                content_hash=legal_content_hash(text),
+            )
+        )
+        logger.info(f"Unconfirmed difference ignored: {page.url}")
+    return replace(first, pages=pages)
 
 
 def record_document_changes(

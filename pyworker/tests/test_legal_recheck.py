@@ -45,6 +45,11 @@ def _stored(text: str, **extra: object) -> dict[str, dict[str, object]]:
 
 
 class TestRecheckService(unittest.TestCase):
+    def setUp(self):
+        patcher = patch("pyworker.utils.legal_changes.time.sleep")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     @patch("pyworker.utils.legal_changes.create_legal_revision")
     @patch("pyworker.utils.legal_changes.upsert_legal_document", return_value=7)
     @patch("pyworker.utils.legal_changes.get_legal_documents")
@@ -67,11 +72,57 @@ class TestRecheckService(unittest.TestCase):
         ):
             recheck_service_documents(1, ["https://x.com/terms"], "X")
 
-        mock_fetch.assert_called_once_with(
+        self.assertEqual(mock_fetch.call_count, 2)
+        mock_fetch.assert_called_with(
             ["https://x.com/terms"], known_urls=["https://x.com/terms"]
         )
         self.assertTrue(mock_upsert.call_args.kwargs["changed"])
         mock_revision.assert_called_once()
+
+    @patch("pyworker.utils.legal_changes.create_legal_revision")
+    @patch("pyworker.utils.legal_changes.upsert_legal_document", return_value=7)
+    @patch("pyworker.utils.legal_changes.get_legal_documents")
+    @patch("pyworker.utils.legal_changes.fetch_legal_corpus")
+    def test_a_difference_the_second_fetch_does_not_repeat_is_noise(
+        self,
+        mock_fetch: MagicMock,
+        mock_docs: MagicMock,
+        mock_upsert: MagicMock,
+        mock_revision: MagicMock,
+    ):
+        mock_docs.return_value = _stored("Withdrawals are instant.")
+        mock_fetch.side_effect = [
+            _corpus(
+                "Withdrawals are instant. Rotating banner: offer A and more words."
+            ),
+            _corpus(
+                "Withdrawals are instant. Rotating banner: offer B and more words."
+            ),
+        ]
+
+        recheck_service_documents(1, ["https://x.com/terms"], "X")
+
+        self.assertFalse(mock_upsert.call_args.kwargs["changed"])
+        mock_revision.assert_not_called()
+
+    @patch("pyworker.utils.legal_changes.create_legal_revision")
+    @patch("pyworker.utils.legal_changes.upsert_legal_document", return_value=7)
+    @patch("pyworker.utils.legal_changes.get_legal_documents")
+    @patch("pyworker.utils.legal_changes.fetch_legal_corpus")
+    def test_an_unchanged_page_is_fetched_once(
+        self,
+        mock_fetch: MagicMock,
+        mock_docs: MagicMock,
+        mock_upsert: MagicMock,
+        mock_revision: MagicMock,
+    ):
+        mock_docs.return_value = _stored("Withdrawals are instant.")
+        mock_fetch.return_value = _corpus("Withdrawals are instant.")
+
+        recheck_service_documents(1, ["https://x.com/terms"], "X")
+
+        mock_fetch.assert_called_once()
+        mock_revision.assert_not_called()
 
     @patch("pyworker.utils.legal_changes.create_legal_revision")
     @patch("pyworker.utils.legal_changes.upsert_legal_document", return_value=7)
