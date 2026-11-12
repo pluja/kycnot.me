@@ -25,6 +25,7 @@ from pyworker.utils.legal_text import (
     diff_legal_text,
     is_usable_legal_page,
     legal_content_hash,
+    normalize_legal_markdown,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,10 +63,16 @@ def recheck_service_documents(
     known_urls = tracked_document_urls(service_id)
     corpus = fetch_legal_corpus(tos_urls, known_urls=known_urls)
     stored = get_legal_documents(service_id)
-    if any(_has_moved(stored.get(page.url_key), page) for page in corpus.pages):
+    moved = any(_has_moved(stored.get(page.url_key), page) for page in corpus.pages)
+    newly_gone = any(
+        corpus.is_gone(url_key) and not document.get("removedAt")
+        for url_key, document in stored.items()
+    )
+    if moved or newly_gone:
         time.sleep(CONFIRMATION_PAUSE_SECONDS)
         second = fetch_legal_corpus(tos_urls, known_urls=known_urls)
         corpus = _keep_confirmed_pages(service_id, corpus, second, stored)
+        corpus = _keep_confirmed_removals(service_id, corpus, second)
     record_document_changes(service_id, corpus, service_name)
 
 
@@ -84,12 +91,13 @@ def _keep_confirmed_pages(
     An unconfirmed page is replaced by its stored text, so it is still counted
     as checked without being recorded as changed.
     """
-    second_hashes = {page.url_key: page.content_hash for page in second.pages}
+    second_pages = {page.url_key: page for page in second.pages}
     pages = []
     for page in first.pages:
         previous = stored.get(page.url_key)
-        confirmed = second_hashes.get(page.url_key) == page.content_hash
-        if confirmed or not _has_moved(previous, page):
+        if not _has_moved(previous, page) or _repeats_the_change(
+            previous["normalizedText"], page, second_pages.get(page.url_key)
+        ):
             pages.append(page)
             continue
         text = previous["normalizedText"]
@@ -101,10 +109,51 @@ def _keep_confirmed_pages(
                 content_hash=legal_content_hash(text),
             )
         )
-        logger.info(
+        logger.warning(
             f"Unconfirmed difference ignored for service {service_id}: {page.url}"
         )
     return replace(first, pages=pages)
+
+
+def _repeats_the_change(stored_text: str, first: Any, second: Optional[Any]) -> bool:
+    """Whether the second fetch shows the change the first one found.
+
+    Equal hashes are not required, or noise that normalization misses would keep
+    a real edit unconfirmed forever. A line both fetches added is the edit; a
+    rotating banner adds a different line each time. Lines both fetches dropped
+    prove nothing on their own, since a rotated banner drops the stored one, so a
+    pure deletion has to read the same way twice.
+    """
+    if second is None or not is_usable_legal_page(second.normalized_text):
+        return False
+    if second.content_hash == first.content_hash:
+        return True
+    before = set(normalize_legal_markdown(stored_text).splitlines())
+    first_lines = set(first.normalized_text.splitlines())
+    second_lines = set(second.normalized_text.splitlines())
+    first_added, second_added = first_lines - before, second_lines - before
+    if first_added & second_added:
+        return True
+    first_removed, second_removed = before - first_lines, before - second_lines
+    return not first_added and not second_added and first_removed == second_removed
+
+
+def _keep_confirmed_removals(
+    service_id: int, first: LegalCorpus, second: LegalCorpus
+) -> LegalCorpus:
+    """Keep a page as gone only if the second fetch found it gone too.
+
+    A removal is published, so one stray 404 must not announce it. An
+    unconfirmed one drops its status and the page counts as unreachable.
+    """
+    statuses = dict(first.statuses)
+    for url_key in list(statuses):
+        if first.is_gone(url_key) and not second.is_gone(url_key):
+            del statuses[url_key]
+            logger.warning(
+                f"Unconfirmed removal ignored for service {service_id}: {url_key}"
+            )
+    return replace(first, statuses=statuses)
 
 
 def record_document_changes(

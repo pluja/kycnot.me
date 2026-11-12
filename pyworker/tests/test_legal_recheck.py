@@ -32,6 +32,12 @@ def _corpus(text: str) -> LegalCorpus:
     return LegalCorpus(pages=[page], combined=text, corpus_hash=page.content_hash)
 
 
+def _gone() -> LegalCorpus:
+    return LegalCorpus(
+        pages=[], combined="", corpus_hash="", statuses={"x.com/terms": 404}
+    )
+
+
 def _stored(text: str, **extra: object) -> dict[str, dict[str, object]]:
     return {
         "x.com/terms": {
@@ -144,6 +150,76 @@ class TestRecheckService(unittest.TestCase):
 
         self.assertFalse(mock_upsert.call_args.kwargs["changed"])
         mock_revision.assert_not_called()
+
+    @patch("pyworker.utils.legal_changes.create_legal_revision")
+    @patch("pyworker.utils.legal_changes.upsert_legal_document", return_value=7)
+    @patch("pyworker.utils.legal_changes.get_legal_documents")
+    @patch("pyworker.utils.legal_changes.fetch_legal_corpus")
+    def test_an_edit_repeated_under_rotating_noise_is_confirmed(
+        self,
+        mock_fetch: MagicMock,
+        mock_docs: MagicMock,
+        mock_upsert: MagicMock,
+        mock_revision: MagicMock,
+    ):
+        mock_docs.return_value = _stored("Withdrawals are instant.")
+        edit = (
+            "Withdrawals are instant.\nWe may freeze funds pending an identity check."
+        )
+        mock_fetch.side_effect = [
+            _corpus(f"{edit}\nRotating banner: offer A and more words."),
+            _corpus(f"{edit}\nRotating banner: offer B and more words."),
+        ]
+
+        with patch(
+            "pyworker.utils.legal_changes.prompt_legal_change_summary",
+            return_value="Adds an identity check.",
+        ):
+            recheck_service_documents(1, ["https://x.com/terms"], "X")
+
+        self.assertTrue(mock_upsert.call_args.kwargs["changed"])
+        mock_revision.assert_called_once()
+
+    @patch("pyworker.utils.legal_changes.mark_legal_document_unreachable")
+    @patch("pyworker.utils.legal_changes.mark_legal_document_removed")
+    @patch("pyworker.utils.legal_changes.create_legal_revision")
+    @patch("pyworker.utils.legal_changes.get_legal_documents")
+    @patch("pyworker.utils.legal_changes.fetch_legal_corpus")
+    def test_a_single_not_found_is_not_published_as_a_removal(
+        self,
+        mock_fetch: MagicMock,
+        mock_docs: MagicMock,
+        mock_revision: MagicMock,
+        mock_removed: MagicMock,
+        mock_unreachable: MagicMock,
+    ):
+        mock_docs.return_value = _stored("Withdrawals are instant.")
+        mock_fetch.side_effect = [_gone(), _corpus("Withdrawals are instant.")]
+
+        recheck_service_documents(1, ["https://x.com/terms"], "X")
+
+        self.assertEqual(mock_fetch.call_count, 2)
+        mock_removed.assert_not_called()
+        mock_revision.assert_not_called()
+        mock_unreachable.assert_called_once_with(7)
+
+    @patch("pyworker.utils.legal_changes.mark_legal_document_removed")
+    @patch("pyworker.utils.legal_changes.create_legal_revision")
+    @patch("pyworker.utils.legal_changes.get_legal_documents")
+    @patch("pyworker.utils.legal_changes.fetch_legal_corpus")
+    def test_a_not_found_seen_twice_is_a_removal(
+        self,
+        mock_fetch: MagicMock,
+        mock_docs: MagicMock,
+        mock_revision: MagicMock,
+        mock_removed: MagicMock,
+    ):
+        mock_docs.return_value = _stored("Withdrawals are instant.")
+        mock_fetch.side_effect = [_gone(), _gone()]
+
+        recheck_service_documents(1, ["https://x.com/terms"], "X")
+
+        mock_removed.assert_called_once_with(7)
 
 
 class TestRecheckWorkerLoop(unittest.TestCase):

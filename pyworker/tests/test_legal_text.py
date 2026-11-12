@@ -127,9 +127,17 @@ class TestRenderNoise(unittest.TestCase):
         )
 
     def test_reader_envelope_is_ignored(self):
-        self._same(
-            "Title: Terms\nURL Source: https://x.example/tos\nMarkdown Content:", ""
+        envelope = (
+            "Title: Terms\n\nURL Source: https://x.example/tos\n\nMarkdown Content:"
         )
+        self.assertEqual(
+            normalize_legal_markdown(f"{envelope}\n{self.BODY}"),
+            normalize_legal_markdown(self.BODY),
+        )
+
+    def test_a_title_line_inside_the_document_is_kept(self):
+        text = "Terms of service\nTitle: Governing Law\nThe laws of Panama apply."
+        self.assertIn("Title: Governing Law", normalize_legal_markdown(text))
 
 
 class TestLegalContentHash(unittest.TestCase):

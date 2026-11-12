@@ -514,22 +514,21 @@ _SCANNABLE_SERVICE_CONDITIONS = """
 
 
 def fetch_services_with_legal_documents() -> List[Dict[str, Any]]:
-    """Every service the scan sweep can cover, for the daily document recheck."""
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor(row_factory=dict_row) as cursor:
-                cursor.execute(
-                    f"""
-                    SELECT s.id, s.name, s."tosUrls"
-                    FROM "Service" s
-                    WHERE {_SCANNABLE_SERVICE_CONDITIONS}
-                    ORDER BY s.id
-                    """
-                )
-                return list(cursor.fetchall())
-    except Exception as e:
-        logger.error(f"Error selecting services for the legal recheck: {e}")
-        return []
+    """Every service the scan sweep can cover, for the daily document recheck.
+
+    Raises on a database error, so a failed run is not logged as an empty one.
+    """
+    with get_db_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                f"""
+                SELECT s.id, s.name, s."tosUrls"
+                FROM "Service" s
+                WHERE {_SCANNABLE_SERVICE_CONDITIONS}
+                ORDER BY s.id
+                """
+            )
+            return list(cursor.fetchall())
 
 
 def fetch_services_needing_scan(limit: int) -> List[Dict[str, Any]]:

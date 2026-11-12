@@ -105,6 +105,7 @@ _TRACKING_PIXEL_RE = re.compile(
     re.IGNORECASE,
 )
 # Jina Reader prefixes its own envelope, which the primary crawler never emits.
+# Only the leading block is the envelope; a "Title:" line further down is text.
 _READER_ENVELOPE_RE = re.compile(
     r"^(Title|URL Source|Published Time|Markdown Content):(\s|$)"
 )
@@ -228,8 +229,14 @@ def normalize_legal_markdown(markdown: str) -> str:
     text = _LINK_TARGET_RE.sub(lambda m: f"]({_strip_url_noise(m.group(1))})", text)
 
     lines: List[str] = []
+    in_reader_envelope = True
     for raw_line in text.splitlines():
-        if _READER_ENVELOPE_RE.match(raw_line) or _RATE_TICKER_RE.match(raw_line):
+        if in_reader_envelope:
+            if _READER_ENVELOPE_RE.match(raw_line):
+                in_reader_envelope = not raw_line.startswith("Markdown Content:")
+                continue
+            in_reader_envelope = not raw_line.strip()
+        if _RATE_TICKER_RE.match(raw_line):
             continue
         line = _TRACKING_PIXEL_RE.sub("", raw_line)
         line = _DATE_RE.sub(_DATE_PLACEHOLDER, line)
