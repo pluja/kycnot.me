@@ -440,6 +440,8 @@ enum IncidentOutcome {
   PARTIAL
   FUNDS_LOST
   UNKNOWN
+  /// Fixed, and no user funds were lost: a patched vulnerability, or attacks that cost only the service.
+  NO_USER_LOSS
 }
 
 enum ServiceUserRole {

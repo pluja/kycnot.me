@@ -1,0 +1,1 @@
+ALTER TYPE "IncidentOutcome" ADD VALUE 'NO_USER_LOSS';

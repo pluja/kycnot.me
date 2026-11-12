@@ -13,6 +13,7 @@ const RESOLUTION_STEP = {
   PARTIAL: 0.5,
   FUNDS_LOST: 0.75,
   UNKNOWN: 0.5,
+  NO_USER_LOSS: 0.2,
 } as const
 
 const MS_PER_DAY = 86_400_000

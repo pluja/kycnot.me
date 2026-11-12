@@ -183,6 +183,7 @@ BEGIN
                     ELSE
                         (CASE COALESCE(i.outcome::text, 'UNKNOWN')
                             WHEN 'FUNDS_RECOVERED' THEN 0.2
+                            WHEN 'NO_USER_LOSS' THEN 0.2
                             WHEN 'USERS_REIMBURSED' THEN 0.3
                             WHEN 'PARTIAL' THEN 0.5
                             WHEN 'FUNDS_LOST' THEN 0.75
