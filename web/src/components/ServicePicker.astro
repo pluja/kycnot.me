@@ -191,7 +191,7 @@ const SearchWrapper = searchForm ? 'div' : 'form'
       </button>
     </SearchWrapper>
 
-    <ul class="mt-2 max-h-72 overflow-y-auto overscroll-contain">
+    <ul class="mt-2 max-h-72 overflow-y-auto overscroll-contain" data-service-list>
       {
         options.map(({ service, key }) => (
           <li data-service-option data-name={key}>
@@ -268,15 +268,52 @@ const SearchWrapper = searchForm ? 'div' : 'form'
       const more = picker.querySelector<HTMLLIElement>('[data-service-more]')
       const value = picker.querySelector<HTMLInputElement>('[data-service-value]')
       const label = picker.querySelector<HTMLSpanElement>('[data-service-label]')
+      const list = picker.querySelector<HTMLUListElement>('[data-service-list]')
       if (!input) return
 
       // The list below holds the same services with icons and narrows as you
       // type, so the browser's own dropdown would only sit on top of it. Taking
       // it away here rather than never rendering it means it survives for
       // readers without scripting, and for anyone this script fails to reach.
-      // As a form field it stays: the rows cover only the busiest services, and
-      // a reload to reach the rest would throw away the form around the picker.
-      if (!value) input.removeAttribute('list')
+      input.removeAttribute('list')
+
+      // The rows cover only the busiest services. A page picker reaches the rest
+      // through a search reload, but a form field cannot reload without losing
+      // the form around it, so its rows are extended from the datalist instead.
+      const allServices = [...picker.querySelectorAll<HTMLOptionElement>('datalist option')]
+      const renderedIds = new Set(
+        [...options].map((option) => option.querySelector<HTMLAnchorElement>('a')?.dataset.id)
+      )
+      const MAX_EXTRA_ROWS = 25
+
+      const extraRow = (service: HTMLOptionElement) => {
+        const row = document.createElement('li')
+        row.dataset.serviceOption = ''
+        row.dataset.serviceExtra = ''
+        const link = document.createElement('a')
+        link.href = '#'
+        link.dataset.id = service.dataset.id ?? ''
+        link.dataset.serviceName = service.value
+        link.className =
+          'flex items-center gap-2 rounded-md px-2 py-1 text-sm text-day-200 hover:bg-night-700'
+        link.textContent = service.value
+        row.append(link)
+        return row
+      }
+
+      const showExtraRows = (needle: string) => {
+        list?.querySelectorAll('[data-service-extra]').forEach((row) => row.remove())
+        if (!value || !list || !needle) return 0
+        const closeness = (name: string) => (name === needle ? 0 : name.startsWith(needle) ? 1 : 2)
+        const extras = allServices
+          .filter(
+            (service) => !renderedIds.has(service.dataset.id) && service.value.toLowerCase().includes(needle)
+          )
+          .sort((a, b) => closeness(a.value.toLowerCase()) - closeness(b.value.toLowerCase()))
+          .slice(0, MAX_EXTRA_ROWS)
+        extras.forEach((service) => list.insertBefore(extraRow(service), empty))
+        return extras.length
+      }
 
       const narrow = () => {
         const needle = input.value.trim().toLowerCase()
@@ -286,6 +323,7 @@ const SearchWrapper = searchForm ? 'div' : 'form'
           option.hidden = !shown
           if (shown) matches += 1
         })
+        matches += showExtraRows(needle)
         if (empty) empty.hidden = matches > 0
         // The count was taken before typing, so it stops being true once the
         // list narrows, and the empty row already says how to reach the rest.
@@ -305,34 +343,25 @@ const SearchWrapper = searchForm ? 'div' : 'form'
         close()
       }
 
-      // A typed name that matches no rendered row may still be a service: the
-      // datalist holds every one. Exact first, then the only name that starts
-      // with it, so "bis" picks Bisq and "s" picks nothing.
-      const typedService = () => {
-        const needle = input.value.trim().toLowerCase()
-        if (!needle) return null
-        const names = [...picker.querySelectorAll<HTMLOptionElement>('datalist option')]
-        const exact = names.find((option) => option.value.toLowerCase() === needle)
-        const starting = names.filter((option) => option.value.toLowerCase().startsWith(needle))
-        return exact ?? (starting.length === 1 ? starting[0] : null) ?? null
-      }
-
-      // Enter picks the first service still standing. When nothing is standing
-      // the form is left alone, so the reader reaches the services further down
-      // the list than this panel renders instead of pressing a dead key. As a
-      // form field the reload would lose the form, so the name is resolved here
-      // and an unknown one is left in the field with the empty row showing.
+      // Enter picks the service named exactly, or else the first one still
+      // standing, so "bisq" picks Bisq even when Bisq Easy is listed above it.
+      // When nothing is standing the form is left alone, so the reader reaches
+      // the services further down the list than this panel renders instead of
+      // pressing a dead key. As a form field the reload would lose the form, so
+      // an unknown name is left in the field with the empty row showing.
       input.form?.addEventListener('submit', (event) => {
-        const first = picker.querySelector<HTMLAnchorElement>('[data-service-option]:not([hidden]) a')
-        if (first) {
+        const needle = input.value.trim().toLowerCase()
+        const standing = [
+          ...picker.querySelectorAll<HTMLAnchorElement>('[data-service-option]:not([hidden]) a'),
+        ]
+        const chosen =
+          standing.find((link) => link.dataset.serviceName?.toLowerCase() === needle) ?? standing[0]
+        if (chosen) {
           event.preventDefault()
-          first.click()
+          chosen.click()
           return
         }
-        if (!value) return
-        event.preventDefault()
-        const typed = typedService()
-        if (typed) pick(typed.dataset.id ?? '', typed.value, null)
+        if (value) event.preventDefault()
       })
 
       if (value && label) {
