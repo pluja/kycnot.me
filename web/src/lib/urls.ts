@@ -1,6 +1,8 @@
 import { SITE_URL } from 'astro:env/client'
 import { escapeRegExp } from 'lodash-es'
 
+import { resolveSitePath } from './sitePath'
+
 /**
  * Canonical site origin derived from the SITE_URL env variable.
  * Use instead of `Astro.url.origin` / `context.url.origin` which resolve to
@@ -31,7 +33,7 @@ export function browserOriginForUrl(url: URL): string {
 }
 
 export function absoluteSiteUrl(path: string): string {
-  return new URL(path, siteOrigin).href
+  return resolveSitePath(path, siteOrigin)
 }
 
 export const createPageUrl = (
