@@ -69,6 +69,20 @@ _NAME_GONE_ERRORS = {
     socket.EAI_NONAME,
     getattr(socket, "EAI_NODATA", socket.EAI_NONAME),
 }
+# EAI_AGAIN is also what a domain whose own name servers stopped answering gives (common once a domain is abandoned).
+# It only counts against the site when this name still resolves, which shows our resolver is fine.
+RESOLVER_PROBE_HOST = "example.com"
+
+
+def _resolver_works() -> bool:
+    try:
+        return bool(
+            socket.getaddrinfo(RESOLVER_PROBE_HOST, None, type=socket.SOCK_STREAM)
+        )
+    except socket.gaierror:
+        return False
+
+
 _CONNECTION_FAILURES = (
     urllib3.exceptions.NewConnectionError,
     urllib3.exceptions.ConnectTimeoutError,
@@ -102,7 +116,11 @@ def _check(url: str) -> Optional[bool]:
                 )
             ]
         except socket.gaierror as error:
-            return True if error.errno in _NAME_GONE_ERRORS else None
+            if error.errno in _NAME_GONE_ERRORS:
+                return True
+            return (
+                True if error.errno == socket.EAI_AGAIN and _resolver_works() else None
+            )
         if not addresses or not all(
             ipaddress.ip_address(a).is_global for a in addresses
         ):

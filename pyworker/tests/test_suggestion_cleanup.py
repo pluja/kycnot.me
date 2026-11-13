@@ -61,6 +61,16 @@ def test_only_a_name_that_no_longer_exists_is_down():
         assert cleanup.site_is_down("https://fine.test") is None
 
 
+def test_a_name_whose_own_servers_fail_is_down_when_our_resolver_works():
+    def resolve(host, *_args, **_kwargs):
+        if host == cleanup.RESOLVER_PROBE_HOST:
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.215.14", 0))]
+        raise socket.gaierror(socket.EAI_AGAIN, "temporary failure")
+
+    with patch.object(cleanup.socket, "getaddrinfo", side_effect=resolve):
+        assert cleanup.site_is_down("https://abandoned.test") is True
+
+
 def test_private_addresses_are_never_requested():
     for address in ("127.0.0.1", "10.0.0.5", "169.254.169.254", "100.64.0.1", "::1"):
         with _resolves_to(address), patch.object(cleanup, "fetch_status") as fetch:
