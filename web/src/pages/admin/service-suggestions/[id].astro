@@ -10,6 +10,7 @@ import BadgeSmall from '../../../components/BadgeSmall.astro'
 import Button from '../../../components/Button.astro'
 import Chat from '../../../components/Chat.astro'
 import InputSelect from '../../../components/InputSelect.astro'
+import InternalServiceNotes from '../../../components/InternalServiceNotes.astro'
 import ServiceCard from '../../../components/ServiceCard.astro'
 import FieldEditsReview from '../../../components/serviceSuggestions/FieldEditsReview.astro'
 import UserBadge from '../../../components/UserBadge.astro'
@@ -54,6 +55,9 @@ Astro.locals.banners.addIfSuccess(applyFieldEditsResult, 'Changes applied')
 
 const deepScanDismissResult = Astro.getActionResult(actions.admin.service.deepScan.dismiss)
 Astro.locals.banners.addIfSuccess(deepScanDismissResult, 'Proposed edits dismissed')
+
+const internalNoteAddResult = Astro.getActionResult(actions.admin.service.internalNote.add)
+Astro.locals.banners.addIfSuccess(internalNoteAddResult, 'Internal note added')
 
 const { id: serviceSuggestionIdRaw } = Astro.params
 const serviceSuggestionId = parseIntWithFallback(serviceSuggestionIdRaw)
@@ -104,6 +108,15 @@ const serviceSuggestion = await Astro.locals.banners.try('Error fetching service
           imageUrl: true,
           verificationStatus: true,
           serviceVisibility: true,
+          internalNotes: {
+            select: {
+              id: true,
+              content: true,
+              createdAt: true,
+              addedByUser: { select: { name: true, displayName: true, picture: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+          },
           categories: {
             select: {
               id: true,
@@ -283,6 +296,22 @@ const typeInfo = getServiceSuggestionTypeInfo(serviceSuggestion.type)
         )
       }
     </div>
+
+    <section class="mt-6">
+      <h2 class="mb-2 flex items-center gap-2 font-title text-sm font-bold text-day-200">
+        Internal notes on the service ({serviceSuggestion.service.internalNotes.length})
+        <a
+          href={`/admin/services/${serviceSuggestion.service.slug}/edit#internal-notes`}
+          class="ms-auto text-xs font-normal text-day-400 hover:text-day-200">Manage</a
+        >
+      </h2>
+      <InternalServiceNotes
+        serviceId={serviceSuggestion.service.id}
+        notes={serviceSuggestion.service.internalNotes}
+        canAdd={Astro.locals.userCan('services:edit')}
+        sourceSuggestionId={serviceSuggestion.id}
+      />
+    </section>
 
     <div class="mt-6">
       <AuditLogTimeline entries={auditEntries} title="Moderation history" />

@@ -460,6 +460,7 @@ export const adminServiceActions = {
       input: z.object({
         serviceId: z.number().int().positive(),
         content: z.string().min(1),
+        sourceSuggestionId: z.number().int().positive().optional(),
       }),
       handler: async (input, { locals }) => {
         const service = await prisma.service.findUnique({
@@ -475,7 +476,9 @@ export const adminServiceActions = {
 
         await prisma.internalServiceNote.create({
           data: {
-            content: input.content,
+            content: input.sourceSuggestionId
+              ? `**Suggestion #${String(input.sourceSuggestionId)}:** ${input.content}`
+              : input.content,
             serviceId: input.serviceId,
             addedByUserId: locals.user.id,
           },

@@ -13,8 +13,7 @@ import CommentSection from '../../components/CommentSection.astro'
 import DropdownButton from '../../components/DropdownButton.astro'
 import DropdownButtonItemForm from '../../components/DropdownButtonItemForm.astro'
 import DropdownButtonItemLink from '../../components/DropdownButtonItemLink.astro'
-import InputSubmitButton from '../../components/InputSubmitButton.astro'
-import InputTextArea from '../../components/InputTextArea.astro'
+import InternalServiceNotes from '../../components/InternalServiceNotes.astro'
 import Markdown from '../../components/Markdown.astro'
 import MyPicture from '../../components/MyPicture.astro'
 import ScoreSquare from '../../components/ScoreSquare.astro'
@@ -30,7 +29,6 @@ import ServiceLinkButton from '../../components/ServiceLinkButton.astro'
 import SwapCTA from '../../components/swap/SwapCTA.astro'
 import TimeFormatted from '../../components/TimeFormatted.astro'
 import Tooltip from '../../components/Tooltip.astro'
-import UserBadge from '../../components/UserBadge.astro'
 import { getAttributeCategoryInfo } from '../../constants/attributeCategories'
 import { baseScoreType, getAttributeTypeInfo } from '../../constants/attributeTypes'
 import { formatContactMethod } from '../../constants/contactMethods'
@@ -363,6 +361,7 @@ const ogImageTemplateData = {
 } satisfies OgImagePublicTemplateWithProps
 
 const serviceVisibilityInfo = getServiceVisibilityInfo(service.serviceVisibility)
+const latestInternalNote = service.internalNotes[0]
 
 const activeAlertOrWarningEvents = service.events
   .map((event) => ({ ...event, display: getEventDisplay(event, now) }))
@@ -1073,52 +1072,37 @@ const showsSingleThread = Astro.url.searchParams.has('comment')
   </div>
 
   <AdminOnly>
-    <SectionHeading
-      title="Internal Notes"
-      links={[{ href: `/admin/services/${service.slug}/edit#internal-notes`, text: 'Manage' }]}
-    />
-
-    {
-      service.internalNotes.length === 0 ? (
-        <p class="mt-2 text-center text-xs text-day-400">No internal notes yet.</p>
-      ) : (
-        <div
-          class={cn(
-            'grid grid-cols-1 items-start gap-2',
-            service.internalNotes.length > 1 && 'sm:grid-cols-2'
-          )}
+    <details class="group/notes mt-6 rounded-lg border border-dashed border-red-500/50 bg-red-950/20">
+      <summary
+        class="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm text-day-300 [&::-webkit-details-marker]:hidden"
+      >
+        <Icon
+          name="ri:arrow-right-s-line"
+          class="size-4 shrink-0 text-day-500 transition-transform group-open/notes:rotate-90"
+        />
+        <span
+          class="inline-flex shrink-0 items-center gap-1 rounded-sm bg-red-500/15 px-1.5 py-0.5 text-2xs font-bold tracking-wide text-red-300 uppercase"
         >
-          {service.internalNotes.map((note) => (
-            <div class="rounded-lg border border-night-600 bg-night-800 p-3">
-              <div class="prose prose-sm max-w-none text-pretty text-day-200 prose-invert">
-                <Markdown content={note.content} />
-              </div>
-
-              <div class="mt-2 flex items-center gap-1 text-xs text-day-500">
-                <TimeFormatted date={note.createdAt} hourPrecision />
-                {note.addedByUser && (
-                  <span class="flex items-center gap-1">
-                    by <UserBadge user={note.addedByUser} size="sm" />
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )
-    }
-
-    <form
-      method="POST"
-      action={actions.admin.service.internalNote.add}
-      data-note-edit-form
-      class="mt-4 space-y-4"
-    >
-      <input type="hidden" name="serviceId" value={service.id} />
-
-      <InputTextArea label="Add a note" name="content" />
-      <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
-    </form>
+          <Icon name="ri:shield-user-line" class="size-3" />
+          Admin
+        </span>
+        <span class="font-title font-bold text-day-200">Internal notes ({service.internalNotes.length})</span>
+        {
+          latestInternalNote && (
+            <span class="min-w-0 flex-1 truncate text-xs text-day-500">
+              latest <TimeFormatted date={latestInternalNote.createdAt} hourPrecision />
+            </span>
+          )
+        }
+        <a
+          href={`/admin/services/${service.slug}/edit#internal-notes`}
+          class="ms-auto shrink-0 text-xs text-day-400 hover:text-day-200">Manage</a
+        >
+      </summary>
+      <div class="border-t border-dashed border-red-500/30 p-3">
+        <InternalServiceNotes serviceId={service.id} notes={service.internalNotes} canAdd />
+      </div>
+    </details>
   </AdminOnly>
 
   <section id="scores" class="mt-8">

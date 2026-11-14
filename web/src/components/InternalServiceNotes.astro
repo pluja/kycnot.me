@@ -1,0 +1,89 @@
+---
+import { actions } from 'astro:actions'
+
+import InputSubmitButton from './InputSubmitButton.astro'
+import InputTextArea from './InputTextArea.astro'
+import Markdown from './Markdown.astro'
+import TimeFormatted from './TimeFormatted.astro'
+import UserBadge from './UserBadge.astro'
+
+import type { Prisma } from '@prisma/client'
+
+type Props = {
+  serviceId: number
+  notes: Prisma.InternalServiceNoteGetPayload<{
+    select: {
+      id: true
+      content: true
+      createdAt: true
+      addedByUser: { select: { name: true; displayName: true; picture: true } }
+    }
+  }>[]
+  canAdd: boolean
+  sourceSuggestionId?: number
+}
+
+const { serviceId, notes, canAdd, sourceSuggestionId } = Astro.props
+
+const splitFirstLine = (content: string) => {
+  const trimmed = content.trim()
+  const newlineIndex = trimmed.indexOf('\n')
+  if (newlineIndex === -1) return { firstLine: trimmed, rest: '' }
+  return { firstLine: trimmed.slice(0, newlineIndex), rest: trimmed.slice(newlineIndex + 1).trim() }
+}
+---
+
+{
+  notes.length === 0 ? (
+    <p class="mt-2 text-center text-xs text-day-400">No internal notes yet.</p>
+  ) : (
+    <ul class="space-y-2">
+      {notes.map((note) => {
+        const { firstLine, rest } = splitFirstLine(note.content)
+        const byline = (
+          <div class="mt-2 flex items-center gap-1 text-xs text-day-500">
+            <TimeFormatted date={note.createdAt} hourPrecision />
+            {note.addedByUser && (
+              <span class="flex items-center gap-1">
+                by <UserBadge user={note.addedByUser} size="sm" />
+              </span>
+            )}
+          </div>
+        )
+        return (
+          <li class="rounded-lg border border-night-600 bg-night-800 p-3">
+            {rest ? (
+              <details class="group/note">
+                <summary class="flex cursor-pointer list-none items-baseline gap-2 text-sm text-day-200 [&::-webkit-details-marker]:hidden">
+                  <span class="text-day-500 transition-transform group-open/note:rotate-90">›</span>
+                  <span class="prose prose-sm max-w-none min-w-0 flex-1 prose-invert [&>p]:m-0 [&>p]:truncate">
+                    <Markdown content={firstLine} />
+                  </span>
+                </summary>
+                <div class="prose prose-sm mt-2 max-w-none text-pretty text-day-200 prose-invert">
+                  <Markdown content={rest} />
+                </div>
+              </details>
+            ) : (
+              <div class="prose prose-sm max-w-none text-pretty text-day-200 prose-invert">
+                <Markdown content={firstLine} />
+              </div>
+            )}
+            {byline}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+{
+  canAdd && (
+    <form method="POST" action={actions.admin.service.internalNote.add} class="mt-4 space-y-4">
+      <input type="hidden" name="serviceId" value={serviceId} />
+      {sourceSuggestionId && <input type="hidden" name="sourceSuggestionId" value={sourceSuggestionId} />}
+      <InputTextArea label="Add a note" name="content" />
+      <InputSubmitButton label="Save" icon="ri:save-line" hideCancel />
+    </form>
+  )
+}
