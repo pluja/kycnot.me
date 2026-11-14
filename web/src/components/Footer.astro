@@ -3,98 +3,144 @@ import { Icon } from 'astro-icon/components'
 import { SOURCE_CODE_URL } from 'astro:env/client'
 import { I2P_ADDRESS, ONION_ADDRESS } from 'astro:env/server'
 
+import { currencies } from '../constants/currencies'
+import { getBrowseCategories } from '../lib/browseCategories'
 import { cn } from '../lib/cn'
 
 import type { HTMLAttributes } from 'astro/types'
 
 type Props = HTMLAttributes<'footer'>
 
-const links = [
-  {
-    href: SOURCE_CODE_URL,
-    label: 'Code',
-    icon: 'ri:git-repository-line',
-    external: true,
-  },
-  {
-    href: ONION_ADDRESS,
-    label: 'Tor',
-    icon: 'onion',
-    external: true,
-  },
-  {
-    href: I2P_ADDRESS,
-    label: 'I2P',
-    icon: 'i2p',
-    external: true,
-  },
-  {
-    href: '/docs',
-    label: 'Docs',
-    icon: 'ri:book-open-line',
-    external: false,
-  },
-  {
-    href: '/feeds',
-    label: 'RSS',
-    icon: 'ri:rss-line',
-    external: false,
-  },
-  {
-    href: '/swap',
-    label: 'Swap',
-    icon: 'ri:swap-line',
-    external: false,
-  },
-  {
-    href: '/comments',
-    label: 'Comments',
-    icon: 'ri:chat-3-line',
-    external: false,
-  },
-  {
-    href: '/blog',
-    label: 'Blog',
-    icon: 'ri:article-line',
-    external: false,
-  },
-  {
-    href: '/about',
-    label: 'About',
-    icon: 'ri:information-line',
-    external: false,
-  },
-] as const satisfies {
-  href: string
-  label: string
-  icon: string
-  external: boolean
-}[]
+const mirrorLinks = [
+  { href: ONION_ADDRESS, label: 'Tor mirror', icon: 'onion' },
+  { href: I2P_ADDRESS, label: 'I2P mirror', icon: 'i2p' },
+  { href: SOURCE_CODE_URL, label: 'Source code', icon: 'ri:git-repository-line' },
+] as const satisfies { href: string; label: string; icon: string }[]
+
+const projectLinks = [
+  { href: '/about', label: 'About', icon: 'ri:information-line' },
+  { href: '/service-suggestion/new', label: 'Suggest a service', icon: 'ri:add-line' },
+  { href: '/docs', label: 'Docs', icon: 'ri:book-open-line' },
+  { href: '/blog', label: 'Blog', icon: 'ri:article-line' },
+  { href: '/comments', label: 'Latest comments', icon: 'ri:chat-3-line' },
+  { href: '/feeds', label: 'RSS feeds', icon: 'ri:rss-line' },
+] as const satisfies { href: string; label: string; icon: string }[]
 
 const { class: className, ...htmlProps } = Astro.props
+
+// The page's banners and cache headers are already settled by the time the
+// footer renders, so a failure here is logged and the category column hidden.
+const browseCategories = await getBrowseCategories().catch((error: unknown) => {
+  console.error('[Footer] Unable to load browse categories', error)
+  return []
+})
+
+const exploreLinks = [
+  { href: '/?max-kyc=0', label: 'Zero-KYC services', icon: 'ri:shield-check-line' },
+  { href: '/events?view=incidents', label: 'Recent incidents', icon: 'ri:alarm-warning-line' },
+  { href: '/attributes', label: 'Privacy attributes', icon: 'ri:list-check-3' },
+  { href: '/swap', label: 'Compare swap rates', icon: 'ri:swap-line' },
+] as const satisfies { href: string; label: string; icon: string }[]
+
+const linkColumns = [
+  {
+    title: 'Pay with',
+    links: currencies.map((currency) => ({
+      href: `/?currencies=${currency.slug}`,
+      label: currency.name,
+      icon: currency.icon,
+    })),
+  },
+  { title: 'Explore', links: exploreLinks },
+  { title: 'KYCnot.me', links: projectLinks },
+]
+
+const headingClass = 'mb-2.5 font-title text-sm leading-none text-green-500'
+const linkClass =
+  'group flex items-center gap-1.5 py-0.5 text-[13px] text-day-400 transition-colors hover:text-day-100'
 ---
 
-<footer
-  class={cn('flex flex-wrap items-center justify-center gap-x-3 gap-y-2 p-4 xs:gap-x-6', className)}
-  {...htmlProps}
->
-  {
-    links.map(
-      ({ href, label, icon, external }) =>
-        href && (
-          <a
-            href={href}
-            target={external ? '_blank' : undefined}
-            rel={external ? 'noopener' : undefined}
-            class="flex items-center gap-0.5 text-sm text-day-500 transition-colors hover:text-gray-200 hover:underline xs:gap-1"
-          >
-            <Icon name={icon} class="size-4 opacity-40 xs:opacity-100" />
-            {label}
-          </a>
-        )
-    )
-  }
-  <p class="basis-full text-center text-xs text-day-500">
-    Some service links carry a referral code that helps support the site.
-  </p>
+<footer class={cn('mt-auto bg-night-900', className)} {...htmlProps}>
+  <div aria-hidden="true" class="h-px bg-linear-to-r from-transparent via-green-500/50 to-transparent"></div>
+  <nav
+    aria-label="Browse no-KYC services"
+    class={cn(
+      'mx-auto grid w-full max-w-6xl grid-cols-2 gap-x-6 gap-y-8 px-4 py-8 sm:grid-cols-3 lg:px-8',
+      browseCategories.length > 0 && 'lg:grid-cols-[minmax(0,2.4fr)_repeat(3,minmax(0,1fr))]'
+    )}
+  >
+    {
+      browseCategories.length > 0 && (
+        <section class="col-span-full lg:col-span-1">
+          <h2 class={headingClass}>Categories</h2>
+          <ul class="columns-2 gap-x-6 xs:columns-3">
+            {browseCategories.map((category) => (
+              <li class="break-inside-avoid">
+                <a href={`/?categories=${encodeURIComponent(category.slug)}`} class={linkClass}>
+                  <Icon
+                    name={category.icon}
+                    class="size-3.5 shrink-0 text-day-600 transition-colors group-hover:text-green-400"
+                  />
+                  <span class="truncate">{category.name}</span>
+                  <span class="text-[11px] text-day-600 tabular-nums">
+                    {category.serviceCount.toLocaleString()}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+    {
+      linkColumns.map((column) => (
+        <section>
+          <h2 class={headingClass}>{column.title}</h2>
+          <ul>
+            {column.links.map((link) => (
+              <li>
+                <a href={link.href} class={linkClass}>
+                  <Icon
+                    name={link.icon}
+                    class="size-3.5 shrink-0 text-day-600 transition-colors group-hover:text-green-400"
+                  />
+                  {link.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))
+    }
+  </nav>
+
+  <div class="border-t border-night-700">
+    <div
+      class="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between lg:px-8"
+    >
+      <p class="text-xs text-day-600">
+        Some service links carry a referral code that helps support the site.
+      </p>
+      <ul class="flex flex-wrap gap-2">
+        {
+          mirrorLinks.map(
+            (link) =>
+              link.href && (
+                <li>
+                  <a
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener"
+                    class="flex items-center gap-1.5 rounded-md border border-night-600 bg-night-800 px-2.5 py-1.5 text-xs text-day-300 transition-colors hover:border-green-500/40 hover:text-day-100"
+                  >
+                    <Icon name={link.icon} class="size-4 text-green-500" />
+                    {link.label}
+                  </a>
+                </li>
+              )
+          )
+        }
+      </ul>
+    </div>
+  </div>
 </footer>
