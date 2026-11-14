@@ -3,8 +3,6 @@ import { Icon } from 'astro-icon/components'
 import { SOURCE_CODE_URL } from 'astro:env/client'
 import { I2P_ADDRESS, ONION_ADDRESS } from 'astro:env/server'
 
-import { currencies } from '../constants/currencies'
-import { getBrowseCategories } from '../lib/browseCategories'
 import { cn } from '../lib/cn'
 
 import type { HTMLAttributes } from 'astro/types'
@@ -17,43 +15,36 @@ const mirrorLinks = [
   { href: SOURCE_CODE_URL, label: 'Source code', icon: 'ri:git-repository-line' },
 ] as const satisfies { href: string; label: string; icon: string }[]
 
-const projectLinks = [
-  { href: '/about', label: 'About', icon: 'ri:information-line' },
-  { href: '/service-suggestion/new', label: 'Suggest a service', icon: 'ri:add-line' },
-  { href: '/docs', label: 'Docs', icon: 'ri:book-open-line' },
-  { href: '/blog', label: 'Blog', icon: 'ri:article-line' },
-  { href: '/comments', label: 'Latest comments', icon: 'ri:chat-3-line' },
-  { href: '/feeds', label: 'RSS feeds', icon: 'ri:rss-line' },
-] as const satisfies { href: string; label: string; icon: string }[]
-
 const { class: className, ...htmlProps } = Astro.props
-
-// The page's banners and cache headers are already settled by the time the
-// footer renders, so a failure here is logged and the category column hidden.
-const browseCategories = await getBrowseCategories().catch((error: unknown) => {
-  console.error('[Footer] Unable to load browse categories', error)
-  return []
-})
-
-const exploreLinks = [
-  { href: '/?max-kyc=0', label: 'Zero-KYC services', icon: 'ri:shield-check-line' },
-  { href: '/events?view=incidents', label: 'Recent incidents', icon: 'ri:alarm-warning-line' },
-  { href: '/attributes', label: 'Privacy attributes', icon: 'ri:list-check-3' },
-  { href: '/swap', label: 'Compare swap rates', icon: 'ri:swap-line' },
-] as const satisfies { href: string; label: string; icon: string }[]
 
 const linkColumns = [
   {
-    title: 'Pay with',
-    links: currencies.map((currency) => ({
-      href: `/?currencies=${currency.slug}`,
-      label: currency.name,
-      icon: currency.icon,
-    })),
+    title: 'Explore',
+    links: [
+      { href: '/categories', label: 'All categories', icon: 'ri:apps-2-line' },
+      { href: '/?max-kyc=0', label: 'Zero-KYC services', icon: 'ri:shield-check-line' },
+      { href: '/events?view=incidents', label: 'Recent incidents', icon: 'ri:alarm-warning-line' },
+      { href: '/attributes', label: 'Privacy attributes', icon: 'ri:list-check-3' },
+      { href: '/swap', label: 'Compare swap rates', icon: 'ri:swap-line' },
+    ],
   },
-  { title: 'Explore', links: exploreLinks },
-  { title: 'KYCnot.me', links: projectLinks },
-]
+  {
+    title: 'Community',
+    links: [
+      { href: '/service-suggestion/new', label: 'Suggest a service', icon: 'ri:add-line' },
+      { href: '/comments', label: 'Latest comments', icon: 'ri:chat-3-line' },
+      { href: '/feeds', label: 'RSS feeds', icon: 'ri:rss-line' },
+    ],
+  },
+  {
+    title: 'KYCnot.me',
+    links: [
+      { href: '/about', label: 'About', icon: 'ri:information-line' },
+      { href: '/docs', label: 'Docs', icon: 'ri:book-open-line' },
+      { href: '/blog', label: 'Blog', icon: 'ri:article-line' },
+    ],
+  },
+] as const satisfies { title: string; links: { href: string; label: string; icon: string }[] }[]
 
 const headingClass = 'mb-2.5 font-title text-sm leading-none text-green-500'
 const linkClass =
@@ -63,35 +54,9 @@ const linkClass =
 <footer class={cn('mt-auto bg-night-900', className)} {...htmlProps}>
   <div aria-hidden="true" class="h-px bg-linear-to-r from-transparent via-green-500/50 to-transparent"></div>
   <nav
-    aria-label="Browse no-KYC services"
-    class={cn(
-      'mx-auto grid w-full max-w-6xl grid-cols-2 gap-x-6 gap-y-8 px-4 py-8 sm:grid-cols-3 lg:px-8',
-      browseCategories.length > 0 && 'lg:grid-cols-[minmax(0,2.4fr)_repeat(3,minmax(0,1fr))]'
-    )}
+    aria-label="Site links"
+    class="mx-auto grid w-full max-w-6xl grid-cols-2 gap-x-6 gap-y-8 px-4 py-8 sm:grid-cols-3 lg:px-8"
   >
-    {
-      browseCategories.length > 0 && (
-        <section class="col-span-full lg:col-span-1">
-          <h2 class={headingClass}>Categories</h2>
-          <ul class="columns-2 gap-x-6 xs:columns-3">
-            {browseCategories.map((category) => (
-              <li class="break-inside-avoid">
-                <a href={`/?categories=${encodeURIComponent(category.slug)}`} class={linkClass}>
-                  <Icon
-                    name={category.icon}
-                    class="size-3.5 shrink-0 text-day-600 transition-colors group-hover:text-green-400"
-                  />
-                  <span class="truncate">{category.name}</span>
-                  <span class="text-[11px] text-day-600 tabular-nums">
-                    {category.serviceCount.toLocaleString()}
-                  </span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )
-    }
     {
       linkColumns.map((column) => (
         <section>
