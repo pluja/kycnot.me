@@ -3,32 +3,42 @@ import { Icon } from 'astro-icon/components'
 import { z } from 'astro:content'
 import { orderBy } from 'lodash-es'
 
-import BadgeStandard from '../components/BadgeStandard.astro'
 import Markdown from '../components/Markdown.astro'
 import MyPicture from '../components/MyPicture.astro'
 import SortArrowIcon from '../components/SortArrowIcon.astro'
-import { getAttributeCategoryInfo } from '../constants/attributeCategories'
-import { getAttributeTypeInfo } from '../constants/attributeTypes'
-import { getVerificationStatusInfo } from '../constants/verificationStatus'
+import {
+  attributeCategories,
+  attributeCategoriesZodEnumBySlug,
+  attributeCategorySlugToId,
+  getAttributeCategoryInfo,
+} from '../constants/attributeCategories'
+import { attributeTypes, getAttributeTypeInfo } from '../constants/attributeTypes'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { nonDbAttributes, sortAttributes } from '../lib/attributes'
 import { cn } from '../lib/cn'
+import { listedServiceWhere } from '../lib/listedServices'
 import { formatNumber } from '../lib/numbers'
-import { makeOverallScoreInfo } from '../lib/overallScore'
+import { setPublicPageCacheHeaders } from '../lib/pageCacheHeaders'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
+import { pluralize } from '../lib/pluralize'
 import { prisma } from '../lib/prisma'
+
+const TOP_SERVICES_SHOWN = 5
+const SORT_COLUMNS = ['name', 'privacy', 'trust', 'services'] as const
+type SortColumn = (typeof SORT_COLUMNS)[number]
 
 const { data: filters } = zodParseQueryParamsStoringErrors(
   {
-    'sort-by': z.enum(['name', 'category', 'type', 'privacy', 'trust']),
-    'sort-order': z.enum(['asc', 'desc']).default('asc'),
+    category: attributeCategoriesZodEnumBySlug.optional(),
+    'sort-by': z.enum(SORT_COLUMNS).optional(),
+    'sort-order': z.enum(['asc', 'desc']).optional(),
   },
   Astro
 )
 
-const attributes = await Astro.locals.banners.try(
+const dbAttributes = await Astro.locals.banners.try(
   'Error fetching attributes',
-  async () =>
+  () =>
     prisma.attribute.findMany({
       select: {
         id: true,
@@ -39,385 +49,334 @@ const attributes = await Astro.locals.banners.try(
         type: true,
         privacyPoints: true,
         trustPoints: true,
+        _count: { select: { services: { where: { service: listedServiceWhere } } } },
         services: {
-          where: {
-            service: {
-              serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
-            },
-          },
-          select: {
-            service: {
-              select: {
-                id: true,
-                slug: true,
-                name: true,
-                imageUrl: true,
-                overallScore: true,
-                verificationStatus: true,
-              },
-            },
-          },
+          where: { service: listedServiceWhere },
+          orderBy: { service: { overallScore: 'desc' } },
+          take: TOP_SERVICES_SHOWN,
+          select: { service: { select: { slug: true, name: true, imageUrl: true } } },
         },
       },
     }),
   []
 )
 
+setPublicPageCacheHeaders(Astro.response.headers, {
+  isAuthenticated: Astro.locals.user !== null,
+  hasErrors: Astro.locals.banners.errors.length > 0,
+})
+
+const filterLabels: Record<string, string> = {
+  'Search with this': 'With',
+  'With this': 'With',
+  'Without this': 'Without',
+  'With this or better': 'With or better',
+}
+
+const allAttributes = [
+  ...nonDbAttributes.map((attribute) => ({
+    ...attribute,
+    serviceCount: null,
+    topServices: [],
+    hiddenServiceCount: 0,
+    withHref: null,
+    filterLinks: attribute.links.map((link) => ({
+      href: link.url,
+      label: filterLabels[link.label] ?? link.label,
+      isWithout: link.label === 'Without this',
+    })),
+  })),
+  ...dbAttributes.map((attribute) => {
+    const withHref = `/?attr-${attribute.id.toString()}=yes`
+    return {
+      ...attribute,
+      serviceCount: attribute._count.services,
+      topServices: attribute.services.map(({ service }) => service),
+      hiddenServiceCount: attribute._count.services - attribute.services.length,
+      withHref,
+      filterLinks:
+        attribute._count.services > 0
+          ? [
+              { href: withHref, label: 'With', isWithout: false },
+              { href: `/?attr-${attribute.id.toString()}=no`, label: 'Without', isWithout: true },
+            ]
+          : [],
+    }
+  }),
+].map((attribute) => ({
+  ...attribute,
+  typeInfo: getAttributeTypeInfo(attribute.type),
+  categoryInfo: getAttributeCategoryInfo(attribute.category),
+}))
+
+const selectedCategory = filters.category ? attributeCategorySlugToId(filters.category) : null
 const sortBy = filters['sort-by']
-const mergedAttributes = [
-  ...nonDbAttributes.map((attribute) => ({ ...attribute, services: [], id: attribute.slug })),
-  ...attributes,
-]
+const defaultSortOrder = (column: SortColumn) => (column === 'name' ? 'asc' : 'desc')
+const sortOrder = sortBy ? (filters['sort-order'] ?? defaultSortOrder(sortBy)) : null
+
+const visibleAttributes = sortAttributes(
+  allAttributes.filter((attribute) => !selectedCategory || attribute.category === selectedCategory)
+)
 
 const sortedAttributes = sortBy
   ? orderBy(
-      sortAttributes(mergedAttributes),
-      sortBy === 'type'
-        ? (attribute) => getAttributeTypeInfo(attribute.type).order
-        : sortBy === 'category'
-          ? (attribute) => getAttributeCategoryInfo(attribute.category).order
-          : sortBy === 'name'
-            ? 'title'
-            : sortBy === 'privacy'
-              ? 'privacyPoints'
-              : 'trustPoints',
-      filters['sort-order']
+      visibleAttributes,
+      {
+        name: 'title',
+        privacy: 'privacyPoints',
+        trust: 'trustPoints',
+        services: (attribute: (typeof visibleAttributes)[number]) => attribute.serviceCount ?? -1,
+      }[sortBy],
+      sortOrder ?? 'asc'
     )
-  : sortAttributes(mergedAttributes)
+  : visibleAttributes
 
-const attributesWithInfo = sortedAttributes.map((attribute) => ({
-  ...attribute,
-  categoryInfo: getAttributeCategoryInfo(attribute.category),
-  typeInfo: getAttributeTypeInfo(attribute.type),
-  services: orderBy(
-    attribute.services.map(({ service }) => ({
-      ...service,
-      verificationStatusInfo: getVerificationStatusInfo(service.verificationStatus),
-      overallScoreInfo: makeOverallScoreInfo(service.overallScore),
-    })),
-    [
-      (service) => (service.verificationStatus === 'VERIFICATION_FAILED' ? 1 : -1),
-      'overallScore',
-      () => Math.random(),
-    ],
-    ['asc', 'desc', 'asc']
-  ),
-}))
+// Unsorted, rows are grouped under category headings; once a column is
+// sorted they form one list so values can be compared across categories.
+const isGrouped = !sortBy && !selectedCategory
+const rowGroups = isGrouped
+  ? orderBy(attributeCategories, 'order')
+      .map((category) => ({
+        category,
+        attributes: sortedAttributes.filter((attribute) => attribute.category === category.value),
+      }))
+      .filter((group) => group.attributes.length > 0)
+  : [{ category: null, attributes: sortedAttributes }]
+const showCategoryColumn = !isGrouped && !selectedCategory
 
-const makeSortUrl = (slug: NonNullable<(typeof filters)['sort-by']>) => {
-  const sortOrder = filters['sort-by'] === slug ? (filters['sort-order'] === 'asc' ? 'desc' : 'asc') : 'asc'
-  return `/attributes?sort-by=${slug}&sort-order=${sortOrder}`
+const makeUrl = ({ category, column }: { category: string | undefined; column?: SortColumn }) => {
+  const params = new URLSearchParams()
+  if (category) params.set('category', category)
+  if (column) {
+    params.set('sort-by', column)
+    const nextOrder = sortBy === column ? (sortOrder === 'asc' ? 'desc' : 'asc') : defaultSortOrder(column)
+    if (nextOrder !== defaultSortOrder(column)) params.set('sort-order', nextOrder)
+  }
+  const query = params.toString()
+  return query ? `/attributes?${query}` : '/attributes'
 }
+
+const categoryTabs = [
+  { slug: undefined, label: 'All', icon: 'ri:list-check-3', count: allAttributes.length },
+  ...orderBy(attributeCategories, 'order').map((category) => ({
+    slug: category.slug,
+    label: category.label,
+    icon: category.icon,
+    count: allAttributes.filter((attribute) => attribute.category === category.value).length,
+  })),
+].filter((tab) => tab.count > 0)
+
+const sortableColumns = [
+  { column: 'privacy', label: 'Privacy' },
+  { column: 'trust', label: 'Trust' },
+  { column: 'services', label: 'Services' },
+] as const satisfies { column: SortColumn; label: string }[]
+
+const pointsClass = (points: number) =>
+  points > 0 ? 'text-green-400' : points < 0 ? 'text-red-400' : 'text-day-700'
 ---
 
 <BaseLayout
-  pageTitle="Attributes"
-  description="Browse all available service attributes used to evaluate privacy and trust scores."
+  pageTitle="Privacy & Trust Attributes of No-KYC Services"
+  description="Every attribute KYCnot.me tracks on no-KYC services, from IP logging to Monero support, and how many privacy and trust points each one adds to a score."
   ogImage={{
     template: 'generic',
-    title: 'All attributes',
-    description: 'Browse all available service attributes',
-    icon: 'ri:list-radio',
+    title: 'Service attributes',
+    description: 'What we track on every no-KYC service, and how it moves the score',
+    icon: 'ri:list-check-3',
   }}
+  widthClassName="max-w-5xl"
 >
-  <h1 class="mb-2 text-center font-title text-3xl font-bold text-white">Service attributes</h1>
+  <header class="mt-4 mb-6">
+    <h1 class="font-title text-3xl font-bold text-white">Service attributes</h1>
+    <p class="mt-2 max-w-3xl text-pretty text-day-300">
+      The facts we track on every no-KYC service, and the privacy and trust points each one adds to or removes
+      from its score.
+      <a href="/docs/scores" class="text-green-400 hover:text-green-300 hover:underline">How scores work</a>
+    </p>
+  </header>
 
-  <p class="text-center text-balance text-zinc-300">
-    Characteristics or features of services that affect their scores.
-  </p>
-  <p class="mb-8 text-center">
-    <a
-      href="/docs/scores#service-attributes"
-      class="mt-2 inline-flex items-center text-sm text-zinc-400 hover:text-zinc-200"
+  <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+    <nav
+      aria-label="Filter by category"
+      class="flex flex-wrap rounded-lg border border-night-600 bg-night-800 p-0.5 text-sm"
     >
-      <Icon name="ri:information-line" class="mr-1 size-4" />
-      Learn more about attributes
-    </a>
-  </p>
-
-  <!-- Mobile view -->
-  <div class="grid grid-cols-1 gap-4 md:hidden">
-    {
-      attributesWithInfo.map((attribute) => (
-        <div class="space-y-2 rounded-lg border border-zinc-600 bg-zinc-800 p-4">
-          <div class="flex flex-col items-center space-y-2">
-            <h2 class={cn('text-center text-lg font-bold', attribute.typeInfo.classNames.text)}>
-              {attribute.title}
-            </h2>
-            <div class="flex space-x-2">
-              <BadgeStandard
-                text={attribute.categoryInfo.label}
-                icon={attribute.categoryInfo.icon}
-                class={attribute.categoryInfo.classNames.icon}
-              />
-              <BadgeStandard
-                text={attribute.typeInfo.label}
-                icon={attribute.typeInfo.icon}
-                class={attribute.typeInfo.classNames.icon}
-              />
-            </div>
-          </div>
-
-          <div
+      {
+        categoryTabs.map((tab) => (
+          <a
+            href={makeUrl({ category: tab.slug, column: undefined })}
+            aria-current={filters.category === tab.slug ? 'page' : undefined}
             class={cn(
-              'mx-auto prose prose-sm max-w-lg text-sm prose-invert',
-              attribute.typeInfo.classNames.text
+              'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-day-400 transition-colors hover:text-day-100',
+              filters.category === tab.slug && 'bg-night-600 text-day-100'
             )}
           >
-            <Markdown content={attribute.description} />
-          </div>
+            <Icon name={tab.icon} class="size-4" />
+            {tab.label}
+            <span class="text-xs text-day-500 tabular-nums">{tab.count.toLocaleString()}</span>
+          </a>
+        ))
+      }
+    </nav>
 
-          <div class="grid grid-cols-2 gap-2">
-            <div class="flex flex-col items-center text-zinc-200">
-              <span
-                class={cn('text-base', attribute.typeInfo.classNames.textLight, {
-                  'text-red-400': attribute.privacyPoints < 0,
-                  'text-green-400': attribute.privacyPoints > 0,
-                  'opacity-50': attribute.privacyPoints === 0,
-                })}
-              >
-                {formatNumber(attribute.privacyPoints, { showSign: true })}
-              </span>
-              <span
-                class={cn('text-2xs font-bold text-white uppercase', attribute.typeInfo.classNames.textLight)}
-              >
-                Privacy
-              </span>
-            </div>
-
-            <div class="flex flex-col items-center text-zinc-200">
-              <span
-                class={cn('text-base', attribute.typeInfo.classNames.textLight, {
-                  'text-red-400': attribute.trustPoints < 0,
-                  'text-green-400': attribute.trustPoints > 0,
-                  'opacity-50': attribute.trustPoints === 0,
-                })}
-              >
-                {formatNumber(attribute.trustPoints, { showSign: true })}
-              </span>
-              <span
-                class={cn('text-2xs font-bold text-white uppercase', attribute.typeInfo.classNames.textLight)}
-              >
-                Trust
-              </span>
-            </div>
-          </div>
-
-          {attribute.services.length > 0 && (
-            <details class="pt-2">
-              <summary class="flex cursor-pointer items-center text-sm text-zinc-300">
-                Show services
-                <Icon name="ri:arrow-down-s-line" class="ml-1 size-4" />
-              </summary>
-              <ul class="mt-2 grid max-h-64 grid-cols-1 overflow-y-auto rounded-sm bg-zinc-700">
-                {attribute.services.map((service) => (
-                  <li>
-                    <a
-                      href={`/service/${service.slug}`}
-                      class="flex items-center gap-2 rounded-md p-2 transition-colors hover:bg-zinc-800"
-                    >
-                      {service.imageUrl ? (
-                        <MyPicture
-                          src={service.imageUrl}
-                          alt={service.name}
-                          width={24}
-                          height={24}
-                          class="size-6 shrink-0 rounded-xs object-contain"
-                        />
-                      ) : (
-                        <div class="flex size-6 shrink-0 items-center justify-center rounded-xs bg-zinc-800 text-zinc-500">
-                          <Icon name="ri:image-line" class="size-4" />
-                        </div>
-                      )}
-
-                      <div
-                        class={cn(
-                          'mt-1 flex-1 truncate text-xs text-zinc-300',
-                          service.verificationStatus === 'VERIFICATION_FAILED' && 'text-red-200'
-                        )}
-                      >
-                        {service.name}
-                      </div>
-
-                      {service.verificationStatus !== 'APPROVED' && (
-                        <Icon
-                          name={service.verificationStatusInfo.icon}
-                          class={cn(
-                            'inline-block size-4 shrink-0',
-                            service.verificationStatusInfo.classNames.icon
-                          )}
-                        />
-                      )}
-
-                      <span
-                        class={cn(
-                          'inline-flex size-5 items-center justify-center rounded-xs text-xs font-bold',
-                          service.overallScoreInfo.classNameBg
-                        )}
-                      >
-                        {service.overallScoreInfo.formattedScore}
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </div>
-      ))
-    }
+    <ul class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-day-400" aria-label="Attribute types">
+      {
+        orderBy(attributeTypes, 'order').map((type) => (
+          <li class="flex items-center gap-1">
+            <Icon name={type.icon} class={cn('size-3.5', type.classNames.icon)} />
+            {type.label}
+          </li>
+        ))
+      }
+    </ul>
   </div>
 
-  <!-- Desktop view -->
   <div
-    class="-m-2 hidden grid-cols-[minmax(auto,calc(var(--spacing)*64))_auto_auto_1fr_auto_auto_auto] gap-x-4 md:grid"
+    class={cn(
+      'grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-3 text-sm sm:gap-x-5 md:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]',
+      showCategoryColumn && 'md:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto_auto]'
+    )}
   >
-    <div class="col-span-full grid grid-cols-subgrid p-2">
-      <a href={makeSortUrl('name')}>
-        Name <SortArrowIcon active={filters['sort-by'] === 'name'} sortOrder={filters['sort-order']} />
+    <nav
+      aria-label="Sort attributes"
+      class="col-span-full grid grid-cols-subgrid border-b border-night-600 py-2 text-xs text-day-400"
+    >
+      <a href={makeUrl({ category: filters.category, column: 'name' })} class="hover:text-day-100">
+        Attribute <SortArrowIcon active={sortBy === 'name'} sortOrder={sortOrder} />
       </a>
-      <a href={makeSortUrl('category')}>
-        Category <SortArrowIcon
-          active={filters['sort-by'] === 'category'}
-          sortOrder={filters['sort-order']}
-        />
-      </a>
-      <a href={makeSortUrl('type')}>
-        Type <SortArrowIcon active={filters['sort-by'] === 'type'} sortOrder={filters['sort-order']} />
-      </a>
-      <div>Description</div>
-      <a href={makeSortUrl('privacy')}>
-        Privacy <SortArrowIcon active={filters['sort-by'] === 'privacy'} sortOrder={filters['sort-order']} />
-      </a>
-      <a href={makeSortUrl('trust')}>
-        Trust <SortArrowIcon active={filters['sort-by'] === 'trust'} sortOrder={filters['sort-order']} />
-      </a>
-      <div></div>
-    </div>
-
-    {
-      attributesWithInfo.map((attribute) => (
-        <div
-          id={attribute.slug}
-          class="group col-span-full grid scroll-mt-24 grid-cols-subgrid hover:bg-zinc-800"
-        >
-          <input type="checkbox" id={`show-services-${attribute.id}`} class="peer/show-services hidden" />
-
-          <label
-            for={`show-services-${attribute.id}`}
+      {showCategoryColumn && <span class="hidden md:block">Category</span>}
+      {
+        sortableColumns.map(({ column, label }) => (
+          <a
+            href={makeUrl({ category: filters.category, column })}
             class={cn(
-              'col-span-full grid cursor-pointer list-none grid-cols-subgrid items-center rounded-sm p-2 peer-checked/show-services:**:data-expand-icon:rotate-180',
-              attribute.services.length === 0 && 'cursor-default'
+              'text-right whitespace-nowrap hover:text-day-100',
+              column === 'services' && 'hidden md:block'
             )}
-            aria-label={`Show services for ${attribute.title}`}
           >
-            <h2 class={cn('text-lg font-bold', attribute.typeInfo.classNames.text)}>{attribute.title}</h2>
-
-            <BadgeStandard
-              text={attribute.categoryInfo.label}
-              icon={attribute.categoryInfo.icon}
-              class={attribute.categoryInfo.classNames.icon}
-            />
-
-            <BadgeStandard
-              text={attribute.typeInfo.label}
-              icon={attribute.typeInfo.icon}
-              class={attribute.typeInfo.classNames.icon}
-            />
-
+            <SortArrowIcon active={sortBy === column} sortOrder={sortOrder} />
+            {label}
+          </a>
+        ))
+      }
+      <span class="hidden items-center gap-1 md:flex">
+        <Icon name="ri:filter-line" class="size-3.5" />
+        Filter services
+      </span>
+    </nav>
+    {
+      rowGroups.map((group) => (
+        <Fragment>
+          {group.category && (
+            <h2
+              id={`category-${group.category.slug}`}
+              class="col-span-full flex scroll-mt-24 items-center gap-1.5 pt-6 pb-2 font-title text-base text-green-500"
+            >
+              <Icon name={group.category.icon} class={cn('size-4', group.category.classNames.icon)} />
+              {group.category.label}
+            </h2>
+          )}
+          {group.attributes.map((attribute) => (
             <div
-              class={cn(
-                'prose prose-sm text-sm text-pretty prose-invert',
-                attribute.typeInfo.classNames.text
+              id={attribute.slug}
+              class="group col-span-full grid scroll-mt-24 grid-cols-subgrid gap-y-0.5 border-b border-night-700 py-2.5 transition-colors target:bg-green-500/10 hover:bg-night-800"
+            >
+              <h3 class={cn('flex items-start gap-1.5 font-semibold', attribute.typeInfo.classNames.text)}>
+                <Icon
+                  name={attribute.typeInfo.icon}
+                  class={cn('mt-0.5 size-4 shrink-0', attribute.typeInfo.classNames.icon)}
+                />
+                <span class="sr-only">{attribute.typeInfo.label}:</span>
+                {attribute.title}
+              </h3>
+              {showCategoryColumn && (
+                <span class="hidden items-start gap-1.5 whitespace-nowrap text-day-400 md:flex">
+                  <Icon
+                    name={attribute.categoryInfo.icon}
+                    class={cn('mt-0.5 size-4', attribute.categoryInfo.classNames.icon)}
+                  />
+                  {attribute.categoryInfo.label}
+                </span>
               )}
-            >
-              <Markdown content={attribute.description} />
-            </div>
-
-            <div
-              class={cn('text-center text-base', attribute.typeInfo.classNames.text, {
-                'text-red-400': attribute.privacyPoints < 0,
-                'text-green-400': attribute.privacyPoints > 0,
-                'text-zinc-400': attribute.privacyPoints === 0,
-              })}
-            >
-              {formatNumber(attribute.privacyPoints, { showSign: true })}
-            </div>
-
-            <div
-              class={cn('text-center text-base', attribute.typeInfo.classNames.text, {
-                'text-red-400': attribute.trustPoints < 0,
-                'text-green-400': attribute.trustPoints > 0,
-                'text-zinc-400': attribute.trustPoints === 0,
-              })}
-            >
-              {formatNumber(attribute.trustPoints, { showSign: true })}
-            </div>
-
-            <div class="flex items-center justify-center">
-              {attribute.services.length > 0 && (
-                <Icon name="ri:arrow-down-s-line" class="size-6" data-expand-icon />
-              )}
-            </div>
-          </label>
-
-          {attribute.services.length > 0 && (
-            <div class="col-span-full hidden rounded-sm bg-zinc-700/80 peer-checked/show-services:block">
-              <ul class="grid max-h-64 grid-cols-[repeat(auto-fill,minmax(calc(var(--spacing)*64),1fr))] gap-x-4 overflow-y-auto mask-y-from-[calc(100%-var(--spacing)*8)] p-3">
-                {attribute.services.map((service) => (
-                  <li>
-                    <a
-                      href={`/service/${service.slug}`}
-                      class="flex items-center gap-2 rounded-md p-2 transition-colors hover:bg-zinc-800"
-                    >
-                      {service.imageUrl ? (
+              {[
+                { label: 'Privacy points', points: attribute.privacyPoints },
+                { label: 'Trust points', points: attribute.trustPoints },
+              ].map(({ label, points }) => (
+                <span class={cn('text-right font-medium tabular-nums', pointsClass(points))}>
+                  <span class="sr-only">{label}:</span>
+                  {formatNumber(points, { showSign: true })}
+                </span>
+              ))}
+              <div class="order-last col-span-full flex items-center gap-3 pt-1.5 pl-5.5 text-xs whitespace-nowrap md:contents">
+                <a
+                  href={attribute.withHref ?? undefined}
+                  class={cn(
+                    'flex items-center justify-end gap-1.5 text-day-400',
+                    attribute.withHref && 'transition-colors hover:text-day-100',
+                    attribute.serviceCount === null && 'max-md:hidden'
+                  )}
+                  aria-label={
+                    attribute.serviceCount === null
+                      ? undefined
+                      : `See ${attribute.serviceCount.toLocaleString()} ${pluralize('service', attribute.serviceCount)} with ${attribute.title}`
+                  }
+                >
+                  <span class="flex items-center -space-x-1.5 md:w-26 md:justify-end">
+                    {attribute.topServices.map((service) =>
+                      service.imageUrl ? (
                         <MyPicture
                           src={service.imageUrl}
-                          alt={service.name}
-                          width={24}
-                          height={24}
-                          class="size-6 shrink-0 rounded-xs object-contain"
+                          alt=""
+                          width={20}
+                          height={20}
+                          class="size-5 rounded-full bg-night-900 object-contain ring-2 ring-night-700 group-hover:ring-night-800"
                         />
                       ) : (
-                        <div class="flex size-6 shrink-0 items-center justify-center rounded-xs bg-zinc-800 text-zinc-500">
-                          <Icon name="ri:image-line" class="size-4" />
-                        </div>
-                      )}
-
-                      <div
+                        <span class="flex size-5 items-center justify-center rounded-full bg-night-600 ring-2 ring-night-700 group-hover:ring-night-800">
+                          <Icon name="ri:image-line" class="size-3 text-day-500" />
+                        </span>
+                      )
+                    )}
+                    {attribute.hiddenServiceCount > 0 && (
+                      <span class="flex h-5 min-w-5 items-center justify-center rounded-full border border-night-500 bg-night-600 px-0.5 text-[9px] leading-none font-medium tracking-tight text-day-200 tabular-nums ring-2 ring-night-700 group-hover:ring-night-800">
+                        +{attribute.hiddenServiceCount.toLocaleString()}
+                      </span>
+                    )}
+                    {attribute.serviceCount === 0 && <span class="text-day-700">0</span>}
+                  </span>
+                </a>
+                {attribute.filterLinks.length > 0 ? (
+                  <span class="flex w-40 gap-px self-start overflow-hidden rounded-md">
+                    {attribute.filterLinks.map((link) => (
+                      <a
+                        href={link.href}
+                        title={`Show services ${link.isWithout ? 'without' : 'with'} ${attribute.title}`}
                         class={cn(
-                          'mt-1 flex-1 truncate text-xs text-zinc-300',
-                          service.verificationStatus === 'VERIFICATION_FAILED' && 'text-red-200'
+                          'group/filter flex flex-1 items-center justify-center gap-1 bg-night-600 px-2 py-0.5 font-medium text-day-200 transition-colors hover:text-white',
+                          link.isWithout ? 'hover:bg-red-600' : 'hover:bg-green-600'
                         )}
                       >
-                        {service.name}
-                      </div>
-
-                      {service.verificationStatus !== 'APPROVED' && (
                         <Icon
-                          name={service.verificationStatusInfo.icon}
+                          name={link.isWithout ? 'ri:filter-off-line' : 'ri:filter-line'}
                           class={cn(
-                            'inline-block size-4 shrink-0',
-                            service.verificationStatusInfo.classNames.icon
+                            'size-3.5 transition-colors group-hover/filter:text-white',
+                            link.isWithout ? 'text-red-400' : 'text-green-400'
                           )}
                         />
-                      )}
-
-                      <span
-                        class={cn(
-                          'inline-flex size-5 items-center justify-center rounded-xs text-xs font-bold',
-                          service.overallScoreInfo.classNameBg
-                        )}
-                      >
-                        {service.overallScoreInfo.formattedScore}
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
+                        {link.label}
+                      </a>
+                    ))}
+                  </span>
+                ) : (
+                  <span class="hidden w-40 md:block" />
+                )}
+              </div>
+              <div class="col-span-full prose prose-sm max-w-none pl-5.5 text-xs text-pretty text-day-400 prose-invert md:col-span-1 md:col-start-1 prose-p:my-0">
+                <Markdown content={attribute.description} />
+              </div>
             </div>
-          )}
-        </div>
+          ))}
+        </Fragment>
       ))
     }
   </div>

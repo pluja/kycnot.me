@@ -234,7 +234,7 @@ export const nonDbAttributes: NonDbAttributeFull[] = [
     trustPoints: 0,
     links: [
       {
-        url: '/?currency=monero',
+        url: '/?currencies=xmr',
         label: 'Search with this',
         icon: 'ri:search-line',
       },
