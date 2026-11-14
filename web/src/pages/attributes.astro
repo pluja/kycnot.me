@@ -4,7 +4,7 @@ import { z } from 'astro:content'
 import { orderBy } from 'lodash-es'
 
 import Markdown from '../components/Markdown.astro'
-import MyPicture from '../components/MyPicture.astro'
+import ServiceAvatarStack from '../components/ServiceAvatarStack.astro'
 import SortArrowIcon from '../components/SortArrowIcon.astro'
 import {
   attributeCategories,
@@ -321,29 +321,13 @@ const pointsClass = (points: number) =>
                       : `See ${attribute.serviceCount.toLocaleString()} ${pluralize('service', attribute.serviceCount)} with ${attribute.title}`
                   }
                 >
-                  <span class="flex items-center -space-x-1.5 md:w-26 md:justify-end">
-                    {attribute.topServices.map((service) =>
-                      service.imageUrl ? (
-                        <MyPicture
-                          src={service.imageUrl}
-                          alt=""
-                          width={20}
-                          height={20}
-                          class="size-5 rounded-full bg-night-900 object-contain ring-2 ring-night-700 group-hover:ring-night-800"
-                        />
-                      ) : (
-                        <span class="flex size-5 items-center justify-center rounded-full bg-night-600 ring-2 ring-night-700 group-hover:ring-night-800">
-                          <Icon name="ri:image-line" class="size-3 text-day-500" />
-                        </span>
-                      )
-                    )}
-                    {attribute.hiddenServiceCount > 0 && (
-                      <span class="flex h-5 min-w-5 items-center justify-center rounded-full border border-night-500 bg-night-600 px-0.5 text-[9px] leading-none font-medium tracking-tight text-day-200 tabular-nums ring-2 ring-night-700 group-hover:ring-night-800">
-                        +{attribute.hiddenServiceCount.toLocaleString()}
-                      </span>
-                    )}
+                  <ServiceAvatarStack
+                    services={attribute.topServices}
+                    hiddenCount={attribute.hiddenServiceCount}
+                    class="md:w-26 md:justify-end"
+                  >
                     {attribute.serviceCount === 0 && <span class="text-day-700">0</span>}
-                  </span>
+                  </ServiceAvatarStack>
                 </a>
                 {attribute.filterLinks.length > 0 ? (
                   <span class="flex w-40 gap-px self-start overflow-hidden rounded-md">

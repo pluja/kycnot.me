@@ -1,0 +1,52 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../lib/cn'
+
+import MyPicture from './MyPicture.astro'
+
+import type { Prisma } from '@prisma/client'
+import type { HTMLAttributes } from 'astro/types'
+
+type Props = HTMLAttributes<'span'> & {
+  services: Prisma.ServiceGetPayload<{ select: { slug: true; imageUrl: true } }>[]
+  hiddenCount: number
+}
+
+const { services, hiddenCount, class: className, ...htmlProps } = Astro.props
+
+const ringClass = 'ring-2 ring-night-700 group-hover:ring-night-800'
+---
+
+<span class={cn('flex items-center -space-x-1.5', className)} {...htmlProps}>
+  {
+    services.map((service) =>
+      service.imageUrl ? (
+        <MyPicture
+          src={service.imageUrl}
+          alt=""
+          width={20}
+          height={20}
+          class={cn('size-5 rounded-full bg-night-900 object-contain', ringClass)}
+        />
+      ) : (
+        <span class={cn('flex size-5 items-center justify-center rounded-full bg-night-600', ringClass)}>
+          <Icon name="ri:image-line" class="size-3 text-day-500" />
+        </span>
+      )
+    )
+  }
+  {
+    hiddenCount > 0 && (
+      <span
+        class={cn(
+          'flex h-5 min-w-5 items-center justify-center rounded-full border border-night-500 bg-night-600 px-0.5 text-[9px] leading-none font-medium tracking-tight text-day-200 tabular-nums',
+          ringClass
+        )}
+      >
+        +{hiddenCount.toLocaleString()}
+      </span>
+    )
+  }
+  <slot />
+</span>

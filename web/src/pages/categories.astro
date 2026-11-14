@@ -1,0 +1,123 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import ServiceAvatarStack from '../components/ServiceAvatarStack.astro'
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { listedServiceWhere } from '../lib/listedServices'
+import { setPublicPageCacheHeaders } from '../lib/pageCacheHeaders'
+import { pluralize } from '../lib/pluralize'
+import { prisma } from '../lib/prisma'
+import { absoluteSiteUrl } from '../lib/urls'
+
+import type { ItemList, ListItem, WithContext } from 'schema-dts'
+
+const TOP_SERVICES_SHOWN = 5
+
+const dbCategories = await Astro.locals.banners.try(
+  'Error fetching categories',
+  () =>
+    prisma.category.findMany({
+      select: {
+        name: true,
+        namePluralLong: true,
+        slug: true,
+        icon: true,
+        _count: { select: { services: { where: listedServiceWhere } } },
+        services: {
+          where: listedServiceWhere,
+          orderBy: { overallScore: 'desc' },
+          take: TOP_SERVICES_SHOWN,
+          select: { slug: true, imageUrl: true },
+        },
+      },
+      orderBy: { name: 'asc' },
+    }),
+  []
+)
+
+setPublicPageCacheHeaders(Astro.response.headers, {
+  isAuthenticated: Astro.locals.user !== null,
+  hasErrors: Astro.locals.banners.errors.length > 0,
+})
+
+const categories = dbCategories
+  .filter((category) => category._count.services > 0)
+  .map((category) => ({
+    label: category.namePluralLong ?? category.name,
+    icon: category.icon,
+    href: `/?categories=${encodeURIComponent(category.slug)}`,
+    serviceCount: category._count.services,
+    topServices: category.services,
+    hiddenServiceCount: category._count.services - category.services.length,
+  }))
+
+const itemListSchema: WithContext<ItemList> = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: 'No-KYC crypto services by category',
+  itemListElement: categories.map(
+    (category, index) =>
+      ({
+        '@type': 'ListItem',
+        position: index + 1,
+        url: absoluteSiteUrl(category.href),
+        name: category.label,
+      }) satisfies ListItem
+  ),
+}
+---
+
+<BaseLayout
+  pageTitle="Browse No-KYC Crypto Services by Category"
+  description="Browse no-KYC crypto services by category: exchanges, VPNs, hosting, eSIMs, gift cards and more, with privacy and trust scores and user reviews for each one."
+  ogImage={{
+    template: 'generic',
+    title: 'No-KYC services by category',
+    description: 'Exchanges, VPNs, hosting, eSIMs, gift cards and more',
+    icon: 'ri:apps-2-line',
+  }}
+  widthClassName="max-w-3xl"
+  schemas={[itemListSchema]}
+>
+  <header class="mt-4 mb-6">
+    <h1 class="font-title text-3xl font-bold text-white">No-KYC services by category</h1>
+    <p class="mt-2 text-pretty text-day-300">
+      Pick a category to see its services in the <a
+        href="/"
+        class="text-green-400 hover:text-green-300 hover:underline">directory</a
+      >, where you can narrow the list by currency, KYC level and <a
+        href="/attributes"
+        class="text-green-400 hover:text-green-300 hover:underline">attributes</a
+      >.
+    </p>
+  </header>
+
+  <ul class="border-t border-night-600 text-sm">
+    {
+      categories.map((category) => (
+        <li>
+          <a
+            href={category.href}
+            class="group flex items-center gap-3 border-b border-night-700 px-1 py-2.5 transition-colors hover:bg-night-800"
+          >
+            <Icon
+              name={category.icon}
+              class="size-4.5 shrink-0 text-day-500 transition-colors group-hover:text-green-400"
+            />
+            <span class="min-w-0 flex-1 truncate font-semibold text-day-100">
+              {category.label}
+              <span class="sr-only">
+                , {category.serviceCount.toLocaleString()} {pluralize('service', category.serviceCount)}
+              </span>
+            </span>
+            <ServiceAvatarStack services={category.topServices} hiddenCount={category.hiddenServiceCount} />
+            <Icon
+              name="ri:arrow-right-s-line"
+              class="size-4 shrink-0 text-day-600 transition-colors group-hover:text-day-200"
+            />
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</BaseLayout>
