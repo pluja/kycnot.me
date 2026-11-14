@@ -15,7 +15,6 @@ export function buildOrganizationSchema(): WithContext<Organization> {
   return {
     '@context': 'https://schema.org',
     ...KYCNOTME_SCHEMA_MINI,
-    logo: absoluteSiteUrl('/favicon.svg'),
   }
 }
 

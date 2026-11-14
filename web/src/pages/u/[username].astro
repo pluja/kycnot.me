@@ -152,8 +152,8 @@ const publicTrustFacts = trustRecord(user.trust, replyCount).filter((fact) => fa
 ---
 
 <BaseLayout
-  pageTitle={`${user.displayName ?? user.name} - User Profile`}
-  description={`User profile page of ${user.displayName ?? user.name} in KYCnot.me`}
+  pageTitle={`${user.displayName ?? user.name} - Reviews & Comments`}
+  description={`Read ${user.displayName ?? user.name}'s reviews and comments on no-KYC crypto services, with their trust record and contribution history on KYCnot.me.`}
   noindex={!isUserProfileIndexable(user)}
   ogImage={{
     template: 'generic',

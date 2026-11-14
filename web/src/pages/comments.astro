@@ -18,7 +18,7 @@ import { currentExperienceStates, experienceFeedPage } from '../lib/experienceQu
 import { publishedCommentStatuses } from '../lib/experiences'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
-import { makeFilterUrl } from '../lib/urls'
+import { canonicalPathWithParams, makeFilterUrl } from '../lib/urls'
 
 import type { CommentForFeed } from '../lib/commentsWithReplies'
 import type { ExperienceOutcome, Prisma } from '@prisma/client'
@@ -189,6 +189,8 @@ const nextPageUrl = (() => {
 
 <BaseLayout
   pageTitle="Latest comments on KYC-free services"
+  canonical={canonicalPathWithParams(Astro.url, ['service', 'issue', 'rated', 'page'])}
+  noindex={params.page > 1 || !!params.service || !!params.issue || !!params.rated}
   description="Read the newest user experiences and discussion on no-KYC exchanges, VPNs and services, including reports of requested KYC and blocked funds."
   widthClassName="max-w-5xl"
   ogImage={{

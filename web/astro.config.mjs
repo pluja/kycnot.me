@@ -95,9 +95,9 @@ export default defineConfig({
           '/notifications',
           '/access-denied',
         ]
-        // /swap is owned by /sitemaps/swap.xml so it doesn't appear twice in
-        // the sitemap graph.
-        const excludedPaths = ['/downloads', '/swap']
+        // /swap and /blog are owned by their own sitemaps so they don't appear
+        // twice. /contact is noindex and redirects visitors who are not logged in.
+        const excludedPaths = ['/downloads', '/swap', '/blog', '/contact']
         return (
           !noIndexPrefixes.some((prefix) => url.pathname.startsWith(prefix)) &&
           !excludedPaths.includes(url.pathname)

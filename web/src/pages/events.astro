@@ -8,7 +8,7 @@ import EventCard from '../components/events/EventCard.astro'
 import EventServiceLink from '../components/events/EventServiceLink.astro'
 import FilterPill from '../components/FilterPill.astro'
 import ServicePicker from '../components/ServicePicker.astro'
-import { eventClassFilterFor, eventViews, eventViewsZodEnum } from '../constants/eventViews'
+import { eventClassFilterFor, eventViews, eventViewsZodEnum, type EventView } from '../constants/eventViews'
 import { getIncidentSeverityInfo } from '../constants/incidentSeverities'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { cn } from '../lib/cn'
@@ -16,7 +16,7 @@ import { getEventDisplay, isEventOpen } from '../lib/eventKind'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
 import { formatDateShort } from '../lib/timeAgo'
-import { createPageUrl, makeFilterUrl } from '../lib/urls'
+import { canonicalPathWithParams, createPageUrl, makeFilterUrl } from '../lib/urls'
 
 import type { Prisma } from '@prisma/client'
 
@@ -36,6 +36,14 @@ const { data: params, hasDefaultData: hasDefaultFilters } = zodParseQueryParamsS
 )
 
 const classFilter = eventClassFilterFor(params.view)
+
+const eventViewTitles = {
+  curated: 'No-KYC Service Incidents & Events Timeline',
+  events: 'Events at No-KYC Crypto Services',
+  incidents: 'Incidents at No-KYC Services: Scams, Freezes, Outages',
+  changes: 'Listing Changes to No-KYC Services',
+  all: 'Full Activity Log of No-KYC Services',
+} as const satisfies Record<EventView, string>
 
 const eventViewIcons: Record<string, string> = {
   curated: 'ri:stack-line',
@@ -187,20 +195,22 @@ const hasMorePages = params.page < totalPages
 ---
 
 <BaseLayout
-  pageTitle="Events"
-  description="Discover important events, updates, and news about KYC-free services in chronological order."
+  pageTitle={eventViewTitles[params.view]}
+  description="Timeline of what happens to no-KYC crypto services: scams, frozen funds, KYC changes, outages and shutdowns, newest first, with a source for each event."
+  canonical={canonicalPathWithParams(Astro.url, params.view === 'curated' ? ['page'] : ['view', 'page'])}
+  noindex={params.page > 1 || !!params.service || !!params.from || !!params.to || params.view === 'all'}
   widthClassName="max-w-5xl"
   classNames={{ main: 'sm:flex sm:items-start sm:gap-6' }}
   ogImage={{
     template: 'generic',
-    title: 'Events',
-    description: 'Discover important events, updates, and news about KYC-free services',
+    title: 'No-KYC service events',
+    description: 'Scams, frozen funds, KYC changes and outages at no-KYC services',
     icon: 'ri:calendar-event-line',
   }}
   htmx
 >
   <div>
-    <h1 class="font-title text-2xl font-bold text-white sm:text-3xl">Events on KYCnot.me</h1>
+    <h1 class="font-title text-2xl font-bold text-white sm:text-3xl">No-KYC service events and incidents</h1>
     <p class="mt-1 mb-4 text-sm text-day-400">
       What has happened to KYC-free services, newest first.
       {totalEvents > 0 && ` ${totalEvents.toLocaleString()} events.`}

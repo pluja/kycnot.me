@@ -3,11 +3,13 @@ import BlogPostContent from '../../components/BlogPostContent.astro'
 import Breadcrumbs from '../../components/Breadcrumbs.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { getPrevNextPosts, getPublishedPosts, getRelatedPosts, postUrl } from '../../lib/blog'
+import { makeOgImageUrl } from '../../lib/ogImageUrl'
 import { setPublicPageCacheHeaders } from '../../lib/pageCacheHeaders'
 import { KYCNOTME_SCHEMA_MINI } from '../../lib/schema'
-import { absoluteSiteUrl } from '../../lib/urls'
+import { absoluteSiteUrl, siteOrigin } from '../../lib/urls'
 
 import type { BreadcrumArray } from '../../components/BaseHead.astro'
+import type { OgImagePublicTemplateWithProps } from '../../lib/ogImageProps'
 import type { BlogPosting, WithContext } from 'schema-dts'
 
 const isAdmin = Astro.locals.user?.admin ?? false
@@ -33,6 +35,13 @@ const { older, newer } = getPrevNextPosts(post, publishedPosts)
 
 const postPath = postUrl(post)
 const canonicalUrl = absoluteSiteUrl(postPath)
+const ogImage = {
+  template: 'blog',
+  title: post.data.title,
+  coverImage: post.data.coverImage?.src,
+  author: post.data.author,
+  publishedAt: post.data.publishedAt.toISOString(),
+} satisfies OgImagePublicTemplateWithProps
 const coverImageUrl = post.data.coverImage ? absoluteSiteUrl(post.data.coverImage.src) : null
 
 const blogPostingSchema: WithContext<BlogPosting> = {
@@ -44,20 +53,14 @@ const blogPostingSchema: WithContext<BlogPosting> = {
   },
   headline: post.data.title,
   description: post.data.summary,
-  image: coverImageUrl ? [coverImageUrl] : undefined,
+  image: [coverImageUrl ?? makeOgImageUrl(ogImage, siteOrigin)],
   datePublished: post.data.publishedAt.toISOString(),
   dateModified: (post.data.updatedAt ?? post.data.publishedAt).toISOString(),
   author: {
     '@type': 'Person',
     name: post.data.author,
   },
-  publisher: {
-    ...KYCNOTME_SCHEMA_MINI,
-    logo: {
-      '@type': 'ImageObject',
-      url: absoluteSiteUrl('/favicon.svg'),
-    },
-  },
+  publisher: KYCNOTME_SCHEMA_MINI,
   keywords: post.data.tags.length > 0 ? post.data.tags.join(', ') : undefined,
   inLanguage: 'en',
   wordCount: (post.body ?? '').trim().split(/\s+/).filter(Boolean).length,
@@ -74,13 +77,7 @@ const breadcrumbs: BreadcrumArray = [
   pageTitle={post.data.title}
   description={post.data.summary}
   canonical={postPath}
-  ogImage={{
-    template: 'blog',
-    title: post.data.title,
-    coverImage: post.data.coverImage?.src,
-    author: post.data.author,
-    publishedAt: post.data.publishedAt.toISOString(),
-  }}
+  ogImage={ogImage}
   schemas={[blogPostingSchema]}
   breadcrumbs={breadcrumbs}
   articleMeta={{

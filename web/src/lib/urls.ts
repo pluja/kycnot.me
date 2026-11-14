@@ -61,6 +61,19 @@ export const createPageUrl = (
   return url.pathname + url.search
 }
 
+// canonicalPathWithParams keeps only the listed query parameters, in a stable
+// order, and drops `page=1` so a first page shares the bare URL.
+export function canonicalPathWithParams(url: URL, keys: readonly string[]) {
+  const params = new URLSearchParams()
+  for (const key of [...keys].sort()) {
+    for (const value of url.searchParams.getAll(key)) {
+      if (key === 'page' && value === '1') continue
+      params.append(key, value)
+    }
+  }
+  return params.size > 0 ? `${url.pathname}?${params.toString()}` : url.pathname
+}
+
 export function urlParamsToFormData(params: URLSearchParams) {
   const formData = new FormData()
   params.forEach((value, key) => {
