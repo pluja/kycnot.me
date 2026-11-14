@@ -6,7 +6,7 @@ import { verificationStatusesByValue } from '../constants/verificationStatus'
 import { cn } from '../lib/cn'
 import { pluralize } from '../lib/pluralize'
 import { defaultViewOption, viewOptions } from '../lib/searchFiltersOptions'
-import { makeSearchTitle } from '../lib/searchSeo'
+import { makeSearchHeading } from '../lib/searchSeo'
 import { createPageUrl, urlWithParams } from '../lib/urls'
 
 import Button from './Button.astro'
@@ -28,7 +28,8 @@ type Props = HTMLAttributes<'div'> & {
   currentPage?: number
   total: number
   pageSize: number
-  sortSeed?: string
+  // sortSeed pins infinite scroll to the shuffle page 1 was rendered with, across the daily seed change.
+  sortSeed: string
   filters: ServicesFiltersObject
   countCommunityOnly: number | null
   inlineIcons?: boolean
@@ -96,7 +97,7 @@ const urlIfIncludingCommunity = urlWithParams(Astro.url, {
   ]),
 })
 
-const searchTitle = makeSearchTitle({
+const searchHeading = makeSearchHeading({
   filters,
   hasDefaultFilters,
   categories,
@@ -106,12 +107,36 @@ const searchTitle = makeSearchTitle({
 ---
 
 <div {...divProps} class={cn('min-w-0 flex-1', className)}>
-  <div class="hidden flex-wrap items-center justify-between gap-x-4 sm:flex">
-    <h2 class="mb-2 font-title text-xl/tight text-day-100 lg:text-2xl">
-      {searchTitle}
-    </h2>
+  <div class="flex flex-wrap items-end justify-between gap-x-4">
+    <div class="mb-2 min-w-0">
+      <p
+        class="mb-1 flex items-center gap-0.5 text-[11px] font-medium tracking-widest text-day-500 uppercase"
+      >
+        {
+          hasDefaultFilters ? (
+            'KYCnot.me directory'
+          ) : (
+            <a href="/" class="transition-colors hover:text-day-300">
+              No-KYC crypto services directory
+            </a>
+          )
+        }
+        <a
+          href="/about"
+          aria-label="About this directory"
+          title="About this directory"
+          class="-m-1.5 rounded-sm p-1.5 transition-colors hover:text-day-300 focus-visible:ring-1 focus-visible:ring-day-300 focus-visible:outline-hidden"
+        >
+          <Icon name="ri:information-line" class="size-3" is:inline={inlineIcons} />
+        </a>
+      </p>
+      <h1 class="font-title text-xl/tight text-pretty text-day-100 lg:text-2xl">
+        {searchHeading}
+        {currentPage > 1 && <span class="text-day-500"> · page {currentPage.toLocaleString()}</span>}
+      </h1>
+    </div>
     <ServiceFiltersPillsRow
-      class="mask-l-from-[calc(100%-var(--spacing)*4)] pb-2"
+      class="hidden mask-l-from-[calc(100%-var(--spacing)*4)] pb-2 sm:flex"
       filters={filters}
       filtersOptions={filtersOptions}
       categories={categories}
@@ -194,9 +219,7 @@ const searchTitle = makeSearchTitle({
               aria-current={view.active ? 'true' : undefined}
               class={cn(
                 'flex items-center gap-1 rounded-sm px-2 py-1 text-sm transition-colors',
-                view.active
-                  ? 'bg-night-600 text-white'
-                  : 'text-day-400 hover:text-day-200'
+                view.active ? 'bg-night-600 text-white' : 'text-day-400 hover:text-day-200'
               )}
             >
               <Icon name={view.icon} class="size-4" is:inline={inlineIcons} />

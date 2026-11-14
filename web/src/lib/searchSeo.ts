@@ -68,11 +68,7 @@ export function makeSearchTitle({
   const listAndformatter = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' })
   const MAX_TITLE_LENGTH = 60
 
-  let [prefix, base, attributesPart, currencies, kycLevel, score] = ['', 'services', '', '', '', '']
-
-  if (!hasDefaultFilters) {
-    prefix = 'filtered'
-  }
+  let [prefix, base, attributesPart, currencies, kycLevel, score] = ['filtered', 'services', '', '', '', '']
 
   const attributesFilters = Object.entries(filters.attr ?? {})
     .filter((entry): entry is [string, 'no' | 'yes'] => entry[1] === 'yes' || entry[1] === 'no')
@@ -216,18 +212,26 @@ export function makeSearchMetaDescription({
 
   // Default: match "no KYC crypto" / "buy crypto without ID" intent
   if (hasDefaultFilters) {
-    return 'Find no-KYC crypto exchanges, wallets, VPNs, and more - all verified and ranked by privacy score. Use crypto without identity verification or government-issued ID.'
+    return 'Find no-KYC crypto exchanges, wallets, VPNs and more, verified and ranked by privacy score. Use crypto without identity verification or government-issued ID.'
   }
 
   // Filtered: describe what's on the page without a count (counts go stale in cached snippets)
   const shortTitle = makeSearchTitle({ filters, hasDefaultFilters, categories, attributes, attributeOptions })
-  // Lowercase first char for prose, but preserve acronyms (VPNs, CEXs...)
-  const s0 = shortTitle[0] ?? '',
-    s1 = shortTitle[1] ?? ''
-  const isAcronymShort = shortTitle.length >= 2 && s0 === s0.toUpperCase() && s1 === s1.toUpperCase()
-  const shortTitleProse = isAcronymShort
-    ? shortTitle
-    : shortTitle.charAt(0).toLowerCase() + shortTitle.slice(1)
 
-  return `Browse no-KYC ${shortTitleProse} on KYCnot.me - all verified and ranked by privacy score, trust rating, and accepted currencies. Use crypto without identity verification.`
+  return `Browse no-KYC ${toProse(shortTitle)} on KYCnot.me - all verified and ranked by privacy score, trust rating, and accepted currencies. Use crypto without identity verification.`
+}
+
+export function makeSearchHeading(input: SearchSeoInput) {
+  const shortTitle = makeSearchTitle(input)
+  if (input.filters.q || input.hasDefaultFilters) return shortTitle
+  // "without KYC" is the guaranteed level, a stronger promise than the "No-KYC" every listing makes.
+  const isZeroKyc = shortTitle.endsWith(' without KYC')
+  const subject = shortTitle.replace(/^Filtered /, '').replace(/ without KYC$/, '')
+  return `${isZeroKyc ? 'Zero-KYC' : 'No-KYC'} ${toProse(subject)}`
+}
+
+// toProse lowercases the first letter for use mid-sentence, keeping acronyms (VPNs, CEXs) intact.
+function toProse(title: string) {
+  const isAcronym = title.length >= 2 && title.slice(0, 2) === title.slice(0, 2).toUpperCase()
+  return isAcronym ? title : title.charAt(0).toLowerCase() + title.slice(1)
 }

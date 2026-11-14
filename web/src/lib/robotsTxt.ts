@@ -9,8 +9,8 @@
 const DISALLOWED_PATHS = ['/admin/', '/internal-api/', '/api/', '/feeds/user/', '/go/', '/account/']
 
 /**
- * Listing pagination links carry a seed that is new on every render of page 1:
- * an unbounded URL space whose canonical already drops it.
+ * Old listing pagination links carried a random seed per visit: an unbounded
+ * URL space whose canonical already drops it. Links no longer emit it.
  */
 const DISALLOWED_PARAMS = ['sort-seed']
 

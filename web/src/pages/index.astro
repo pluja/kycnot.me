@@ -1,6 +1,5 @@
 ---
 import { z } from 'astro/zod'
-import { Icon } from 'astro-icon/components'
 import { groupBy, omit, orderBy, sortBy, uniq } from 'lodash-es'
 import seedrandom from 'seedrandom'
 
@@ -20,11 +19,13 @@ import {
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { areEqualArraysWithoutOrder, zodEnumFromConstant } from '../lib/arrays'
 import { findServicesBySimilarity } from '../lib/findServicesBySimilarity'
+import { listedServiceWhere } from '../lib/listedServices'
 import { parseIntWithFallback } from '../lib/numbers'
 import { areEqualObjectsWithoutOrder } from '../lib/objects'
 import { setPublicPageCacheHeaders } from '../lib/pageCacheHeaders'
 import { zodParseQueryParamsStoringErrors } from '../lib/parseUrlFilters'
 import { prisma } from '../lib/prisma'
+import { KYCNOTME_SCHEMA_MINI } from '../lib/schema'
 import {
   defaultSortOption,
   defaultViewOption,
@@ -33,9 +34,10 @@ import {
   sortOptions,
   viewOptions,
 } from '../lib/searchFiltersOptions'
+import { isIndexableSearch } from '../lib/searchIndexing'
 import { makeSearchMetaDescription, makeSearchTitle } from '../lib/searchSeo'
 import { serviceListItemSelect } from '../lib/serviceListItem'
-import { makeSortSeed } from '../lib/sortSeed'
+import { dailySortSeed } from '../lib/sortSeed'
 import { siteOrigin } from '../lib/urls'
 
 import type { Prisma } from '@prisma/client'
@@ -81,6 +83,7 @@ const {
   data: filters,
   hasDefaultData: hasDefaultFilters,
   defaultData: defaultFilters,
+  errors: filterErrors,
   redirectUrl,
 } = zodParseQueryParamsStoringErrors(
   {
@@ -99,10 +102,7 @@ const {
     'attribute-mode': zodEnumFromConstant(modeOptions, 'value').default('or'),
     sort: zodEnumFromConstant(sortOptions, 'value').default(defaultSortOption.value),
     view: zodEnumFromConstant(viewOptions, 'value').default(defaultViewOption.value),
-    'sort-seed': z
-      .string()
-      .transform((seed) => (Astro.url.searchParams.has('page') ? seed : makeSortSeed()))
-      .default(makeSortSeed()),
+    'sort-seed': z.string().default(dailySortSeed()),
     'max-kyc': z.coerce.number().int().min(0).max(4).default(4),
     networks: z.array(zodEnumFromConstant(networks, 'slug')),
     attr: z
@@ -128,6 +128,11 @@ const {
       },
     },
   }
+)
+
+const hasDefaultFiltersIgnoringPresentation = areEqualObjectsWithoutOrder(
+  omit(filters, [...ignoredKeysForDefaultData, 'page', 'sort', 'view']),
+  omit(defaultFilters, [...ignoredKeysForDefaultData, 'page', 'sort', 'view'])
 )
 
 const hasDefaultFiltersIgnoringQ = areEqualObjectsWithoutOrder(
@@ -255,11 +260,7 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
             icon: true,
             _count: {
               select: {
-                services: {
-                  where: {
-                    serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
-                  },
-                },
+                services: { where: listedServiceWhere },
               },
             },
           },
@@ -380,13 +381,7 @@ const [categories, [services, totalServices], countCommunityOnly, attributes] =
             type: true,
             _count: {
               select: {
-                services: {
-                  where: {
-                    service: {
-                      serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
-                    },
-                  },
-                },
+                services: { where: { service: listedServiceWhere } },
               },
             },
           },
@@ -415,10 +410,16 @@ const canonicalSearchParamAllowlist = new Set([
   'currency-mode',
   'max-kyc',
   'attribute-mode',
+  'networks',
+  'min-score',
+  'page',
+  'q',
 ])
 
 const canonicalEntries = Array.from(Astro.url.searchParams.entries())
   .filter(([key]) => canonicalSearchParamAllowlist.has(key) || /^attr-\d+$/.test(key))
+  .filter(([key, value]) => !(key === 'page' && value === '1'))
+  .filter(([key, value]) => !((key === 'currency-mode' || key === 'attribute-mode') && value === 'or'))
   .sort(([firstKey, firstValue], [secondKey, secondValue]) =>
     firstKey === secondKey ? firstValue.localeCompare(secondValue) : firstKey.localeCompare(secondKey)
   )
@@ -430,17 +431,27 @@ canonicalEntries.forEach(([key, value]) => {
 const canonicalUrl = `${Astro.url.pathname}${
   canonicalSearchParams.size > 0 ? `?${canonicalSearchParams.toString()}` : ''
 }`
-const searchPageTitle = makeSearchTitle({
+// A parameter that failed to parse falls back to its default, so the page would duplicate another.
+const isSearchIndexable =
+  filterErrors.length === 0 &&
+  isIndexableSearch({
+    canonicalParams: canonicalSearchParams,
+    query: filters.q,
+    shownCount: services.length,
+  })
+const searchTitle = makeSearchTitle({
   filters,
-  hasDefaultFilters,
+  hasDefaultFilters: hasDefaultFiltersIgnoringPresentation,
   categories,
   attributes,
   attributeOptions,
   forPageTitle: true,
 })
+const searchPageTitle =
+  filters.page > 1 ? `${searchTitle} - Page ${filters.page.toLocaleString()}` : searchTitle
 const searchPageDescription = makeSearchMetaDescription({
   filters,
-  hasDefaultFilters,
+  hasDefaultFilters: hasDefaultFiltersIgnoringPresentation,
   categories,
   attributes,
   attributeOptions,
@@ -470,17 +481,12 @@ const searchBoxSchema = {
 <BaseLayout
   pageTitle={searchPageTitle}
   canonical={canonicalUrl}
+  noindex={!isSearchIndexable}
   description={searchPageDescription}
   widthClassName="max-w-none"
   htmx
   showSplashText
-  schemas={[searchBoxSchema]}
-  breadcrumbs={[
-    {
-      name: 'Services',
-      url: '/',
-    },
-  ]}
+  schemas={[searchBoxSchema, { '@context': 'https://schema.org', ...KYCNOTME_SCHEMA_MINI }]}
 >
   <div class="flex flex-col gap-4 sm:flex-row sm:gap-8">
     <div
@@ -551,36 +557,21 @@ const searchBoxSchema = {
       <ServicesFilters
         searchResultsId={searchResultsId}
         showFiltersId={showFiltersId}
-        filters={{
-          ...filters,
-          'sort-seed': makeSortSeed(),
-        }}
+        filters={filters}
         options={filtersOptions}
         hasDefaultFilters={hasDefaultFilters}
       />
     </div>
 
     <div class="min-w-0 flex-1">
-      <h1
-        class="mb-2 flex items-center gap-0.5 text-[11px] font-medium tracking-widest text-day-500 uppercase"
-      >
-        No-KYC crypto services directory
-        <a
-          href="/about"
-          aria-label="About this directory"
-          title="About this directory"
-          class="-m-1.5 rounded-sm p-1.5 text-day-500 transition-colors hover:text-day-300 focus-visible:ring-1 focus-visible:ring-day-300 focus-visible:outline-hidden"
-        >
-          <Icon name="ri:information-line" class="size-3" />
-        </a>
-      </h1>
       <ServicesSearchResults
         services={services}
         id="search-results"
+        hasDefaultFilters={hasDefaultFiltersIgnoringPresentation}
+        sortSeed={filters['sort-seed']}
         currentPage={filters.page}
         total={totalServices}
         pageSize={PAGE_SIZE}
-        sortSeed={filters['sort-seed']}
         filters={filters}
         countCommunityOnly={countCommunityOnly}
         inlineIcons
@@ -595,7 +586,6 @@ const searchBoxSchema = {
           <Pagination
             currentPage={filters.page}
             totalPages={Math.ceil(totalServices / PAGE_SIZE)}
-            sortSeed={filters['sort-seed']}
             class="mt-8 js:hidden"
           />
         )
@@ -603,20 +593,3 @@ const searchBoxSchema = {
     </div>
   </div>
 </BaseLayout>
-
-<script>
-  ////////////////////////////////////////////////////////////
-  // Optional script for removing sort-seed from URL.       //
-  // This helps keep URLs cleaner when sharing.             //
-  ////////////////////////////////////////////////////////////
-
-  import { addOnLoadEventListener } from '../lib/onload'
-
-  addOnLoadEventListener(() => {
-    const url = new URL(window.location.href)
-    if (url.searchParams.has('sort-seed')) {
-      url.searchParams.delete('sort-seed')
-      window.history.replaceState({}, '', url)
-    }
-  })
-</script>

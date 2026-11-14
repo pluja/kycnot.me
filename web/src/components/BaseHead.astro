@@ -118,7 +118,7 @@ const ogImageUrl = makeOgImageUrl(ogImage, siteOrigin)
 <meta name="description" content={description} />
 <title>{fullTitle}</title>
 <link rel="canonical" href={absoluteSiteUrl(canonical)} />
-{noindex && <meta name="robots" content="noindex, nofollow" />}
+{noindex && <meta name="robots" content="noindex, follow" />}
 <meta http-equiv="onion-location" content={ONION_ADDRESS} />
 
 {/* Open Graph / Facebook */}

@@ -2,6 +2,7 @@
 import he from 'he'
 
 import { getCurrencyInfo } from '../../constants/currencies'
+import { listedServiceWhere } from '../../lib/listedServices'
 import { prisma } from '../../lib/prisma'
 
 import type { APIRoute } from 'astro'
@@ -36,25 +37,19 @@ export const GET: APIRoute = async ({ site }) => {
 }
 
 async function generateSEOSitemapUrls(siteUrl: string) {
-  const [categories, services] = await Promise.all([
+  const [categories, services, attributes] = await Promise.all([
     prisma.category.findMany({
       select: {
         slug: true,
         _count: {
           select: {
-            services: {
-              where: {
-                serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
-              },
-            },
+            services: { where: listedServiceWhere },
           },
         },
       },
     }),
     prisma.service.findMany({
-      where: {
-        serviceVisibility: { in: ['PUBLIC', 'ARCHIVED'] },
-      },
+      where: listedServiceWhere,
       select: {
         kycLevel: true,
         acceptedCurrencies: true,
@@ -64,6 +59,13 @@ async function generateSEOSitemapUrls(siteUrl: string) {
           },
         },
       },
+    }),
+    prisma.attribute.findMany({
+      select: {
+        id: true,
+        _count: { select: { services: { where: { service: listedServiceWhere } } } },
+      },
+      orderBy: { id: 'asc' },
     }),
   ])
 
@@ -211,6 +213,11 @@ async function generateSEOSitemapUrls(siteUrl: string) {
         ])
       )
     }
+  }
+
+  for (const attribute of attributes) {
+    if (attribute._count.services < MIN_RESULTS_FOR_CURATED_COMBINATION) continue
+    searchUrls.add(makeSearchUrl(siteUrl, [[`attr-${attribute.id.toString()}`, 'yes']]))
   }
 
   return Array.from(searchUrls)

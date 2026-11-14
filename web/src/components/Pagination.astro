@@ -10,7 +10,6 @@ type Props = HTMLAttributes<'nav'> & {
   currentPage: number
   totalPages: number
   currentUrl?: URL | string
-  sortSeed?: string
   hash?: string
   // pageParam names the query parameter, for a page with more than one paged list.
   pageParam?: string
@@ -20,7 +19,6 @@ const {
   currentPage,
   totalPages,
   currentUrl = Astro.url,
-  sortSeed,
   hash,
   pageParam,
   class: className,
@@ -28,7 +26,7 @@ const {
 } = Astro.props
 
 const pageUrl = (page: number) =>
-  `${createPageUrl(page, currentUrl, { 'sort-seed': sortSeed }, pageParam)}${hash ? `#${hash}` : ''}`
+  `${createPageUrl(page, currentUrl, undefined, pageParam)}${hash ? `#${hash}` : ''}`
 const prevPage = currentPage > 1 ? currentPage - 1 : null
 const nextPage = currentPage < totalPages ? currentPage + 1 : null
 
