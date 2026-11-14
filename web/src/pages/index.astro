@@ -77,6 +77,17 @@ if (Astro.url.searchParams.has(retiredParam)) {
   return Astro.redirect(canonicalUrl.pathname + canonicalUrl.search, 301)
 }
 
+const renamedCategorySlugs: Record<string, string> = { 'other-sevices': 'other-services' }
+const requestedCategories = Astro.url.searchParams.getAll('categories')
+if (requestedCategories.some((slug) => slug in renamedCategorySlugs)) {
+  const renamedUrl = new URL(Astro.url)
+  renamedUrl.searchParams.delete('categories')
+  for (const slug of requestedCategories) {
+    renamedUrl.searchParams.append('categories', renamedCategorySlugs[slug] ?? slug)
+  }
+  return Astro.redirect(renamedUrl.pathname + renamedUrl.search, 301)
+}
+
 const ignoredKeysForDefaultData = ['sort-seed']
 
 const {
