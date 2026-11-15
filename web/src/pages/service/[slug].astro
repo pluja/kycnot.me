@@ -19,6 +19,7 @@ import MyPicture from '../../components/MyPicture.astro'
 import ScoreSquare from '../../components/ScoreSquare.astro'
 import SectionHeading from '../../components/SectionHeading.astro'
 import AcceptedCurrencies from '../../components/service/AcceptedCurrencies.astro'
+import ListingStateNotice from '../../components/service/ListingStateNotice.astro'
 import ServiceAnswerPanel from '../../components/service/ServiceAnswerPanel.astro'
 import ServiceRiskAlert from '../../components/service/ServiceRiskAlert.astro'
 import ServiceTimeline from '../../components/service/ServiceTimeline.astro'
@@ -35,6 +36,7 @@ import { formatContactMethod } from '../../constants/contactMethods'
 import { getCountryInfo } from '../../constants/countries'
 import { currencies, getCurrencyInfo } from '../../constants/currencies'
 import { getKycLevelInfo } from '../../constants/kycLevels'
+import { getListingStateInfo } from '../../constants/listingStates'
 import { getServiceVisibilityInfo } from '../../constants/serviceVisibility'
 import { getVerificationStatusInfo } from '../../constants/verificationStatus'
 import { getVerificationStepStatusInfo } from '../../constants/verificationStepStatus'
@@ -47,6 +49,7 @@ import { getSupportedProviderSlugs } from '../../lib/exchange/supportedProviders
 import { experienceSummary, summaryWindowDays } from '../../lib/experienceQueries'
 import { isServicePubliclyReadable } from '../../lib/experiences'
 import { computeIncidentTrustPenalty, totalIncidentTrustPenalty } from '../../lib/incidentPenalty'
+import { getListingState } from '../../lib/listingState'
 import { fitSentences } from '../../lib/metaDescription'
 import { getOrCreateNotificationPreferences } from '../../lib/notificationPreferences'
 import { formatNumber } from '../../lib/numbers'
@@ -329,6 +332,12 @@ const categorySummary = describingCategories.length
   ? `${sentenceListFormatter.format(describingCategories.map((category) => asProseCategory(category.name)))} service`
   : 'service'
 const acceptedCurrencyNames = service.acceptedCurrencies.map((currency) => getCurrencyInfo(currency).name)
+const listingState = getListingState({
+  serviceVisibility: service.serviceVisibility,
+  latestCreateSuggestionStatus: service.suggestions[0]?.status ?? null,
+})
+const { scoreNote, metaCaveat } = getListingStateInfo(listingState)
+
 // A flagged service leads with the verdict. The neutral facts below otherwise
 // read as a feature list, and this string is also the meta description, so a
 // scam would advertise its own no-KYC policy in search results.
@@ -342,9 +351,13 @@ const serviceIntroVariants = [
   ),
   `${serviceIntro}.`,
 ]
-const scoreSummary = isFlaggedScam
-  ? `It has a score of ${formatRating(service.overallScore)}/10.`
-  : `It ${getKycPolicySummary(kycLevelInfo.value)} and has a score of ${formatRating(service.overallScore)}/10.`
+const scoreSummary = metaCaveat
+  ? isFlaggedScam
+    ? null
+    : `It ${getKycPolicySummary(kycLevelInfo.value)}, but ${metaCaveat}.`
+  : isFlaggedScam
+    ? `It has a score of ${formatRating(service.overallScore)}/10.`
+    : `It ${getKycPolicySummary(kycLevelInfo.value)} and has a score of ${formatRating(service.overallScore)}/10.`
 const pageDescription = transformCase(
   fitSentences([scamVerdict, serviceIntroVariants, scoreSummary]) || `${service.name} review on KYCnot.me.`,
   'first-upper'
@@ -355,7 +368,7 @@ const ogImageTemplateData = {
   title: service.name,
   description: service.description,
   categories: service.categories.map((category) => pick(category, ['name', 'icon'])),
-  score: service.overallScore,
+  score: scoreNote ? null : service.overallScore,
   imageUrl: service.imageUrl,
   verificationStatus: service.verificationStatus,
 } satisfies OgImagePublicTemplateWithProps
@@ -530,24 +543,25 @@ const safetyAnswer = makeSafetyAnswer({
   checks: flaggedChecks,
   recentlyApprovedAt: service.isRecentlyApproved ? service.approvedAt : null,
 })
-// The Review sits on the Organization itself. An unreviewed listing gets no
-// Review: nobody has looked at it yet.
-const serviceReview = isReviewed
-  ? makeServiceReview({
-      name: service.name,
-      overallScore: service.overallScore,
-      privacyScore: service.privacyScore,
-      trustScore: service.trustScore,
-      kycVerdict: { name: kycLevelInfo.name, description: kycLevelInfo.description },
-      tosSummary: isTosReviewable(service.verificationStatus) ? (service.tosReview?.summary ?? null) : null,
-      highlights: isTosReviewable(service.verificationStatus) ? (service.tosReview?.highlights ?? []) : [],
-      isFlaggedScam,
-      scamHeadline: statusInfo.headline,
-      listedAt: service.listedAt,
-      reviewedAt: verificationOverview.lastReviewAt,
-      author: KYCNOTME_SCHEMA_MINI,
-    })
-  : undefined
+// The Review sits on the Organization itself. An unreviewed or unlisted service
+// gets no Review: nobody on the team stands behind its scores.
+const serviceReview =
+  isReviewed && !scoreNote
+    ? makeServiceReview({
+        name: service.name,
+        overallScore: service.overallScore,
+        privacyScore: service.privacyScore,
+        trustScore: service.trustScore,
+        kycVerdict: { name: kycLevelInfo.name, description: kycLevelInfo.description },
+        tosSummary: isTosReviewable(service.verificationStatus) ? (service.tosReview?.summary ?? null) : null,
+        highlights: isTosReviewable(service.verificationStatus) ? (service.tosReview?.highlights ?? []) : [],
+        isFlaggedScam,
+        scamHeadline: statusInfo.headline,
+        listedAt: service.listedAt,
+        reviewedAt: verificationOverview.lastReviewAt,
+        author: KYCNOTME_SCHEMA_MINI,
+      })
+    : undefined
 
 const registrationCountry = service.registrationCountryCode
   ? getCountryInfo(service.registrationCountryCode)
@@ -691,47 +705,24 @@ const showsSingleThread = Astro.url.searchParams.has('comment')
     { name: service.name, url: `/service/${service.slug}` },
   ]}
 >
-  {
-    (serviceVisibilityInfo.value === 'UNLISTED' || serviceVisibilityInfo.value === 'ARCHIVED') && (
-      <div
-        class={cn(
-          'mb-3 rounded-lg border border-day-500/10 bg-yellow-900/50 px-3 py-2 text-sm text-yellow-400'
-        )}
-      >
-        <Icon
-          name={serviceVisibilityInfo.icon}
-          class="me-1.5 inline-block size-4 align-[-0.15em] text-yellow-500"
-        />
-        {serviceVisibilityInfo.longDescription}
-      </div>
-    )
-  }
+  {listingState !== 'LISTED' && <ListingStateNotice state={listingState} class="mb-3" />}
 
-  {/* An open incident outranks the review status: one banner, the worse one. */}
   {
-    activeEventToShow ? (
-      <div class="mb-4">
+    activeEventToShow && (
+      <div class={cn(!scoreNote && !isReviewed ? 'mb-3' : 'mb-4')}>
         <ServiceRiskAlert
           event={activeEventToShow}
           moreIncidents={moreActiveIncidents}
           moreWarnings={moreActiveWarnings}
         />
       </div>
-    ) : (
-      !isReviewed && (
-        <div class="mb-4">
-          <UnreviewedNotice />
-        </div>
-      )
     )
   }
 
   {
-    serviceVisibilityInfo.value === 'HIDDEN' && (
-      <div class="mb-3 rounded-lg border border-red-500/20 bg-red-900/40 px-3 py-2 text-sm text-red-300">
-        <Icon name="ri:eye-off-line" class="me-1.5 inline-block size-4 align-[-0.15em] text-red-400" />
-        This service is <span class="font-bold">hidden</span>. It is not publicly visible and can only be seen
-        by admins and moderators.
+    !scoreNote && !isReviewed && (
+      <div class="mb-4">
+        <UnreviewedNotice />
       </div>
     )
   }
@@ -758,9 +749,12 @@ const showsSingleThread = Astro.url.searchParams.has('comment')
           href="#scores"
           role="link"
           size="badge"
-          aria-label={`Overall score ${formatRating(service.overallScore)} out of 10. See the attributes behind it.`}
+          aria-label={scoreNote
+            ? `Overall score ${formatRating(service.overallScore)} out of 10, calculated automatically (${transformCase(scoreNote, 'lower')}). See the attributes behind it.`
+            : `Overall score ${formatRating(service.overallScore)} out of 10. See the attributes behind it.`}
           score={service.overallScore}
           label="Overall"
+          provisionalNote={scoreNote}
           class="size-6 text-base sm:size-7 sm:text-lg"
         />
         <h1
@@ -1137,6 +1131,11 @@ const showsSingleThread = Astro.url.searchParams.has('comment')
         Overall <span class="font-semibold text-day-200">{service.overallScore}</span>/10
       </span>
       {isFlaggedScam && <span class="text-red-400">capped at 3</span>}
+      {
+        scoreNote && (
+          <span class="text-day-500">· calculated automatically, {transformCase(scoreNote, 'lower')}</span>
+        )
+      }
     </p>
 
     <div id="attributes" class="space-y-4">

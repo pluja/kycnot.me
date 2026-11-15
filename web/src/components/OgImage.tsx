@@ -54,7 +54,7 @@ const ogImageTemplates = {
     { title, description, categories, score, imageUrl, verificationStatus }: OgImageProps<'service'>,
     _context
   ) => {
-    const scoreInfo = makeOverallScoreInfo(score, 10)
+    const scoreInfo = makeOverallScoreInfo(score ?? 0, 10)
     const scoreColors = {
       'bg-score-1': '#e26136',
       'bg-score-2': '#eba370',
@@ -182,24 +182,26 @@ const ogImageTemplates = {
               )}
             </div>
           </div>
-          <div style={{ display: 'flex' }}>
-            <div
-              style={{
-                fontSize: 150,
-                color: 'black',
-                height: 200,
-                width: 200,
-                borderRadius: 30,
-                backgroundColor: scoreColor,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 'bold',
-              }}
-            >
-              {score}
+          {score !== null && (
+            <div style={{ display: 'flex' }}>
+              <div
+                style={{
+                  fontSize: 150,
+                  color: 'black',
+                  height: 200,
+                  width: 200,
+                  borderRadius: 30,
+                  backgroundColor: scoreColor,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold',
+                }}
+              >
+                {score}
+              </div>
             </div>
-          </div>
+          )}
         </div>
         <svg
           xmlns="http://www.w3.org/2000/svg"

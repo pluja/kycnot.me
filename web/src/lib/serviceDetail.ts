@@ -19,6 +19,12 @@ export function serviceDetailSelect(viewerId: number) {
     trustScore: true,
     verificationStatus: true,
     serviceVisibility: true,
+    suggestions: {
+      where: { type: 'CREATE_SERVICE' },
+      select: { status: true },
+      orderBy: { createdAt: 'desc' },
+      take: 1,
+    },
     verificationSummary: true,
     verificationProofMd: true,
     tosUrls: true,

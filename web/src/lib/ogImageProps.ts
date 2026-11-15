@@ -68,7 +68,8 @@ export const publicOgImagePropsSchemas = {
             .strict()
         )
         .max(OG_IMAGE_LIMITS.maxCategories),
-      score: scoreSchema,
+      // null leaves the score out, for services nobody on the team has reviewed.
+      score: scoreSchema.nullable(),
       imageUrl: imageSourceSchema.nullish(),
       verificationStatus: verificationStatusSchema,
     })

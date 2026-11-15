@@ -37,7 +37,7 @@ export function normalizePublicOgImageProps(
         title,
         description,
         categories,
-        score: normalizeOgImageScore(ogImage.score),
+        score: ogImage.score === null ? null : normalizeOgImageScore(ogImage.score),
         imageUrl: normalizeImageSource(ogImage.imageUrl),
         verificationStatus: ogImage.verificationStatus,
       }

@@ -46,6 +46,11 @@ void test('accepts a service with no picture and no status', () => {
   })
 })
 
+void test('accepts a null score, which leaves the badge out', () => {
+  const props = accepted(publicOgImagePropsSchemas.service, { ...serviceProps, score: null })
+  assert.equal(props.score, null)
+})
+
 void test('rejects a score that is not a number', () => {
   // Unparsed, this painted "NaN" into the score badge and cached it for a year.
   assert.equal(

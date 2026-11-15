@@ -13,6 +13,8 @@ type Props = Polymorphic<{
   showInfo?: boolean
   // size 'badge' is only the coloured square with the number, with no size of its own.
   size?: 'badge' | 'lg'
+  // provisionalNote greys the score out and says why nobody on the team stands behind it.
+  provisionalNote?: string | null
   children?: never
 }>
 
@@ -24,10 +26,14 @@ const {
   size = 'lg',
   class: className,
   showInfo = false,
+  provisionalNote = null,
   ...htmlProps
 } = Astro.props
 
-const { text, classNameBg, formattedScore } = makeOverallScoreInfo(score, total)
+const scoreInfo = makeOverallScoreInfo(score, total)
+const { formattedScore } = scoreInfo
+const text = provisionalNote ?? scoreInfo.text
+const classNameBg = provisionalNote ? 'bg-day-500' : scoreInfo.classNameBg
 ---
 
 {
@@ -40,7 +46,11 @@ const { text, classNameBg, formattedScore } = makeOverallScoreInfo(score, total)
         className
       )}
       role={htmlProps.role ?? 'group'}
-      title={`${text} ${transformCase(label, 'lower')}`}
+      title={
+        provisionalNote
+          ? `${label} score, calculated automatically: ${transformCase(provisionalNote, 'lower')}`
+          : `${text} ${transformCase(label, 'lower')}`
+      }
     >
       {formattedScore}
     </Tag>
