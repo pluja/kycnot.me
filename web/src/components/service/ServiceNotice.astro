@@ -1,0 +1,50 @@
+---
+import { Icon } from 'astro-icon/components'
+
+import { cn } from '../../lib/cn'
+
+type Props = {
+  title: string
+  description: string
+  icon: string
+  link?: { href: string; text: string } | null
+  classNames: {
+    banner: string
+    icon: string
+    title: string
+  }
+  class?: string
+}
+
+const { title, description, icon, link, classNames, class: className } = Astro.props
+---
+
+<aside class={cn('rounded-lg border px-4 py-3', classNames.banner, className)} aria-label={title}>
+  <p
+    class={cn(
+      'flex items-center gap-2 font-title text-xs leading-none font-bold tracking-wider uppercase',
+      classNames.title
+    )}
+  >
+    <Icon name={icon} class={cn('size-4 shrink-0', classNames.icon)} aria-hidden="true" />
+    {title}
+  </p>
+
+  <p class="mt-2 max-w-prose text-sm text-pretty text-day-300">
+    {description}
+    {
+      link && (
+        <a
+          href={link.href}
+          class={cn(
+            'ms-1 inline-flex items-center gap-0.5 font-medium whitespace-nowrap underline decoration-current/40 underline-offset-4 hover:decoration-current',
+            classNames.title
+          )}
+        >
+          {link.text}
+          <Icon name="ri:arrow-right-s-line" class="size-4" aria-hidden="true" />
+        </a>
+      )
+    }
+  </p>
+</aside>
