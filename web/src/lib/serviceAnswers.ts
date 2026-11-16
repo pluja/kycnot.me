@@ -147,8 +147,8 @@ type SafetyInput = {
   incidents: OpenIncident[]
   // warnings are the open ones, listed under any incident verdict and a verdict of their own without one.
   warnings?: OpenWarning[]
-  // hasBeenReviewed is false when nobody has reviewed the listing, so a low score means "unknown".
-  hasBeenReviewed: boolean
+  // reviewDepth below IN_DEPTH means nobody vouches for the attributes, so a low score means "unknown".
+  reviewDepth: ReviewDepth
   // caveats is the trust half of `pickCaveats`.
   caveats: Caveat[]
   // checks are the review checks that failed or raised a warning, each linking to its entry.
@@ -156,6 +156,10 @@ type SafetyInput = {
   // recentlyApprovedAt is set while a listing counts as recently approved, so a clean record is also a short one.
   recentlyApprovedAt: Date | null
 }
+
+// ReviewDepth is how far the team has looked: BASIC is a listed community service that passed the spam and
+// eligibility check, NONE is a page outside the directory whose attributes nobody on the team vouches for.
+export type ReviewDepth = 'BASIC' | 'IN_DEPTH' | 'NONE'
 
 export type FlaggedCheck = { title: string; href: string; failed: boolean }
 
@@ -190,7 +194,7 @@ export function makeSafetyAnswer({
   verificationStatus,
   incidents,
   warnings = [],
-  hasBeenReviewed,
+  reviewDepth,
   caveats,
   checks,
   recentlyApprovedAt,
@@ -281,14 +285,17 @@ export function makeSafetyAnswer({
     }
   }
 
-  if (!hasBeenReviewed) {
+  if (reviewDepth !== 'IN_DEPTH') {
+    const recordLine =
+      ongoing.length > 0 ? 'Nothing beyond the notice above.' : 'No incidents or warnings so far.'
+    const reviewLine =
+      reviewDepth === 'BASIC'
+        ? 'Our team only did a basic check, not an in-depth review.'
+        : "Our team hasn't verified its details."
     return {
       tone: 'unknown',
       answer: ongoing.length > 0 ? 'Nothing serious on record' : 'Nothing on record',
-      detail:
-        ongoing.length > 0
-          ? 'Nothing beyond the notice above. Nobody from the team has looked yet.'
-          : 'No incidents or warnings so far. Nobody from the team has looked yet.',
+      detail: `${recordLine} ${reviewLine}`,
       caveats: flaggedChecks,
     }
   }

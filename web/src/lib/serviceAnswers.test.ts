@@ -44,7 +44,7 @@ void test('an empty policy falls back to the stock sentence', () => {
 const base = {
   verificationStatus: 'VERIFICATION_SUCCESS' as const,
   incidents: [],
-  hasBeenReviewed: true,
+  reviewDepth: 'IN_DEPTH' as const,
   caveats: [],
   checks: [],
   recentlyApprovedAt: null,
@@ -128,7 +128,7 @@ void test('an unreviewed listing reads as unknown, not as bad', () => {
   const answer = makeSafetyAnswer({
     ...base,
     verificationStatus: 'COMMUNITY_CONTRIBUTED',
-    hasBeenReviewed: false,
+    reviewDepth: 'BASIC',
   })
   assert.equal(answer.tone, 'unknown')
   assert.equal(answer.answer, 'Nothing on record')
@@ -278,7 +278,7 @@ void test('an unreviewed listing keeps its verdict and lists its flagged checks 
   const answer = makeSafetyAnswer({
     ...base,
     verificationStatus: 'COMMUNITY_CONTRIBUTED',
-    hasBeenReviewed: false,
+    reviewDepth: 'BASIC',
     checks: [{ title: 'Due Diligence Notice', href: '#check-3', failed: false }],
   })
   assert.equal(answer.answer, 'Nothing on record')
@@ -364,7 +364,7 @@ void test('the users fact counts recent experiences and states the verdict', () 
 
 void test('an open low incident is never contradicted or left out', () => {
   const low = { ...incident, title: 'Server list outdated', severity: 'LOW' as const }
-  const unreviewed = makeSafetyAnswer({ ...base, hasBeenReviewed: false, incidents: [low] })
+  const unreviewed = makeSafetyAnswer({ ...base, reviewDepth: 'NONE', incidents: [low] })
   assert.equal(unreviewed.answer, 'Nothing serious on record')
   const withResolved = makeSafetyAnswer({
     ...base,
@@ -390,4 +390,18 @@ void test('an open low incident is named next to a warning and a caveat', () => 
   )
   const withCaveat = makeSafetyAnswer({ ...base, incidents: [low], caveats: [{ title: 'No-refund policy' }] })
   assert.doesNotMatch(withCaveat.detail, /Nothing on record/)
+})
+
+void test('the safety detail says how far the team has looked', () => {
+  const basic = makeSafetyAnswer({
+    ...base,
+    verificationStatus: 'COMMUNITY_CONTRIBUTED',
+    reviewDepth: 'BASIC',
+  })
+  assert.equal(
+    basic.detail,
+    'No incidents or warnings so far. Our team only did a basic check, not an in-depth review.'
+  )
+  const none = makeSafetyAnswer({ ...base, verificationStatus: 'COMMUNITY_CONTRIBUTED', reviewDepth: 'NONE' })
+  assert.equal(none.detail, "No incidents or warnings so far. Our team hasn't verified its details.")
 })

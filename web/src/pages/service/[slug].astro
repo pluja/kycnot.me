@@ -67,6 +67,7 @@ import {
   makeSafetyAnswer,
   makeUsersFact,
   pickCaveats,
+  type ReviewDepth,
 } from '../../lib/serviceAnswers'
 import { isEmbeddableBadgeStatus } from '../../lib/serviceBadges'
 import { serviceDetailSelect } from '../../lib/serviceDetail'
@@ -337,6 +338,7 @@ const listingState = getListingState({
   latestCreateSuggestionStatus: service.suggestions[0]?.status ?? null,
 })
 const { scoreNote, metaCaveat } = getListingStateInfo(listingState)
+const reviewDepth: ReviewDepth = scoreNote ? 'NONE' : isReviewed ? 'IN_DEPTH' : 'BASIC'
 
 // A flagged service leads with the verdict. The neutral facts below otherwise
 // read as a feature list, and this string is also the meta description, so a
@@ -538,7 +540,7 @@ const safetyAnswer = makeSafetyAnswer({
     ...pick(entry.incident, ['severity', 'state', 'occurredAt', 'resolvedAt']),
   })),
   warnings: openWarnings.map((event) => ({ id: event.id, title: event.title, startedAt: event.startedAt })),
-  hasBeenReviewed: isReviewed,
+  reviewDepth,
   caveats: caveats.trust,
   checks: flaggedChecks,
   recentlyApprovedAt: service.isRecentlyApproved ? service.approvedAt : null,
@@ -1046,7 +1048,8 @@ const showsSingleThread = Astro.url.searchParams.has('comment')
       privacyScore={service.privacyScore}
       trustScore={service.trustScore}
       serviceName={service.name}
-      unverified={!isReviewed}
+      reviewDepth={reviewDepth}
+      scoreNote={scoreNote}
     />
 
     <TosSummaryCard service={service} />

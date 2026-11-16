@@ -8,7 +8,7 @@ import ScoreGauge from '../ScoreGauge.astro'
 import SentimentBar from '../SentimentBar.astro'
 import Tooltip from '../Tooltip.astro'
 
-import type { makeUsersFact, ServiceAnswer } from '../../lib/serviceAnswers'
+import type { makeUsersFact, ReviewDepth, ServiceAnswer } from '../../lib/serviceAnswers'
 
 type Props = {
   kyc: ServiceAnswer
@@ -17,8 +17,9 @@ type Props = {
   privacyScore: number
   trustScore: number
   serviceName: string
-  // unverified means nobody has reviewed the listing: the scores are shown, but not vouched for.
-  unverified?: boolean
+  reviewDepth: ReviewDepth
+  // scoreNote names the listing state when the page is outside the directory.
+  scoreNote?: string | null
   usersFact?: ReturnType<typeof makeUsersFact>
 }
 
@@ -30,8 +31,28 @@ const {
   privacyScore,
   trustScore,
   serviceName,
-  unverified = false,
+  reviewDepth,
+  scoreNote = null,
 } = Astro.props
+
+const unverified = reviewDepth !== 'IN_DEPTH'
+
+const reviewBadge =
+  reviewDepth === 'IN_DEPTH'
+    ? null
+    : reviewDepth === 'BASIC'
+      ? {
+          label: 'Basic check only',
+          tooltip:
+            'Our team only did a basic check for spam and eligibility. The attributes and the score are as the user declared them.',
+          href: '/docs/listings#community-contributed',
+        }
+      : {
+          label: scoreNote ?? 'Not reviewed',
+          tooltip:
+            "The attributes and the score are as a user submitted them. Our team hasn't verified them.",
+          href: '/docs/listings#listing-statuses',
+        }
 
 const toneClass = {
   good: 'text-green-400',
@@ -51,7 +72,7 @@ const questions = [
     score: privacyScore,
     scoreLabel: 'Privacy',
     dim: unverified,
-    unreviewedBadge: false,
+    reviewBadge: null,
     ...kyc,
     detailHtml: kyc.detailMd ? await markdownToInlineHtml(kyc.detailMd) : null,
     usersFact: null,
@@ -63,7 +84,7 @@ const questions = [
     score: trustScore,
     scoreLabel: 'Trust',
     dim: unverified,
-    unreviewedBadge: unverified,
+    reviewBadge,
     ...safety,
     detailHtml: null,
     usersFact,
@@ -102,22 +123,18 @@ const questions = [
                     </Tooltip>
                   </>
                 )}
-                {question.unreviewedBadge && (
+                {question.reviewBadge && (
                   <>
                     <span class="text-day-600" aria-hidden="true">
                       ·
                     </span>
-                    <Tooltip
-                      text="Submitted by a user. The attributes and the score are as submitted; nobody from KYCnot.me has checked them yet."
-                      position="top"
-                      class="inline-flex"
-                    >
+                    <Tooltip text={question.reviewBadge.tooltip} position="top" class="inline-flex">
                       <a
-                        href="/docs/listings#listing-statuses"
+                        href={question.reviewBadge.href}
                         class="inline-flex items-center gap-1 text-yellow-300"
                       >
                         <Icon name="ri:question-line" class="size-3.5" />
-                        Not reviewed
+                        {question.reviewBadge.label}
                       </a>
                     </Tooltip>
                   </>
