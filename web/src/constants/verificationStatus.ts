@@ -142,7 +142,7 @@ export const {
       icon: 'ri:question-line',
       default: false,
       description:
-        'Our team only did a basic check for spam and eligibility. The attributes are as the user declared them, so the scores are unverified until an in-depth review is published.',
+        "We only checked that it meets our listing rules. We haven't tested it, and its details and scores are as the user declared them.",
       privacyPoints: 0,
       trustPoints: 0,
       classNames: {

@@ -398,10 +398,7 @@ void test('the safety detail says how far the team has looked', () => {
     verificationStatus: 'COMMUNITY_CONTRIBUTED',
     reviewDepth: 'BASIC',
   })
-  assert.equal(
-    basic.detail,
-    'No incidents or warnings so far. Our team only did a basic check, not an in-depth review.'
-  )
+  assert.equal(basic.detail, "No incidents or warnings so far. We haven't tested this service.")
   const none = makeSafetyAnswer({ ...base, verificationStatus: 'COMMUNITY_CONTRIBUTED', reviewDepth: 'NONE' })
   assert.equal(none.detail, "No incidents or warnings so far. Our team hasn't verified its details.")
 })

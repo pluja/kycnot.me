@@ -337,7 +337,26 @@ const listingState = getListingState({
   serviceVisibility: service.serviceVisibility,
   latestCreateSuggestionStatus: service.suggestions[0]?.status ?? null,
 })
-const { scoreNote, metaCaveat } = getListingStateInfo(listingState)
+const listingStateInfo = getListingStateInfo(listingState)
+const { scoreNote, metaCaveat } = listingStateInfo
+// Every suggestion starts as community contributed, so outside the directory that status only means
+// "submitted"; the page shows the listing state in its place. A scam verdict always shows.
+const showsVerificationStatus = !scoreNote || isFlaggedScam
+const evidenceStatus = showsVerificationStatus
+  ? {
+      label: statusInfo.label,
+      description: statusInfo.description,
+      icon: statusInfo.icon,
+      badgeClassName: statusInfo.classNames.badgeBig,
+      containerClassName: statusInfo.classNames.containerBg,
+    }
+  : {
+      label: listingStateInfo.title,
+      description: listingStateInfo.description,
+      icon: listingStateInfo.icon,
+      badgeClassName: 'bg-night-400 text-day-100',
+      containerClassName: 'bg-night-600',
+    }
 const reviewDepth: ReviewDepth = scoreNote ? 'NONE' : isReviewed ? 'IN_DEPTH' : 'BASIC'
 
 // A flagged service leads with the verdict. The neutral facts below otherwise
@@ -772,13 +791,17 @@ const showsSingleThread = Astro.url.searchParams.has('comment')
       <div class="order-last flex basis-full flex-wrap items-center gap-2">
         <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           {/* Outside the category list: it is a verdict, not a category. */}
-          <Tooltip class="inline-flex" text={statusInfo.description} position="bottom">
-            <BadgeStandard
-              icon={statusInfo.icon}
-              text={statusInfo.labelShort}
-              class={cn('font-bold', badgeSizeClass, statusInfo.classNames.badgeBig)}
-            />
-          </Tooltip>
+          {
+            showsVerificationStatus && (
+              <Tooltip class="inline-flex" text={statusInfo.description} position="bottom">
+                <BadgeStandard
+                  icon={statusInfo.icon}
+                  text={statusInfo.labelShort}
+                  class={cn('font-bold', badgeSizeClass, statusInfo.classNames.badgeBig)}
+                />
+              </Tooltip>
+            )
+          }
 
           <ul class="contents" aria-label="Categories">
             <li class="contents">
@@ -1191,7 +1214,7 @@ const showsSingleThread = Astro.url.searchParams.has('comment')
   <div
     class={cn(
       'mb-6 flex flex-col gap-3 rounded-lg border border-day-500/10 px-4 py-3 sm:flex-row sm:items-start sm:justify-between',
-      statusInfo.classNames.containerBg
+      evidenceStatus.containerClassName
     )}
   >
     <div class="min-w-0 flex-1">
@@ -1199,13 +1222,13 @@ const showsSingleThread = Astro.url.searchParams.has('comment')
         <div
           class={cn(
             'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-medium',
-            statusInfo.classNames.badgeBig
+            evidenceStatus.badgeClassName
           )}
         >
-          <Icon name={statusInfo.icon} class="size-4" />
-          <span>{statusInfo.label}</span>
+          <Icon name={evidenceStatus.icon} class="size-4" />
+          <span>{evidenceStatus.label}</span>
         </div>
-        <p class="text-sm text-current/70">{statusInfo.description}</p>
+        <p class="text-sm text-current/70">{evidenceStatus.description}</p>
       </div>
 
       {

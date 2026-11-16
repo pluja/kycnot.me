@@ -289,9 +289,7 @@ export function makeSafetyAnswer({
     const recordLine =
       ongoing.length > 0 ? 'Nothing beyond the notice above.' : 'No incidents or warnings so far.'
     const reviewLine =
-      reviewDepth === 'BASIC'
-        ? 'Our team only did a basic check, not an in-depth review.'
-        : "Our team hasn't verified its details."
+      reviewDepth === 'BASIC' ? "We haven't tested this service." : "Our team hasn't verified its details."
     return {
       tone: 'unknown',
       answer: ongoing.length > 0 ? 'Nothing serious on record' : 'Nothing on record',
