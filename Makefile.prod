@@ -121,7 +121,7 @@ import-db:  ## Restore a backup. Usage: make import-db [FILE=backups/x.dump]
 	docker compose exec -T database psql -U $${POSTGRES_USER:-kycnot} -c "CREATE DATABASE $${POSTGRES_DATABASE:-kycnot};" postgres
 
 	echo "=== STEP 2: RESTORING DUMP ==="
-	docker compose exec -T database pg_restore -U $${POSTGRES_USER:-kycnot} -d $${POSTGRES_DATABASE:-kycnot} --no-owner --exit-on-error < "$$BACKUP_FILE"
+	docker compose exec -T database pg_restore -U $${POSTGRES_USER:-kycnot} -d $${POSTGRES_DATABASE:-kycnot} --no-owner $(RESTORE_FLAGS) --exit-on-error < "$$BACKUP_FILE"
 	echo "Database data restored."
 
 	echo "=== STEP 3: APPLYING PENDING MIGRATIONS ==="
@@ -181,13 +181,15 @@ sync-prod:  ## Restore newest prod dump, then scrub credentials (preprod only)
 	echo "Saving a rollback copy of this database to $$OUT..."
 	docker compose exec -T database pg_dump -U $${POSTGRES_USER:-kycnot} -d $${POSTGRES_DATABASE:-kycnot} -c -F c > "$$OUT"
 	docker compose exec -T database pg_restore --list < "$$OUT" >/dev/null
-	SRC=$$(ls -1t backups/db_backup_*.dump 2>/dev/null | head -1 || true)
+	# sync-all.sh pushes prod dumps into backups/prod/, apart from this host's own backups.
+	SRC=$$(ls -1 backups/prod/db_backup_*.dump 2>/dev/null | sort | tail -1 || true)
 	if [ -z "$$SRC" ]; then
-		echo "No production dump found (backups/db_backup_*.dump). Run sync-all.sh first." >&2
+		echo "No production dump found (backups/prod/db_backup_*.dump). Run sync-all.sh first." >&2
 		exit 1
 	fi
 	echo "Restoring production dump: $$SRC"
-	$(MAKE) import-db FILE="$$SRC"
+	# --no-acl: prod grants to roles (such as the sentinel's read-only one) that preprod does not have.
+	$(MAKE) import-db FILE="$$SRC" RESTORE_FLAGS=--no-acl
 	$(MAKE) scrub-credentials
 	echo "Preprod is now a scrubbed copy of production. Rollback: make import-db FILE=$$OUT"
 
