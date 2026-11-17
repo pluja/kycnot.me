@@ -58,10 +58,13 @@ const unprovenSql = (commentId: Prisma.Sql) => Prisma.sql`(
       AND NOT EXISTS (
         SELECT 1 FROM "CommentEvidence" v
         WHERE v."commentId"=${commentId} AND v."removedAt" IS NULL
-          AND ((v."needsCheck" AND v."createdAt" <= r."dueAt") OR (
-            SELECT ch.finding FROM "EvidenceCheck" ch WHERE ch."evidenceId"=v.id
-            ORDER BY ch."recordedAt" DESC, ch.id DESC LIMIT 1
-          ) = 'UNABLE_TO_CHECK')
+          AND ((v."needsCheck" AND v."createdAt" <= r."dueAt") OR EXISTS (
+            SELECT 1 FROM (
+              SELECT ch.finding, ch."recordedAt" FROM "EvidenceCheck" ch WHERE ch."evidenceId"=v.id
+              ORDER BY ch."recordedAt" DESC, ch.id DESC LIMIT 1
+            ) latest
+            WHERE latest.finding = 'UNABLE_TO_CHECK' AND latest."recordedAt" >= r."createdAt"
+          ))
       )
   )
 )`

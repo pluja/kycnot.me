@@ -10,20 +10,29 @@ export const MAX_DISPUTES_PER_SERVICE_PER_WEEK = 3
 
 const proofRequestDueAt = (from = new Date()) => addDays(from, PROOF_REQUEST_DAYS)
 
-type Evidence = ProofInput & { createdAt: Date; needsCheck: boolean; checks: { finding: EvidenceFinding }[] }
+type Evidence = ProofInput & {
+  createdAt: Date
+  needsCheck: boolean
+  checks: { finding: EvidenceFinding; recordedAt: Date }[]
+}
 
 // proofRequestState mirrors unprovenSql in experienceQueries.ts. Accepted proof answers a request, and so does proof
-// that could not be checked or that was sent by the due date and still waits for a check: neither is the author's
-// fault. Proof sent later answers only once accepted, so resending after a failed check can't hold the request open.
-// Unanswered past its due date, a published post reads as Unproven.
-export function proofRequestState(request: { dueAt: Date }, evidence: Evidence[], now = new Date()) {
-  const answered = evidence.some(
-    (item) =>
-      countsAsProof(item) ||
-      (!item.removedAt &&
-        ((item.needsCheck && item.createdAt <= request.dueAt) ||
-          item.checks[0]?.finding === 'UNABLE_TO_CHECK'))
-  )
+// that was sent by the due date and still waits for a check, or that could not be checked after the request was made:
+// neither is the author's fault. A could-not-check result from before the request doesn't answer it, since the request
+// asked for better proof than that. Proof sent after the due date answers only once accepted, so resending after a
+// failed check can't hold the request open. Unanswered past its due date, a published post reads as Unproven.
+export function proofRequestState(
+  request: { createdAt: Date; dueAt: Date },
+  evidence: Evidence[],
+  now = new Date()
+) {
+  const answered = evidence.some((item) => {
+    if (countsAsProof(item)) return true
+    if (item.removedAt) return false
+    if (item.needsCheck) return item.createdAt <= request.dueAt
+    const [latestCheck] = item.checks
+    return latestCheck?.finding === 'UNABLE_TO_CHECK' && latestCheck.recordedAt >= request.createdAt
+  })
   if (answered) return 'answered'
   return request.dueAt > now ? 'open' : 'unanswered'
 }

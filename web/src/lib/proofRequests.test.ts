@@ -7,11 +7,15 @@ const asked = new Date('2026-10-01T00:00:00Z')
 const request = { createdAt: asked, dueAt: new Date('2026-10-08T00:00:00Z') }
 const before = new Date('2026-10-05T00:00:00Z')
 const after = new Date('2026-10-09T00:00:00Z')
-const proof = (finding: 'INCONSISTENT' | 'ORDER_FOUND' | 'UNABLE_TO_CHECK' | null, createdAt = before) => ({
+const proof = (
+  finding: 'INCONSISTENT' | 'ORDER_FOUND' | 'UNABLE_TO_CHECK' | null,
+  createdAt = before,
+  checkedAt = createdAt
+) => ({
   createdAt,
   removedAt: null,
   needsCheck: finding === null,
-  checks: finding ? [{ finding }] : [],
+  checks: finding ? [{ finding, recordedAt: checkedAt }] : [],
 })
 
 void test('a request is open until its due date, then unanswered', () => {
@@ -32,6 +36,19 @@ void test('proof sent before the request still answers it while it waits for a c
 void test('proof sent after the due date answers it only once accepted', () => {
   assert.equal(proofRequestState(request, [proof(null, after)], after), 'unanswered')
   assert.equal(proofRequestState(request, [proof('ORDER_FOUND', after)], after), 'answered')
+})
+
+void test('proof found uncheckable before the request does not answer it', () => {
+  const sentEarlier = new Date('2026-09-01')
+  assert.equal(
+    proofRequestState(request, [proof('UNABLE_TO_CHECK', sentEarlier, sentEarlier)], before),
+    'open'
+  )
+  assert.equal(
+    proofRequestState(request, [proof('UNABLE_TO_CHECK', sentEarlier, sentEarlier)], after),
+    'unanswered'
+  )
+  assert.equal(proofRequestState(request, [proof('UNABLE_TO_CHECK', sentEarlier, before)], after), 'answered')
 })
 
 void test('inconsistent proof does not answer it', () => {

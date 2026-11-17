@@ -49,7 +49,7 @@ export const commentPageEvidenceSelect = {
   needsCheck: true,
   checks: {
     orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
-    select: { id: true, finding: true, explanation: true, checkedAt: true },
+    select: { id: true, finding: true, explanation: true, checkedAt: true, recordedAt: true },
   },
 } satisfies Prisma.CommentEvidenceSelect
 
