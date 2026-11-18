@@ -118,3 +118,20 @@ def test_a_reply_that_never_validates_raises(monkeypatch):
 
     with pytest.raises(ValueError, match="bad rating"):
         ai.query_openai_json([], model="m", validate=validate)
+
+
+def test_a_deep_scan_warning_is_stored_with_a_markdown_body(monkeypatch):
+    from pyworker.utils import ai
+
+    reply = {"warnings": [{"title": "t", "content": "c", "severity": "info"}]}
+    monkeypatch.setattr(ai, "query_openai_json", lambda messages, validate: reply)
+
+    result = ai.prompt_deep_scan(
+        content="",
+        service_name="s",
+        attribute_catalog_md="",
+        current_attribute_ids=[],
+        listing_record={},
+    )
+
+    assert result["warnings"] == [{"title": "t", "bodyMd": "c", "severity": "info"}]

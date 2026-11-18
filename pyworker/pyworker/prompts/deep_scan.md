@@ -61,7 +61,7 @@ Produce a single JSON object with all of the following fields:
    - `'warning'` the moderator should check this before applying the scan.
    - `'alert'` the scan may be wrong on something that matters (the KYC level, a fund-blocking clause) until a person checks.
 
-   Usually empty. Each warning needs a short `title`, a `bodyMd` (markdown, 1-2 sentences) grounded in the corpus, and a `severity`.
+   Usually empty. Each warning needs a short `title`, a `content` (markdown, 1-2 sentences) grounded in the corpus, and a `severity`.
 
 Format the response as a valid JSON object matching this type:
 

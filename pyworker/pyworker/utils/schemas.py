@@ -127,7 +127,7 @@ def _validate_deep_scan(data: dict[str, Any]) -> None:
     for i, w in enumerate(data["warnings"]):
         if not isinstance(w, dict):
             raise ValueError(f"warnings[{i}] must be a dict")
-        for field in ("title", "bodyMd", "severity"):
+        for field in ("title", "content", "severity"):
             if field not in w:
                 raise ValueError(f"warnings[{i}] missing field: {field}")
         if w["severity"] not in ("info", "warning", "alert"):
@@ -311,7 +311,7 @@ DEEP_SCAN = PromptSchema(
     /** Notes for the moderator reviewing this scan, never shown to readers. Usually empty. */
     warnings: {
         title: string
-        bodyMd: MarkdownString
+        content: MarkdownString
         severity: 'info' | 'warning' | 'alert'
     }[]
 }""",

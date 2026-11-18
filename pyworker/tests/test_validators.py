@@ -125,3 +125,13 @@ def test_deep_scan_accepts_up_to_the_highlight_ceiling():
 def test_deep_scan_rejects_highlights_past_the_ceiling():
     with pytest.raises(ValueError, match="highlights"):
         schemas.DEEP_SCAN.validate(deep_scan_with(schemas.MAX_HIGHLIGHTS + 1))
+
+
+def test_deep_scan_warning_is_written_as_content():
+    scan = deep_scan_with(0)
+    scan["warnings"] = [{"title": "t", "content": "c", "severity": "info"}]
+    schemas.DEEP_SCAN.validate(scan)
+
+    scan["warnings"] = [{"title": "t", "bodyMd": "c", "severity": "info"}]
+    with pytest.raises(ValueError, match="content"):
+        schemas.DEEP_SCAN.validate(scan)

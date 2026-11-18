@@ -244,6 +244,12 @@ def prompt_deep_scan(
         current_kyc_notes=current_kyc_notes,
     )
     result_dict = query_openai_json(messages, validate=schemas.DEEP_SCAN.validate)
+    # The model is asked for `content`, the name highlights use, because it
+    # misspells `bodyMd` ("body Md", "body") in about one scan in twenty.
+    result_dict["warnings"] = [
+        {"title": w["title"], "bodyMd": w["content"], "severity": w["severity"]}
+        for w in result_dict["warnings"]
+    ]
     return cast(DeepScanResultType, result_dict)
 
 
