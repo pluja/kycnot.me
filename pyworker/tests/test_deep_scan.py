@@ -784,6 +784,28 @@ class StorableListingValueTests(unittest.TestCase):
             self.storable("registeredCompanyName", " Acme Ltd "), "Acme Ltd"
         )
 
+    def test_a_numbered_company_name_is_kept(self):
+        self.assertEqual(
+            self.storable(
+                "registeredCompanyName",
+                "3-102-939930 SOCIEDAD DE RESPONSABILIDAD LIMITADA",
+            ),
+            "3-102-939930 SOCIEDAD DE RESPONSABILIDAD LIMITADA",
+        )
+
+    def test_a_sentence_about_the_documents_is_not_a_company_name(self):
+        self.assertIsNone(
+            self.storable(
+                "registeredCompanyName",
+                "The Privacy Policy names a Costa Rican limited company, "
+                "3-102-939930 SOCIEDAD DE RESPONSABILIDAD LIMITADA. "
+                "The KYC/AML page names StealthEx Ltd.",
+            )
+        )
+
+    def test_a_company_name_longer_than_the_field_is_not_storable(self):
+        self.assertIsNone(self.storable("registeredCompanyName", "A" * 101))
+
 
 class ReviewChangeIsActionableTests(unittest.TestCase):
     """A review that now reads differently is a decision for a reviewer."""

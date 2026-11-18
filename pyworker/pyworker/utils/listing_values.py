@@ -90,6 +90,20 @@ def values_disagree(field: str, recorded: str, found: str) -> bool:
     return to_key(recorded) != to_key(found)
 
 
+# Matches the limit the web app applies when a person edits the field.
+_COMPANY_NAME_MAX_CHARS = 100
+# A full stop followed by a capitalised word: one sentence ending and another
+# starting. "Acme S.A. de C.V." does not match, "names Acme Ltd. The" does.
+_SENTENCE_BREAK_RE = re.compile(r"[.!?]\s+[A-Z][a-z]")
+
+
+def _is_company_name(value: str) -> bool:
+    """Whether a value reads as a name rather than the model describing documents."""
+    return len(value) <= _COMPANY_NAME_MAX_CHARS and not _SENTENCE_BREAK_RE.search(
+        value
+    )
+
+
 def storable_value(field: str, found: str) -> "str | None":
     """The value as the record holds it, or None when it cannot be held at all.
 
@@ -102,6 +116,8 @@ def storable_value(field: str, found: str) -> "str | None":
     found = (found or "").strip()
     if not found:
         return None
+    if field == "registeredCompanyName":
+        return found if _is_company_name(found) else None
     if field != "registrationCountryCode":
         return found
     code = country_key(found)
