@@ -23,6 +23,10 @@ HIGHLIGHT_TOPICS = frozenset(
     }
 )
 
+# The prompt asks for 6 and allows 8 when needed. A reply past 8 is asked for
+# again rather than trimmed, because choosing what to drop is the model's call.
+MAX_HIGHLIGHTS = 8
+
 
 def _validate_highlights(highlights: list[Any]) -> None:
     for i, h in enumerate(highlights):
@@ -84,6 +88,10 @@ def _validate_deep_scan(data: dict[str, Any]) -> None:
 
     if not isinstance(data["highlights"], list):
         raise ValueError("highlights must be a list")
+    if len(data["highlights"]) > MAX_HIGHLIGHTS:
+        raise ValueError(
+            f"highlights must be at most {MAX_HIGHLIGHTS}, got {len(data['highlights'])}"
+        )
 
     _validate_highlights(data["highlights"])
 
@@ -251,7 +259,7 @@ DESCRIPTION = PromptSchema(
 
 DEEP_SCAN = PromptSchema(
     ts_type="""type DeepScan = {
-    /** 0=Guaranteed no KYC, 1=No KYC mention, 2=KYC on authorities request, 3=Shotgun KYC, 4=Mandatory KYC */
+    /** 0=Guaranteed no KYC, 1=No KYC mention, 2=Rare KYC, 3=Shotgun KYC, 4=Mandatory KYC */
     kycLevel: 0 | 1 | 2 | 3 | 4
     /** Less than 260 characters. What the terms mean for someone using the service. */
     summary: MarkdownString
@@ -273,7 +281,7 @@ DEEP_SCAN = PromptSchema(
         field: string
         /** What the platform currently records. */
         current: string
-        /** What the document says instead. */
+        /** The value to store, exactly as the field holds it: a company name or a country. Never a sentence. */
         found: string
         /** The clause showing it, copied verbatim from the corpus. */
         quote: string
@@ -300,7 +308,7 @@ DEEP_SCAN = PromptSchema(
         quote: string
         sourceUrl: string
     }[]
-    /** User-facing warnings. Reserve 'alert' for material risks. May be empty. */
+    /** Notes for the moderator reviewing this scan, never shown to readers. Usually empty. */
     warnings: {
         title: string
         bodyMd: MarkdownString

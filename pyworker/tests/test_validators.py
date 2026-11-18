@@ -97,3 +97,31 @@ def test_comment_mod_brigade_without_confidence_rejected():
                 "brigadeConfidence": 0,
             }
         )
+
+
+# --- DEEP_SCAN ---
+
+
+def deep_scan_with(highlight_count: int) -> dict:
+    return {
+        "kycLevel": 1,
+        "summary": "s",
+        "complexity": "low",
+        "highlights": [{"title": "t", "content": "c", "rating": "neutral"}]
+        * highlight_count,
+        "kycPolicyNotesMd": "",
+        "listingChecks": [],
+        "kycLevelRationale": "r",
+        "attributesToAdd": [],
+        "attributesToRemove": [],
+        "warnings": [],
+    }
+
+
+def test_deep_scan_accepts_up_to_the_highlight_ceiling():
+    schemas.DEEP_SCAN.validate(deep_scan_with(schemas.MAX_HIGHLIGHTS))
+
+
+def test_deep_scan_rejects_highlights_past_the_ceiling():
+    with pytest.raises(ValueError, match="highlights"):
+        schemas.DEEP_SCAN.validate(deep_scan_with(schemas.MAX_HIGHLIGHTS + 1))

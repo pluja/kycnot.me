@@ -13,6 +13,8 @@ The input contains two parts, in this order:
 
 Treat the corpus union as one document. When two pages overlap, prefer the most operationally specific clause.
 
+Some pages carry a date ("Last updated", "Effective"). When pages disagree, the newest dated page states the current terms: do not quote an older page that a newer one replaces, and do not report the gap between them as a contradiction or a warning. A page that names a different company than the newer pages is likely outdated. Blog posts, articles and guides explain the service but are not its terms: never quote one as a clause, for a highlight, an attribute or a listing check.
+
 Produce a single JSON object with all of the following fields:
 
 {{fields}}
@@ -25,6 +27,7 @@ Produce a single JSON object with all of the following fields:
    - Report a disagreement only when the document states its value plainly. A document that is silent on a field is not a disagreement, it is silence.
    - `sourceUrl` is the `===== PAGE: <url> =====` header the clause appeared under.
    - A service may use a legal template naming a different jurisdiction than where it is registered. Report what the clause says and let the reviewer weigh it. Do not assert which is correct.
+   - `found` is the value exactly as the field should store it: a company name as the document writes it, or a country. Never a sentence, an explanation or two values. When two documents name different values, report the newest page's value.
    - Empty list when nothing plainly disagrees. That is the normal result.
 
 6. **kycPolicyNotesMd**: what a reader should know about identity checks before signing up. It is shown under the KYC verdict on the service page, so it must be easy to read at a glance, including for readers whose first language is not English.
@@ -50,15 +53,15 @@ Produce a single JSON object with all of the following fields:
    - Be conservative. Propose changes only when the corpus provides clear, operationally specific evidence. When in doubt, omit.
    - Do not propose an attribute that is borderline or weakly supported.
    - Do not propose adding and removing the same `attributeId`.
+   - Do not propose an attribute whose meaning an assigned attribute already covers.
+   - When two catalog attributes describe the same thing at different strengths, propose only the one whose description matches the clause. "At its sole discretion, with or without notice" is not the same as "may suspend for overdue payments or rule breaches".
 
-10. **warnings**: user-facing notices that material to a privacy-conscious reader and that do not fit elsewhere. Severities:
-   - `'info'` informational, no risk implication.
-   - `'warning'` notable concern (e.g. broad data sharing, surprising retention).
-   - `'alert'` material risk (e.g. funds may be confiscated under specified conditions, terms allow account termination without notice plus KYC trigger). Reserve for genuine risks.
+10. **warnings**: notes for the moderator who reviews this scan, never shown to readers. Use them for what a person should check by hand: pages that contradict each other, a page that looks outdated or names a different company, a clause you could not place, a corpus that looks incomplete. Do not repeat the highlights here. Severities:
+   - `'info'` worth knowing, nothing to act on.
+   - `'warning'` the moderator should check this before applying the scan.
+   - `'alert'` the scan may be wrong on something that matters (the KYC level, a fund-blocking clause) until a person checks.
 
-   May be empty. Each warning needs a short `title` and a `bodyMd` (markdown, 1-2 sentences) grounded in the corpus.
-
-**Scope to the service under review.** A single operator may publish shared legal terms covering multiple distinct products. Exclude any clause whose text scopes it to a sibling product (a different product name, app, or domain than the service being reviewed). Include only clauses that apply to the service being reviewed or to the operator/account level. When in doubt, prefer exclusion over speculation.
+   Usually empty. Each warning needs a short `title`, a `bodyMd` (markdown, 1-2 sentences) grounded in the corpus, and a `severity`.
 
 Format the response as a valid JSON object matching this type:
 
