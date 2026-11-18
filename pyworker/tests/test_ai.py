@@ -70,3 +70,51 @@ def test_load_prompt_schema_substituted():
         PROMPT_CHECK_TOS_REVIEW,
     ):
         assert "{{schema}}" not in prompt
+
+
+def _completion(content):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
+    )
+
+
+def test_a_reply_that_fails_validation_is_asked_for_again(monkeypatch):
+    from unittest.mock import MagicMock
+
+    from pyworker.utils import ai
+
+    def validate(result):
+        if result["rating"] not in ("negative", "neutral", "positive"):
+            raise ValueError("bad rating")
+
+    create = MagicMock(
+        side_effect=[
+            _completion('{"rating": "warning"}'),
+            _completion('{"rating": "neutral"}'),
+        ]
+    )
+    monkeypatch.setattr(ai.client.chat.completions, "create", create)
+    monkeypatch.setattr(ai.time, "sleep", lambda seconds: None)
+
+    result = ai.query_openai_json([], model="m", validate=validate)
+
+    assert result == {"rating": "neutral"}
+    assert create.call_count == 2
+
+
+def test_a_reply_that_never_validates_raises(monkeypatch):
+    from unittest.mock import MagicMock
+
+    from pyworker.utils import ai
+
+    def validate(result):
+        raise ValueError("bad rating")
+
+    create = MagicMock(return_value=_completion('{"rating": "warning"}'))
+    monkeypatch.setattr(ai.client.chat.completions, "create", create)
+    monkeypatch.setattr(ai.time, "sleep", lambda seconds: None)
+
+    with pytest.raises(ValueError, match="bad rating"):
+        ai.query_openai_json([], model="m", validate=validate)

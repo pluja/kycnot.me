@@ -1,10 +1,11 @@
+import json
 import logging
 import os
 import re
 import time
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, TypedDict, cast
+from typing import Any, Callable, Dict, List, Literal, Optional, TypedDict, cast
 
 from json_repair import repair_json
 from openai import OpenAI, OpenAIError
@@ -22,8 +23,10 @@ _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 logger = logging.getLogger(__name__)
 
 
-def _load_prompt(name: str, **static_vars: str) -> str:
-    text = (_PROMPTS_DIR / name).read_text()
+def _load_prompt(
+    name: str, prompts_dir: Path = _PROMPTS_DIR, **static_vars: str
+) -> str:
+    text = (prompts_dir / name).read_text()
     for key, value in static_vars.items():
         placeholder = f"{{{{{key}}}}}"
         if placeholder not in text:
@@ -43,17 +46,21 @@ def _today() -> str:
     return f"Today's date: {date.today().isoformat()}\n\n"
 
 
-# Shared by both legal-review prompts so the nightly review and the deep scan
-# cannot drift into judging the same corpus by different rules.
-_LEGAL_REVIEW_FIELDS = (_PROMPTS_DIR / "_legal_review_fields.md").read_text()
+def build_deep_scan_prompt(prompts_dir: Path = _PROMPTS_DIR) -> str:
+    """The deep scan system prompt, read from prompts_dir so a variant can be evaluated."""
+    return _load_prompt(
+        "deep_scan.md",
+        prompts_dir,
+        schema=schemas.DEEP_SCAN.ts_type,
+        fields=(prompts_dir / "_legal_review_fields.md").read_text(),
+    )
+
 
 PROMPT_CHECK_TOS_REVIEW = _load_prompt("tos_check.md", schema=schemas.TOS_CHECK.ts_type)
 _PROMPT_LEGAL_CHANGE_SUMMARY = _load_prompt(
     "legal_change_summary.md", schema=schemas.LEGAL_CHANGE_SUMMARY.ts_type
 )
-_PROMPT_DEEP_SCAN = _load_prompt(
-    "deep_scan.md", schema=schemas.DEEP_SCAN.ts_type, fields=_LEGAL_REVIEW_FIELDS
-)
+_PROMPT_DEEP_SCAN = build_deep_scan_prompt()
 _PROMPT_DESCRIPTION = _load_prompt(
     "description.md",
     schema=schemas.DESCRIPTION.ts_type,
@@ -65,6 +72,17 @@ _PROMPT_COMMENT_MODERATION = _load_prompt(
 )
 
 
+def parse_json_reply(content: str) -> Dict[str, Any]:
+    result = repair_json(_strip_thinking(content))
+    if isinstance(result, str):
+        result = json.loads(result)
+    if not isinstance(result, dict):
+        raise TypeError(
+            f"Expected a dictionary from AI response, but got {type(result)}"
+        )
+    return result
+
+
 client = OpenAI(
     base_url=os.environ.get("OPENAI_BASE_URL"),
     api_key=os.environ.get("OPENAI_API_KEY"),
@@ -74,7 +92,9 @@ client = OpenAI(
 def query_openai_json(
     messages: List[ChatCompletionMessageParam],
     model: str | None = None,
+    validate: Callable[[Dict[str, Any]], None] | None = None,
 ) -> Dict[str, Any]:
+    """The reply as a dict. A reply that fails validate is asked for again, like one that fails to parse."""
     model = model or os.environ["OPENAI_MODEL"]
     max_retries = int(os.environ.get("OPENAI_RETRY", 3))
     retry_delay = 30
@@ -92,24 +112,10 @@ def query_openai_json(
 
             logger.debug(f"Raw AI response content: {content}")
 
-            content = _strip_thinking(content)
-
             try:
-                result = repair_json(content)
-
-                if isinstance(result, str):
-                    import json
-
-                    result = json.loads(result)
-
-                if not isinstance(result, dict):
-                    logger.error(
-                        f"Repaired JSON is not a dictionary. Type: {type(result)}, Value: {result}"
-                    )
-                    raise TypeError(
-                        f"Expected a dictionary from AI response, but got {type(result)}"
-                    )
-
+                result = parse_json_reply(content)
+                if validate is not None:
+                    validate(result)
                 return result
             except Exception as e:
                 logger.error(f"Failed to process JSON response: {e}")
@@ -149,9 +155,8 @@ def prompt_check_tos_review(content: str) -> TosReviewCheck:
     result_dict = query_openai_json(
         messages,
         model=os.environ.get("OPENAI_MODEL_FAST") or os.environ["OPENAI_MODEL"],
+        validate=schemas.TOS_CHECK.validate,
     )
-
-    schemas.TOS_CHECK.validate(result_dict)
     return cast(TosReviewCheck, result_dict)
 
 
@@ -173,20 +178,21 @@ def prompt_legal_change_summary(
         {"role": "user", "content": diff},
     ]
 
-    result_dict = query_openai_json(messages)
-
-    schemas.LEGAL_CHANGE_SUMMARY.validate(result_dict)
+    result_dict = query_openai_json(
+        messages, validate=schemas.LEGAL_CHANGE_SUMMARY.validate
+    )
     return cast(str, result_dict["summary"])
 
 
-def prompt_deep_scan(
+def deep_scan_messages(
     content: str,
     service_name: str,
     attribute_catalog_md: str,
     current_attribute_ids: list[int],
     listing_record: dict[str, str],
     current_kyc_notes: str = "",
-) -> DeepScanResultType:
+    system_prompt: str = _PROMPT_DEEP_SCAN,
+) -> List[ChatCompletionMessageParam]:
     scope = (
         f"You are reviewing the service named exactly '{service_name}'. "
         "The corpus may include clauses that apply to sibling products from the same operator "
@@ -215,14 +221,29 @@ def prompt_deep_scan(
         f"{content}"
     )
 
-    messages: List[ChatCompletionMessageParam] = [
-        {"role": "system", "content": _today() + scope + _PROMPT_DEEP_SCAN},
+    return [
+        {"role": "system", "content": _today() + scope + system_prompt},
         {"role": "user", "content": user_payload},
     ]
 
-    result_dict = query_openai_json(messages)
 
-    schemas.DEEP_SCAN.validate(result_dict)
+def prompt_deep_scan(
+    content: str,
+    service_name: str,
+    attribute_catalog_md: str,
+    current_attribute_ids: list[int],
+    listing_record: dict[str, str],
+    current_kyc_notes: str = "",
+) -> DeepScanResultType:
+    messages = deep_scan_messages(
+        content=content,
+        service_name=service_name,
+        attribute_catalog_md=attribute_catalog_md,
+        current_attribute_ids=current_attribute_ids,
+        listing_record=listing_record,
+        current_kyc_notes=current_kyc_notes,
+    )
+    result_dict = query_openai_json(messages, validate=schemas.DEEP_SCAN.validate)
     return cast(DeepScanResultType, result_dict)
 
 
@@ -259,8 +280,7 @@ def prompt_description(
         {"role": "system", "content": _PROMPT_DESCRIPTION},
         {"role": "user", "content": user_payload},
     ]
-    result_dict = query_openai_json(messages)
-    schemas.DESCRIPTION.validate(result_dict)
+    result_dict = query_openai_json(messages, validate=schemas.DESCRIPTION.validate)
     return cast(DescriptionResultType, result_dict)
 
 
@@ -270,7 +290,5 @@ def prompt_comment_moderation(content: str) -> CommentModerationType:
         {"role": "user", "content": content},
     ]
 
-    result_dict = query_openai_json(messages)
-
-    schemas.COMMENT_MOD.validate(result_dict)
+    result_dict = query_openai_json(messages, validate=schemas.COMMENT_MOD.validate)
     return cast(CommentModerationType, result_dict)
